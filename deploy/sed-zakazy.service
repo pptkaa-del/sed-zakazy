@@ -1,0 +1,18 @@
+# /etc/systemd/system/sed-zakazy.service — запуск без Docker
+[Unit]
+Description=Документооборот по заказам
+After=network.target
+
+[Service]
+Type=simple
+User=sed
+WorkingDirectory=/opt/sed-zakazy
+Environment=PORT=3000 HOST=127.0.0.1 DATA_DIR=/opt/sed-zakazy/data COOKIE_SECURE=1
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/sed-zakazy/data
+
+[Install]
+WantedBy=multi-user.target

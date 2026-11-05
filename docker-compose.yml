@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: sed-zakazy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"   # снаружи доступ только через nginx
+    environment:
+      - DATA_DIR=/data
+      - COOKIE_SECURE=1          # уберите, если сайт работает без HTTPS
+      # Первый запуск: создать администратора автоматически
+      # - ADMIN_LOGIN=admin
+      # - ADMIN_PASSWORD=смените-этот-пароль
+    volumes:
+      - ./data:/data

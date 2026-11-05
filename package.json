@@ -1,0 +1,12 @@
+{
+  "name": "sed-zakazy",
+  "version": "1.0.0",
+  "description": "Документооборот по заказам: спецификации, компоненты, счета, бухгалтерия и план-график",
+  "private": true,
+  "main": "server.js",
+  "engines": { "node": ">=16" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "UNLICENSED"
+}
