@@ -38,6 +38,25 @@
 
 Репозиторий приватный, поэтому нужен токен GitHub с правом чтения. Создайте его: GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token. В Repository access выберите **Only select repositories → sed-zakazy**, в Permissions → **Contents: Read-only**. Скопируйте токен, вида `github_pat_…`.
 
+**Свой сервер на Ubuntu, без домена и сертификата (по IP-адресу):**
+
+```bash
+T=github_pat_ВАШ_ТОКЕН; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/pptkaa-del/sed-zakazy/main/install.sh | sudo GITHUB_TOKEN=$T bash
+```
+
+Сайт откроется по адресу `http://IP-сервера`, скрипт покажет его в конце. Что делает скрипт:
+
+- ставит Node.js в `/opt/node`;
+- скачивает код в `/opt/sed-zakazy`;
+- кладёт данные в `/var/lib/sed-zakazy`;
+- создаёт службу systemd `sed-zakazy`, которая запускается вместе с сервером;
+- ставит nginx на порт 80 и отключает его стандартную страницу;
+- открывает порт в брандмауэре ufw, если тот включён.
+
+Если порт 80 занят другим сайтом, добавьте в конце команды `-s -- --port 8080`, тогда адрес будет `http://IP-сервера:8080`.
+
+Без HTTPS пароли передаются по сети открытым текстом. Это допустимо во внутренней сети компании, но не в интернете. Когда появится домен, запустите ту же команду с `-s -- ваш-домен.ru --email ваша@почта.ru`, и скрипт выпустит сертификат.
+
 **Виртуальный хостинг (reg.ru и похожие), по SSH:**
 
 ```bash
@@ -46,13 +65,13 @@ T=github_pat_ВАШ_ТОКЕН; curl -fsSL -H "Authorization: token $T" https://
 
 Скрипт поставит Node.js в `~/node` (версию подберёт под сервер), скачает код в `~/sed-zakazy` и подключит его к сайту через Passenger. Затем проверит, что сайт отвечает, и при работающем HTTPS включит защищённую cookie. Домен уже должен быть добавлен в панели хостинга. Если сайт на аккаунте один, домен можно не указывать.
 
-**Свой сервер (VPS) с Ubuntu, Debian, CentOS, AlmaLinux и т. п., от root:**
+**Свой сервер с доменом и HTTPS (Ubuntu, Debian, CentOS, AlmaLinux и т. п.):**
 
 ```bash
 T=github_pat_ВАШ_ТОКЕН; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/pptkaa-del/sed-zakazy/main/install.sh | sudo GITHUB_TOKEN=$T bash -s -- ваш-домен.ru --email ваша@почта.ru
 ```
 
-Скрипт поставит Node.js в `/opt/node`, код в `/opt/sed-zakazy`, данные в `/var/lib/sed-zakazy`. Ещё он создаст службу systemd `sed-zakazy`, установит и настроит nginx и выпустит сертификат Let's Encrypt (для этого нужен `--email`). A-запись домена должна заранее указывать на сервер. Без домена приложение поставится только на `127.0.0.1:3000`.
+Скрипт поставит Node.js в `/opt/node`, код в `/opt/sed-zakazy`, данные в `/var/lib/sed-zakazy`. Ещё он создаст службу systemd `sed-zakazy`, установит и настроит nginx и выпустит сертификат Let's Encrypt (для этого нужен `--email`). A-запись домена должна заранее указывать на сервер.
 
 **Обновление** в обоих случаях — та же команда, или короче:
 
@@ -60,7 +79,15 @@ T=github_pat_ВАШ_ТОКЕН; curl -fsSL -H "Authorization: token $T" https://
 GITHUB_TOKEN=github_pat_ВАШ_ТОКЕН bash ~/sed-zakazy/install.sh ваш-домен.ru
 ```
 
-На VPS: `sudo GITHUB_TOKEN=… bash /opt/sed-zakazy/install.sh ваш-домен.ru`.
+На своём сервере: `sudo GITHUB_TOKEN=… bash /opt/sed-zakazy/install.sh` (с доменом — добавьте его в конце).
+
+Полезное на своём сервере:
+
+```bash
+sudo systemctl status sed-zakazy      # состояние
+sudo journalctl -u sed-zakazy -f      # журнал
+sudo systemctl restart sed-zakazy     # перезапуск
+```
 
 Токен нигде не сохраняется: после клонирования адрес репозитория записывается без него. Если репозиторий сделать публичным, токен не нужен, тогда `-H …` и `GITHUB_TOKEN=…` можно убрать.
 

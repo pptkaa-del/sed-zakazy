@@ -1,22 +1,35 @@
 #!/usr/bin/env bash
 # Документооборот по заказам: установка и обновление одной командой.
 #
-#   bash install.sh [домен] [--email почта] [--mode shared|server] [--branch main]
+#   bash install.sh [домен] [--email почта] [--port 80] [--mode shared|server] [--branch main]
 #
 # Режим выбирается сам:
 #   shared — виртуальный хостинг без прав root (reg.ru и т. п.): Node.js в ~/node,
 #            код в ~/sed-zakazy, данные в ~/sed-zakazy-data, запуск через Passenger (.htaccess).
 #   server — свой сервер с root: Node.js в /opt/node, код в /opt/sed-zakazy,
-#            данные в /var/lib/sed-zakazy, служба systemd, nginx и (с --email) HTTPS от Let's Encrypt.
+#            данные в /var/lib/sed-zakazy, служба systemd и nginx.
+#            Без домена сайт открывается по IP сервера (http://IP), без сертификата.
+#            С доменом и --email дополнительно выпускается HTTPS-сертификат Let's Encrypt.
 #
 # Повторный запуск обновляет код (git pull) и перезапускает приложение. Данные не трогаются.
 # Для приватного репозитория задайте GITHUB_TOKEN (токен с правом чтения этого репозитория).
 set -euo pipefail
 
+# Run from a temporary copy: updating the code rewrites this very file, and bash reads scripts lazily.
+SELF="${BASH_SOURCE[0]:-}"
+if [ -n "$SELF" ] && [ -f "$SELF" ] && [ -z "${SED_RUNNING_COPY:-}" ]; then
+  export SED_SELF_DIR="${SED_SELF_DIR:-$(cd "$(dirname "$SELF")" && pwd)}"
+  SED_RUNNING_COPY="$(mktemp)"; cp "$SELF" "$SED_RUNNING_COPY"; export SED_RUNNING_COPY
+  exec bash "$SED_RUNNING_COPY" "$@"
+fi
+[ -n "${SED_RUNNING_COPY:-}" ] && trap 'rm -f "$SED_RUNNING_COPY"' EXIT
+ORIG_ARGS=("$@")
+
 REPO="${SED_REPO:-https://github.com/pptkaa-del/sed-zakazy.git}"
 BRANCH="main"
 DOMAIN=""
 EMAIL=""
+HTTP_PORT=80
 MODE=""
 NODE_NEW="20.18.1"
 NODE_OLD="16.20.2"
@@ -31,6 +44,7 @@ while [ $# -gt 0 ]; do
     --email)  EMAIL="${2:-}"; shift 2 ;;
     --mode)   MODE="${2:-}"; shift 2 ;;
     --branch) BRANCH="${2:-}"; shift 2 ;;
+    --port)   HTTP_PORT="${2:-}"; shift 2 ;;
     -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) die "Неизвестный параметр $1" ;;
     *)  DOMAIN="$1"; shift ;;
@@ -93,16 +107,28 @@ fetch_code() {   # $1 = app dir, $2 = owner (optional, server mode)
   fi
   ok "Версия: $(git -C "$dir" log -1 --format='%h %cd' --date=short 2>/dev/null || echo 'без git')"
 }
+reexec_if_changed() {   # $1 = app dir: continue with the freshly downloaded install.sh
+  local new="$1/install.sh"
+  { [ -z "${SED_REEXEC:-}" ] && [ -f "$new" ]; } || return 0
+  if [ -n "${SED_RUNNING_COPY:-}" ] && cmp -s "$new" "$SED_RUNNING_COPY"; then return 0; fi
+  [ -n "${SED_RUNNING_COPY:-}" ] && say "Скрипт установки обновился, продолжаю новой версией"
+  rm -f "${SED_RUNNING_COPY:-}"
+  SED_REEXEC=1 SED_SELF_DIR="$1" SED_RUNNING_COPY="" exec bash "$new" "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}"
+}
 set_env() {   # $1 file, $2 key, $3 value — add or replace KEY=value
   local f="$1" k="$2" v="$3"
   touch "$f"
   if grep -qE "^#? *$k=" "$f"; then sed -i "s#^\#\? *$k=.*#$k=$v#" "$f"; else echo "$k=$v" >> "$f"; fi
 }
-smoke_test() {   # $1 node, $2 app dir, $3 data dir — start on a random port and stop
-  local log; log="$(mktemp)"
-  ( cd "$2" && PORT=0 HOST=127.0.0.1 DATA_DIR="$3" timeout 5 "$1" server.js >"$log" 2>&1 ) || true
+smoke_test() {   # $1 node, $2 app dir — start on a random port with throwaway data, then stop
+  local log data; log="$(mktemp)"; data="$(mktemp -d)"
+  ( cd "$2" && PORT=0 HOST=127.0.0.1 DATA_DIR="$data" timeout 5 "$1" server.js >"$log" 2>&1 ) || true
+  rm -rf "$data"
   if grep -q 'запущен' "$log"; then ok "Приложение запускается"; rm -f "$log"
   else cat "$log" >&2; rm -f "$log"; die "Приложение не запустилось, текст ошибки выше"; fi
+}
+wait_http() {   # $1 url, then extra curl args — up to 15 s
+  local i; for i in $(seq 1 30); do curl -fs -o /dev/null "$@" && return 0; sleep 0.5; done; return 1
 }
 
 # ======================================================================
@@ -132,14 +158,15 @@ if [ "$MODE" = shared ]; then
   fi
 
   # code
-  SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+  SELF_DIR="${SED_SELF_DIR:-$(pwd)}"
   APP_DIR="$HOME/sed-zakazy"
   if [ -f "$SELF_DIR/server.js" ] && [ "$SELF_DIR" != "$APP_DIR" ]; then
     case "$SELF_DIR" in "$HOME/www"*) die "Код лежит внутри папки сайта ($SELF_DIR). Перенесите его в ~/sed-zakazy" ;; esac
     APP_DIR="$SELF_DIR"
   fi
   fetch_code "$APP_DIR"
-  smoke_test "$NODE" "$APP_DIR" "$HOME/sed-zakazy-data"
+  reexec_if_changed "$APP_DIR"
+  smoke_test "$NODE" "$APP_DIR"
 
   say "Подключаю приложение к сайту через Passenger"
   bash "$APP_DIR/deploy/regru-setup.sh" "$DOMAIN" | sed 's/^/    /'
@@ -195,12 +222,13 @@ ok "Node.js: $NODE ($("$NODE" -v))"
 
 id sed >/dev/null 2>&1 || { useradd --system --home-dir "$DATA_DIR" --shell /usr/sbin/nologin sed; ok "Создан системный пользователь sed"; }
 fetch_code "$APP_DIR"
+reexec_if_changed "$APP_DIR"
 mkdir -p "$DATA_DIR"; chown -R sed:sed "$DATA_DIR"; chmod 700 "$DATA_DIR"
 ENV_FILE="$APP_DIR/sed.env"
 set_env "$ENV_FILE" DATA_DIR "$DATA_DIR"
 set_env "$ENV_FILE" HOST 127.0.0.1
 set_env "$ENV_FILE" PORT "$APP_PORT"
-smoke_test "$NODE" "$APP_DIR" "$(mktemp -d)"
+smoke_test "$NODE" "$APP_DIR"
 
 cat > /etc/systemd/system/$SVC.service <<EOF
 [Unit]
@@ -225,28 +253,34 @@ EOF
 systemctl daemon-reload
 systemctl enable --quiet $SVC
 systemctl restart $SVC
-sleep 1.5
-if curl -fs -o /dev/null "http://127.0.0.1:$APP_PORT/api/setup"; then ok "Служба $SVC работает на 127.0.0.1:$APP_PORT"
+if wait_http "http://127.0.0.1:$APP_PORT/api/setup"; then ok "Служба $SVC работает на 127.0.0.1:$APP_PORT"
 else journalctl -u $SVC -n 30 --no-pager >&2; die "Служба не отвечает, журнал выше"; fi
 
-if [ -z "$DOMAIN" ]; then
-  echo
-  say "Готово без домена. Приложение слушает только 127.0.0.1:$APP_PORT."
-  echo "    Чтобы открыть его снаружи с HTTPS: sudo bash $APP_DIR/install.sh ваш-домен.ru --email ваша@почта"
-  exit 0
-fi
-
+[[ "$HTTP_PORT" =~ ^[0-9]+$ ]] || die "--port должен быть числом"
 command -v nginx >/dev/null || pkg_install nginx
-if [ -d /etc/nginx/sites-available ]; then NGX="/etc/nginx/sites-available/$DOMAIN.conf"; LINK="/etc/nginx/sites-enabled/$DOMAIN.conf"
-else NGX="/etc/nginx/conf.d/$DOMAIN.conf"; LINK=""; fi
+CONF_NAME="${DOMAIN:-sed-zakazy}"
+if [ -d /etc/nginx/sites-available ]; then NGX="/etc/nginx/sites-available/$CONF_NAME.conf"; LINK="/etc/nginx/sites-enabled/$CONF_NAME.conf"
+else NGX="/etc/nginx/conf.d/$CONF_NAME.conf"; LINK=""; fi
+LISTEN="$HTTP_PORT"; SERVER_NAME="${DOMAIN:-_}"
+if [ -z "$DOMAIN" ]; then
+  # No domain: answer on the server's IP. The stock "Welcome to nginx" site would win, so switch it off.
+  if [ -L /etc/nginx/sites-enabled/default ] && [ "$HTTP_PORT" = 80 ]; then
+    rm /etc/nginx/sites-enabled/default; ok "Отключена стандартная страница nginx (sites-enabled/default)"
+  fi
+  if ! grep -rqs "listen.*\b$HTTP_PORT\b.*default_server" /etc/nginx/nginx.conf /etc/nginx/conf.d /etc/nginx/sites-enabled --exclude="$CONF_NAME.conf"; then
+    LISTEN="$HTTP_PORT default_server"
+  else
+    warn "В nginx уже есть другой сайт по умолчанию на порту $HTTP_PORT. Укажите домен или другой порт: --port 8080"
+  fi
+fi
 if [ -f "$NGX" ] && grep -q 'managed by Certbot' "$NGX"; then
   ok "Конфигурация nginx с сертификатом уже есть, не трогаю: $NGX"
 else
   cat > "$NGX" <<EOF
 # Документооборот по заказам — создано install.sh
 server {
-    listen 80;
-    server_name $DOMAIN;
+    listen $LISTEN;
+    server_name $SERVER_NAME;
     client_max_body_size 55m;
     proxy_request_buffering off;
     location / {
@@ -263,9 +297,16 @@ EOF
 fi
 nginx -t -q || die "Ошибка в конфигурации nginx (nginx -t)"
 systemctl enable --quiet nginx; systemctl reload nginx 2>/dev/null || systemctl restart nginx
+if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q 'Status: active'; then
+  ufw allow "$HTTP_PORT/tcp" >/dev/null && ok "Брандмауэр ufw: открыт порт $HTTP_PORT"
+fi
+if wait_http "http://127.0.0.1:$HTTP_PORT/api/setup" -H "Host: ${DOMAIN:-localhost}"; then ok "nginx передаёт запросы приложению (порт $HTTP_PORT)"
+else warn "nginx на порту $HTTP_PORT не отвечает приложением. Проверьте: nginx -T | grep -n listen"; fi
 
 HTTPS=no
-if [ -n "$EMAIL" ]; then
+if [ -n "$EMAIL" ] && [ -z "$DOMAIN" ]; then
+  warn "Сертификат выпускается только для домена, --email без домена пропущен"
+elif [ -n "$EMAIL" ]; then
   if ! command -v certbot >/dev/null; then
     if [ "$PKG" = apt ]; then pkg_install certbot python3-certbot-nginx; else pkg_install certbot python3-certbot-nginx || true; fi
   fi
@@ -279,11 +320,18 @@ elif grep -qs 'managed by Certbot' "$NGX"; then HTTPS=yes; fi
 
 if [ "$HTTPS" = yes ]; then set_env "$ENV_FILE" COOKIE_SECURE 1; else set_env "$ENV_FILE" COOKIE_SECURE 0; fi
 systemctl restart $SVC
+wait_http "http://127.0.0.1:$APP_PORT/api/setup" || warn "Служба долго не отвечает после перезапуска: journalctl -u $SVC -n 50"
+
+PORT_SUFFIX=""; [ "$HTTP_PORT" = 80 ] || PORT_SUFFIX=":$HTTP_PORT"
+if [ -n "$DOMAIN" ]; then ADDR="$DOMAIN$PORT_SUFFIX"
+else ADDR="$(hostname -I 2>/dev/null | awk '{print $1}')$PORT_SUFFIX"; [ "$ADDR" = "$PORT_SUFFIX" ] && ADDR="IP-адрес-сервера$PORT_SUFFIX"; fi
+ARGS="${DOMAIN:+ $DOMAIN}"; [ "$HTTP_PORT" = 80 ] || ARGS="$ARGS --port $HTTP_PORT"
 
 echo
-if [ "$HTTPS" = yes ]; then say "Готово. Откройте https://$DOMAIN и создайте администратора, если ещё не создан."
-else say "Готово. Откройте http://$DOMAIN и создайте администратора."
-  warn "Сайт работает без HTTPS. Включить: sudo bash $APP_DIR/install.sh $DOMAIN --email ваша@почта"; fi
-echo "    Обновить:  sudo bash $APP_DIR/install.sh $DOMAIN"
+if [ "$HTTPS" = yes ]; then say "Готово. Откройте https://$ADDR и создайте администратора, если ещё не создан."
+else say "Готово. Откройте http://$ADDR и создайте администратора, если ещё не создан."
+  [ -z "$DOMAIN" ] && echo "    Если у сервера есть внешний IP, отличный от показанного, используйте его."
+fi
+echo "    Обновить:  sudo GITHUB_TOKEN=токен bash $APP_DIR/install.sh$ARGS"
 echo "    Журнал:    journalctl -u $SVC -f"
 echo "    Данные:    $DATA_DIR (сохраняйте в резервных копиях)"
