@@ -194,13 +194,12 @@ table.comp{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
 .seg button{border:0;background:transparent;padding:6px 12px;border-radius:7px;cursor:pointer;font-size:14px;color:var(--ink-2)}
 .seg button.on{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;padding:7px 10px;max-width:100%}
-.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:20px}
 .tile{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;min-width:0}
 .tile span{display:block;font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.05em}
 .tile b{display:block;font:600 clamp(17px,2vw,22px)/1.25 var(--f-display);font-variant-numeric:tabular-nums;margin-top:4px;overflow-wrap:anywhere}
 .tile small{color:var(--ink-2);font-size:13px}
 .tile.bad b{color:var(--bad)}.tile.warn b{color:var(--warn)}.tile.ok b{color:var(--ok)}
-@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .pproj{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;margin-bottom:16px;overflow:hidden}
 .pp-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;padding:14px 16px;border-bottom:1px solid var(--rule)}
 .pp-h h3{font:600 16px var(--f-display)}
@@ -373,9 +372,9 @@ const ordersOf = pid => S.orders.filter(o => o.projectId === pid).sort((a,b) => 
 const invOf = oid => S.invoices.filter(i => i.orderId === oid);
 const tasksOf = oid => S.tasks.filter(t => t.orderId === oid).sort((a,b) => (a.start||'').localeCompare(b.start||''));
 const exTag = x => x?.example ? '<span class="ex">пример</span>' : '';
-const isOver = i => i.status === 'topay' && i.due && i.due < today();
-const soon = i => i.status === 'topay' && i.due && !isOver(i) && dnum(i.due) - dnum(today()) <= 3;
-const invChip = i => i.status === 'paid' ? ['c-ok','Оплачен'] : isOver(i) ? ['c-bad','Просрочен'] : soon(i) ? ['c-warn','Срочно'] : ['c-info','К оплате'];
+const daysLeft = i => i.due ? dnum(i.due) - dnum(today()) : null;
+const soon = i => { const d = daysLeft(i); return i.status === 'topay' && d !== null && d >= 0 && d <= 3; };
+const invChip = i => i.status === 'paid' ? ['c-ok','Оплачен'] : soon(i) ? ['c-warn','Срочно'] : ['c-info','К оплате'];
 const who = id => id ? (names[id] || 'Сотрудник') : '—';
 const sum = (arr, f) => arr.reduce((s,x) => s + num(f(x)), 0);
 
@@ -457,10 +456,9 @@ function vOrders(){
 const billText = o => !!(o && o.billNo);
 function orderItem(x){
   const topay = invOf(x.id).filter(i => i.status === 'topay');
-  const over = topay.some(isOver);
   return `<button class="oitem ${ui.order===x.id?'on':''}" data-act="selOrder" data-id="${x.id}">
     <span class="mono">Заказ ${esc(x.number)}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>
-    <span class="ometa"><span class="chip c-${x.status}">${ORDER_ST[x.status]||''}</span>${topay.length?`<span class="chip ${over?'c-bad':'c-warn'}">к оплате: ${topay.length}</span>`:''}</span>
+    <span class="ometa"><span class="chip c-${x.status}">${ORDER_ST[x.status]||''}</span>${topay.length?`<span class="chip c-warn">к оплате: ${topay.length}</span>`:''}</span>
   </button>`;
 }
 function orderDetail(o){
@@ -536,10 +534,10 @@ function invRow(i, withPay){
     <span class="ist"><span class="chip ${cc}">${cl}</span></span>
     <span class="inum"><b>№ <span class="mono">${esc(i.number)}</span></b><small>от ${fmtD(i.date)}</small></span>
     <span class="isup"><b>${esc(i.supplier)}${exTag(i)}</b><small>${esc(i.purpose||'')}${!withPay||!o?'':''}</small></span>
-    <span class="idue ${isOver(i)?'bad':''}"><small>${i.status==='paid'?'Оплачен':'Оплатить до'}</small>${fmtD(i.status==='paid'?i.paidAt:i.due)}</span>
+    <span class="idue"><small>${i.status==='paid'?'Оплачен':'Оплатить до'}</small>${fmtD(i.status==='paid'?i.paidAt:i.due)}</span>
     <span class="iamt mono">${money(i.amount)}</span>
     <span class="ifiles">${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">Счёт</a>`:'<span class="dim">нет файла</span>'}${i.receipt?`<a href="${esc(fileUrl(i.receipt))}" target="_blank" rel="noopener">Чек</a>`:''}${seenNote}</span>
-    <span class="iact">${withPay && canPay() && i.status==='topay' ? `<button class="btn sm ok" data-act="openInvoice" data-id="${i.id}">Оплатить</button>` : withPay && i.status==='paid' && !i.receipt ? '<span class="chip c-warn">нет чека</span>' : ''}</span>
+    <span class="iact">${withPay && canPay() && i.status==='topay' ? `<button class="btn sm ok" data-act="openInvoice" data-id="${i.id}">Оплатить</button>` : ''}</span>
   </div>`;
 }
 
@@ -548,14 +546,12 @@ function vPay(){
   const t = today(), tn = dnum(t), month = t.slice(0,7);
   const all = S.invoices.filter(i => !ui.payProj || i.projectId === ui.payProj);
   const topay = all.filter(i => i.status === 'topay');
-  const over = topay.filter(isOver);
-  const week = topay.filter(i => !isOver(i) && i.due && dnum(i.due) - tn <= 7);
+  const week = topay.filter(i => { const d = daysLeft(i); return d !== null && d >= 0 && d <= 7; });
   const paidM = all.filter(i => i.status === 'paid' && (i.paidAt||'').startsWith(month));
-  const noRc = all.filter(i => i.status === 'paid' && !i.receipt);
-  const F = { new: unseen, topay: i => i.status==='topay', over: isOver, norc: i => i.status==='paid' && !i.receipt, paid: i => i.status==='paid', all: () => true };
+  const F = { new: unseen, topay: i => i.status==='topay', paid: i => i.status==='paid', all: () => true };
   const list = all.filter(F[ui.payF] || F.all);
   const nNew = all.filter(unseen).length;
-  const seg = [['new', 'Не скачанные' + (nNew ? ` (${nNew})` : '')],['topay','К оплате'],['over','Просроченные'],['norc','Без чека'],['paid','Оплаченные'],['all','Все']];
+  const seg = [['new', 'Не скачанные' + (nNew ? ` (${nNew})` : '')],['topay','К оплате'],['paid','Оплаченные'],['all','Все']];
   const head = `<div class="toolbar">
     <div class="seg" role="tablist">${seg.map(([k,l]) => `<button data-act="payF" data-id="${k}" class="${ui.payF===k?'on':''}">${l}</button>`).join('')}</div>
     <select class="f" id="payProj" aria-label="Проект"><option value="">Все проекты</option>${projectsSorted().map(p => `<option value="${p.id}" ${ui.payProj===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
@@ -563,9 +559,8 @@ function vPay(){
   </div>
   <div class="tiles">
     <div class="tile"><span>К оплате</span><b>${money(sum(topay,i=>i.amount))}</b><small>${topay.length} сч.</small></div>
-    <div class="tile bad"><span>Просрочено</span><b>${money(sum(over,i=>i.amount))}</b><small>${over.length} сч.</small></div>
     <div class="tile warn"><span>Срок в ближайшие 7 дней</span><b>${money(sum(week,i=>i.amount))}</b><small>${week.length} сч.</small></div>
-    <div class="tile ok"><span>Оплачено за ${MONTHS[Number(month.slice(5))-1]}</span><b>${money(sum(paidM,i=>i.amount))}</b><small>${paidM.length} сч.${noRc.length?` · без чека: ${noRc.length}`:''}</small></div>
+    <div class="tile ok"><span>Оплачено за ${MONTHS[Number(month.slice(5))-1]}</span><b>${money(sum(paidM,i=>i.amount))}</b><small>${paidM.length} сч.</small></div>
   </div>`;
   if (!S.invoices.length) return head + `<div class="empty"><h3>Счетов пока нет</h3>Счета добавляются в карточке заказа на вкладке «Заказы» и сразу появляются здесь.</div>`;
   if (!list.length) return head + `<div class="empty"><h3>${ui.payF==='topay'?'Все счета оплачены':'Нет счетов по этому фильтру'}</h3>Выберите другой фильтр или проект.</div>`;
@@ -723,7 +718,7 @@ function renderDrawer(){
         <dt>Поставщик</dt><dd>${esc(i.supplier)}</dd>
         <dt>Назначение</dt><dd>${esc(i.purpose||'—')}</dd>
         <dt>Сумма</dt><dd class="mono"><b>${money(i.amount)}</b></dd>
-        <dt>Оплатить до</dt><dd class="${isOver(i)?'idue bad':''}">${fmtD(i.due)}</dd>
+        <dt>Оплатить до</dt><dd>${fmtD(i.due)}</dd>
         <dt>Файл счёта</dt><dd>${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">${esc(i.file.name)}</a>`:'не приложен'}</dd>
         ${i.createdBy?`<dt>Добавил</dt><dd>${esc(who(i.createdBy))}${i.createdAt?' · '+esc(fmtDT(i.createdAt)):''}</dd>`:''}
         ${i.file ? `<dt>Бухгалтер скачал</dt><dd>${i.seenAt ? `<span class="seen">✓ ${esc(fmtDT(i.seenAt))}</span> · ${esc(who(i.seenBy))}${(i.seenCount||0) > 1 ? ` <span class="dim">(открывал ${i.seenCount} раз, последний ${esc(fmtDT(i.seenLastAt))})</span>` : ''}` : '<span class="chip c-warn">ещё не скачивал</span>'}</dd>` : ''}
@@ -733,7 +728,7 @@ function renderDrawer(){
           <dt>Платёжное поручение</dt><dd>${esc(i.payNo||'—')}</dd>
           <dt>Сумма оплаты</dt><dd class="mono">${money(i.paidAmount ?? i.amount)}</dd>
           ${i.paidBy?`<dt>Отметил</dt><dd>${esc(who(i.paidBy))}</dd>`:''}
-          <dt>Чек / платёжка</dt><dd>${i.receipt?`<a href="${esc(fileUrl(i.receipt))}" target="_blank" rel="noopener">${esc(i.receipt.name)}</a>`:'<span class="chip c-warn">не приложен</span>'}</dd></dl>
+          <dt>Чек / платёжка</dt><dd>${i.receipt?`<a href="${esc(fileUrl(i.receipt))}" target="_blank" rel="noopener">${esc(i.receipt.name)}</a>`:'<span class="dim">не приложен</span>'}</dd></dl>
           ${canPay() ? `<div class="row-g"><label class="btn sm">${i.receipt?'Заменить чек':'Приложить чек'}<input type="file" data-up="receipt" data-id="${i.id}" accept="${ACCEPT}" hidden></label>
           ${armBtn('unpay','Снять отметку об оплате','unpay',i.id,'btn sm')}</div><div class="err" id="rerr"></div>` : ''}</div>`
       : !canPay() ? `<p class="box dim" style="margin:0">Оплату отмечает бухгалтер.</p>
@@ -840,7 +835,7 @@ async function onSubmit(e){
       const file = $('p-file').files[0];
       if (file) { fail('Загружаем чек…'); patch.receipt = await upload(file); }
       await upd('invoices', d.id, patch); renderDrawer(); render();
-      toast(file ? 'Оплата отмечена, чек приложен' : 'Оплата отмечена. Чек можно приложить позже');
+      toast(file ? 'Оплата отмечена, чек приложен' : 'Оплата отмечена');
     }
     if (kind === 'task') {
       const tg = val('t-target'); if (!tg) return fail('Сначала создайте проект.');
