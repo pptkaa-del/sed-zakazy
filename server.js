@@ -8,13 +8,14 @@
  *   node server.js useradd <логин> <роль> "<Имя>" [пароль]
  *   node server.js passwd  <логин> [пароль]
  *   node server.js userdel <логин>
+ *   node server.js unblock <логин>         снять блокировку
  *   node server.js users
  *   node server.js backup  [файл.json]     выгрузить все записи в JSON
  *
  * Настройки берутся из переменных окружения и из файла sed.env рядом с server.js
  * (строки вида КЛЮЧ=значение; переменные окружения важнее файла).
  *
- * Роли: admin, manager, accountant, viewer.
+ * Роли: admin, manager, accountant, user, viewer.
  */
 const http = require('node:http');
 const fs = require('node:fs');
@@ -51,11 +52,16 @@ const ROLES = {
   admin:      'Администратор',
   manager:    'Менеджер',
   accountant: 'Бухгалтер',
+  user:       'Сотрудник',
   viewer:     'Просмотр',
 };
 const PAY_FIELDS = ['status', 'paidAt', 'payNo', 'paidAmount', 'paidBy', 'receipt'];
 const canEdit = u => u.role === 'admin' || u.role === 'manager';
 const canPay = u => u.role === 'admin' || u.role === 'accountant';
+/* «Сотрудник» загружает счета и правит/удаляет только свои неоплаченные */
+const canAddInvoice = u => canEdit(u) || u.role === 'user';
+const ownsInvoice = (u, inv) => u.role === 'user' && inv.createdBy === u.id && inv.status !== 'paid';
+const SEEN_FIELDS = ['seenAt', 'seenBy', 'seenLastAt', 'seenCount'];
 
 fs.mkdirSync(FILES_DIR, { recursive: true });
 
@@ -122,7 +128,7 @@ function sessionUser(req) {
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   if (Number(parts[1]) < Date.now()) return null;
   const u = users.find(x => x.id === parts[0]);
-  if (!u || String(u.ver || 0) !== parts[2]) return null;
+  if (!u || u.blocked || String(u.ver || 0) !== parts[2]) return null;
   return u;
 }
 function cookie(req, value, maxAge) {
@@ -212,6 +218,8 @@ async function api(req, res, url) {
       attempts.get(key).push(Date.now());
       return fail(res, 401, 'Неверный логин или пароль');
     }
+    if (u.blocked) return fail(res, 403, 'Учётная запись заблокирована. Обратитесь к администратору');
+    u.lastLoginAt = new Date().toISOString(); saveUsers();
     return send(res, 200, publicUser(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
   if (p[1] === 'logout' && m === 'POST') return send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, '', 0) });
@@ -223,12 +231,12 @@ async function api(req, res, url) {
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && users.find(u => u.id === p[2]);
-    if (m === 'GET' && !p[2]) return send(res, 200, users.map(publicUser));
+    if (m === 'GET' && !p[2]) return send(res, 200, users.map(adminUser));
     if (m === 'POST' && !p[2]) {
       const b = await readJsonBody(req);
       const err = validateUser(b, true); if (err) return fail(res, 400, err);
       if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
-      return send(res, 200, publicUser(addUser(String(b.login), b.role, String(b.name).trim(), String(b.password))));
+      return send(res, 200, adminUser(addUser(String(b.login), b.role, String(b.name).trim(), String(b.password))));
     }
     if (!target) return fail(res, 404, 'Пользователь не найден');
     if (m === 'PATCH') {
@@ -238,13 +246,24 @@ async function api(req, res, url) {
         if (target.id === user.id && b.role !== 'admin') return fail(res, 400, 'Нельзя снять роль администратора с самого себя');
         target.role = b.role;
       }
-      if (b.name !== undefined) { if (!String(b.name).trim()) return fail(res, 400, 'Укажите имя'); target.name = String(b.name).trim(); }
+      if (b.name !== undefined) { if (!String(b.name).trim()) return fail(res, 400, 'Укажите имя'); target.name = String(b.name).trim().slice(0, 120); }
+      if (b.login !== undefined) {
+        const login = String(b.login).trim().toLowerCase();
+        if (!/^[a-z0-9._-]{2,40}$/.test(login)) return fail(res, 400, 'Логин: от 2 символов, латиница, цифры, точка, дефис или подчёркивание');
+        if (users.some(u => u.login === login && u.id !== target.id)) return fail(res, 400, 'Такой логин уже есть');
+        target.login = login;
+      }
+      if (b.blocked !== undefined) {
+        if (target.id === user.id) return fail(res, 400, 'Нельзя заблокировать самого себя');
+        target.blocked = !!b.blocked;
+        if (target.blocked) target.ver = (target.ver || 0) + 1;   // end active sessions
+      }
       if (b.password !== undefined) {
         if (String(b.password).length < 8) return fail(res, 400, 'Пароль должен быть не короче 8 символов');
         Object.assign(target, hashPassword(String(b.password)), { ver: (target.ver || 0) + 1 });
       }
       saveUsers();
-      return send(res, 200, publicUser(target));
+      return send(res, 200, adminUser(target));
     }
     if (m === 'DELETE') {
       if (target.id === user.id) return fail(res, 400, 'Нельзя удалить самого себя');
@@ -269,7 +288,7 @@ async function api(req, res, url) {
   }
 
   if (p[1] === 'files' && m === 'POST') {
-    if (!canEdit(user) && !canPay(user)) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
+    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user)) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
     let name = 'файл';
     try { name = decodeURIComponent(String(req.headers['x-filename'] || 'файл')); } catch {}
     name = name.replace(/[\\/\r\n"]/g, '_').slice(0, 200) || 'файл';
@@ -287,10 +306,14 @@ async function api(req, res, url) {
   if (!COLLECTIONS.includes(col) || p.length > 3) return fail(res, 404, 'Не найдено');
 
   if (m === 'POST' && !id) {
-    if (!canEdit(user)) return fail(res, 403, 'Недостаточно прав');
+    if (!(col === 'invoices' ? canAddInvoice(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
     const data = clean(await readJsonBody(req));
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
-    if (col === 'invoices') { data.status = 'topay'; PAY_FIELDS.slice(1).forEach(f => delete data[f]); }
+    if (col === 'invoices') {
+      if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
+      data.projectId = db.orders[data.orderId].projectId;
+      data.status = 'topay'; [...PAY_FIELDS.slice(1), ...SEEN_FIELDS].forEach(f => delete data[f]);
+    }
     const nid = newId(); db[col][nid] = data; saveDb();
     return send(res, 200, { id: nid, rev: db.rev });
   }
@@ -299,10 +322,19 @@ async function api(req, res, url) {
   if (m === 'PATCH') {
     const patch = clean(await readJsonBody(req));
     delete patch.createdBy; delete patch.createdAt;
+    SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     const keys = Object.keys(patch);
     const payKeys = col === 'invoices' ? keys.filter(k => PAY_FIELDS.includes(k)) : [];
     if (payKeys.length && !canPay(user)) return fail(res, 403, 'Отмечать оплату может только бухгалтер или администратор');
-    if (keys.length > payKeys.length && !canEdit(user)) return fail(res, 403, 'Недостаточно прав');
+    const mayEdit = canEdit(user) || (col === 'invoices' && ownsInvoice(user, db[col][id]));
+    if (keys.length > payKeys.length && !mayEdit) return fail(res, 403, 'Недостаточно прав');
+    if (col === 'invoices' && patch.orderId !== undefined) {
+      if (!db.orders[patch.orderId]) return fail(res, 400, 'Заказ не найден');
+      patch.projectId = db.orders[patch.orderId].projectId;
+    }
+    if (col === 'invoices' && patch.file !== undefined && (patch.file && patch.file.id) !== (db[col][id].file && db[col][id].file.id)) {
+      SEEN_FIELDS.forEach(f => { patch[f] = null; });   // new invoice file: the accountant has not seen it yet
+    }
     if (col === 'invoices' && db[col][id].status === 'paid' && keys.some(k => !PAY_FIELDS.includes(k) && k !== 'projectId') && !('status' in patch))
       return fail(res, 409, 'Оплаченный счёт нельзя изменить. Сначала снимите отметку об оплате');
     if (col === 'invoices' && 'status' in patch) {
@@ -314,8 +346,8 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true, rev: db.rev });
   }
   if (m === 'DELETE') {
-    if (!canEdit(user)) return fail(res, 403, 'Недостаточно прав');
     const d = db[col][id];
+    if (!canEdit(user) && !(col === 'invoices' && ownsInvoice(user, d))) return fail(res, 403, 'Недостаточно прав');
     if (col === 'projects' && listOf('orders').some(o => o.projectId === id)) return fail(res, 409, 'В проекте есть заказы');
     if (col === 'orders' && listOf('invoices').some(i => i.orderId === id)) return fail(res, 409, 'По заказу есть счета');
     if (col === 'invoices' && d.status === 'paid') return fail(res, 409, 'Оплаченный счёт удалить нельзя');
@@ -325,13 +357,30 @@ async function api(req, res, url) {
   return fail(res, 405, 'Метод не поддерживается');
 }
 const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role, roleName: ROLES[u.role] });
+const adminUser = u => ({ ...publicUser(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
+
+/* Remember that the accountant has opened the invoice file */
+function markSeen(user, fileId) {
+  if (user.role !== 'accountant') return;
+  const now = new Date().toISOString();
+  let changed = false;
+  for (const inv of Object.values(db.invoices)) {
+    if (!inv.file || inv.file.id !== fileId) continue;
+    if (!inv.seenAt) { inv.seenAt = now; inv.seenBy = user.id; }
+    inv.seenLastAt = now; inv.seenCount = (inv.seenCount || 0) + 1;
+    changed = true;
+  }
+  if (changed) saveDb();
+}
 
 function serveFile(req, res, id) {
-  if (!sessionUser(req)) return fail(res, 401, 'Требуется вход');
+  const user = sessionUser(req);
+  if (!user) return fail(res, 401, 'Требуется вход');
   const meta = db.files[id];
   if (!meta || !/^[\w-]+$/.test(id)) return fail(res, 404, 'Файл не найден');
   const fp = path.join(FILES_DIR, id);
   if (!fs.existsSync(fp)) return fail(res, 404, 'Файл не найден');
+  markSeen(user, id);
   const inline = INLINE.has(meta.type);
   const enc = encodeURIComponent(meta.name);
   res.writeHead(200, {
@@ -340,7 +389,7 @@ function serveFile(req, res, id) {
     'Content-Length': meta.size,
     'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${enc}"; filename*=UTF-8''${enc}`,
     'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
-    'Cache-Control': 'private, max-age=86400',
+    'Cache-Control': 'private, no-cache',
   });
   fs.createReadStream(fp).pipe(res);
 }
@@ -437,9 +486,13 @@ async function cli(cmd, args) {
     need(1);
     const n = users.length; users = users.filter(x => x.login !== args[0].toLowerCase()); saveUsers();
     console.log(n === users.length ? 'Нет такого пользователя' : 'Пользователь удалён.');
+  } else if (cmd === 'unblock') {
+    need(1);
+    const u = users.find(x => x.login === args[0].toLowerCase()); if (!u) { console.error('Нет такого пользователя'); process.exit(1); }
+    u.blocked = false; saveUsers(); console.log('Блокировка снята.');
   } else if (cmd === 'users') {
     if (!users.length) console.log('Пользователей нет.');
-    users.forEach(u => console.log(`${u.login.padEnd(20)} ${ROLES[u.role].padEnd(14)} ${u.name}`));
+    users.forEach(u => console.log(`${u.login.padEnd(20)} ${ROLES[u.role].padEnd(14)} ${u.blocked ? 'ЗАБЛОКИРОВАН  ' : ''}${u.name}`));
   } else if (cmd === 'backup') {
     const file = args[0] || `backup-${new Date().toISOString().slice(0, 10)}.json`;
     writeJSON(path.resolve(file), db);

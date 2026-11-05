@@ -136,8 +136,8 @@ table.comp{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
 .comp tfoot td{font-weight:600;padding:8px;white-space:nowrap}
 .comp td.emptyrow{text-align:center;color:var(--ink-2);padding:20px}
 
-.ilist{display:flex;flex-direction:column}
-.irow{display:grid;grid-template-columns:104px 130px minmax(0,1fr) 110px 150px 100px 118px;gap:12px;align-items:center;padding:10px 12px;border-top:1px solid var(--rule-2);cursor:pointer}
+.ilist{display:flex;flex-direction:column;container-type:inline-size}
+.irow{display:grid;grid-template-columns:104px 130px minmax(0,1fr) 110px 150px 140px 118px;gap:12px;align-items:center;padding:10px 12px;border-top:1px solid var(--rule-2);cursor:pointer}
 .irow:first-child{border-top:0}
 .irow:hover{background:var(--paper)}
 .irow small{display:block;color:var(--ink-2);font-size:12px}
@@ -147,11 +147,28 @@ table.comp{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
 .idue{font-variant-numeric:tabular-nums;font-size:14px}
 .idue.bad{color:var(--bad);font-weight:600}
 .iamt{text-align:right;font-weight:500;white-space:nowrap}
-.ifiles{display:flex;gap:8px;font-size:13px;flex-wrap:wrap}
-@media (max-width:1000px){
+.ifiles{display:flex;gap:4px 8px;font-size:13px;flex-wrap:wrap;align-items:center}
+.seen{color:var(--ok);font-size:12px;white-space:nowrap}
+.unseen-note{color:var(--ink-2);font-size:12px;white-space:nowrap}
+.irow.unseen{box-shadow:inset 3px 0 0 var(--stamp);background:color-mix(in srgb,var(--stamp-soft) 45%,transparent)}
+.irow.unseen .isup b{font-weight:600}
+.urow{display:grid;grid-template-columns:minmax(0,1fr) 130px 130px 160px 310px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}
+.urow:first-child{border-top:0}
+.urow.head{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px}
+.urow b{font-weight:500;overflow-wrap:anywhere}
+.urow small{display:block;color:var(--ink-2);font-size:12px}
+.urow .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.urow.blocked b{color:var(--ink-2);text-decoration:line-through}
+.roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:16px}
+.roles div{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;font-size:14px}
+.roles b{display:block;margin-bottom:4px}
+@media (max-width:820px){.urow{grid-template-columns:1fr auto;grid-template-areas:"who role" "st last" "acts acts"}.urow.head{display:none}
+  .urow>:nth-child(1){grid-area:who}.urow>:nth-child(2){grid-area:role;text-align:right}.urow>:nth-child(3){grid-area:st}.urow>:nth-child(4){grid-area:last;text-align:right}.urow>:nth-child(5){grid-area:acts;justify-content:flex-start}}
+@container (max-width:900px){
   .irow{grid-template-columns:auto 1fr auto;grid-template-areas:"st num amt" "sup sup sup" "due files act";gap:4px 10px}
   .ist{grid-area:st}.inum{grid-area:num}.iamt{grid-area:amt}.isup{grid-area:sup}.idue{grid-area:due}.ifiles{grid-area:files}.iact{grid-area:act}
   .inum small,.idue small{display:inline;margin-right:4px}
+  .inum small{margin-left:6px}
 }
 
 .tlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -252,16 +269,17 @@ textarea{resize:vertical;min-height:70px}
 .login form{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
 .login h1{font-size:18px}
 .login label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2)}
+.pw{position:relative;display:block}
+.pw .in{padding-right:44px}
+.pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:32px;border:0;background:transparent;color:var(--ink-2);border-radius:6px;cursor:pointer;display:grid;place-items:center}
+.pw-eye:hover{color:var(--ink);background:var(--mute-soft)}
+.pw-eye[aria-pressed="false"] .pw-slash{display:none}
 .login p{margin:0;font-size:14px;color:var(--ink-2)}
-.ulist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.ulist li{display:grid;grid-template-columns:minmax(0,1fr) 160px auto 84px;gap:8px;align-items:center;border:1px solid var(--rule-2);border-radius:8px;padding:8px 10px}
-.ulist li small{display:block;color:var(--ink-2);font-size:12px}
-.ulist li b{font-weight:500;overflow-wrap:anywhere}
-@media (max-width:480px){.ulist li{grid-template-columns:1fr 1fr}.ulist li>div{grid-column:1/-1}}
 body.no-edit [data-act=newProject],body.no-edit [data-act=editProject],body.no-edit [data-act=newOrder],body.no-edit [data-act=editOrder],
 body.no-edit [data-act=addComp],body.no-edit [data-act=delComp],body.no-edit [data-act=paste],body.no-edit [data-act=newInvoice],
 body.no-edit [data-act=editInvoice],body.no-edit [data-act=delInvoice],body.no-edit [data-act=newTask],body.no-edit [data-act=delSpec],
 body.no-edit label:has(> [data-up=spec]){display:none!important}
+body.no-edit.can-invoice [data-act=newInvoice],body.no-edit.can-invoice .own[data-act=editInvoice],body.no-edit.can-invoice .own[data-act=delInvoice]{display:inline-flex!important}
 body.no-edit .comp input,body.no-edit .comp select{pointer-events:none}
 body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-events:none}
 </style>
@@ -273,7 +291,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     <p id="l-hint" hidden>Первый запуск. Создайте учётную запись администратора: он добавит остальных сотрудников.</p>
     <label id="l-name-wrap" hidden>Ваше имя<input class="in" id="l-name" autocomplete="name" placeholder="Иванов И. И."></label>
     <label>Логин<input class="in" id="l-login" autocomplete="username" required></label>
-    <label>Пароль<input class="in" id="l-pass" type="password" autocomplete="current-password" required></label>
+    <label>Пароль<span class="pw"><input class="in" id="l-pass" type="password" autocomplete="current-password" required><button type="button" class="pw-eye" data-pw-toggle aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></span></label>
     <div class="err" id="l-err"></div>
     <button class="btn primary" type="submit" id="l-btn">Войти</button>
   </form>
@@ -289,8 +307,9 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#orders" data-v="orders">Заказы</a>
       <a href="#pay" data-v="pay">Бухгалтерия <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
+      <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
     </nav>
-    <div class="userbox"><div><b id="uname"></b><small id="urole"></small></div><button class="btn sm" data-act="users" id="usersBtn" hidden>Пользователи</button><button class="btn sm" data-act="password">Пароль</button><button class="btn sm" data-act="logout">Выйти</button></div>
+    <div class="userbox"><div><b id="uname"></b><small id="urole"></small></div><button class="btn sm" data-act="password">Пароль</button><button class="btn sm" data-act="logout">Выйти</button></div>
   </div>
 </header>
 <main class="wrap">
@@ -314,6 +333,7 @@ const num = v => { const n = parseFloat(String(v ?? '').replace(/\s| /g,'').rep
 const money = n => (Number(n)||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ₽';
 const dnum = s => Math.round(Date.parse(s+'T00:00:00Z')/864e5);
 const dstr = n => new Date(n*864e5).toISOString().slice(0,10);
+const fmtDT = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); };
 const fmtSize = n => n > 1048576 ? (n/1048576).toFixed(1)+' МБ' : Math.max(1,Math.round((n||0)/1024))+' КБ';
 const fileUrl = f => f.url || ('/files/'+f.id);
 const MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
@@ -323,12 +343,23 @@ const MAX_MB = 50;
 const ORDER_ST = { new:'Новый', work:'В работе', closed:'Закрыт' };
 const COMP_ST = { need:'Нужно заказать', ordered:'Заказано', got:'Получено' };
 const KIND = { buy:'Закупка', work:'Работа' };
-const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', viewer:'Просмотр' };
+const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', user:'Сотрудник', viewer:'Просмотр' };
+const ROLE_INFO = {
+  admin:'Всё, включая управление пользователями.',
+  manager:'Проекты, заказы, спецификации, компоненты, счета, план-график. Оплату не отмечает.',
+  accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
+  user:'Видит всё, загружает счета в заказы, правит и удаляет свои неоплаченные счета.',
+  viewer:'Только просмотр.'
+};
 
 const S = { projects:[], orders:[], invoices:[], tasks:[] };
 let me = null, rev = -1, mode = 'loading';
 const canEdit = () => me && (me.role === 'admin' || me.role === 'manager');
 const canPay = () => me && (me.role === 'admin' || me.role === 'accountant');
+const canAddInvoice = () => canEdit() || (me && me.role === 'user');
+const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.status !== 'paid';
+const isAccountant = () => me && me.role === 'accountant';
+const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
 const ui = { view:'orders', order:null, payF:'topay', payProj:'', planProj:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
@@ -398,7 +429,7 @@ function render(){
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
   const V = $('view');
   if (mode === 'loading') { V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : vOrders();
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
 
@@ -496,13 +527,16 @@ function compTable(o){
 function invRow(i, withPay){
   const [cc, cl] = invChip(i);
   const o = ord(i.orderId);
-  return `<div class="irow" data-act="openInvoice" data-id="${i.id}" role="button" tabindex="0">
+  const seenNote = !i.file ? '' : i.seenAt
+    ? `<span class="seen" title="Бухгалтер скачал ${esc(fmtDT(i.seenAt))} · ${esc(who(i.seenBy))}">✓ скачан ${esc(fmtDT(i.seenAt).slice(0,5))}</span>`
+    : i.status === 'topay' ? (isAccountant() ? '<span class="chip c-info">новый</span>' : '<span class="unseen-note">не скачан</span>') : '';
+  return `<div class="irow ${isAccountant() && unseen(i) ? 'unseen' : ''}" data-act="openInvoice" data-id="${i.id}" role="button" tabindex="0">
     <span class="ist"><span class="chip ${cc}">${cl}</span></span>
     <span class="inum"><b>№ <span class="mono">${esc(i.number)}</span></b><small>от ${fmtD(i.date)}</small></span>
     <span class="isup"><b>${esc(i.supplier)}${exTag(i)}</b><small>${esc(i.purpose||'')}${!withPay||!o?'':''}</small></span>
     <span class="idue ${isOver(i)?'bad':''}"><small>${i.status==='paid'?'Оплачен':'Оплатить до'}</small>${fmtD(i.status==='paid'?i.paidAt:i.due)}</span>
     <span class="iamt mono">${money(i.amount)}</span>
-    <span class="ifiles">${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">Счёт</a>`:'<span class="dim">нет файла</span>'}${i.receipt?`<a href="${esc(fileUrl(i.receipt))}" target="_blank" rel="noopener">Чек</a>`:''}</span>
+    <span class="ifiles">${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">Счёт</a>`:'<span class="dim">нет файла</span>'}${i.receipt?`<a href="${esc(fileUrl(i.receipt))}" target="_blank" rel="noopener">Чек</a>`:''}${seenNote}</span>
     <span class="iact">${withPay && canPay() && i.status==='topay' ? `<button class="btn sm ok" data-act="openInvoice" data-id="${i.id}">Оплатить</button>` : withPay && i.status==='paid' && !i.receipt ? '<span class="chip c-warn">нет чека</span>' : ''}</span>
   </div>`;
 }
@@ -516,12 +550,14 @@ function vPay(){
   const week = topay.filter(i => !isOver(i) && i.due && dnum(i.due) - tn <= 7);
   const paidM = all.filter(i => i.status === 'paid' && (i.paidAt||'').startsWith(month));
   const noRc = all.filter(i => i.status === 'paid' && !i.receipt);
-  const F = { topay: i => i.status==='topay', over: isOver, norc: i => i.status==='paid' && !i.receipt, paid: i => i.status==='paid', all: () => true };
+  const F = { new: unseen, topay: i => i.status==='topay', over: isOver, norc: i => i.status==='paid' && !i.receipt, paid: i => i.status==='paid', all: () => true };
   const list = all.filter(F[ui.payF] || F.all);
-  const seg = [['topay','К оплате'],['over','Просроченные'],['norc','Без чека'],['paid','Оплаченные'],['all','Все']];
+  const nNew = all.filter(unseen).length;
+  const seg = [['new', 'Не скачанные' + (nNew ? ` (${nNew})` : '')],['topay','К оплате'],['over','Просроченные'],['norc','Без чека'],['paid','Оплаченные'],['all','Все']];
   const head = `<div class="toolbar">
     <div class="seg" role="tablist">${seg.map(([k,l]) => `<button data-act="payF" data-id="${k}" class="${ui.payF===k?'on':''}">${l}</button>`).join('')}</div>
     <select class="f" id="payProj" aria-label="Проект"><option value="">Все проекты</option>${projectsSorted().map(p => `<option value="${p.id}" ${ui.payProj===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+    ${canAddInvoice() && S.orders.length ? '<button class="btn primary" data-act="newInvoice" data-id="">+ Счёт</button>' : ''}
   </div>
   <div class="tiles">
     <div class="tile"><span>К оплате</span><b>${money(sum(topay,i=>i.amount))}</b><small>${topay.length} сч.</small></div>
@@ -548,6 +584,28 @@ function vPay(){
           <div class="ilist">${is.map(i => invRow(i,true)).join('')}</div></div>`;
       }).join('')}</section>`;
   }).join('');
+}
+
+/* ===== Users view (admin) ===== */
+function vUsers(){
+  const L = ui.usersList;
+  const head = `<div class="toolbar"><button class="btn primary" data-act="userNew">+ Пользователь</button>
+    <span class="dim">${L ? `Всего ${L.length}, заблокировано ${L.filter(u => u.blocked).length}` : ''}</span></div>`;
+  if (!L) return head + '<div class="empty"><h3>Загружаем список…</h3></div>';
+  const order = Object.keys(ROLE_NAMES);
+  const rows = L.slice().sort((a,b) => (a.blocked - b.blocked) || (order.indexOf(a.role) - order.indexOf(b.role)) || a.name.localeCompare(b.name,'ru')).map(u => {
+    const self = u.id === me.id;
+    return `<div class="urow ${u.blocked?'blocked':''}">
+      <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}</small></div>
+      <div><span class="chip ${u.role==='admin'?'c-work':u.role==='accountant'?'c-ok':u.role==='viewer'?'c-mute':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
+      <div>${u.blocked ? '<span class="chip c-bad">Заблокирован</span>' : '<span class="chip c-ok">Активен</span>'}</div>
+      <div><small>Последний вход</small>${u.lastLoginAt ? esc(fmtDT(u.lastLoginAt)) : '<span class="dim">не входил</span>'}</div>
+      <div class="acts"><button class="btn sm" data-act="userEdit" data-id="${u.id}">Изменить</button>
+        ${self ? '' : `<button class="btn sm" data-act="userBlock" data-id="${u.id}">${u.blocked ? 'Разблокировать' : 'Заблокировать'}</button>${armBtn('u:'+u.id, 'Удалить', 'userDel', u.id)}`}</div>
+    </div>`;
+  }).join('');
+  return head + `<section class="card" style="padding:0;overflow:hidden"><div class="urow head"><span>Сотрудник</span><span>Роль</span><span>Статус</span><span>Вход</span><span></span></div>${rows}</section>
+    <div class="roles">${Object.entries(ROLE_NAMES).map(([k,n]) => `<div><b>${n}</b><span class="dim">${ROLE_INFO[k]}</span></div>`).join('')}</div>`;
 }
 
 /* ===== Plan view ===== */
@@ -662,7 +720,8 @@ function renderDrawer(){
         <dt>Сумма</dt><dd class="mono"><b>${money(i.amount)}</b></dd>
         <dt>Оплатить до</dt><dd class="${isOver(i)?'idue bad':''}">${fmtD(i.due)}</dd>
         <dt>Файл счёта</dt><dd>${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">${esc(i.file.name)}</a>`:'не приложен'}</dd>
-        ${i.createdBy?`<dt>Добавил</dt><dd>${esc(who(i.createdBy))}</dd>`:''}
+        ${i.createdBy?`<dt>Добавил</dt><dd>${esc(who(i.createdBy))}${i.createdAt?' · '+esc(fmtDT(i.createdAt)):''}</dd>`:''}
+        ${i.file ? `<dt>Бухгалтер скачал</dt><dd>${i.seenAt ? `<span class="seen">✓ ${esc(fmtDT(i.seenAt))}</span> · ${esc(who(i.seenBy))}${(i.seenCount||0) > 1 ? ` <span class="dim">(открывал ${i.seenCount} раз, последний ${esc(fmtDT(i.seenLastAt))})</span>` : ''}` : '<span class="chip c-warn">ещё не скачивал</span>'}</dd>` : ''}
       </dl>
       ${i.status === 'paid' ? `<div class="box paid"><h4>Оплата</h4><dl class="kv">
           <dt>Дата оплаты</dt><dd>${fmtD(i.paidAt)}</dd>
@@ -673,7 +732,7 @@ function renderDrawer(){
           ${canPay() ? `<div class="row-g"><label class="btn sm">${i.receipt?'Заменить чек':'Приложить чек'}<input type="file" data-up="receipt" data-id="${i.id}" accept="${ACCEPT}" hidden></label>
           ${armBtn('unpay','Снять отметку об оплате','unpay',i.id,'btn sm')}</div><div class="err" id="rerr"></div>` : ''}</div>`
       : !canPay() ? `<p class="box dim" style="margin:0">Оплату отмечает бухгалтер.</p>
-        <div class="row-g"><button class="btn sm" data-act="editInvoice" data-id="${i.id}">Изменить счёт</button>${armBtn('inv','Удалить счёт','delInvoice',i.id)}</div>`
+        <div class="row-g"><button class="btn sm${ownInv(i)?' own':''}" data-act="editInvoice" data-id="${i.id}">Изменить счёт</button>${armBtn('inv','Удалить счёт','delInvoice',i.id,'btn sm danger'+(ownInv(i)?' own':''))}</div>`
       : `<form class="box" data-form="pay"><h4>Отметить оплату</h4><div class="form">
           <label>Дата оплаты<input class="in" type="date" id="p-date" value="${today()}" required></label>
           <label>№ платёжного поручения<input class="in" id="p-no" placeholder="845"></label>
@@ -681,7 +740,7 @@ function renderDrawer(){
           <label>Чек / платёжка<input class="in" type="file" id="p-file" accept="${ACCEPT}"></label></div>
           <div class="err" id="ferr"></div>
           <div class="row-g"><button class="btn ok" type="submit">Счёт оплачен</button></div></form>
-        <div class="row-g"><button class="btn sm" data-act="editInvoice" data-id="${i.id}">Изменить счёт</button>${armBtn('inv','Удалить счёт','delInvoice',i.id)}</div>`}
+        <div class="row-g"><button class="btn sm${ownInv(i)?' own':''}" data-act="editInvoice" data-id="${i.id}">Изменить счёт</button>${armBtn('inv','Удалить счёт','delInvoice',i.id,'btn sm danger'+(ownInv(i)?' own':''))}</div>`}
     </div>`;
   }
   if (d.kind === 'task') {
@@ -699,36 +758,23 @@ function renderDrawer(){
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${t?'Сохранить':'Добавить в график'}</button><button class="btn" type="button" data-act="close">Отмена</button>${t?armBtn('task','Удалить','delTask',t.id):''}</div></form>`;
   }
-  if (d.kind === 'users') {
-    const L = ui.usersList;
-    D.innerHTML = dh('Пользователи') + `<div class="d-body">
-      ${!L ? '<p class="dim" style="margin:0">Загружаем…</p>' : `<ul class="ulist">${L.map(u => `<li>
-        <div><b>${esc(u.name)}${u.id===me.id?' (вы)':''}</b><small class="mono">${esc(u.login)}</small></div>
-        <select class="in" data-urole="${u.id}" aria-label="Роль" ${u.id===me.id?'disabled':''}>${opt(ROLE_NAMES, u.role)}</select>
-        <button class="btn sm" data-act="userPass" data-id="${u.id}">Пароль</button>
-        ${u.id===me.id ? '<span></span>' : armBtn('u:'+u.id, 'Удалить', 'userDel', u.id)}</li>`).join('')}</ul>`}
-      <form class="box" data-form="userAdd"><h4>Новый пользователь</h4><div class="form">
-        <label>Логин (латиницей)<input class="in" id="ua-login" autocomplete="off" placeholder="petrova"></label>
-        <label>Роль<select class="in" id="ua-role">${opt(ROLE_NAMES, 'manager')}</select></label>
-        <label class="wide">Имя<input class="in" id="ua-name" placeholder="Петрова А. С."></label>
-        <label class="wide">Пароль, не короче 8 символов<input class="in" id="ua-pass" autocomplete="new-password"></label></div>
-        <div class="err" id="ferr"></div>
-        <div class="row-g"><button class="btn primary" type="submit">Добавить</button></div></form>
-      <p class="hint" style="margin:0">Менеджер ведёт проекты, заказы, счета и план-график. Бухгалтер отмечает оплату и прикладывает чеки. «Просмотр» только читает.</p>
-    </div>`;
-  }
-  if (d.kind === 'userPass') {
+  if (d.kind === 'userForm') {
     const u = (ui.usersList || []).find(x => x.id === d.id);
-    D.innerHTML = dh('Новый пароль: ' + esc(u?.name || '')) + `<form class="d-body" data-form="userPass"><div class="form">
-      <label class="wide">Новый пароль, не короче 8 символов<input class="in" id="up-pass" autocomplete="new-password" required></label></div>
-      <p class="hint" style="margin:0">Сотрудник выйдет со всех устройств и войдёт с новым паролем.</p>
+    const self = u && u.id === me.id;
+    D.innerHTML = dh(u ? 'Пользователь: ' + esc(u.name) : 'Новый пользователь') + `<form class="d-body" data-form="userForm"><div class="form">
+      <label class="wide">Имя<input class="in" id="uf-name" value="${v(u,'name')}" placeholder="Петрова А. С." required></label>
+      <label>Логин (латиницей)<input class="in" id="uf-login" value="${v(u,'login')}" autocomplete="off" placeholder="petrova" required></label>
+      <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(ROLE_NAMES, u?.role || 'user')}</select></label>
+      <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<input class="in" id="uf-pass" autocomplete="new-password" ${u?'':'required'}></label></div>
+      <p class="hint dim" id="uf-info" style="margin:0">${esc(ROLE_INFO[u?.role || 'user'])}</p>
+      ${u ? '<p class="hint" style="margin:0">После смены пароля сотрудник выйдет со всех устройств.</p>' : ''}
       <div class="err" id="ferr"></div>
-      <div class="row-g"><button class="btn primary" type="submit">Сменить пароль</button><button class="btn" type="button" data-act="users">Назад</button></div></form>`;
+      <div class="row-g"><button class="btn primary" type="submit">${u?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'password') {
     D.innerHTML = dh('Смена пароля') + `<form class="d-body" data-form="password"><div class="form">
-      <label class="wide">Текущий пароль<input class="in" type="password" id="pw-cur" autocomplete="current-password" required></label>
-      <label class="wide">Новый пароль (не короче 8 символов)<input class="in" type="password" id="pw-new" autocomplete="new-password" required></label></div>
+      <label class="wide">Текущий пароль<span class="pw"><input class="in" type="password" id="pw-cur" autocomplete="current-password" required><button type="button" class="pw-eye" data-pw-toggle aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></span></label>
+      <label class="wide">Новый пароль (не короче 8 символов)<span class="pw"><input class="in" type="password" id="pw-new" autocomplete="new-password" required><button type="button" class="pw-eye" data-pw-toggle aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></span></label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Сменить пароль</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
@@ -802,13 +848,19 @@ async function onSubmit(e){
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
       closeDrawer(); render(); toast(d.id ? 'Задача сохранена' : 'Задача добавлена в план-график');
     }
-    if (kind === 'userAdd') {
-      await api('POST', '/api/users', { login:val('ua-login'), role:val('ua-role'), name:val('ua-name'), password:$('ua-pass').value });
-      toast('Пользователь добавлен'); await loadUsers();
-    }
-    if (kind === 'userPass') {
-      await api('PATCH', '/api/users/' + d.id, { password:$('up-pass').value });
-      toast('Пароль изменён'); ui.usersList = null; openDrawer('users'); await loadUsers();
+    if (kind === 'userForm') {
+      const body = { name:val('uf-name'), login:val('uf-login'), role:$('uf-role').value };
+      const pw = $('uf-pass').value;
+      if (d.id) {
+        if (pw) body.password = pw;
+        if (d.id === me.id) delete body.role;
+        await api('PATCH', '/api/users/' + d.id, body);
+        toast('Сохранено');
+      } else {
+        await api('POST', '/api/users', { ...body, password:pw });
+        toast('Пользователь добавлен');
+      }
+      closeDrawer(); await loadUsers();
     }
     if (kind === 'password') {
       await api('POST', '/api/password', { current:$('pw-cur').value, next:$('pw-new').value });
@@ -836,8 +888,13 @@ async function act(el){
     case 'close': return closeDrawer();
     case 'logout': await api('POST','/api/logout').catch(() => {}); return showLogin();
     case 'password': return openDrawer('password');
-    case 'users': ui.usersList = null; openDrawer('users'); return loadUsers();
-    case 'userPass': return openDrawer('userPass', id);
+    case 'userNew': return openDrawer('userForm');
+    case 'userEdit': return openDrawer('userForm', id);
+    case 'userBlock': {
+      const u = (ui.usersList || []).find(x => x.id === id); if (!u) return;
+      try { await api('PATCH', '/api/users/' + id, { blocked: !u.blocked }); toast(u.blocked ? 'Пользователь разблокирован' : 'Пользователь заблокирован, его сеансы завершены'); } catch(e) { toast(errText(e)); }
+      return loadUsers();
+    }
     case 'userDel': try { await api('DELETE', '/api/users/' + id); toast('Пользователь удалён'); } catch(e) { toast(errText(e)); } return loadUsers();
     case 'selOrder': ui.order = id; remember(); render(); window.scrollTo({top:0}); return;
     case 'back': ui.order = null; remember(); return render();
@@ -871,7 +928,22 @@ async function act(el){
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
-  if (e.target.closest('a[target=_blank]')) return;
+  const eye = e.target.closest('[data-pw-toggle]');
+  if (eye) {
+    e.preventDefault();
+    const inp = eye.parentElement.querySelector('input');
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    eye.setAttribute('aria-pressed', String(show));
+    eye.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль'); eye.title = eye.getAttribute('aria-label');
+    inp.focus();
+    return;
+  }
+  const link = e.target.closest('a[target=_blank]');
+  if (link) {
+    if (isAccountant() && link.getAttribute('href')?.startsWith('/files/')) setTimeout(() => refresh().catch(() => {}), 1500);
+    return;
+  }
   const el = e.target.closest('[data-act]');
   if (!el) { disarm(); return; }
   if (el.tagName === 'A' && el.getAttribute('href') === '#orders' && el.dataset.act) e.preventDefault();
@@ -887,10 +959,7 @@ $('drawer').addEventListener('submit', onSubmit);
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
-  if (t.dataset.urole) {
-    try { await api('PATCH', '/api/users/' + t.dataset.urole, { role:t.value }); toast('Роль изменена'); } catch(err) { toast(errText(err)); }
-    return loadUsers();
-  }
+  if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; return; }
   if (t.id === 'payProj') { ui.payProj = t.value; return render(); }
   if (t.id === 'planProj') { ui.planProj = t.value; return render(); }
   if (t.classList.contains('ci')) {
@@ -920,14 +989,19 @@ document.addEventListener('change', async e => {
     } catch(err) { const el = $('rerr'); if (el && t.dataset.up === 'receipt') el.textContent = errText(err); else toast(errText(err)); }
   }
 });
-function route(){ const h = location.hash.slice(1); ui.view = ['orders','pay','plan'].includes(h) ? h : 'orders'; render(); }
+function route(){
+  const h = location.hash.slice(1);
+  ui.view = ['orders','pay','plan'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
+  if (ui.view === 'users' && !ui.usersList) loadUsers();
+  render();
+}
 window.addEventListener('hashchange', route);
 
 /* ---------- boot ---------- */
 let poll = null, setupMode = false;
 async function loadUsers(){
   try { ui.usersList = await api('GET', '/api/users'); } catch(e) { toast(errText(e)); ui.usersList = []; }
-  if (ui.drawer?.kind === 'users') renderDrawer();
+  if (ui.view === 'users') render();
 }
 function setSetup(on){
   setupMode = on;
@@ -938,13 +1012,16 @@ function setSetup(on){
 function showLogin(){
   clearInterval(poll); poll = null; me = null; mode = 'loading'; closeDrawer();
   $('app').hidden = true; $('loginView').hidden = false; $('l-err').textContent = '';
+  $('l-pass').type = 'password'; const eye = $('loginForm').querySelector('[data-pw-toggle]'); eye.setAttribute('aria-pressed','false'); eye.setAttribute('aria-label','Показать пароль'); eye.title = 'Показать пароль';
   setTimeout(() => (setupMode ? $('l-name') : $('l-login')).focus(), 30);
 }
 async function start(u){
   me = u;
   $('uname').textContent = u.name; $('urole').textContent = u.roleName;
   document.body.classList.toggle('no-edit', !canEdit());
-  $('usersBtn').hidden = u.role !== 'admin';
+  document.body.classList.toggle('can-invoice', canAddInvoice());
+  $('usersTab').hidden = u.role !== 'admin';
+  ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
   route();
   try { await refresh(); } catch(e) { $('banner').hidden = false; $('banner').textContent = errText(e); }
