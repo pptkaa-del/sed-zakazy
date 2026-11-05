@@ -49,7 +49,6 @@ h2,h3{text-wrap:balance;margin:0}
 header.top{background:var(--sheet);border-bottom:1px solid var(--rule)}
 header.top .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding-block:14px}
 .brand{display:flex;gap:12px;align-items:center}
-.seal{width:40px;height:40px;border-radius:50%;border:2px solid var(--stamp);display:grid;place-items:center;color:var(--stamp);font:600 10px/1 var(--f-display);transform:rotate(-8deg);flex:none}
 h1{font:600 clamp(16px,2.2vw,20px)/1.2 var(--f-display);margin:0}
 .sub{color:var(--ink-2);font-size:13px;margin:2px 0 0}
 nav.views{display:flex;gap:4px;background:var(--mute-soft);padding:4px;border-radius:10px;flex-wrap:wrap}
@@ -106,6 +105,8 @@ main{padding-block:20px 48px}
 .odetail{display:flex;flex-direction:column;gap:16px;min-width:0}
 .back{display:none;align-self:flex-start}
 .ohead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.bill{margin-top:4px;font-size:14px}
+.bill b{font-weight:600}
 .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--stamp);font-weight:600}
 .ohead h2{font:600 clamp(17px,2.2vw,21px)/1.3 var(--f-display);overflow-wrap:anywhere}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
@@ -287,7 +288,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <body>
 <div class="login" id="loginView" hidden>
   <form id="loginForm" novalidate>
-    <div class="brand"><div class="seal" aria-hidden="true">СЭД</div><h1>Документооборот по заказам</h1></div>
+    <div class="brand"><h1>Документооборот по заказам</h1></div>
     <p id="l-hint" hidden>Первый запуск. Создайте учётную запись администратора: он добавит остальных сотрудников.</p>
     <label id="l-name-wrap" hidden>Ваше имя<input class="in" id="l-name" autocomplete="name" placeholder="Иванов И. И."></label>
     <label>Логин<input class="in" id="l-login" autocomplete="username" required></label>
@@ -300,7 +301,6 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <div class="seal" aria-hidden="true">СЭД</div>
       <div><h1>Документооборот по заказам</h1><p class="sub">Спецификации, компоненты, счета и план-график проектов</p></div>
     </div>
     <nav class="views" id="views">
@@ -454,11 +454,12 @@ function vOrders(){
     <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Слева список проектов и их заказов. Откройте заказ, чтобы загрузить спецификацию, заполнить компоненты и добавить счета.</div>`}</section>
   </div>`;
 }
+const billText = o => !!(o && o.billNo);
 function orderItem(x){
   const topay = invOf(x.id).filter(i => i.status === 'topay');
   const over = topay.some(isOver);
   return `<button class="oitem ${ui.order===x.id?'on':''}" data-act="selOrder" data-id="${x.id}">
-    <span class="mono">Заказ ${esc(x.number)}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>
+    <span class="mono">Заказ ${esc(x.number)}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>
     <span class="ometa"><span class="chip c-${x.status}">${ORDER_ST[x.status]||''}</span>${topay.length?`<span class="chip ${over?'c-bad':'c-warn'}">к оплате: ${topay.length}</span>`:''}</span>
   </button>`;
 }
@@ -474,12 +475,13 @@ function orderDetail(o){
   <div class="ohead">
     <div style="min-width:0"><div class="eyebrow">${esc(p?.name||'Без проекта')}</div>
       <h2>Заказ ${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
-      <div class="dim">${[o.customer && 'Заказчик: '+esc(o.customer), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div></div>
+      <div class="dim">${[o.customer && 'Заказчик: '+esc(o.customer), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
+      <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button></div>
   </div>
   <div class="kpis">
     <div><span>По спецификации</span><b>${money(total)}</b></div>
-    <div><span>Счета выставлены</span><b>${money(invT)}</b></div>
+    <div><span>Счета поставщиков</span><b>${money(invT)}</b></div>
     <div><span>Оплачено</span><b>${money(paid)}</b></div>
     <div><span>Осталось оплатить</span><b class="${invT-paid>0?'bad':''}">${money(invT-paid)}</b></div>
   </div>
@@ -579,7 +581,7 @@ function vPay(){
       <span class="dim">к оплате <span class="mono" style="color:var(--ink)">${money(due)}</span> · всего ${items.length} сч.</span></div>
       ${[...g.keys()].sort((a,b) => (ord(a)?.number||'').localeCompare(ord(b)?.number||'','ru',{numeric:true})).map(ok => {
         const o = ord(ok), is = g.get(ok).sort(sorter);
-        return `<div class="pord"><div class="po-h"><button data-act="gotoOrder" data-id="${ok}">Заказ ${esc(o?.number||'—')} · ${esc(o?.title||'не найден')}</button>
+        return `<div class="pord"><div class="po-h"><button data-act="gotoOrder" data-id="${ok}">Заказ ${esc(o?.number||'—')} · ${esc(o?.title||'не найден')}${o?.billNo?` <span class="dim" style="font-weight:400">· выставлен счёт № ${esc(o.billNo)}${o.billDate?' от '+fmtD(o.billDate):''}</span>`:''}</button>
           <span class="dim">${is.length} сч. на <span class="mono">${money(sum(is,i=>i.amount))}</span></span></div>
           <div class="ilist">${is.map(i => invRow(i,true)).join('')}</div></div>`;
       }).join('')}</section>`;
@@ -688,7 +690,10 @@ function renderDrawer(){
       <label>Статус<select class="in" id="f-st">${opt(ORDER_ST, o?.status||'new')}</select></label>
       <label class="wide">Наименование<input class="in" id="f-title" value="${v(o,'title')}" placeholder="Шкаф управления ШУ-3" required></label>
       <label>Заказчик / получатель<input class="in" id="f-cust" value="${v(o,'customer')}"></label>
-      <label>Срок сдачи<input class="in" type="date" id="f-dl" value="${v(o,'deadline')}"></label></div>
+      <label>Срок сдачи<input class="in" type="date" id="f-dl" value="${v(o,'deadline')}"></label>
+      <label>№ выставленного счёта<input class="in" id="f-bill" value="${v(o,'billNo')}" placeholder="СЧ-0142"></label>
+      <label>Дата выставленного счёта<input class="in" type="date" id="f-billdate" value="${v(o,'billDate')}"></label></div>
+      <p class="hint" style="margin:0">Счёт, который вы выставили заказчику по этому заказу. Можно заполнить позже.</p>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${o?'Сохранить':'Создать заказ'}</button><button class="btn" type="button" data-act="close">Отмена</button>
       ${o ? (hasInv ? '<span class="dim" style="font-size:13px">Заказ со счетами удалить нельзя</span>' : armBtn('ord','Удалить заказ','delOrder',o.id)) : ''}</div></form>`;
@@ -812,7 +817,7 @@ async function onSubmit(e){
     }
     if (kind === 'order') {
       if (!val('f-num') || !val('f-title')) return fail('Укажите номер и наименование заказа.');
-      const data = { projectId:val('f-proj'), number:val('f-num'), status:val('f-st'), title:val('f-title'), customer:val('f-cust'), deadline:val('f-dl') };
+      const data = { projectId:val('f-proj'), number:val('f-num'), status:val('f-st'), title:val('f-title'), customer:val('f-cust'), deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
       if (d.id) { await upd('orders', d.id, data); S.invoices.filter(i => i.orderId === d.id && i.projectId !== data.projectId).forEach(i => guard(upd('invoices', i.id, { projectId:data.projectId }))); }
       else { const id = await add('orders', { ...data, components:[], specs:[], createdAt:now }); ui.order = id; remember(); }
       closeDrawer(); render(); toast(d.id ? 'Заказ сохранён' : 'Заказ создан');
