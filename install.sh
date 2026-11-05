@@ -12,7 +12,7 @@
 #            С доменом и --email дополнительно выпускается HTTPS-сертификат Let's Encrypt.
 #
 # Повторный запуск обновляет код (git pull) и перезапускает приложение. Данные не трогаются.
-# Для приватного репозитория задайте GITHUB_TOKEN (токен с правом чтения этого репозитория).
+# Репозиторий публичный, токен не нужен. Для приватной копии задайте GITHUB_TOKEN (право чтения).
 set -euo pipefail
 
 # Run from a temporary copy: updating the code rewrites this very file, and bash reads scripts lazily.
@@ -332,6 +332,6 @@ if [ "$HTTPS" = yes ]; then say "Готово. Откройте https://$ADDR и
 else say "Готово. Откройте http://$ADDR и создайте администратора, если ещё не создан."
   [ -z "$DOMAIN" ] && echo "    Если у сервера есть внешний IP, отличный от показанного, используйте его."
 fi
-echo "    Обновить:  sudo GITHUB_TOKEN=токен bash $APP_DIR/install.sh$ARGS"
+echo "    Обновить:  sudo ${GITHUB_TOKEN:+GITHUB_TOKEN=токен }bash $APP_DIR/install.sh$ARGS"
 echo "    Журнал:    journalctl -u $SVC -f"
 echo "    Данные:    $DATA_DIR (сохраняйте в резервных копиях)"
