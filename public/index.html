@@ -457,7 +457,7 @@ function nextOrderNumber(){
   const max = Math.max(...parsed.filter(m => m[1] === prefix).map(m => Number(m[2])));
   return prefix + String(max + 1).padStart(width, '0');
 }
-const ordName = o => o ? `Заказ ${o.number} · ${o.title}` : 'Заказ не найден';
+const ordName = o => o ? `${o.number} · ${o.title}` : 'Заказ не найден';
 const invOf = oid => S.invoices.filter(i => i.orderId === oid);
 const tasksOf = oid => S.tasks.filter(t => t.orderId === oid).sort((a,b) => (a.start||'').localeCompare(b.start||''));
 const exTag = x => x?.example ? '<span class="ex">пример</span>' : '';
@@ -551,7 +551,7 @@ function orderItem(x, q){
   const cm = Array.isArray(x.comments) ? x.comments : [];
   const last = cm[cm.length - 1];
   return `<button class="oitem ${ui.order===x.id?'on':''}" data-act="selOrder" data-id="${x.id}" data-q="${esc(orderHay(x))}" ${matchOrder(x, q)?'':'hidden'}>
-    <span class="mono">Заказ ${esc(x.number)}${x.orderNo?` · № ${esc(x.orderNo)}`:''}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>${custName(x)?`<span class="oc">${esc(custName(x))}</span>`:''}
+    <span class="mono">${esc(x.number)}${x.orderNo?` · № ${esc(x.orderNo)}`:''}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>${custName(x)?`<span class="oc">${esc(custName(x))}</span>`:''}
     ${last ? `<span class="ocm" title="${esc(last.text)}"><b>${esc(who(last.by))}:</b> ${esc(last.text.slice(0,120))}${cm.length > 1 ? ` · ещё ${cm.length - 1}` : ''}</span>` : ''}
   </button>`;
 }
@@ -573,7 +573,7 @@ function orderDetail(o){
   return `<button class="btn ghost back" data-act="back">← Все заказы</button>
   <div class="ohead">
     <div style="min-width:0">
-      <h2>Заказ ${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
+      <h2>${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button></div>
@@ -674,7 +674,7 @@ function cpDetail(c){
     ${ks.length ? `<ul class="files">${ks.map(k => `<li>${k.file ? `<a href="${esc(fileUrl(k.file))}" target="_blank" rel="noopener">` : '<span style="flex:1">'}Договор № ${esc(k.number || 'б/н')}${k.date ? ' от ' + fmtD(k.date) : ''}${k.file ? '</a>' : '</span>'}<small>${esc([k.subject, k.file && k.file.name, k.file && fmtSize(k.file.size)].filter(Boolean).join(' · '))}</small>${armBtn('k:'+k.id,'✕','delContract',c.id+'|'+k.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Договоры не загружены.</p>'}
   </section>
   <section class="card"><div class="ch"><h3>Заказы <span class="dim">${orders.length||''}</span></h3></div>
-    ${orders.length ? `<ul class="tlist">${orders.map(o => `<li data-act="gotoOrder" data-id="${o.id}" tabindex="0" role="button"><span class="t">Заказ ${esc(o.number)} · ${esc(o.title)}</span><span class="chip c-${o.status||'new'}">${ORDER_ST[o.status||'new']}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Заказов с этим заказчиком нет.</p>'}
+    ${orders.length ? `<ul class="tlist">${orders.map(o => `<li data-act="gotoOrder" data-id="${o.id}" tabindex="0" role="button"><span class="t">${esc(o.number)} · ${esc(o.title)}</span><span class="chip c-${o.status||'new'}">${ORDER_ST[o.status||'new']}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Заказов с этим заказчиком нет.</p>'}
   </section>
   ${commentsCard('counterparties', c)}`;
 }
@@ -771,7 +771,7 @@ function vPlan(){
   ordersSorted().slice().reverse().forEach(o => {
     const ot = tasks.filter(t => t.orderId === o.id).sort(byStart); if (!ot.length) return;
     const dl = o.deadline && dnum(o.deadline) >= lo && dnum(o.deadline) <= hi ? `<i class="g-dl" style="left:${(dnum(o.deadline)-lo)*DW + DW - 1}px" title="Срок сдачи заказа ${fmtD(o.deadline)}"></i>` : '';
-    rows += `<div class="g-row g-proj"><div class="g-lab">Заказ ${esc(o.number)} · ${esc(o.title)}</div>${track('', dl)}</div>` + ot.map(taskRow).join('');
+    rows += `<div class="g-row g-proj"><div class="g-lab">${esc(o.number)} · ${esc(o.title)}</div>${track('', dl)}</div>` + ot.map(taskRow).join('');
   });
   const common = tasks.filter(t => !ord(t.orderId)).sort(byStart);
   if (common.length) rows += `<div class="g-row g-proj"><div class="g-lab">Общие работы</div>${track('')}</div>` + common.map(taskRow).join('');
