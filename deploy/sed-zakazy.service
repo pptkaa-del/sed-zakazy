@@ -1,6 +1,6 @@
 # /etc/systemd/system/sed-zakazy.service — запуск без Docker
 [Unit]
-Description=Документооборот по заказам
+Description=Управление предприятием
 After=network.target
 
 [Service]

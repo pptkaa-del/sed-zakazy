@@ -30,12 +30,12 @@ if ! "$NODE" -e 'process.exit(+process.versions.node.split(".")[0] >= 16 ? 0 : 1
 fi
 NODE="$(readlink -f "$NODE")"
 
-if [ -f "$WWW/.htaccess" ] && ! grep -q '^# Документооборот по заказам' "$WWW/.htaccess"; then
+if [ -f "$WWW/.htaccess" ] && ! grep -qE '^# (Документооборот по заказам|Управление предприятием)' "$WWW/.htaccess"; then
   cp "$WWW/.htaccess" "$WWW/.htaccess.bak.$(date +%Y%m%d-%H%M%S)"
   echo "Прежний .htaccess сохранён рядом с суффиксом .bak"
 fi
 cat > "$WWW/.htaccess" <<EOF
-# Документооборот по заказам: Node.js через Passenger
+# Управление предприятием: Node.js через Passenger
 PassengerAppRoot $APP_DIR
 PassengerAppType node
 PassengerStartupFile server.js

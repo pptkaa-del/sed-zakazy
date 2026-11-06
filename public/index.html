@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Документооборот по заказам</title>
+<title>Управление предприятием</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&display=swap">
@@ -102,6 +102,28 @@ main{padding-block:20px 48px}
 .oitem .ot{font-weight:500;overflow-wrap:anywhere}
 .oitem .oc{font-size:12px;color:var(--ink-2);overflow-wrap:anywhere}
 .olist-top{display:flex;gap:8px}
+.ogroup{border-top:1px solid var(--rule)}
+.ogroup:first-child{border-top:0}
+.ogroup>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:var(--mute-soft);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+.ogroup>summary::-webkit-details-marker{display:none}
+.ogroup>summary::after{content:"▾";font-size:12px;transition:transform .15s}
+.ogroup:not([open])>summary::after{transform:rotate(-90deg)}
+.ogroup>summary .cnt{margin-left:auto;margin-right:8px;font-variant-numeric:tabular-nums}
+.ogroup .oitem:first-of-type{border-top:0}
+.ocm{display:block;font-size:12px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.ocm b{font-weight:600;color:var(--ink)}
+.comments{display:flex;flex-direction:column;gap:10px}
+.cmt{display:flex;gap:10px;align-items:flex-start}
+.cmt .avatar{width:28px;height:28px;font-size:11px}
+.cmt .body{flex:1;min-width:0;background:var(--paper);border:1px solid var(--rule-2);border-radius:10px;padding:8px 12px}
+.cmt .meta{font-size:12px;color:var(--ink-2);display:flex;gap:8px;align-items:center}
+.cmt .meta .icon{margin-left:auto;padding:0 4px}
+.cmt p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.cform{display:flex;gap:8px;align-items:flex-end;margin-top:12px}
+.cform textarea{min-height:44px;flex:1}
+.cphint{font-size:13px;margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cpcard dl{margin:0}
+.roles-chips{display:flex;gap:6px;flex-wrap:wrap}
 .olist-top .in{flex:1;min-width:0}
 .ometa{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 .pad{padding:10px 14px;margin:0;font-size:14px}
@@ -299,7 +321,7 @@ textarea{resize:vertical;min-height:70px}
 .pw-eye:hover{color:var(--ink);background:var(--mute-soft)}
 .pw-eye[aria-pressed="false"] .pw-slash{display:none}
 .login p{margin:0;font-size:14px;color:var(--ink-2)}
-body.no-edit [data-act=newProject],body.no-edit [data-act=editProject],body.no-edit [data-act=newOrder],body.no-edit [data-act=editOrder],
+body.no-edit [data-act=newCp],body.no-edit [data-act=editCp],body.no-edit [data-act=newContract],body.no-edit [data-act=delContract],body.no-edit [data-act=newProject],body.no-edit [data-act=editProject],body.no-edit [data-act=newOrder],body.no-edit [data-act=editOrder],
 body.no-edit [data-act=addComp],body.no-edit [data-act=delComp],body.no-edit [data-act=paste],body.no-edit [data-act=newInvoice],
 body.no-edit [data-act=editInvoice],body.no-edit [data-act=delInvoice],body.no-edit [data-act=newTask],body.no-edit [data-act=delSpec],
 body.no-edit label:has(> [data-up=spec]){display:none!important}
@@ -311,7 +333,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <body>
 <div class="login" id="loginView" hidden>
   <form id="loginForm" novalidate>
-    <div class="brand"><h1>Документооборот по заказам</h1></div>
+    <div class="brand"><h1>Управление предприятием</h1></div>
     <p id="l-hint" hidden>Первый запуск. Создайте учётную запись администратора: он добавит остальных сотрудников.</p>
     <label id="l-name-wrap" hidden>Ваше имя<input class="in" id="l-name" autocomplete="name" placeholder="Иванов И. И."></label>
     <label>Логин<input class="in" id="l-login" autocomplete="username" required></label>
@@ -324,10 +346,11 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <div><h1>Документооборот по заказам</h1><p class="sub">Спецификации, компоненты, счета и план-график заказов</p></div>
+      <div><h1>Управление предприятием</h1><p class="sub">Заказы, контрагенты, документы, счета и план-график</p></div>
     </div>
     <nav class="views" id="views">
       <a href="#orders" data-v="orders">Заказы</a>
+      <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#pay" data-v="pay">Бухгалтерия <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
@@ -364,25 +387,27 @@ const money = n => (Number(n)||0).toLocaleString('ru-RU',{minimumFractionDigits:
 const dnum = s => Math.round(Date.parse(s+'T00:00:00Z')/864e5);
 const dstr = n => new Date(n*864e5).toISOString().slice(0,10);
 const fmtDT = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); };
+const initials = n => String(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0]).join('').toUpperCase();
 const fmtSize = n => n > 1048576 ? (n/1048576).toFixed(1)+' МБ' : Math.max(1,Math.round((n||0)/1024))+' КБ';
 const fileUrl = f => f.url || ('/files/'+f.id);
 const MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 const ACCEPT = '';
 const MAX_MB = 50;
 
-const ORDER_ST = { new:'Новый', work:'В работе', closed:'Закрыт' };
+const ORDER_ST = { new:'Планируется', work:'В работе', closed:'Закрыт' };
+const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', contractor:'Подрядчик' };
 const COMP_ST = { need:'Нужно заказать', ordered:'Заказано', got:'Получено' };
 const KIND = { buy:'Закупка', work:'Работа' };
 const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', user:'Сотрудник', viewer:'Просмотр' };
 const ROLE_INFO = {
   admin:'Всё, включая управление пользователями.',
-  manager:'Заказы, спецификации, компоненты, счета, план-график. Оплату не отмечает.',
+  manager:'Заказы, контрагенты и договоры, документы, компоненты, счета, план-график. Оплату не отмечает.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
   user:'Видит всё, загружает счета в заказы, правит и удаляет свои неоплаченные счета.',
   viewer:'Только просмотр.'
 };
 
-const S = { projects:[], orders:[], invoices:[], tasks:[] };
+const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[] };
 let me = null, rev = -1, mode = 'loading';
 const canEdit = () => me && (me.role === 'admin' || me.role === 'manager');
 const canPay = () => me && (me.role === 'admin' || me.role === 'accountant');
@@ -391,13 +416,29 @@ const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.statu
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', order:null, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
+const ui = { view:'orders', order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
 const ord = id => S.orders.find(o => o.id === id);
 const inv = id => S.invoices.find(i => i.id === id);
 const ordersSorted = () => S.orders.slice().sort((a,b) => (b.number||'').localeCompare(a.number||'','ru',{numeric:true}));
+const cpOf = id => S.counterparties.find(c => c.id === id);
+const cpsSorted = () => S.counterparties.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
+const cpByName = n => { const k = String(n||'').trim().toLowerCase(); return k ? S.counterparties.find(c => (c.name||'').trim().toLowerCase() === k) : null; };
+const custName = o => (o && (cpOf(o.customerId)?.name || o.customer)) || '';
+const brigadesOf = t => t.brigades != null ? (Number(t.brigades) || 0) : (t.contractors ? 1 : 0);
+const crew = t => [t.people ? `${t.people} чел.` : '', brigadesOf(t) ? `${brigadesOf(t)} бр. подрядчиков` : ''].filter(Boolean).join(' + ');
+const crewShort = t => [t.people ? `${t.people} чел.` : '', brigadesOf(t) ? `${brigadesOf(t)} бр.` : ''].filter(Boolean).join(' + ');
+function nextOrderNumber(){
+  const parsed = S.orders.map(o => /^(.*?)(\d+)$/.exec(String(o.number||'').trim())).filter(Boolean);
+  if (!parsed.length) return 'З-1';
+  const last = S.orders.slice().sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''))
+    .map(o => /^(.*?)(\d+)$/.exec(String(o.number||'').trim())).find(Boolean) || parsed[0];
+  const prefix = last[1], width = last[2].length;
+  const max = Math.max(...parsed.filter(m => m[1] === prefix).map(m => Number(m[2])));
+  return prefix + String(max + 1).padStart(width, '0');
+}
 const ordName = o => o ? `Заказ ${o.number} · ${o.title}` : 'Заказ не найден';
 const invOf = oid => S.invoices.filter(i => i.orderId === oid);
 const tasksOf = oid => S.tasks.filter(t => t.orderId === oid).sort((a,b) => (a.start||'').localeCompare(b.start||''));
@@ -429,7 +470,7 @@ async function api(method, url, body, headers = {}){
 async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {};
-  ['projects','orders','invoices','tasks'].forEach(c => S[c] = d[c] || []);
+  ['projects','orders','invoices','tasks','counterparties'].forEach(c => S[c] = d[c] || []);
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
   render();
@@ -458,7 +499,7 @@ function render(){
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
   const V = $('view');
   if (mode === 'loading') { V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : vOrders();
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
 
@@ -471,7 +512,12 @@ function vOrders(){
   if (!S.orders.length) return `<div class="empty"><h3>Пока нет ни одного заказа</h3>Создайте заказ: в нём хранятся спецификации, компоненты, счета и задачи план-графика.<div class="row-g"><button class="btn primary" data-act="newOrder">+ Заказ</button></div></div>`;
   const o = ord(ui.order);
   const q = ui.oq.trim().toLowerCase();
-  const items = ordersSorted().map(x => orderItem(x, q)).join('');
+  const items = Object.entries(ORDER_ST).map(([st, label]) => {
+    const os = ordersSorted().filter(x => (x.status || 'new') === st);
+    if (!os.length) return '';
+    const open = st !== 'closed' || q || os.some(x => x.id === ui.order) || ui.openClosed;
+    return `<details class="ogroup" data-st="${st}" ${open?'open':''}><summary>${label}<span class="cnt">${os.length}</span></summary>${os.map(x => orderItem(x, q)).join('')}</details>`;
+  }).join('');
   return `<div class="split ${o?'has-sel':''}">
     <nav class="olist" aria-label="Заказы">
       <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" placeholder="Поиск: номер, название, заказчик" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button></div>
@@ -480,42 +526,42 @@ function vOrders(){
     <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Откройте заказ слева, чтобы загрузить спецификацию, заполнить компоненты и добавить счета.</div>`}</section>
   </div>`;
 }
-const orderHay = x => [x.number, x.title, x.customer, x.billNo].join(' ').toLowerCase();
+const orderHay = x => [x.number, x.title, custName(x), x.billNo].join(' ').toLowerCase();
 const matchOrder = (x, q) => !q || orderHay(x).includes(q);
 const billText = o => !!(o && o.billNo);
 function orderItem(x, q){
-  const topay = invOf(x.id).filter(i => i.status === 'topay');
+  const cm = Array.isArray(x.comments) ? x.comments : [];
+  const last = cm[cm.length - 1];
   return `<button class="oitem ${ui.order===x.id?'on':''}" data-act="selOrder" data-id="${x.id}" data-q="${esc(orderHay(x))}" ${matchOrder(x, q)?'':'hidden'}>
-    <span class="mono">Заказ ${esc(x.number)}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>${x.customer?`<span class="oc">${esc(x.customer)}</span>`:''}
-    <span class="ometa"><span class="chip c-${x.status}">${ORDER_ST[x.status]||''}</span>${topay.length?`<span class="chip c-warn">к оплате: ${topay.length}</span>`:''}</span>
+    <span class="mono">Заказ ${esc(x.number)}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>${custName(x)?`<span class="oc">${esc(custName(x))}</span>`:''}
+    ${last ? `<span class="ocm" title="${esc(last.text)}"><b>${esc(who(last.by))}:</b> ${esc(last.text.slice(0,120))}${cm.length > 1 ? ` · ещё ${cm.length - 1}` : ''}</span>` : ''}
   </button>`;
 }
 function orderDetail(o){
   const comps = o.components || [];
-  const total = sum(comps, c => num(c.qty)*num(c.price));
   const is = invOf(o.id).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-  const invT = sum(is, i => i.amount), paid = sum(is.filter(i => i.status==='paid'), i => i.amount);
   const ts = tasksOf(o.id);
+  const cm = Array.isArray(o.comments) ? o.comments : [];
+  const canComment = me && me.role !== 'viewer';
   const specs = o.specs || [];
   return `<button class="btn ghost back" data-act="back">← Все заказы</button>
   <div class="ohead">
     <div style="min-width:0">
       <h2>Заказ ${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
-      <div class="dim">${[o.customer && 'Заказчик: '+esc(o.customer), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
+      <div class="dim">${[custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button></div>
   </div>
-  <div class="kpis">
-    <div><span>По спецификации</span><b>${money(total)}</b></div>
-    <div><span>Счета поставщиков</span><b>${money(invT)}</b></div>
-    <div><span>Оплачено</span><b>${money(paid)}</b></div>
-    <div><span>Осталось оплатить</span><b class="${invT-paid>0?'bad':''}">${money(invT-paid)}</b></div>
-  </div>
   <section class="card">
-    <div class="ch"><h3>Спецификации <span class="dim">${specs.length||''}</span></h3>
+    <div class="ch"><h3>Комментарии <span class="dim">${cm.length||''}</span></h3></div>
+    ${cm.length ? `<div class="comments">${cm.map(c => `<div class="cmt"><span class="avatar">${esc(initials(who(c.by)))}</span><div class="body"><div class="meta"><b style="color:var(--ink)">${esc(who(c.by))}</b><span>${esc(fmtDT(c.at))}</span>${me && (c.by === me.id || me.role === 'admin') ? armBtn('c:'+c.id,'✕','delComment',o.id+'|'+c.id,'icon') : ''}</div><p>${esc(c.text)}</p></div></div>`).join('')}</div>` : '<p class="dim" style="margin:0">Комментариев пока нет.</p>'}
+    ${canComment ? `<div class="cform" data-keep><textarea class="in" id="c-text" data-oid="${o.id}" rows="2" placeholder="Написать комментарий… (Ctrl+Enter — отправить)" aria-label="Комментарий">${esc(ui.drafts[o.id]||'')}</textarea><button class="btn primary" data-act="addComment" data-id="${o.id}">Отправить</button></div>` : ''}
+  </section>
+  <section class="card">
+    <div class="ch"><h3>Документы по заказу <span class="dim">${specs.length||''}</span></h3>
       <label class="btn sm">Загрузить файл<input type="file" data-up="spec" data-id="${o.id}" accept="${ACCEPT}" multiple hidden></label></div>
-    ${specs.length ? `<ul class="files">${specs.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at||'').slice(0,10))}</small>${armBtn('spec:'+f.id,'✕','delSpec',o.id+'|'+f.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Файлы спецификации не загружены.</p>'}
-    <p class="hint">Любой формат (PDF, Excel, Word, чертежи), до 50 МБ. Строки спецификации из Excel можно вставить в таблицу компонентов.</p>
+    ${specs.length ? `<ul class="files">${specs.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at||'').slice(0,10))}</small>${armBtn('spec:'+f.id,'✕','delSpec',o.id+'|'+f.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документы не загружены.</p>'}
+    <p class="hint">Спецификации, чертежи, письма и другие файлы: любой формат, до 50 МБ. Строки спецификации из Excel можно вставить в таблицу компонентов.</p>
   </section>
   <section class="card">
     <div class="ch"><h3>Компоненты <span class="dim">${comps.length||''}</span></h3>
@@ -528,7 +574,7 @@ function orderDetail(o){
   </section>
   <section class="card">
     <div class="ch"><h3>План-график заказа</h3><div class="row-g"><a class="btn sm" href="#plan">Открыть график</a><button class="btn sm" data-act="newTask" data-id="o:${o.id}">+ Задача</button></div></div>
-    ${ts.length ? `<ul class="tlist">${ts.map(t => `<li data-act="editTask" data-id="${t.id}" tabindex="0" role="button"><span class="dot ${t.kind}"></span><span class="t">${t.done?'✓ ':''}${esc(t.title)}${t.contractors?'<span class="tagc">подрядчики</span>':''}</span><span class="dim mono">${fmtD(t.start)} – ${fmtD(t.end)}</span>${t.people?`<span class="dim">${t.people} чел.</span>`:''}<span class="dim">${esc(t.resp||'')}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Задач по заказу нет.</p>'}
+    ${ts.length ? `<ul class="tlist">${ts.map(t => `<li data-act="editTask" data-id="${t.id}" tabindex="0" role="button"><span class="dot ${t.kind}"></span><span class="t">${t.done?'✓ ':''}${esc(t.title)}</span><span class="dim mono">${fmtD(t.start)} – ${fmtD(t.end)}</span>${crew(t)?`<span class="dim">${esc(crew(t))}</span>`:''}<span class="dim">${esc(t.resp||'')}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Задач по заказу нет.</p>'}
   </section>`;
 }
 function compTable(o){
@@ -567,6 +613,47 @@ function invRow(i, withPay){
     <span class="ifiles">${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">Счёт</a>`:'<span class="dim">нет файла</span>'}${i.receipt?`<a href="${esc(fileUrl(i.receipt))}" target="_blank" rel="noopener">Чек</a>`:''}${seenNote}</span>
     <span class="iact">${withPay && canPay() && i.status==='topay' ? `<button class="btn sm ok" data-act="openInvoice" data-id="${i.id}">Оплатить</button>` : ''}</span>
   </div>`;
+}
+
+/* ===== Counterparties view ===== */
+const cpHay = x => [x.name, x.inn, x.person, x.phone, x.email, x.address].join(' ').toLowerCase();
+function vCps(){
+  if (!S.counterparties.length) return `<div class="empty"><h3>Контрагентов пока нет</h3>Добавьте заказчиков, поставщиков и подрядчиков: их контакты и договоры будут храниться здесь. Заказчика можно добавить и прямо из карточки заказа.<div class="row-g"><button class="btn primary" data-act="newCp">+ Контрагент</button></div></div>`;
+  const q = ui.cq.trim().toLowerCase();
+  const c = cpOf(ui.cp);
+  const list = cpsSorted().map(x => `<button class="oitem ${ui.cp===x.id?'on':''}" data-act="selCp" data-id="${x.id}" data-q="${esc(cpHay(x))}" ${!q || cpHay(x).includes(q) ? '' : 'hidden'}>
+      <span class="ot">${esc(x.name)}${exTag(x)}</span>${x.person || x.phone ? `<span class="oc">${esc([x.person, x.phone].filter(Boolean).join(' · '))}</span>` : ''}
+      <span class="ometa">${(x.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('')}${(x.contracts||[]).length ? `<span class="chip c-mute">договоров: ${x.contracts.length}</span>` : ''}</span></button>`).join('');
+  return `<div class="split ${c?'has-sel':''}">
+    <nav class="olist" aria-label="Контрагенты">
+      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="cq" type="search" placeholder="Поиск: название, ИНН, контакт" value="${esc(ui.cq)}" aria-label="Поиск контрагента"></span><button class="btn primary" data-act="newCp">+ Контрагент</button></div>
+      <div class="pgroup" id="cplist">${list}<p class="pad dim" id="cnone" ${cpsSorted().some(x => !q || cpHay(x).includes(q)) ? 'hidden' : ''}>Ничего не найдено</p></div>
+    </nav>
+    <section class="odetail">${c ? cpDetail(c) : `<div class="empty"><h3>Выберите контрагента</h3>Слева список организаций. Откройте карточку, чтобы посмотреть контакты и загрузить договоры.</div>`}</section>
+  </div>`;
+}
+function cpDetail(c){
+  const orders = ordersSorted().filter(o => o.customerId === c.id);
+  const ks = (c.contracts || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  const row = (k, val) => `<dt>${k}</dt><dd>${val || '<span class="dim">—</span>'}</dd>`;
+  return `<button class="btn ghost back" data-act="backCp">← Все контрагенты</button>
+  <div class="ohead"><div style="min-width:0"><h2>${esc(c.name)}${exTag(c)}</h2>
+      <div class="roles-chips" style="margin-top:6px">${(c.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('') || '<span class="dim">Роль не указана</span>'}</div></div>
+    <div class="row-g"><button class="btn sm" data-act="editCp" data-id="${c.id}">Изменить</button></div></div>
+  <section class="card cpcard"><div class="ch"><h3>Контактные данные</h3></div><dl class="kv">
+    ${row('ИНН / КПП', esc(c.inn))}${row('Контактное лицо', esc(c.person))}
+    ${row('Телефон', c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g,''))}">${esc(c.phone)}</a>` : '')}
+    ${row('Эл. почта', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
+    ${row('Адрес', esc(c.address))}
+    ${row('Банковские реквизиты', c.bank ? `<span style="white-space:pre-wrap">${esc(c.bank)}</span>` : '')}
+    ${row('Заметки', c.notes ? `<span style="white-space:pre-wrap">${esc(c.notes)}</span>` : '')}
+  </dl></section>
+  <section class="card"><div class="ch"><h3>Договоры <span class="dim">${ks.length||''}</span></h3><button class="btn sm primary" data-act="newContract" data-id="${c.id}">+ Договор</button></div>
+    ${ks.length ? `<ul class="files">${ks.map(k => `<li>${k.file ? `<a href="${esc(fileUrl(k.file))}" target="_blank" rel="noopener">` : '<span style="flex:1">'}Договор № ${esc(k.number || 'б/н')}${k.date ? ' от ' + fmtD(k.date) : ''}${k.file ? '</a>' : '</span>'}<small>${esc([k.subject, k.file && k.file.name, k.file && fmtSize(k.file.size)].filter(Boolean).join(' · '))}</small>${armBtn('k:'+k.id,'✕','delContract',c.id+'|'+k.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Договоры не загружены.</p>'}
+  </section>
+  <section class="card"><div class="ch"><h3>Заказы <span class="dim">${orders.length||''}</span></h3></div>
+    ${orders.length ? `<ul class="tlist">${orders.map(o => `<li data-act="gotoOrder" data-id="${o.id}" tabindex="0" role="button"><span class="t">Заказ ${esc(o.number)} · ${esc(o.title)}</span><span class="chip c-${o.status||'new'}">${ORDER_ST[o.status||'new']}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Заказов с этим заказчиком нет.</p>'}
+  </section>`;
 }
 
 /* ===== Accounting view ===== */
@@ -630,9 +717,9 @@ function vPlan(){
     <select class="f" id="planOrd" aria-label="Заказ"><option value="">Все заказы</option><option value="_" ${ui.planOrd==='_'?'selected':''}>Общие работы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.planOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
     <div class="seg"><button data-act="scale" data-id="day" class="${ui.scale==='day'?'on':''}">Дни</button><button data-act="scale" data-id="week" class="${ui.scale==='week'?'on':''}">Недели</button></div>
     <button class="btn primary" data-act="newTask" data-id="${ui.planOrd && ui.planOrd !== '_' ? ui.planOrd : ''}">+ Задача</button>
-    <div class="legend"><span><i class="dot buy"></i>Закупка</span><span><i class="dot work"></i>Работа</span><span><i class="dot work" style="background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.45) 0 2px,transparent 2px 4px)"></i>Нужны подрядчики</span><span><i class="dot" style="background:var(--bad);width:2px;height:14px"></i>Сегодня</span><span><i class="dot" style="border-left:2px dashed var(--warn);border-radius:0;width:2px;height:14px"></i>Срок заказа</span></div>
+    <div class="legend"><span><i class="dot buy"></i>Закупка</span><span><i class="dot work"></i>Работа</span><span><i class="dot work" style="background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.45) 0 2px,transparent 2px 4px)"></i>С подрядчиками</span><span><i class="dot" style="background:var(--bad);width:2px;height:14px"></i>Сегодня</span><span><i class="dot" style="border-left:2px dashed var(--warn);border-radius:0;width:2px;height:14px"></i>Срок заказа</span></div>
   </div>`;
-  if (!tasks.length) return head + `<div class="empty"><h3>План-график пуст</h3>Добавьте закупку или работу с датами начала и окончания, количеством людей и отметкой о подрядчиках. Задачу можно привязать к заказу.</div>`;
+  if (!tasks.length) return head + `<div class="empty"><h3>План-график пуст</h3>Добавьте закупку или работу с датами начала и окончания, количеством своих людей и бригад подрядчиков. Задачу можно привязать к заказу.</div>`;
   const tn = dnum(today());
   let lo = Math.min(tn, ...tasks.map(t => dnum(t.start))) - 3;
   let hi = Math.max(tn, ...tasks.map(t => dnum(t.end))) + 10;
@@ -647,15 +734,15 @@ function vPlan(){
   }
   const todayLine = `<i class="g-today" style="left:${(tn-lo)*DW + DW/2 - 1}px"></i>`;
   const track = (inner, extra='') => `<div class="g-track" style="width:${W}px">${todayLine}${extra}${inner}</div>`;
-  const tip = t => `${t.title}: ${fmtD(t.start)} – ${fmtD(t.end)}${t.people?` · ${t.people} чел.`:''}${t.contractors?` · нужны подрядчики${t.contractorsNote?': '+t.contractorsNote:''}`:''}${t.resp?' · '+t.resp:''}`;
+  const tip = t => `${t.title}: ${fmtD(t.start)} – ${fmtD(t.end)}${crew(t)?' · '+crew(t):''}${t.resp?' · '+t.resp:''}`;
   const bar = t => {
     const s = dnum(t.start), e = Math.max(s, dnum(t.end)), w = (e - s + 1) * DW;
     const late = !t.done && e < tn;
-    const text = (t.done?'✓ ':'') + t.title + (t.people ? ` · ${t.people} чел.` : '');
-    return `<button class="bar ${t.kind} ${t.done?'done':''} ${late?'late':''} ${t.contractors?'contr':''}" style="left:${(s-lo)*DW}px;width:${w}px" data-act="editTask" data-id="${t.id}" title="${esc(tip(t))}">${w > 70 ? esc(text) : ''}</button>`;
+    const text = (t.done?'✓ ':'') + t.title + (crewShort(t) ? ' · ' + crewShort(t) : '');
+    return `<button class="bar ${t.kind} ${t.done?'done':''} ${late?'late':''} ${brigadesOf(t)?'contr':''}" style="left:${(s-lo)*DW}px;width:${w}px" data-act="editTask" data-id="${t.id}" title="${esc(tip(t))}">${w > 70 ? esc(text) : ''}</button>`;
   };
-  const meta = t => [KIND[t.kind], t.people ? t.people + ' чел.' : '', t.resp].filter(Boolean).map(esc).join(' · ');
-  const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}${t.contractors?'<span class="tagc">подрядчики</span>':''}<small>${meta(t)}${t.contractors && t.contractorsNote ? '<br>Подрядчики: '+esc(t.contractorsNote) : ''}</small></div>${track(bar(t))}</div>`;
+  const meta = t => [KIND[t.kind], crew(t), t.resp].filter(Boolean).map(esc).join(' · ');
+  const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}<small>${meta(t)}</small></div>${track(bar(t))}</div>`;
   const byStart = (a,b) => a.start.localeCompare(b.start);
   let rows = '';
   ordersSorted().slice().reverse().forEach(o => {
@@ -671,7 +758,7 @@ function vPlan(){
   for (let d = lo; d <= hi; d++) { per.push(0); con.push(0); }
   tasks.forEach(t => {
     const s = Math.max(lo, dnum(t.start)), e = Math.min(hi, Math.max(dnum(t.start), dnum(t.end)));
-    for (let d = s; d <= e; d++) { per[d-lo] += Number(t.people) || 0; if (t.contractors) con[d-lo]++; }
+    for (let d = s; d <= e; d++) { per[d-lo] += Number(t.people) || 0; con[d-lo] += brigadesOf(t); }
   });
   const cells = (arr, cls) => {
     let h = '';
@@ -680,15 +767,15 @@ function vPlan(){
     return h;
   };
   const hasPeople = per.some(Boolean), hasCon = con.some(Boolean);
-  if (hasPeople) rows += `<div class="g-row g-load"><div class="g-lab">Людей${ui.scale==='week'?' (макс. в неделю)':' в день'}</div>${track(cells(per,'p'))}</div>`;
-  if (hasCon) rows += `<div class="g-row g-load"><div class="g-lab">Работ с подрядчиками</div>${track(cells(con,'c'))}</div>`;
+  if (hasPeople) rows += `<div class="g-row g-load"><div class="g-lab">Своих людей${ui.scale==='week'?' (макс. в неделю)':' в день'}</div>${track(cells(per,'p'))}</div>`;
+  if (hasCon) rows += `<div class="g-row g-load"><div class="g-lab">Бригад подрядчиков${ui.scale==='week'?' (макс.)':' в день'}</div>${track(cells(con,'c'))}</div>`;
   return head + `<div class="gantt ${ui.scale}" style="--dw:${DW}px"><div style="width:calc(var(--lw) + ${W}px)">
     <div class="g-row g-head"><div class="g-lab">Задача</div><div class="g-track" style="width:${W}px">${months}${weeks}</div></div>${rows}
   </div></div>`;
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer();
+function openDrawer(kind, id, ctx){ ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
   setTimeout(() => { const f = $('drawer').querySelector('.d-body input:not([type=file]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){ ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
@@ -702,10 +789,12 @@ function renderDrawer(){
   if (d.kind === 'order') {
     const o = ord(d.id), hasInv = o && invOf(o.id).length;
     D.innerHTML = dh(o ? 'Заказ ' + esc(o.number) : 'Новый заказ') + `<form class="d-body" data-form="order"><div class="form">
-      <label>Номер заказа<input class="in" id="f-num" value="${v(o,'number')}" placeholder="З-114" required></label>
+      <label>Номер заказа${o?'':' <span class="dim">(присвоен автоматически)</span>'}<input class="in" id="f-num" value="${o ? v(o,'number') : esc(nextOrderNumber())}" required></label>
       <label>Статус<select class="in" id="f-st">${opt(ORDER_ST, o?.status||'new')}</select></label>
       <label class="wide">Наименование<input class="in" id="f-title" value="${v(o,'title')}" placeholder="Шкаф управления ШУ-3" required></label>
-      <label>Заказчик / получатель<input class="in" id="f-cust" value="${v(o,'customer')}"></label>
+      <label class="wide">Заказчик / получатель<input class="in" id="f-cust" list="cp-list" autocomplete="off" value="${esc(custName(o))}" placeholder="Начните вводить название контрагента">
+        <datalist id="cp-list">${cpsSorted().map(c => `<option value="${esc(c.name)}">${esc([...(c.roles||[]).map(r => CP_ROLES[r]), c.inn && 'ИНН '+c.inn].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>
+        <span class="cphint" id="cp-hint" hidden></span></label>
       <label>Срок сдачи<input class="in" type="date" id="f-dl" value="${v(o,'deadline')}"></label>
       <label>№ выставленного счёта<input class="in" id="f-bill" value="${v(o,'billNo')}" placeholder="СЧ-0142"></label>
       <label>Дата выставленного счёта<input class="in" type="date" id="f-billdate" value="${v(o,'billDate')}"></label></div>
@@ -714,13 +803,42 @@ function renderDrawer(){
       <div class="row-g"><button class="btn primary" type="submit">${o?'Сохранить':'Создать заказ'}</button><button class="btn" type="button" data-act="close">Отмена</button>
       ${o ? (hasInv ? '<span class="dim" style="font-size:13px">Заказ со счетами удалить нельзя</span>' : armBtn('ord','Удалить заказ','delOrder',o.id)) : ''}</div></form>`;
   }
+  if (d.kind === 'cpForm') {
+    const c = cpOf(d.id), used = c && S.orders.some(o => o.customerId === c.id);
+    const roles = c ? (c.roles || []) : (d.ctx ? [d.ctx] : ['customer']);
+    D.innerHTML = dh(c ? esc(c.name) : 'Новый контрагент') + `<form class="d-body" data-form="cp"><div class="form">
+      <label class="wide">Название<input class="in" id="cp-name" value="${v(c,'name')}" placeholder="ООО «ЭлектроКомплект»" required></label>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Роль</span><div class="row-g" style="margin-top:6px">${Object.entries(CP_ROLES).map(([k,l]) => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="cp-role" value="${k}" ${roles.includes(k)?'checked':''}> ${l}</label>`).join('')}</div></div>
+      <label>ИНН / КПП<input class="in mono" id="cp-inn" value="${v(c,'inn')}" placeholder="7701234567 / 770101001"></label>
+      <label>Контактное лицо<input class="in" id="cp-person" value="${v(c,'person')}" placeholder="Петров Иван Сергеевич"></label>
+      <label>Телефон<input class="in" id="cp-phone" type="tel" value="${v(c,'phone')}" placeholder="+7 900 123-45-67"></label>
+      <label>Эл. почта<input class="in" id="cp-email" type="email" value="${v(c,'email')}" placeholder="zakaz@example.ru"></label>
+      <label class="wide">Адрес<input class="in" id="cp-addr" value="${v(c,'address')}"></label>
+      <label class="wide">Банковские реквизиты<textarea id="cp-bank" rows="3">${v(c,'bank')}</textarea></label>
+      <label class="wide">Заметки<textarea id="cp-notes" rows="3">${v(c,'notes')}</textarea></label></div>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">${c?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button>
+      ${c ? (used ? '<span class="dim" style="font-size:13px">Контрагент указан в заказах, удалить нельзя</span>' : armBtn('cp','Удалить','delCp',c.id)) : ''}</div></form>`;
+  }
+  if (d.kind === 'contract') {
+    const c = cpOf(d.id);
+    D.innerHTML = dh('Договор с ' + esc(c?.name || '')) + `<form class="d-body" data-form="contract"><div class="form">
+      <label>Номер договора<input class="in" id="k-num" placeholder="12/2026-П"></label>
+      <label>Дата<input class="in" type="date" id="k-date" value="${today()}"></label>
+      <label class="wide">Предмет договора<input class="in" id="k-subj" placeholder="Поставка электрооборудования"></label>
+      <label class="wide">Файл договора<input class="in" type="file" id="k-file" required></label></div>
+      <p class="hint" style="margin:0">Любой формат: скан PDF, Word, изображение. До 50 МБ.</p>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">Загрузить договор</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
+  }
   if (d.kind === 'invoiceForm') {
     const i = inv(d.id);
     D.innerHTML = dh(i ? 'Изменить счёт' : 'Новый счёт на оплату') + `<form class="d-body" data-form="invoice"><div class="form">
       <label class="wide">Заказ<select class="in" id="f-ord" required>${orderOpts(i?.orderId || d.ctx)}</select></label>
       <label>Номер счёта<input class="in" id="f-num" value="${v(i,'number')}" placeholder="1482" required></label>
       <label>Дата счёта<input class="in" type="date" id="f-date" value="${esc(i?.date || today())}"></label>
-      <label class="wide">Поставщик<input class="in" id="f-sup" value="${v(i,'supplier')}" placeholder="ООО «ЭлектроКомплект»" required></label>
+      <label class="wide">Поставщик<input class="in" id="f-sup" list="sup-list" autocomplete="off" value="${v(i,'supplier')}" placeholder="ООО «ЭлектроКомплект»" required>
+        <datalist id="sup-list">${cpsSorted().map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist></label>
       <label>Сумма, ₽ с НДС<input class="in mono" id="f-amt" value="${v(i,'amount')}" inputmode="decimal" placeholder="125 400,00" required></label>
       <label>Оплатить до<input class="in" type="date" id="f-due" value="${v(i,'due')}"></label>
       <label class="wide">Назначение платежа<input class="in" id="f-purp" value="${v(i,'purpose')}" placeholder="Автоматические выключатели по спецификации"></label>
@@ -774,9 +892,8 @@ function renderDrawer(){
       <label class="wide">Название<input class="in" id="t-title" value="${v(t,'title')}" placeholder="Закупка кабельной продукции" required></label>
       <label>Начало<input class="in" type="date" id="t-start" value="${esc(st)}" required></label>
       <label>Окончание<input class="in" type="date" id="t-end" value="${esc(t?.end || dstr(dnum(st)+7))}" required></label>
-      <label>Количество людей<input class="in mono" type="number" id="t-people" min="0" max="999" step="1" inputmode="numeric" value="${esc(t?.people || '')}" placeholder="0"></label>
-      <label class="chk" style="align-self:end;padding-bottom:9px"><input type="checkbox" id="t-contr" ${t?.contractors?'checked':''}> Нужны подрядчики</label>
-      <label class="wide" id="t-cnote-wrap" ${t?.contractors?'':'hidden'}>Какие подрядчики или работы<input class="in" id="t-cnote" value="${v(t,'contractorsNote')}" placeholder="Электромонтаж, 2 бригады"></label>
+      <label>Своих людей, чел.<input class="in mono" type="number" id="t-people" min="0" max="999" step="1" inputmode="numeric" value="${esc(t?.people || '')}" placeholder="0"></label>
+      <label>Бригад подрядчиков<input class="in mono" type="number" id="t-brig" min="0" max="99" step="1" inputmode="numeric" value="${esc(t ? (brigadesOf(t) || '') : '')}" placeholder="0"></label>
       <label class="wide chk"><input type="checkbox" id="t-done" ${t?.done?'checked':''}> Выполнено</label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${t?'Сохранить':'Добавить в график'}</button><button class="btn" type="button" data-act="close">Отмена</button>${t?armBtn('task','Удалить','delTask',t.id):''}</div></form>`;
@@ -829,10 +946,30 @@ async function onSubmit(e){
     btn.disabled = true;
     if (kind === 'order') {
       if (!val('f-num') || !val('f-title')) return fail('Укажите номер и наименование заказа.');
-      const data = { number:val('f-num'), status:val('f-st'), title:val('f-title'), customer:val('f-cust'), deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
+      const dup = S.orders.find(x => x.id !== d.id && String(x.number||'').trim().toLowerCase() === val('f-num').toLowerCase());
+      if (dup) return fail(`Номер ${val('f-num')} уже есть у заказа «${dup.title}». Укажите другой.`);
+      let cust = cpByName(val('f-cust'));
+      if (!cust && val('f-cust')) { const cid = await add('counterparties', { name:val('f-cust'), roles:['customer'], contracts:[], createdAt:now }); cust = cpOf(cid) || { id:cid, name:val('f-cust') }; toast('Контрагент «' + val('f-cust') + '» добавлен'); }
+      const data = { number:val('f-num'), status:val('f-st'), title:val('f-title'), customerId: cust ? cust.id : null, customer: cust ? cust.name : '', deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
       if (d.id) { await upd('orders', d.id, data); }
       else { const id = await add('orders', { ...data, components:[], specs:[], createdAt:now }); ui.order = id; remember(); }
       closeDrawer(); render(); toast(d.id ? 'Заказ сохранён' : 'Заказ создан');
+    }
+    if (kind === 'cp') {
+      const name = val('cp-name'); if (!name) return fail('Укажите название контрагента.');
+      const same = cpByName(name); if (same && same.id !== d.id) return fail('Контрагент с таким названием уже есть.');
+      const data = { name, roles:[...f.querySelectorAll('[name=cp-role]:checked')].map(x => x.value), inn:val('cp-inn'), person:val('cp-person'), phone:val('cp-phone'), email:val('cp-email'), address:val('cp-addr'), bank:$('cp-bank').value.trim(), notes:$('cp-notes').value.trim() };
+      if (d.id) await upd('counterparties', d.id, data);
+      else { const id = await add('counterparties', { ...data, contracts:[], createdAt:now }); ui.cp = id; }
+      closeDrawer(); render(); toast(d.id ? 'Сохранено' : 'Контрагент добавлен');
+    }
+    if (kind === 'contract') {
+      const file = $('k-file').files[0]; if (!file) return fail('Выберите файл договора.');
+      fail('Загружаем файл…');
+      const up = await upload(file);
+      const c = cpOf(d.id);
+      await upd('counterparties', d.id, { contracts:[...(c.contracts||[]), { id:uid(), number:val('k-num'), date:val('k-date'), subject:val('k-subj'), file:up, at:now }] });
+      closeDrawer(); render(); toast('Договор загружен');
     }
     if (kind === 'invoice') {
       const o = ord(val('f-ord'));
@@ -862,9 +999,10 @@ async function onSubmit(e){
       const s = val('t-start'), en = val('t-end');
       if (!s || !en) return fail('Укажите даты начала и окончания.');
       if (en < s) return fail('Окончание не может быть раньше начала.');
-      const contractors = $('t-contr').checked;
+      const brigades = val('t-brig') === '' ? 0 : Math.round(num(val('t-brig')));
+      if (brigades < 0 || brigades > 99) return fail('Бригад подрядчиков — от 0 до 99.');
       const data = { orderId: tg || null, kind:val('t-kind'), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
-        people, contractors, contractorsNote: contractors ? val('t-cnote') : '' };
+        people, brigades, contractors: brigades > 0, contractorsNote: '' };
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
       closeDrawer(); render(); toast(d.id ? 'Задача сохранена' : 'Задача добавлена в план-график');
     }
@@ -898,6 +1036,17 @@ async function onSubmit(e){
 }
 
 /* ---------- actions ---------- */
+const val2 = id => ($(id)?.value || '').trim();
+function custHint(){
+  const h = $('cp-hint'); if (!h) return;
+  const name = val2('f-cust');
+  if (!name) { h.hidden = true; return; }
+  const c = cpByName(name);
+  h.hidden = false;
+  h.innerHTML = c ? `<span style="color:var(--ok)">✓ Контрагент из списка</span>`
+    : canEdit() ? `<span class="dim">«${esc(name)}» нет в списке контрагентов.</span><button type="button" class="btn sm" data-act="quickCp">+ Добавить в контрагенты</button><span class="dim">или он добавится при сохранении</span>`
+    : `<span class="dim">«${esc(name)}» нет в списке контрагентов.</span>`;
+}
 function disarm(){ ui.armed = null; document.querySelectorAll('[data-arm].armed').forEach(b => { b.classList.remove('armed'); b.textContent = b.dataset.label; }); }
 function drawerBusy(){ const a = document.activeElement; return $('drawer').contains(a) && a.matches('input,textarea,select'); }
 async function act(el){
@@ -920,6 +1069,27 @@ async function act(el){
     case 'back': ui.order = null; remember(); return render();
     case 'gotoOrder': closeDrawer(); ui.order = id; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); return;
     case 'newOrder': return openDrawer('order');
+    case 'selCp': ui.cp = id; render(); window.scrollTo({top:0}); return;
+    case 'backCp': ui.cp = null; return render();
+    case 'gotoCp': closeDrawer(); ui.cp = id; if (location.hash !== '#cps') location.hash = 'cps'; else render(); return;
+    case 'newCp': return openDrawer('cpForm');
+    case 'editCp': return openDrawer('cpForm', id);
+    case 'delCp': await guard(del('counterparties', id)); if (ui.cp === id) ui.cp = null; closeDrawer(); render(); return toast('Контрагент удалён');
+    case 'newContract': return openDrawer('contract', id);
+    case 'delContract': { const [cid, kid] = id.split('|'); const c = cpOf(cid); await guard(upd('counterparties', cid, { contracts:(c.contracts||[]).filter(k => k.id !== kid) })); return render(); }
+    case 'quickCp': {
+      const name = val2('f-cust'); if (!name || cpByName(name)) return;
+      try { await add('counterparties', { name, roles:['customer'], contracts:[], createdAt:new Date().toISOString() }); custHint(); toast('Контрагент «' + name + '» добавлен'); } catch(e) { toast(errText(e)); }
+      return;
+    }
+    case 'addComment': {
+      const ta = $('c-text'); const text = (ta?.value || '').trim(); if (!text) { ta?.focus(); return; }
+      el.disabled = true;
+      try { await api('POST', `/api/orders/${id}/comments`, { text }); ui.drafts[id] = ''; ta.value = ''; document.activeElement?.blur(); await refresh(); }
+      catch(e) { toast(errText(e)); } finally { el.disabled = false; }
+      return;
+    }
+    case 'delComment': { const [oid, cid] = id.split('|'); try { await api('DELETE', `/api/orders/${oid}/comments/${cid}`); await refresh(); } catch(e) { toast(errText(e)); } return; }
     case 'editOrder': return openDrawer('order', id);
     case 'newInvoice': return openDrawer('invoiceForm', null, id);
     case 'editInvoice': return openDrawer('invoiceForm', id);
@@ -975,23 +1145,30 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('upop').hidden) { $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded','false'); $('ubtn').focus(); return; }
   if (e.key === 'Escape' && ui.drawer) return closeDrawer();
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.id === 'c-text') { e.preventDefault(); const b = document.querySelector('[data-act=addComment]'); if (b) act(b); return; }
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button][data-act]')) { e.preventDefault(); act(e.target); }
 });
 $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
-  if (e.target.id !== 'oq') return;
-  ui.oq = e.target.value; const q = ui.oq.trim().toLowerCase(); let any = false;
-  document.querySelectorAll('#olist .oitem').forEach(b => { const ok = !q || b.dataset.q.includes(q); b.hidden = !ok; any = any || ok; });
-  const none = $('onone'); if (none) none.hidden = any;
+  const t = e.target;
+  if (t.id === 'c-text') { ui.drafts[t.dataset.oid] = t.value; return; }
+  if (t.id === 'f-cust') return custHint();
+  if (t.id !== 'oq' && t.id !== 'cq') return;
+  const q = t.value.trim().toLowerCase(); let any = false;
+  if (t.id === 'oq') ui.oq = t.value; else ui.cq = t.value;
+  const box = t.id === 'oq' ? '#olist' : '#cplist';
+  document.querySelectorAll(box + ' .oitem').forEach(b => { const ok = !q || b.dataset.q.includes(q); b.hidden = !ok; any = any || ok; });
+  document.querySelectorAll(box + ' details').forEach(dt => { const vis = [...dt.querySelectorAll('.oitem')].some(b => !b.hidden); dt.hidden = !vis; if (q && vis) dt.open = true; });
+  const none = $(t.id === 'oq' ? 'onone' : 'cnone'); if (none) none.hidden = any;
 });
+document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-st=closed]')) ui.openClosed = e.target.open; }, true);
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; return; }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
-  if (t.id === 't-contr') { $('t-cnote-wrap').hidden = !t.checked; if (t.checked) $('t-cnote').focus(); return; }
   if (t.classList.contains('ci')) {
     const tr = t.closest('tr'), table = t.closest('table'), o = ord(table.dataset.oid); if (!o) return;
     const comps = (o.components||[]).map(c => ({ ...c }));
@@ -1011,7 +1188,7 @@ document.addEventListener('change', async e => {
         toast('Загружаем…');
         const ups = []; for (const f of files) ups.push(await upload(f));
         const o = ord(t.dataset.id); await upd('orders', o.id, { specs:[...(o.specs||[]), ...ups] }); render();
-        toast(ups.length > 1 ? `Загружено файлов: ${ups.length}` : 'Спецификация загружена');
+        toast(ups.length > 1 ? `Загружено файлов: ${ups.length}` : 'Документ загружен');
       } else if (t.dataset.up === 'receipt') {
         $('rerr').textContent = 'Загружаем чек…';
         const r = await upload(files[0]); await upd('invoices', t.dataset.id, { receipt:r }); renderDrawer(); render(); toast('Чек приложен');
@@ -1021,7 +1198,7 @@ document.addEventListener('change', async e => {
 });
 function route(){
   const h = location.hash.slice(1);
-  ui.view = ['orders','pay','plan'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
+  ui.view = ['orders','cps','pay','plan'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   render();
 }

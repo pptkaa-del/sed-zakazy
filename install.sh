@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Документооборот по заказам: установка и обновление одной командой.
+# Управление предприятием: установка и обновление одной командой.
 #
 #   bash install.sh [домен] [--email почта] [--port 80] [--mode shared|server] [--branch main]
 #
@@ -232,7 +232,7 @@ smoke_test "$NODE" "$APP_DIR"
 
 cat > /etc/systemd/system/$SVC.service <<EOF
 [Unit]
-Description=Документооборот по заказам
+Description=Управление предприятием
 After=network.target
 
 [Service]
@@ -277,7 +277,7 @@ if [ -f "$NGX" ] && grep -q 'managed by Certbot' "$NGX"; then
   ok "Конфигурация nginx с сертификатом уже есть, не трогаю: $NGX"
 else
   cat > "$NGX" <<EOF
-# Документооборот по заказам — создано install.sh
+# Управление предприятием — создано install.sh
 server {
     listen $LISTEN;
     server_name $SERVER_NAME;

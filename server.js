@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 /*
- * Документооборот по заказам — сервер.
+ * Управление предприятием — сервер.
  * Только встроенные модули Node.js (22+), без npm-зависимостей.
  *
  *   node server.js                         запустить сервер
@@ -47,7 +47,7 @@ const SESSION_DAYS = Number(process.env.SESSION_DAYS || 14);
 const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 
-const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks'];
+const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties'];
 const ROLES = {
   admin:      'Администратор',
   manager:    'Менеджер',
@@ -307,6 +307,30 @@ async function api(req, res, url) {
     return send(res, 200, { id, url: '/files/' + id, name, size: buf.length, at: db.files[id].at, by: user.id });
   }
 
+  /* comments on orders: everyone except «Просмотр» may write; author or admin may delete */
+  if (p[1] === 'orders' && p[3] === 'comments') {
+    const o = db.orders[p[2]];
+    if (!o) return fail(res, 404, 'Заказ не найден');
+    o.comments = Array.isArray(o.comments) ? o.comments : [];
+    if (m === 'POST' && p.length === 4) {
+      if (user.role === 'viewer') return fail(res, 403, 'Недостаточно прав');
+      const { text = '' } = await readJsonBody(req);
+      const t = String(text).trim().slice(0, 2000);
+      if (!t) return fail(res, 400, 'Пустой комментарий');
+      const c = { id: newId(), by: user.id, at: new Date().toISOString(), text: t };
+      o.comments.push(c); saveDb();
+      return send(res, 200, c);
+    }
+    if (m === 'DELETE' && p.length === 5) {
+      const c = o.comments.find(x => x.id === p[4]);
+      if (!c) return fail(res, 404, 'Комментарий не найден');
+      if (c.by !== user.id && user.role !== 'admin') return fail(res, 403, 'Удалить можно только свой комментарий');
+      o.comments = o.comments.filter(x => x.id !== c.id); saveDb();
+      return send(res, 200, { ok: true });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+
   const col = p[1], id = p[2];
   if (!COLLECTIONS.includes(col) || p.length > 3) return fail(res, 404, 'Не найдено');
 
@@ -314,6 +338,7 @@ async function api(req, res, url) {
     if (!(col === 'invoices' ? canAddInvoice(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
     const data = clean(await readJsonBody(req));
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
+    if (col === 'orders') data.comments = [];
     if (col === 'invoices') {
       if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
       data.projectId = db.orders[data.orderId].projectId || null;
@@ -327,6 +352,7 @@ async function api(req, res, url) {
   if (m === 'PATCH') {
     const patch = clean(await readJsonBody(req));
     delete patch.createdBy; delete patch.createdAt;
+    if (col === 'orders') delete patch.comments;   // comments go through their own endpoint
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     const keys = Object.keys(patch);
     const payKeys = col === 'invoices' ? keys.filter(k => PAY_FIELDS.includes(k)) : [];
@@ -355,6 +381,7 @@ async function api(req, res, url) {
     if (!canEdit(user) && !(col === 'invoices' && ownsInvoice(user, d))) return fail(res, 403, 'Недостаточно прав');
     if (col === 'projects' && listOf('orders').some(o => o.projectId === id)) return fail(res, 409, 'В проекте есть заказы');
     if (col === 'orders' && listOf('invoices').some(i => i.orderId === id)) return fail(res, 409, 'По заказу есть счета');
+    if (col === 'counterparties' && listOf('orders').some(o => o.customerId === id)) return fail(res, 409, 'Контрагент указан заказчиком в заказах');
     if (col === 'invoices' && d.status === 'paid') return fail(res, 409, 'Оплаченный счёт удалить нельзя');
     delete db[col][id]; saveDb();
     return send(res, 200, { ok: true, rev: db.rev });
@@ -534,10 +561,10 @@ function startServer() {
     try { fs.unlinkSync(LISTEN_SOCKET); } catch {}
     server.listen(LISTEN_SOCKET, () => {
       try { fs.chmodSync(LISTEN_SOCKET, 0o666); } catch {}
-      console.log(`Документооборот запущен на сокете ${LISTEN_SOCKET}  (данные: ${DATA_DIR})`);
+      console.log(`Управление предприятием: запущено на сокете ${LISTEN_SOCKET}  (данные: ${DATA_DIR})`);
     });
   } else {
-    server.listen(PORT, HOST, () => console.log(`Документооборот запущен: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  (данные: ${DATA_DIR})`));
+    server.listen(PORT, HOST, () => console.log(`Управление предприятием: запущено на http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}  (данные: ${DATA_DIR})`));
   }
   if (!users.length) console.log('Пользователей нет: откройте сайт в браузере и создайте администратора.');
   const stop = () => server.close(() => process.exit(0));
