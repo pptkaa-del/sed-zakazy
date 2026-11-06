@@ -287,6 +287,11 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, makeSession(user), SESSION_DAYS * 86400) });
   }
 
+  if (p[1] === 'invoices-zip' && m === 'GET') {
+    if (!canPay(user)) return fail(res, 403, 'Скачивать архив счетов может бухгалтер или администратор');
+    return sendInvoicesZip(res, user, url.searchParams.get('order') || '');
+  }
+
   if (p[1] === 'files' && m === 'POST') {
     if (!canEdit(user) && !canPay(user) && !canAddInvoice(user)) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
     let name = 'файл';
@@ -311,7 +316,7 @@ async function api(req, res, url) {
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
     if (col === 'invoices') {
       if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
-      data.projectId = db.orders[data.orderId].projectId;
+      data.projectId = db.orders[data.orderId].projectId || null;
       data.status = 'topay'; [...PAY_FIELDS.slice(1), ...SEEN_FIELDS].forEach(f => delete data[f]);
     }
     const nid = newId(); db[col][nid] = data; saveDb();
@@ -330,7 +335,7 @@ async function api(req, res, url) {
     if (keys.length > payKeys.length && !mayEdit) return fail(res, 403, 'Недостаточно прав');
     if (col === 'invoices' && patch.orderId !== undefined) {
       if (!db.orders[patch.orderId]) return fail(res, 400, 'Заказ не найден');
-      patch.projectId = db.orders[patch.orderId].projectId;
+      patch.projectId = db.orders[patch.orderId].projectId || null;
     }
     if (col === 'invoices' && patch.file !== undefined && (patch.file && patch.file.id) !== (db[col][id].file && db[col][id].file.id)) {
       SEEN_FIELDS.forEach(f => { patch[f] = null; });   // new invoice file: the accountant has not seen it yet
@@ -359,18 +364,115 @@ async function api(req, res, url) {
 const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role, roleName: ROLES[u.role] });
 const adminUser = u => ({ ...publicUser(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
-/* Remember that the accountant has opened the invoice file */
-function markSeen(user, fileId) {
+/* Remember that the accountant has opened the invoice file(s) */
+function markSeen(user, fileIds) {
   if (user.role !== 'accountant') return;
+  const ids = new Set([].concat(fileIds));
   const now = new Date().toISOString();
   let changed = false;
   for (const inv of Object.values(db.invoices)) {
-    if (!inv.file || inv.file.id !== fileId) continue;
+    if (!inv.file || !ids.has(inv.file.id)) continue;
     if (!inv.seenAt) { inv.seenAt = now; inv.seenBy = user.id; }
     inv.seenLastAt = now; inv.seenCount = (inv.seenCount || 0) + 1;
     changed = true;
   }
   if (changed) saveDb();
+}
+
+/* ---------- ZIP of invoices to pay (stored, no compression; no dependencies) ---------- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+const safeName = s => String(s || '').replace(/[\\/:*?"<>|\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'без названия';
+function writeAsync(res, buf) { return new Promise(r => { if (res.write(buf)) r(); else res.once('drain', r); }); }
+
+async function sendInvoicesZip(res, user, orderFilter) {
+  const list = Object.entries(db.invoices).map(([id, i]) => ({ id, ...i }))
+    .filter(i => i.status === 'topay' && (!orderFilter || i.orderId === orderFilter))
+    .sort((a, b) => String((db.orders[a.orderId] || {}).number || '').localeCompare(String((db.orders[b.orderId] || {}).number || ''), 'ru', { numeric: true })
+      || String(a.due || '9').localeCompare(String(b.due || '9')));
+  if (!list.length) return fail(res, 404, 'Нет счетов к оплате');
+
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+  const used = new Set(), central = [], seenIds = [];
+  const unique = name => {
+    let n = name, k = 2; const dot = name.lastIndexOf('.');
+    while (used.has(n.toLowerCase())) { n = dot > name.lastIndexOf('/') ? `${name.slice(0, dot)} (${k})${name.slice(dot)}` : `${name} (${k})`; k++; }
+    used.add(n.toLowerCase()); return n;
+  };
+  const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const money = n => (Number(n) || 0).toFixed(2).replace('.', ',');
+  const fmtD = d => d ? String(d).split('-').reverse().join('.') : '';
+  const rows = [['Заказ', 'Выставлен счёт заказчику', '№ счёта', 'Дата счёта', 'Поставщик', 'Назначение', 'Сумма, ₽', 'Оплатить до', 'Файл в архиве']];
+  let total = 0;
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const zipName = `Счета к оплате ${stamp}.zip`;
+  res.writeHead(200, {
+    ...SEC_HEADERS,
+    'Content-Type': 'application/zip',
+    'Content-Disposition': `attachment; filename="invoices-${stamp}.zip"; filename*=UTF-8''${encodeURIComponent(zipName)}`,
+    'Cache-Control': 'no-store',
+  });
+  let offset = 0;
+  const addEntry = async (name, data) => {
+    const nameBuf = Buffer.from(name, 'utf8'), crc = crc32(data);
+    const h = Buffer.alloc(30);
+    h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6); h.writeUInt16LE(0, 8);
+    h.writeUInt16LE(dosTime, 10); h.writeUInt16LE(dosDate, 12); h.writeUInt32LE(crc, 14);
+    h.writeUInt32LE(data.length, 18); h.writeUInt32LE(data.length, 22); h.writeUInt16LE(nameBuf.length, 26); h.writeUInt16LE(0, 28);
+    central.push({ nameBuf, crc, size: data.length, offset });
+    await writeAsync(res, h); await writeAsync(res, nameBuf); await writeAsync(res, data);
+    offset += 30 + nameBuf.length + data.length;
+  };
+
+  for (const i of list) {
+    const o = db.orders[i.orderId] || {};
+    const folder = safeName(`Заказ ${o.number || '—'} ${o.title || ''}`);
+    let inZip = 'нет файла';
+    const meta = i.file && db.files[i.file.id];
+    if (meta) {
+      const fp = path.join(FILES_DIR, i.file.id);
+      let data = null; try { data = fs.readFileSync(fp); } catch {}
+      if (data) {
+        const orig = meta.name || i.file.name || '';
+        const ext = /\.[A-Za-z0-9]{1,6}$/.test(orig) ? orig.slice(orig.lastIndexOf('.')) : '';
+        inZip = unique(`${folder}/Счёт ${safeName(i.number)} ${safeName(i.supplier)}${ext}`);
+        await addEntry(inZip, data);
+        seenIds.push(i.file.id);
+      } else inZip = 'файл не найден на сервере';
+    }
+    total += Number(i.amount) || 0;
+    rows.push([`${o.number || ''} ${o.title || ''}`.trim(), o.billNo ? `№ ${o.billNo}${o.billDate ? ' от ' + fmtD(o.billDate) : ''}` : '',
+      i.number, fmtD(i.date), i.supplier, i.purpose, money(i.amount), fmtD(i.due), inZip]);
+  }
+  rows.push(['Итого', '', '', '', '', '', money(total), '', '']);
+  await addEntry(unique('Реестр счетов к оплате.csv'), Buffer.from('\ufeff' + rows.map(r => r.map(csvCell).join(';')).join('\r\n'), 'utf8'));
+
+  const cdStart = offset; let cdSize = 0;
+  for (const e of central) {
+    const c = Buffer.alloc(46);
+    c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0x0800, 8); c.writeUInt16LE(0, 10);
+    c.writeUInt16LE(dosTime, 12); c.writeUInt16LE(dosDate, 14); c.writeUInt32LE(e.crc, 16);
+    c.writeUInt32LE(e.size, 20); c.writeUInt32LE(e.size, 24); c.writeUInt16LE(e.nameBuf.length, 28);
+    c.writeUInt32LE(e.offset, 42);
+    await writeAsync(res, c); await writeAsync(res, e.nameBuf);
+    cdSize += 46 + e.nameBuf.length;
+  }
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(central.length, 8); end.writeUInt16LE(central.length, 10);
+  end.writeUInt32LE(cdSize, 12); end.writeUInt32LE(cdStart, 16);
+  res.end(end);
+  markSeen(user, seenIds);
 }
 
 function serveFile(req, res, id) {

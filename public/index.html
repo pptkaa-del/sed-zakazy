@@ -100,6 +100,9 @@ main{padding-block:20px 48px}
 .oitem.on{background:var(--stamp-soft);box-shadow:inset 3px 0 0 var(--stamp)}
 .oitem .mono{font-size:13px;color:var(--ink-2)}
 .oitem .ot{font-weight:500;overflow-wrap:anywhere}
+.oitem .oc{font-size:12px;color:var(--ink-2);overflow-wrap:anywhere}
+.olist-top{display:flex;gap:8px}
+.olist-top .in{flex:1;min-width:0}
 .ometa{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 .pad{padding:10px 14px;margin:0;font-size:14px}
 .odetail{display:flex;flex-direction:column;gap:16px;min-width:0}
@@ -203,6 +206,8 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .pproj{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;margin-bottom:16px;overflow:hidden}
 .pp-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;padding:14px 16px;border-bottom:1px solid var(--rule)}
 .pp-h h3{font:600 16px var(--f-display)}
+.linkish{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.linkish:hover{color:var(--stamp)}
 .pp-h .mono{font-weight:500}
 .pord{border-top:1px solid var(--rule)}
 .pord:first-of-type{border-top:0}
@@ -231,6 +236,13 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .g-task .g-lab{padding-left:28px;cursor:pointer}
 .g-task .g-lab:hover{color:var(--stamp)}
 .g-lab small{display:block;color:var(--ink-2);font-size:12px}
+.g-load .g-lab{font-weight:600;background:var(--mute-soft);font-size:13px}
+.g-load .g-track{background-color:var(--mute-soft)}
+.g-n{position:absolute;top:8px;text-align:center;font:600 12px/20px var(--f-mono);border-radius:4px;color:var(--ink)}
+.g-n.p{background:var(--stamp-soft);color:var(--stamp)}
+.g-n.c{background:var(--warn-soft);color:var(--warn)}
+.tagc{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:600;background:var(--warn-soft);color:var(--warn);vertical-align:1px}
+.bar.contr{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)}
 .bar{position:absolute;top:7px;height:22px;border-radius:5px;border:0;cursor:pointer;color:var(--sheet);font-size:12px;font-weight:500;padding:0 6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar.buy{background:var(--stamp)}
 .bar.work{background:var(--work)}
@@ -262,9 +274,21 @@ textarea{resize:vertical;min-height:70px}
 @media (max-width:480px){.form{grid-template-columns:1fr}.kv{grid-template-columns:1fr;gap:1px}.kv dd{margin-bottom:8px}}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;z-index:30;font-size:14px;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){aside.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
-.userbox{display:flex;gap:10px;align-items:center;font-size:14px}
-.userbox b{font-weight:600}
-.userbox small{display:block;color:var(--ink-2);font-size:12px}
+.umenu{position:relative}
+.ubtn{display:flex;gap:8px;align-items:center;border:1px solid var(--rule);background:var(--sheet);border-radius:999px;padding:4px 10px 4px 4px;cursor:pointer;font-size:14px;color:var(--ink);max-width:240px}
+.ubtn:hover{border-color:var(--ink-2)}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--stamp-soft);color:var(--stamp);display:grid;place-items:center;font-weight:600;font-size:12px;flex:none;letter-spacing:.02em}
+.ubtn .uname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.ubtn svg{flex:none;color:var(--ink-2)}
+.upop{position:absolute;right:0;top:calc(100% + 6px);min-width:220px;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:15;display:flex;flex-direction:column}
+.upop .uinfo{padding:8px 10px 10px;border-bottom:1px solid var(--rule-2);margin-bottom:4px}
+.upop .uinfo b{display:block;font-weight:600;overflow-wrap:anywhere}
+.upop .uinfo small{color:var(--ink-2);font-size:12px}
+.upop button{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--ink)}
+.upop button:hover{background:var(--mute-soft)}
+.upop button.danger{color:var(--bad)}
+@media (max-width:640px){.ubtn .uname{display:none}.ubtn{padding-right:6px}}
+@media (max-width:900px){header.top .brand{flex:1;min-width:0}nav.views{order:3;width:100%}}
 .login{min-height:100vh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
 .login form{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
 .login h1{font-size:18px}
@@ -300,7 +324,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <div><h1>Документооборот по заказам</h1><p class="sub">Спецификации, компоненты, счета и план-график проектов</p></div>
+      <div><h1>Документооборот по заказам</h1><p class="sub">Спецификации, компоненты, счета и план-график заказов</p></div>
     </div>
     <nav class="views" id="views">
       <a href="#orders" data-v="orders">Заказы</a>
@@ -308,7 +332,14 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
     </nav>
-    <div class="userbox"><div><b id="uname"></b><small id="urole"></small></div><button class="btn sm" data-act="password">Пароль</button><button class="btn sm" data-act="logout">Выйти</button></div>
+    <div class="umenu" id="umenu">
+      <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="upop" id="upop" role="menu" hidden>
+        <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
+        <button type="button" role="menuitem" data-act="password">Сменить пароль</button>
+        <button type="button" role="menuitem" class="danger" data-act="logout">Выйти</button>
+      </div>
+    </div>
   </div>
 </header>
 <main class="wrap">
@@ -345,7 +376,7 @@ const KIND = { buy:'Закупка', work:'Работа' };
 const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', user:'Сотрудник', viewer:'Просмотр' };
 const ROLE_INFO = {
   admin:'Всё, включая управление пользователями.',
-  manager:'Проекты, заказы, спецификации, компоненты, счета, план-график. Оплату не отмечает.',
+  manager:'Заказы, спецификации, компоненты, счета, план-график. Оплату не отмечает.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
   user:'Видит всё, загружает счета в заказы, правит и удаляет свои неоплаченные счета.',
   viewer:'Только просмотр.'
@@ -360,15 +391,14 @@ const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.statu
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', order:null, payF:'topay', payProj:'', planProj:'', scale:'day', drawer:null, armed:null };
+const ui = { view:'orders', order:null, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
-const proj = id => S.projects.find(p => p.id === id);
 const ord = id => S.orders.find(o => o.id === id);
 const inv = id => S.invoices.find(i => i.id === id);
-const projectsSorted = () => S.projects.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
-const ordersOf = pid => S.orders.filter(o => o.projectId === pid).sort((a,b) => (a.number||'').localeCompare(b.number||'','ru',{numeric:true}));
+const ordersSorted = () => S.orders.slice().sort((a,b) => (b.number||'').localeCompare(a.number||'','ru',{numeric:true}));
+const ordName = o => o ? `Заказ ${o.number} · ${o.title}` : 'Заказ не найден';
 const invOf = oid => S.invoices.filter(i => i.orderId === oid);
 const tasksOf = oid => S.tasks.filter(t => t.orderId === oid).sort((a,b) => (a.start||'').localeCompare(b.start||''));
 const exTag = x => x?.example ? '<span class="ex">пример</span>' : '';
@@ -438,31 +468,29 @@ function armBtn(key, label, act, id, cls='btn sm danger'){
 
 /* ===== Orders view ===== */
 function vOrders(){
-  if (!S.projects.length) return `<div class="empty"><h3>Пока нет ни одного проекта</h3>Создайте проект, затем добавьте в него заказы. Спецификации, компоненты, счета и задачи хранятся внутри заказа.<div class="row-g"><button class="btn primary" data-act="newProject">+ Проект</button></div></div>`;
+  if (!S.orders.length) return `<div class="empty"><h3>Пока нет ни одного заказа</h3>Создайте заказ: в нём хранятся спецификации, компоненты, счета и задачи план-графика.<div class="row-g"><button class="btn primary" data-act="newOrder">+ Заказ</button></div></div>`;
   const o = ord(ui.order);
-  const list = projectsSorted().map(p => {
-    const os = ordersOf(p.id);
-    return `<div class="pgroup">
-      <div class="ph"><div><b>${esc(p.name)}</b>${p.code?` <span class="mono dim">${esc(p.code)}</span>`:''}${exTag(p)}${p.client?`<small>${esc(p.client)}</small>`:''}</div>
-        <div class="ph-act"><button class="icon" data-act="editProject" data-id="${p.id}" aria-label="Изменить проект" title="Изменить проект">✎</button><button class="btn sm" data-act="newOrder" data-id="${p.id}">+ Заказ</button></div></div>
-      ${os.length ? os.map(orderItem).join('') : '<p class="pad dim">Заказов пока нет</p>'}
-    </div>`;
-  }).join('');
+  const q = ui.oq.trim().toLowerCase();
+  const items = ordersSorted().map(x => orderItem(x, q)).join('');
   return `<div class="split ${o?'has-sel':''}">
-    <nav class="olist" aria-label="Проекты и заказы">${list}<button class="btn" data-act="newProject">+ Новый проект</button></nav>
-    <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Слева список проектов и их заказов. Откройте заказ, чтобы загрузить спецификацию, заполнить компоненты и добавить счета.</div>`}</section>
+    <nav class="olist" aria-label="Заказы">
+      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" placeholder="Поиск: номер, название, заказчик" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button></div>
+      <div class="pgroup" id="olist">${items}<p class="pad dim" id="onone" ${ordersSorted().some(x => matchOrder(x, q)) ? 'hidden' : ''}>Ничего не найдено</p></div>
+    </nav>
+    <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Откройте заказ слева, чтобы загрузить спецификацию, заполнить компоненты и добавить счета.</div>`}</section>
   </div>`;
 }
+const orderHay = x => [x.number, x.title, x.customer, x.billNo].join(' ').toLowerCase();
+const matchOrder = (x, q) => !q || orderHay(x).includes(q);
 const billText = o => !!(o && o.billNo);
-function orderItem(x){
+function orderItem(x, q){
   const topay = invOf(x.id).filter(i => i.status === 'topay');
-  return `<button class="oitem ${ui.order===x.id?'on':''}" data-act="selOrder" data-id="${x.id}">
-    <span class="mono">Заказ ${esc(x.number)}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>
+  return `<button class="oitem ${ui.order===x.id?'on':''}" data-act="selOrder" data-id="${x.id}" data-q="${esc(orderHay(x))}" ${matchOrder(x, q)?'':'hidden'}>
+    <span class="mono">Заказ ${esc(x.number)}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>${x.customer?`<span class="oc">${esc(x.customer)}</span>`:''}
     <span class="ometa"><span class="chip c-${x.status}">${ORDER_ST[x.status]||''}</span>${topay.length?`<span class="chip c-warn">к оплате: ${topay.length}</span>`:''}</span>
   </button>`;
 }
 function orderDetail(o){
-  const p = proj(o.projectId);
   const comps = o.components || [];
   const total = sum(comps, c => num(c.qty)*num(c.price));
   const is = invOf(o.id).sort((a,b) => (a.date||'').localeCompare(b.date||''));
@@ -471,7 +499,7 @@ function orderDetail(o){
   const specs = o.specs || [];
   return `<button class="btn ghost back" data-act="back">← Все заказы</button>
   <div class="ohead">
-    <div style="min-width:0"><div class="eyebrow">${esc(p?.name||'Без проекта')}</div>
+    <div style="min-width:0">
       <h2>Заказ ${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
       <div class="dim">${[o.customer && 'Заказчик: '+esc(o.customer), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
@@ -500,7 +528,7 @@ function orderDetail(o){
   </section>
   <section class="card">
     <div class="ch"><h3>План-график заказа</h3><div class="row-g"><a class="btn sm" href="#plan">Открыть график</a><button class="btn sm" data-act="newTask" data-id="o:${o.id}">+ Задача</button></div></div>
-    ${ts.length ? `<ul class="tlist">${ts.map(t => `<li data-act="editTask" data-id="${t.id}" tabindex="0" role="button"><span class="dot ${t.kind}"></span><span class="t">${t.done?'✓ ':''}${esc(t.title)}</span><span class="dim mono">${fmtD(t.start)} – ${fmtD(t.end)}</span><span class="dim">${esc(t.resp||'')}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Задач по заказу нет.</p>'}
+    ${ts.length ? `<ul class="tlist">${ts.map(t => `<li data-act="editTask" data-id="${t.id}" tabindex="0" role="button"><span class="dot ${t.kind}"></span><span class="t">${t.done?'✓ ':''}${esc(t.title)}${t.contractors?'<span class="tagc">подрядчики</span>':''}</span><span class="dim mono">${fmtD(t.start)} – ${fmtD(t.end)}</span>${t.people?`<span class="dim">${t.people} чел.</span>`:''}<span class="dim">${esc(t.resp||'')}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Задач по заказу нет.</p>'}
   </section>`;
 }
 function compTable(o){
@@ -543,43 +571,33 @@ function invRow(i, withPay){
 
 /* ===== Accounting view ===== */
 function vPay(){
-  const t = today(), tn = dnum(t), month = t.slice(0,7);
-  const all = S.invoices.filter(i => !ui.payProj || i.projectId === ui.payProj);
+  const all = S.invoices.filter(i => !ui.payOrd || i.orderId === ui.payOrd);
   const topay = all.filter(i => i.status === 'topay');
-  const week = topay.filter(i => { const d = daysLeft(i); return d !== null && d >= 0 && d <= 7; });
-  const paidM = all.filter(i => i.status === 'paid' && (i.paidAt||'').startsWith(month));
   const F = { new: unseen, topay: i => i.status==='topay', paid: i => i.status==='paid', all: () => true };
   const list = all.filter(F[ui.payF] || F.all);
   const nNew = all.filter(unseen).length;
+  const withFiles = topay.filter(i => i.file).length;
   const seg = [['new', 'Не скачанные' + (nNew ? ` (${nNew})` : '')],['topay','К оплате'],['paid','Оплаченные'],['all','Все']];
+  const zipHref = '/api/invoices-zip' + (ui.payOrd ? '?order=' + encodeURIComponent(ui.payOrd) : '');
   const head = `<div class="toolbar">
     <div class="seg" role="tablist">${seg.map(([k,l]) => `<button data-act="payF" data-id="${k}" class="${ui.payF===k?'on':''}">${l}</button>`).join('')}</div>
-    <select class="f" id="payProj" aria-label="Проект"><option value="">Все проекты</option>${projectsSorted().map(p => `<option value="${p.id}" ${ui.payProj===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+    <select class="f" id="payOrd" aria-label="Заказ"><option value="">Все заказы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.payOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
+    ${canPay() ? (topay.length ? `<a class="btn" href="${zipHref}" data-dl title="ZIP-архив: файлы счетов по папкам заказов и реестр в CSV">Скачать ${ui.payOrd ? 'счета заказа' : 'все счета'} к оплате${withFiles ? ` · файлов: ${withFiles}` : ''}</a>` : '<button class="btn" disabled>Скачать все счета к оплате</button>') : ''}
     ${canAddInvoice() && S.orders.length ? '<button class="btn primary" data-act="newInvoice" data-id="">+ Счёт</button>' : ''}
   </div>
-  <div class="tiles">
-    <div class="tile"><span>К оплате</span><b>${money(sum(topay,i=>i.amount))}</b><small>${topay.length} сч.</small></div>
-    <div class="tile warn"><span>Срок в ближайшие 7 дней</span><b>${money(sum(week,i=>i.amount))}</b><small>${week.length} сч.</small></div>
-    <div class="tile ok"><span>Оплачено за ${MONTHS[Number(month.slice(5))-1]}</span><b>${money(sum(paidM,i=>i.amount))}</b><small>${paidM.length} сч.</small></div>
-  </div>`;
+  <div class="tiles"><div class="tile"><span>К оплате</span><b>${money(sum(topay,i=>i.amount))}</b><small>${topay.length} сч.</small></div></div>`;
   if (!S.invoices.length) return head + `<div class="empty"><h3>Счетов пока нет</h3>Счета добавляются в карточке заказа на вкладке «Заказы» и сразу появляются здесь.</div>`;
-  if (!list.length) return head + `<div class="empty"><h3>${ui.payF==='topay'?'Все счета оплачены':'Нет счетов по этому фильтру'}</h3>Выберите другой фильтр или проект.</div>`;
+  if (!list.length) return head + `<div class="empty"><h3>${ui.payF==='topay'?'Все счета оплачены':'Нет счетов по этому фильтру'}</h3>Выберите другой фильтр или заказ.</div>`;
   const sorter = ui.payF === 'paid' ? (a,b) => (b.paidAt||'').localeCompare(a.paidAt||'') : (a,b) => (a.status===b.status?0:a.status==='topay'?-1:1) || (a.due||'9').localeCompare(b.due||'9');
   const groups = new Map();
-  list.forEach(i => { const pk = i.projectId || '_'; if (!groups.has(pk)) groups.set(pk, new Map()); const g = groups.get(pk); const ok = i.orderId || '_'; if (!g.has(ok)) g.set(ok, []); g.get(ok).push(i); });
-  const pkeys = [...groups.keys()].sort((a,b) => (proj(a)?.name||'я').localeCompare(proj(b)?.name||'я','ru'));
-  return head + pkeys.map(pk => {
-    const p = proj(pk), g = groups.get(pk);
-    const items = [...g.values()].flat();
-    const due = sum(items.filter(i => i.status==='topay'), i => i.amount);
-    return `<section class="pproj"><div class="pp-h"><h3>${esc(p?.name || 'Без проекта')}${p?.code?` <span class="mono dim">${esc(p.code)}</span>`:''}</h3>
-      <span class="dim">к оплате <span class="mono" style="color:var(--ink)">${money(due)}</span> · всего ${items.length} сч.</span></div>
-      ${[...g.keys()].sort((a,b) => (ord(a)?.number||'').localeCompare(ord(b)?.number||'','ru',{numeric:true})).map(ok => {
-        const o = ord(ok), is = g.get(ok).sort(sorter);
-        return `<div class="pord"><div class="po-h"><button data-act="gotoOrder" data-id="${ok}">Заказ ${esc(o?.number||'—')} · ${esc(o?.title||'не найден')}${o?.billNo?` <span class="dim" style="font-weight:400">· выставлен счёт № ${esc(o.billNo)}${o.billDate?' от '+fmtD(o.billDate):''}</span>`:''}</button>
-          <span class="dim">${is.length} сч. на <span class="mono">${money(sum(is,i=>i.amount))}</span></span></div>
-          <div class="ilist">${is.map(i => invRow(i,true)).join('')}</div></div>`;
-      }).join('')}</section>`;
+  list.forEach(i => { const k = i.orderId || '_'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  const keys = [...groups.keys()].sort((a,b) => (ord(b)?.number||'').localeCompare(ord(a)?.number||'','ru',{numeric:true}));
+  return head + keys.map(k => {
+    const o = ord(k), is = groups.get(k).sort(sorter);
+    const due = sum(is.filter(i => i.status==='topay'), i => i.amount);
+    return `<section class="pproj"><div class="pp-h"><h3><button class="linkish" data-act="gotoOrder" data-id="${k}">${esc(ordName(o))}</button></h3>
+      <span class="dim">${o?.billNo?`выставлен счёт № ${esc(o.billNo)}${o.billDate?' от '+fmtD(o.billDate):''} · `:''}к оплате <span class="mono" style="color:var(--ink)">${money(due)}</span></span></div>
+      <div class="ilist">${is.map(i => invRow(i,true)).join('')}</div></section>`;
   }).join('');
 }
 
@@ -607,15 +625,14 @@ function vUsers(){
 
 /* ===== Plan view ===== */
 function vPlan(){
-  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planProj || t.projectId === ui.planProj));
+  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planOrd || (ui.planOrd === '_' ? !ord(t.orderId) : t.orderId === ui.planOrd)));
   const head = `<div class="toolbar">
-    <select class="f" id="planProj" aria-label="Проект"><option value="">Все проекты</option>${projectsSorted().map(p => `<option value="${p.id}" ${ui.planProj===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+    <select class="f" id="planOrd" aria-label="Заказ"><option value="">Все заказы</option><option value="_" ${ui.planOrd==='_'?'selected':''}>Общие работы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.planOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
     <div class="seg"><button data-act="scale" data-id="day" class="${ui.scale==='day'?'on':''}">Дни</button><button data-act="scale" data-id="week" class="${ui.scale==='week'?'on':''}">Недели</button></div>
-    <button class="btn primary" data-act="newTask" data-id="${ui.planProj?'p:'+ui.planProj:''}" ${S.projects.length?'':'disabled'}>+ Задача</button>
-    <div class="legend"><span><i class="dot buy"></i>Закупка</span><span><i class="dot work"></i>Работа</span><span><i class="dot" style="background:var(--bad);width:2px;height:14px"></i>Сегодня</span><span><i class="dot" style="border-left:2px dashed var(--warn);border-radius:0;width:2px;height:14px"></i>Срок заказа</span></div>
+    <button class="btn primary" data-act="newTask" data-id="${ui.planOrd && ui.planOrd !== '_' ? ui.planOrd : ''}">+ Задача</button>
+    <div class="legend"><span><i class="dot buy"></i>Закупка</span><span><i class="dot work"></i>Работа</span><span><i class="dot work" style="background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.45) 0 2px,transparent 2px 4px)"></i>Нужны подрядчики</span><span><i class="dot" style="background:var(--bad);width:2px;height:14px"></i>Сегодня</span><span><i class="dot" style="border-left:2px dashed var(--warn);border-radius:0;width:2px;height:14px"></i>Срок заказа</span></div>
   </div>`;
-  if (!S.projects.length) return head + `<div class="empty"><h3>Нет проектов</h3>Создайте проект на вкладке «Заказы», затем планируйте закупки и работы.</div>`;
-  if (!tasks.length) return head + `<div class="empty"><h3>План-график пуст</h3>Добавьте закупку или работу с датами начала и окончания. Задачу можно привязать к заказу или ко всему проекту.</div>`;
+  if (!tasks.length) return head + `<div class="empty"><h3>План-график пуст</h3>Добавьте закупку или работу с датами начала и окончания, количеством людей и отметкой о подрядчиках. Задачу можно привязать к заказу.</div>`;
   const tn = dnum(today());
   let lo = Math.min(tn, ...tasks.map(t => dnum(t.start))) - 3;
   let hi = Math.max(tn, ...tasks.map(t => dnum(t.end))) + 10;
@@ -630,25 +647,41 @@ function vPlan(){
   }
   const todayLine = `<i class="g-today" style="left:${(tn-lo)*DW + DW/2 - 1}px"></i>`;
   const track = (inner, extra='') => `<div class="g-track" style="width:${W}px">${todayLine}${extra}${inner}</div>`;
+  const tip = t => `${t.title}: ${fmtD(t.start)} – ${fmtD(t.end)}${t.people?` · ${t.people} чел.`:''}${t.contractors?` · нужны подрядчики${t.contractorsNote?': '+t.contractorsNote:''}`:''}${t.resp?' · '+t.resp:''}`;
   const bar = t => {
     const s = dnum(t.start), e = Math.max(s, dnum(t.end)), w = (e - s + 1) * DW;
     const late = !t.done && e < tn;
-    return `<button class="bar ${t.kind} ${t.done?'done':''} ${late?'late':''}" style="left:${(s-lo)*DW}px;width:${w}px" data-act="editTask" data-id="${t.id}" title="${esc(t.title)}: ${fmtD(t.start)} – ${fmtD(t.end)}${t.resp?' · '+esc(t.resp):''}">${w > 70 ? (t.done?'✓ ':'') + esc(t.title) : ''}</button>`;
+    const text = (t.done?'✓ ':'') + t.title + (t.people ? ` · ${t.people} чел.` : '');
+    return `<button class="bar ${t.kind} ${t.done?'done':''} ${late?'late':''} ${t.contractors?'contr':''}" style="left:${(s-lo)*DW}px;width:${w}px" data-act="editTask" data-id="${t.id}" title="${esc(tip(t))}">${w > 70 ? esc(text) : ''}</button>`;
   };
-  const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}<small>${KIND[t.kind]||''}${t.resp?' · '+esc(t.resp):''}</small></div>${track(bar(t))}</div>`;
+  const meta = t => [KIND[t.kind], t.people ? t.people + ' чел.' : '', t.resp].filter(Boolean).map(esc).join(' · ');
+  const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}${t.contractors?'<span class="tagc">подрядчики</span>':''}<small>${meta(t)}${t.contractors && t.contractorsNote ? '<br>Подрядчики: '+esc(t.contractorsNote) : ''}</small></div>${track(bar(t))}</div>`;
   const byStart = (a,b) => a.start.localeCompare(b.start);
   let rows = '';
-  projectsSorted().forEach(p => {
-    const pt = tasks.filter(t => t.projectId === p.id); if (!pt.length) return;
-    rows += `<div class="g-row g-proj"><div class="g-lab">${esc(p.name)}</div>${track('')}</div>`;
-    const common = pt.filter(t => !t.orderId || !ord(t.orderId)).sort(byStart);
-    if (common.length) { rows += `<div class="g-row g-ord"><div class="g-lab">Общие работы проекта</div>${track('')}</div>` + common.map(taskRow).join(''); }
-    ordersOf(p.id).forEach(o => {
-      const ot = pt.filter(t => t.orderId === o.id).sort(byStart); if (!ot.length) return;
-      const dl = o.deadline && dnum(o.deadline) >= lo && dnum(o.deadline) <= hi ? `<i class="g-dl" style="left:${(dnum(o.deadline)-lo)*DW + DW - 1}px" title="Срок сдачи заказа ${fmtD(o.deadline)}"></i>` : '';
-      rows += `<div class="g-row g-ord"><div class="g-lab">Заказ ${esc(o.number)} · ${esc(o.title)}</div>${track('', dl)}</div>` + ot.map(t => taskRow(t).replace('<div class="g-track"', `<div class="g-track"`)).join('');
-    });
+  ordersSorted().slice().reverse().forEach(o => {
+    const ot = tasks.filter(t => t.orderId === o.id).sort(byStart); if (!ot.length) return;
+    const dl = o.deadline && dnum(o.deadline) >= lo && dnum(o.deadline) <= hi ? `<i class="g-dl" style="left:${(dnum(o.deadline)-lo)*DW + DW - 1}px" title="Срок сдачи заказа ${fmtD(o.deadline)}"></i>` : '';
+    rows += `<div class="g-row g-proj"><div class="g-lab">Заказ ${esc(o.number)} · ${esc(o.title)}</div>${track('', dl)}</div>` + ot.map(taskRow).join('');
   });
+  const common = tasks.filter(t => !ord(t.orderId)).sort(byStart);
+  if (common.length) rows += `<div class="g-row g-proj"><div class="g-lab">Общие работы</div>${track('')}</div>` + common.map(taskRow).join('');
+
+  // people and contractors per day (week scale: maximum within the week)
+  const per = [], con = [];
+  for (let d = lo; d <= hi; d++) { per.push(0); con.push(0); }
+  tasks.forEach(t => {
+    const s = Math.max(lo, dnum(t.start)), e = Math.min(hi, Math.max(dnum(t.start), dnum(t.end)));
+    for (let d = s; d <= e; d++) { per[d-lo] += Number(t.people) || 0; if (t.contractors) con[d-lo]++; }
+  });
+  const cells = (arr, cls) => {
+    let h = '';
+    if (ui.scale === 'day') arr.forEach((n, k) => { if (n) h += `<span class="g-n ${cls}" style="left:${k*DW+2}px;width:${DW-4}px">${n}</span>`; });
+    else for (let k = 0; k < arr.length; k += 7) { const n = Math.max(...arr.slice(k, k+7)); if (n) h += `<span class="g-n ${cls}" style="left:${k*DW+2}px;width:${7*DW-4}px" title="наибольшее за неделю">${cls==='p'?'до ':''}${n}</span>`; }
+    return h;
+  };
+  const hasPeople = per.some(Boolean), hasCon = con.some(Boolean);
+  if (hasPeople) rows += `<div class="g-row g-load"><div class="g-lab">Людей${ui.scale==='week'?' (макс. в неделю)':' в день'}</div>${track(cells(per,'p'))}</div>`;
+  if (hasCon) rows += `<div class="g-row g-load"><div class="g-lab">Работ с подрядчиками</div>${track(cells(con,'c'))}</div>`;
   return head + `<div class="gantt ${ui.scale}" style="--dw:${DW}px"><div style="width:calc(var(--lw) + ${W}px)">
     <div class="g-row g-head"><div class="g-lab">Задача</div><div class="g-track" style="width:${W}px">${months}${weeks}</div></div>${rows}
   </div></div>`;
@@ -660,27 +693,15 @@ function openDrawer(kind, id, ctx){ ui.drawer = { kind, id, ctx }; ui.armed = nu
 function closeDrawer(){ ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
 const opt = (obj, sel) => Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?'selected':''}>${v}</option>`).join('');
-const projOpts = sel => projectsSorted().map(p => `<option value="${p.id}" ${p.id===sel?'selected':''}>${esc(p.name)}</option>`).join('');
-const orderOpts = sel => projectsSorted().map(p => `<optgroup label="${esc(p.name)}">${ordersOf(p.id).map(o => `<option value="${o.id}" ${o.id===sel?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</optgroup>`).join('');
-const targetOpts = sel => projectsSorted().map(p => `<optgroup label="${esc(p.name)}"><option value="p:${p.id}" ${'p:'+p.id===sel?'selected':''}>Весь проект (общие работы)</option>${ordersOf(p.id).map(o => `<option value="o:${o.id}" ${'o:'+o.id===sel?'selected':''}>Заказ ${esc(o.number+' · '+o.title)}</option>`).join('')}</optgroup>`).join('');
+const orderOpts = sel => ordersSorted().map(o => `<option value="${o.id}" ${o.id===sel?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('');
+const targetOpts = sel => `<option value="" ${!sel?'selected':''}>Общие работы (без заказа)</option>` + orderOpts(sel);
 
 function renderDrawer(){
   const D = $('drawer'), d = ui.drawer; if (!d) return;
   const v = (x, k) => esc(x?.[k] ?? '');
-  if (d.kind === 'project') {
-    const p = proj(d.id), hasOrders = p && ordersOf(p.id).length;
-    D.innerHTML = dh(p ? 'Проект' : 'Новый проект') + `<form class="d-body" data-form="project"><div class="form">
-      <label class="wide">Название<input class="in" id="f-name" value="${v(p,'name')}" placeholder="Модернизация линии упаковки" required></label>
-      <label>Шифр проекта<input class="in" id="f-code" value="${v(p,'code')}" placeholder="ПР-2026-07"></label>
-      <label>Заказчик<input class="in" id="f-client" value="${v(p,'client')}" placeholder="АО «Завод»"></label></div>
-      <div class="err" id="ferr"></div>
-      <div class="row-g"><button class="btn primary" type="submit">${p?'Сохранить':'Создать проект'}</button><button class="btn" type="button" data-act="close">Отмена</button>
-      ${p ? (hasOrders ? '<span class="dim" style="font-size:13px">Проект с заказами удалить нельзя</span>' : armBtn('proj','Удалить проект','delProject',p.id)) : ''}</div></form>`;
-  }
   if (d.kind === 'order') {
     const o = ord(d.id), hasInv = o && invOf(o.id).length;
     D.innerHTML = dh(o ? 'Заказ ' + esc(o.number) : 'Новый заказ') + `<form class="d-body" data-form="order"><div class="form">
-      <label class="wide">Проект<select class="in" id="f-proj">${projOpts(o?.projectId || d.ctx)}</select></label>
       <label>Номер заказа<input class="in" id="f-num" value="${v(o,'number')}" placeholder="З-114" required></label>
       <label>Статус<select class="in" id="f-st">${opt(ORDER_ST, o?.status||'new')}</select></label>
       <label class="wide">Наименование<input class="in" id="f-title" value="${v(o,'title')}" placeholder="Шкаф управления ШУ-3" required></label>
@@ -709,11 +730,10 @@ function renderDrawer(){
   }
   if (d.kind === 'invoice') {
     const i = inv(d.id); if (!i) return closeDrawer();
-    const o = ord(i.orderId), p = proj(i.projectId), [cc, cl] = invChip(i);
+    const o = ord(i.orderId), [cc, cl] = invChip(i);
     D.innerHTML = dh(`Счёт № ${esc(i.number)} от ${fmtD(i.date)}`) + `<div class="d-body">
       <div><span class="chip ${cc}">${cl}</span>${exTag(i)}</div>
       <dl class="kv">
-        <dt>Проект</dt><dd>${esc(p?.name||'—')}</dd>
         <dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${i.orderId}">${esc(o ? o.number+' · '+o.title : '—')}</a></dd>
         <dt>Поставщик</dt><dd>${esc(i.supplier)}</dd>
         <dt>Назначение</dt><dd>${esc(i.purpose||'—')}</dd>
@@ -745,15 +765,18 @@ function renderDrawer(){
   }
   if (d.kind === 'task') {
     const t = S.tasks.find(x => x.id === d.id);
-    const sel = t ? (t.orderId ? 'o:'+t.orderId : 'p:'+t.projectId) : (d.ctx || (S.projects[0] ? 'p:'+projectsSorted()[0].id : ''));
+    const sel = t ? (ord(t.orderId) ? t.orderId : '') : String(d.ctx || '').replace(/^o:/, '');
     const st = t?.start || today();
     D.innerHTML = dh(t ? 'Задача план-графика' : 'Новая задача') + `<form class="d-body" data-form="task"><div class="form">
-      <label class="wide">Относится к<select class="in" id="t-target">${targetOpts(sel)}</select></label>
+      <label class="wide">Заказ<select class="in" id="t-target">${targetOpts(sel)}</select></label>
       <label>Тип<select class="in" id="t-kind">${opt(KIND, t?.kind||'buy')}</select></label>
       <label>Ответственный<input class="in" id="t-resp" value="${v(t,'resp')}" placeholder="Смирнов Д. В."></label>
       <label class="wide">Название<input class="in" id="t-title" value="${v(t,'title')}" placeholder="Закупка кабельной продукции" required></label>
       <label>Начало<input class="in" type="date" id="t-start" value="${esc(st)}" required></label>
       <label>Окончание<input class="in" type="date" id="t-end" value="${esc(t?.end || dstr(dnum(st)+7))}" required></label>
+      <label>Количество людей<input class="in mono" type="number" id="t-people" min="0" max="999" step="1" inputmode="numeric" value="${esc(t?.people || '')}" placeholder="0"></label>
+      <label class="chk" style="align-self:end;padding-bottom:9px"><input type="checkbox" id="t-contr" ${t?.contractors?'checked':''}> Нужны подрядчики</label>
+      <label class="wide" id="t-cnote-wrap" ${t?.contractors?'':'hidden'}>Какие подрядчики или работы<input class="in" id="t-cnote" value="${v(t,'contractorsNote')}" placeholder="Электромонтаж, 2 бригады"></label>
       <label class="wide chk"><input type="checkbox" id="t-done" ${t?.done?'checked':''}> Выполнено</label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${t?'Сохранить':'Добавить в график'}</button><button class="btn" type="button" data-act="close">Отмена</button>${t?armBtn('task','Удалить','delTask',t.id):''}</div></form>`;
@@ -804,16 +827,10 @@ async function onSubmit(e){
   const now = new Date().toISOString();
   try {
     btn.disabled = true;
-    if (kind === 'project') {
-      if (!val('f-name')) return fail('Укажите название проекта.');
-      const data = { name:val('f-name'), code:val('f-code'), client:val('f-client') };
-      if (d.id) await upd('projects', d.id, data); else await add('projects', { ...data, createdAt:now });
-      closeDrawer(); toast(d.id ? 'Проект сохранён' : 'Проект создан');
-    }
     if (kind === 'order') {
       if (!val('f-num') || !val('f-title')) return fail('Укажите номер и наименование заказа.');
-      const data = { projectId:val('f-proj'), number:val('f-num'), status:val('f-st'), title:val('f-title'), customer:val('f-cust'), deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
-      if (d.id) { await upd('orders', d.id, data); S.invoices.filter(i => i.orderId === d.id && i.projectId !== data.projectId).forEach(i => guard(upd('invoices', i.id, { projectId:data.projectId }))); }
+      const data = { number:val('f-num'), status:val('f-st'), title:val('f-title'), customer:val('f-cust'), deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
+      if (d.id) { await upd('orders', d.id, data); }
       else { const id = await add('orders', { ...data, components:[], specs:[], createdAt:now }); ui.order = id; remember(); }
       closeDrawer(); render(); toast(d.id ? 'Заказ сохранён' : 'Заказ создан');
     }
@@ -822,7 +839,7 @@ async function onSubmit(e){
       if (!o) return fail('Выберите заказ. Если заказов нет, сначала создайте его.');
       if (!val('f-num') || !val('f-sup')) return fail('Укажите номер счёта и поставщика.');
       if (!(num(val('f-amt')) > 0)) return fail('Укажите сумму счёта.');
-      const data = { orderId:o.id, projectId:o.projectId, number:val('f-num'), date:val('f-date'), supplier:val('f-sup'), amount:num(val('f-amt')), due:val('f-due'), purpose:val('f-purp') };
+      const data = { orderId:o.id, number:val('f-num'), date:val('f-date'), supplier:val('f-sup'), amount:num(val('f-amt')), due:val('f-due'), purpose:val('f-purp') };
       const file = $('f-file').files[0];
       if (file) { fail('Загружаем файл…'); data.file = await upload(file); }
       if (d.id) { await upd('invoices', d.id, data); openDrawer('invoice', d.id); }
@@ -838,13 +855,16 @@ async function onSubmit(e){
       toast(file ? 'Оплата отмечена, чек приложен' : 'Оплата отмечена');
     }
     if (kind === 'task') {
-      const tg = val('t-target'); if (!tg) return fail('Сначала создайте проект.');
+      const tg = val('t-target');
       if (!val('t-title')) return fail('Укажите название задачи.');
+      const people = val('t-people') === '' ? 0 : Math.round(num(val('t-people')));
+      if (people < 0 || people > 999) return fail('Количество людей — от 0 до 999.');
       const s = val('t-start'), en = val('t-end');
       if (!s || !en) return fail('Укажите даты начала и окончания.');
       if (en < s) return fail('Окончание не может быть раньше начала.');
-      const [k, id] = tg.split(':');
-      const data = { projectId: k === 'p' ? id : ord(id)?.projectId, orderId: k === 'o' ? id : null, kind:val('t-kind'), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked };
+      const contractors = $('t-contr').checked;
+      const data = { orderId: tg || null, kind:val('t-kind'), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
+        people, contractors, contractorsNote: contractors ? val('t-cnote') : '' };
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
       closeDrawer(); render(); toast(d.id ? 'Задача сохранена' : 'Задача добавлена в план-график');
     }
@@ -899,9 +919,7 @@ async function act(el){
     case 'selOrder': ui.order = id; remember(); render(); window.scrollTo({top:0}); return;
     case 'back': ui.order = null; remember(); return render();
     case 'gotoOrder': closeDrawer(); ui.order = id; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); return;
-    case 'newProject': return openDrawer('project');
-    case 'editProject': return openDrawer('project', id);
-    case 'newOrder': return openDrawer('order', null, id);
+    case 'newOrder': return openDrawer('order');
     case 'editOrder': return openDrawer('order', id);
     case 'newInvoice': return openDrawer('invoiceForm', null, id);
     case 'editInvoice': return openDrawer('invoiceForm', id);
@@ -918,7 +936,6 @@ async function act(el){
     }
     case 'delComp': { const [oid, cid] = id.split('|'); const o = ord(oid); await guard(upd('orders', oid, { components:(o.components||[]).filter(c => c.id !== cid) })); return render(); }
     case 'delSpec': { const [oid, fid] = id.split('|'); const o = ord(oid); await guard(upd('orders', oid, { specs:(o.specs||[]).filter(f => f.id !== fid) })); return render(); }
-    case 'delProject': await guard(del('projects', id)); closeDrawer(); return toast('Проект удалён');
     case 'delOrder': await guard(del('orders', id)); S.tasks.filter(t => t.orderId === id).forEach(t => guard(del('tasks', t.id))); if (ui.order === id) ui.order = null; closeDrawer(); render(); return toast('Заказ удалён');
     case 'delInvoice': await guard(del('invoices', id)); closeDrawer(); return toast('Счёт удалён');
     case 'delTask': await guard(del('tasks', id)); closeDrawer(); return toast('Задача удалена');
@@ -939,6 +956,11 @@ document.addEventListener('click', e => {
     inp.focus();
     return;
   }
+  const ub = e.target.closest('#ubtn');
+  if (ub) { const open = $('upop').hidden; $('upop').hidden = !open; ub.setAttribute('aria-expanded', String(open)); if (open) $('upop').querySelector('button').focus(); return; }
+  if (!$('upop').hidden && !e.target.closest('#upop')) { $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded','false'); }
+  else if (e.target.closest('#upop [data-act]')) { $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded','false'); }
+  if (e.target.closest('a[data-dl]')) { setTimeout(() => refresh().catch(() => {}), 2500); return; }
   const link = e.target.closest('a[target=_blank]');
   if (link) {
     if (isAccountant() && link.getAttribute('href')?.startsWith('/files/')) setTimeout(() => refresh().catch(() => {}), 1500);
@@ -951,17 +973,25 @@ document.addEventListener('click', e => {
   act(el);
 });
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('upop').hidden) { $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded','false'); $('ubtn').focus(); return; }
   if (e.key === 'Escape' && ui.drawer) return closeDrawer();
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role=button][data-act]')) { e.preventDefault(); act(e.target); }
 });
 $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
+document.addEventListener('input', e => {
+  if (e.target.id !== 'oq') return;
+  ui.oq = e.target.value; const q = ui.oq.trim().toLowerCase(); let any = false;
+  document.querySelectorAll('#olist .oitem').forEach(b => { const ok = !q || b.dataset.q.includes(q); b.hidden = !ok; any = any || ok; });
+  const none = $('onone'); if (none) none.hidden = any;
+});
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; return; }
-  if (t.id === 'payProj') { ui.payProj = t.value; return render(); }
-  if (t.id === 'planProj') { ui.planProj = t.value; return render(); }
+  if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
+  if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
+  if (t.id === 't-contr') { $('t-cnote-wrap').hidden = !t.checked; if (t.checked) $('t-cnote').focus(); return; }
   if (t.classList.contains('ci')) {
     const tr = t.closest('tr'), table = t.closest('table'), o = ord(table.dataset.oid); if (!o) return;
     const comps = (o.components||[]).map(c => ({ ...c }));
@@ -1010,14 +1040,16 @@ function setSetup(on){
   $('l-pass').autocomplete = on ? 'new-password' : 'current-password';
 }
 function showLogin(){
-  clearInterval(poll); poll = null; me = null; mode = 'loading'; closeDrawer();
+  clearInterval(poll); poll = null; me = null; mode = 'loading'; closeDrawer(); $('upop').hidden = true;
   $('app').hidden = true; $('loginView').hidden = false; $('l-err').textContent = '';
   $('l-pass').type = 'password'; const eye = $('loginForm').querySelector('[data-pw-toggle]'); eye.setAttribute('aria-pressed','false'); eye.setAttribute('aria-label','Показать пароль'); eye.title = 'Показать пароль';
   setTimeout(() => (setupMode ? $('l-name') : $('l-login')).focus(), 30);
 }
 async function start(u){
   me = u;
-  $('uname').textContent = u.name; $('urole').textContent = u.roleName;
+  $('uname').textContent = u.name; $('uname2').textContent = u.name; $('urole').textContent = u.roleName + ' · ' + u.login;
+  $('uav').textContent = (u.name || u.login).split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0]).join('').toUpperCase();
+  $('ubtn').title = u.name + ' — ' + u.roleName;
   document.body.classList.toggle('no-edit', !canEdit());
   document.body.classList.toggle('can-invoice', canAddInvoice());
   $('usersTab').hidden = u.role !== 'admin';
