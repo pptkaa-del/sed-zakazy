@@ -122,6 +122,22 @@ main{padding-block:20px 48px}
 .cform{display:flex;gap:8px;align-items:flex-end;margin-top:12px}
 .cform textarea{min-height:44px;flex:1}
 .cphint{font-size:13px;margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.form .fld{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2);min-width:0}
+.combo{position:relative}
+.combo-pop{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:260px;overflow-y:auto;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;box-shadow:var(--shadow);z-index:5;padding:4px}
+.combo-opt{padding:8px 10px;border-radius:7px;cursor:pointer;color:var(--ink);font-size:14px;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.combo-opt small{color:var(--ink-2);font-size:12px;white-space:nowrap}
+.combo-opt:hover,.combo-opt.active{background:var(--stamp-soft)}
+.combo-opt.new{color:var(--stamp);font-weight:500;border-top:1px solid var(--rule-2);margin-top:2px}
+.combo-empty{padding:10px;color:var(--ink-2);font-size:13px}
+.contacts{display:flex;flex-direction:column}
+.contact{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.2fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--rule-2);font-size:14px}
+.contact:first-child{border-top:0;padding-top:0}
+.contact b{font-weight:500;overflow-wrap:anywhere}
+.contact a{overflow-wrap:anywhere}
+.contact .acts{display:flex;gap:2px}
+@media (max-width:640px){.contact{grid-template-columns:1fr auto}.contact>:nth-child(2),.contact>:nth-child(3){grid-column:1}.contact .acts{grid-row:1;grid-column:2}}
+.site{margin:0 0 12px;font-size:14px}
 .cpcard dl{margin:0}
 .roles-chips{display:flex;gap:6px;flex-wrap:wrap}
 .olist-top .in{flex:1;min-width:0}
@@ -321,7 +337,7 @@ textarea{resize:vertical;min-height:70px}
 .pw-eye:hover{color:var(--ink);background:var(--mute-soft)}
 .pw-eye[aria-pressed="false"] .pw-slash{display:none}
 .login p{margin:0;font-size:14px;color:var(--ink-2)}
-body.no-edit [data-act=newCp],body.no-edit [data-act=editCp],body.no-edit [data-act=newContract],body.no-edit [data-act=delContract],body.no-edit [data-act=newProject],body.no-edit [data-act=editProject],body.no-edit [data-act=newOrder],body.no-edit [data-act=editOrder],
+body.no-edit [data-act=newContact],body.no-edit [data-act=editContact],body.no-edit [data-act=delContact],body.no-edit [data-act=newCp],body.no-edit [data-act=editCp],body.no-edit [data-act=newContract],body.no-edit [data-act=delContract],body.no-edit [data-act=newProject],body.no-edit [data-act=editProject],body.no-edit [data-act=newOrder],body.no-edit [data-act=editOrder],
 body.no-edit [data-act=addComp],body.no-edit [data-act=delComp],body.no-edit [data-act=paste],body.no-edit [data-act=newInvoice],
 body.no-edit [data-act=editInvoice],body.no-edit [data-act=delInvoice],body.no-edit [data-act=newTask],body.no-edit [data-act=delSpec],
 body.no-edit label:has(> [data-up=spec]){display:none!important}
@@ -426,6 +442,9 @@ const ordersSorted = () => S.orders.slice().sort((a,b) => (b.number||'').localeC
 const cpOf = id => S.counterparties.find(c => c.id === id);
 const cpsSorted = () => S.counterparties.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
 const cpByName = n => { const k = String(n||'').trim().toLowerCase(); return k ? S.counterparties.find(c => (c.name||'').trim().toLowerCase() === k) : null; };
+const contactsOf = c => Array.isArray(c?.contacts) && c.contacts.length ? c.contacts
+  : (c && (c.person || c.phone || c.email) ? [{ id:'legacy', name:c.person || '', phone:c.phone || '', email:c.email || '' }] : []);
+const siteUrl = s => /^https?:\/\//i.test(s) ? s : 'https://' + s;
 const custName = o => (o && (cpOf(o.customerId)?.name || o.customer)) || '';
 const brigadesOf = t => t.brigades != null ? (Number(t.brigades) || 0) : (t.contractors ? 1 : 0);
 const crew = t => [t.people ? `${t.people} чел.` : '', brigadesOf(t) ? `${brigadesOf(t)} бр. подрядчиков` : ''].filter(Boolean).join(' + ');
@@ -537,12 +556,20 @@ function orderItem(x, q){
     ${last ? `<span class="ocm" title="${esc(last.text)}"><b>${esc(who(last.by))}:</b> ${esc(last.text.slice(0,120))}${cm.length > 1 ? ` · ещё ${cm.length - 1}` : ''}</span>` : ''}
   </button>`;
 }
+function commentsCard(col, doc){
+  const cm = Array.isArray(doc.comments) ? doc.comments : [];
+  const key = col + ':' + doc.id;
+  const canComment = me && me.role !== 'viewer';
+  return `<section class="card">
+    <div class="ch"><h3>Комментарии <span class="dim">${cm.length||''}</span></h3></div>
+    ${cm.length ? `<div class="comments">${cm.map(c => `<div class="cmt"><span class="avatar">${esc(initials(who(c.by)))}</span><div class="body"><div class="meta"><b style="color:var(--ink)">${esc(who(c.by))}</b><span>${esc(fmtDT(c.at))}</span>${me && (c.by === me.id || me.role === 'admin') ? armBtn('c:'+c.id,'✕','delComment',col+'|'+doc.id+'|'+c.id,'icon') : ''}</div><p>${esc(c.text)}</p></div></div>`).join('')}</div>` : '<p class="dim" style="margin:0">Комментариев пока нет.</p>'}
+    ${canComment ? `<div class="cform" data-keep><textarea class="in" id="c-text" data-key="${key}" rows="2" placeholder="Написать комментарий… (Ctrl+Enter — отправить)" aria-label="Комментарий">${esc(ui.drafts[key]||'')}</textarea><button class="btn primary" data-act="addComment" data-id="${col}|${doc.id}">Отправить</button></div>` : ''}
+  </section>`;
+}
 function orderDetail(o){
   const comps = o.components || [];
   const is = invOf(o.id).sort((a,b) => (a.date||'').localeCompare(b.date||''));
   const ts = tasksOf(o.id);
-  const cm = Array.isArray(o.comments) ? o.comments : [];
-  const canComment = me && me.role !== 'viewer';
   const specs = o.specs || [];
   return `<button class="btn ghost back" data-act="back">← Все заказы</button>
   <div class="ohead">
@@ -552,11 +579,7 @@ function orderDetail(o){
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button></div>
   </div>
-  <section class="card">
-    <div class="ch"><h3>Комментарии <span class="dim">${cm.length||''}</span></h3></div>
-    ${cm.length ? `<div class="comments">${cm.map(c => `<div class="cmt"><span class="avatar">${esc(initials(who(c.by)))}</span><div class="body"><div class="meta"><b style="color:var(--ink)">${esc(who(c.by))}</b><span>${esc(fmtDT(c.at))}</span>${me && (c.by === me.id || me.role === 'admin') ? armBtn('c:'+c.id,'✕','delComment',o.id+'|'+c.id,'icon') : ''}</div><p>${esc(c.text)}</p></div></div>`).join('')}</div>` : '<p class="dim" style="margin:0">Комментариев пока нет.</p>'}
-    ${canComment ? `<div class="cform" data-keep><textarea class="in" id="c-text" data-oid="${o.id}" rows="2" placeholder="Написать комментарий… (Ctrl+Enter — отправить)" aria-label="Комментарий">${esc(ui.drafts[o.id]||'')}</textarea><button class="btn primary" data-act="addComment" data-id="${o.id}">Отправить</button></div>` : ''}
-  </section>
+  ${commentsCard('orders', o)}
   <section class="card">
     <div class="ch"><h3>Документы по заказу <span class="dim">${specs.length||''}</span></h3>
       <label class="btn sm">Загрузить файл<input type="file" data-up="spec" data-id="${o.id}" accept="${ACCEPT}" multiple hidden></label></div>
@@ -616,17 +639,17 @@ function invRow(i, withPay){
 }
 
 /* ===== Counterparties view ===== */
-const cpHay = x => [x.name, x.inn, x.person, x.phone, x.email, x.address].join(' ').toLowerCase();
+const cpHay = x => [x.name, x.site, ...contactsOf(x).flatMap(k => [k.name, k.phone, k.email])].join(' ').toLowerCase();
 function vCps(){
   if (!S.counterparties.length) return `<div class="empty"><h3>Контрагентов пока нет</h3>Добавьте заказчиков, поставщиков и подрядчиков: их контакты и договоры будут храниться здесь. Заказчика можно добавить и прямо из карточки заказа.<div class="row-g"><button class="btn primary" data-act="newCp">+ Контрагент</button></div></div>`;
   const q = ui.cq.trim().toLowerCase();
   const c = cpOf(ui.cp);
   const list = cpsSorted().map(x => `<button class="oitem ${ui.cp===x.id?'on':''}" data-act="selCp" data-id="${x.id}" data-q="${esc(cpHay(x))}" ${!q || cpHay(x).includes(q) ? '' : 'hidden'}>
-      <span class="ot">${esc(x.name)}${exTag(x)}</span>${x.person || x.phone ? `<span class="oc">${esc([x.person, x.phone].filter(Boolean).join(' · '))}</span>` : ''}
+      <span class="ot">${esc(x.name)}${exTag(x)}</span>${contactsOf(x)[0] ? `<span class="oc">${esc([contactsOf(x)[0].name, contactsOf(x)[0].phone].filter(Boolean).join(' · '))}${contactsOf(x).length > 1 ? ` · ещё ${contactsOf(x).length - 1}` : ''}</span>` : ''}
       <span class="ometa">${(x.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('')}${(x.contracts||[]).length ? `<span class="chip c-mute">договоров: ${x.contracts.length}</span>` : ''}</span></button>`).join('');
   return `<div class="split ${c?'has-sel':''}">
     <nav class="olist" aria-label="Контрагенты">
-      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="cq" type="search" placeholder="Поиск: название, ИНН, контакт" value="${esc(ui.cq)}" aria-label="Поиск контрагента"></span><button class="btn primary" data-act="newCp">+ Контрагент</button></div>
+      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="cq" type="search" placeholder="Поиск: название, контакт, телефон" value="${esc(ui.cq)}" aria-label="Поиск контрагента"></span><button class="btn primary" data-act="newCp">+ Контрагент</button></div>
       <div class="pgroup" id="cplist">${list}<p class="pad dim" id="cnone" ${cpsSorted().some(x => !q || cpHay(x).includes(q)) ? 'hidden' : ''}>Ничего не найдено</p></div>
     </nav>
     <section class="odetail">${c ? cpDetail(c) : `<div class="empty"><h3>Выберите контрагента</h3>Слева список организаций. Откройте карточку, чтобы посмотреть контакты и загрузить договоры.</div>`}</section>
@@ -635,25 +658,27 @@ function vCps(){
 function cpDetail(c){
   const orders = ordersSorted().filter(o => o.customerId === c.id);
   const ks = (c.contracts || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
-  const row = (k, val) => `<dt>${k}</dt><dd>${val || '<span class="dim">—</span>'}</dd>`;
+  const cts = contactsOf(c);
   return `<button class="btn ghost back" data-act="backCp">← Все контрагенты</button>
   <div class="ohead"><div style="min-width:0"><h2>${esc(c.name)}${exTag(c)}</h2>
       <div class="roles-chips" style="margin-top:6px">${(c.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('') || '<span class="dim">Роль не указана</span>'}</div></div>
     <div class="row-g"><button class="btn sm" data-act="editCp" data-id="${c.id}">Изменить</button></div></div>
-  <section class="card cpcard"><div class="ch"><h3>Контактные данные</h3></div><dl class="kv">
-    ${row('ИНН / КПП', esc(c.inn))}${row('Контактное лицо', esc(c.person))}
-    ${row('Телефон', c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g,''))}">${esc(c.phone)}</a>` : '')}
-    ${row('Эл. почта', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
-    ${row('Адрес', esc(c.address))}
-    ${row('Банковские реквизиты', c.bank ? `<span style="white-space:pre-wrap">${esc(c.bank)}</span>` : '')}
-    ${row('Заметки', c.notes ? `<span style="white-space:pre-wrap">${esc(c.notes)}</span>` : '')}
-  </dl></section>
+  <section class="card"><div class="ch"><h3>Контактные данные <span class="dim">${cts.length||''}</span></h3><button class="btn sm primary" data-act="newContact" data-id="${c.id}">+ Контакт</button></div>
+    ${c.site ? `<p class="site">Сайт: <a href="${esc(siteUrl(c.site))}" target="_blank" rel="noopener">${esc(c.site)}</a></p>` : ''}
+    ${cts.length ? `<div class="contacts">${cts.map(k => `<div class="contact">
+        <div><b>${esc(k.name || 'Без имени')}</b></div>
+        <div>${k.phone ? `<a href="tel:${esc(k.phone.replace(/[^\d+]/g,''))}">${esc(k.phone)}</a>` : '<span class="dim">телефона нет</span>'}</div>
+        <div>${k.email ? `<a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : '<span class="dim">почты нет</span>'}</div>
+        <div class="acts"><button class="icon" data-act="editContact" data-id="${c.id}|${k.id}" aria-label="Изменить контакт" title="Изменить">✎</button>${armBtn('ct:'+k.id,'✕','delContact',c.id+'|'+k.id,'icon')}</div>
+      </div>`).join('')}</div>` : '<p class="dim" style="margin:0">Контактов пока нет.</p>'}
+  </section>
   <section class="card"><div class="ch"><h3>Договоры <span class="dim">${ks.length||''}</span></h3><button class="btn sm primary" data-act="newContract" data-id="${c.id}">+ Договор</button></div>
     ${ks.length ? `<ul class="files">${ks.map(k => `<li>${k.file ? `<a href="${esc(fileUrl(k.file))}" target="_blank" rel="noopener">` : '<span style="flex:1">'}Договор № ${esc(k.number || 'б/н')}${k.date ? ' от ' + fmtD(k.date) : ''}${k.file ? '</a>' : '</span>'}<small>${esc([k.subject, k.file && k.file.name, k.file && fmtSize(k.file.size)].filter(Boolean).join(' · '))}</small>${armBtn('k:'+k.id,'✕','delContract',c.id+'|'+k.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Договоры не загружены.</p>'}
   </section>
   <section class="card"><div class="ch"><h3>Заказы <span class="dim">${orders.length||''}</span></h3></div>
     ${orders.length ? `<ul class="tlist">${orders.map(o => `<li data-act="gotoOrder" data-id="${o.id}" tabindex="0" role="button"><span class="t">Заказ ${esc(o.number)} · ${esc(o.title)}</span><span class="chip c-${o.status||'new'}">${ORDER_ST[o.status||'new']}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Заказов с этим заказчиком нет.</p>'}
-  </section>`;
+  </section>
+  ${commentsCard('counterparties', c)}`;
 }
 
 /* ===== Accounting view ===== */
@@ -789,12 +814,14 @@ function renderDrawer(){
   if (d.kind === 'order') {
     const o = ord(d.id), hasInv = o && invOf(o.id).length;
     D.innerHTML = dh(o ? 'Заказ ' + esc(o.number) : 'Новый заказ') + `<form class="d-body" data-form="order"><div class="form">
-      <label>Номер заказа${o?'':' <span class="dim">(присвоен автоматически)</span>'}<input class="in" id="f-num" value="${o ? v(o,'number') : esc(nextOrderNumber())}" required></label>
+      <label>Номер заказа<input class="in" id="f-num" value="${o ? v(o,'number') : esc(nextOrderNumber())}" required>${o?'':'<small class="dim" style="font-size:12px">Присвоен автоматически, можно изменить</small>'}</label>
       <label>Статус<select class="in" id="f-st">${opt(ORDER_ST, o?.status||'new')}</select></label>
       <label class="wide">Наименование<input class="in" id="f-title" value="${v(o,'title')}" placeholder="Шкаф управления ШУ-3" required></label>
-      <label class="wide">Заказчик / получатель<input class="in" id="f-cust" list="cp-list" autocomplete="off" value="${esc(custName(o))}" placeholder="Начните вводить название контрагента">
-        <datalist id="cp-list">${cpsSorted().map(c => `<option value="${esc(c.name)}">${esc([...(c.roles||[]).map(r => CP_ROLES[r]), c.inn && 'ИНН '+c.inn].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>
-        <span class="cphint" id="cp-hint" hidden></span></label>
+      <div class="wide fld"><label for="f-cust">Заказчик / получатель</label>
+        <div class="combo"><input class="in" id="f-cust" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cust-pop" value="${esc(custName(o))}" placeholder="Выберите из списка или начните вводить название">
+          <input type="hidden" id="f-cust-id" value="${esc(o?.customerId || '')}">
+          <div class="combo-pop" id="cust-pop" role="listbox" hidden></div></div>
+        <span class="cphint" id="cp-hint" hidden></span></div>
       <label>Срок сдачи<input class="in" type="date" id="f-dl" value="${v(o,'deadline')}"></label>
       <label>№ выставленного счёта<input class="in" id="f-bill" value="${v(o,'billNo')}" placeholder="СЧ-0142"></label>
       <label>Дата выставленного счёта<input class="in" type="date" id="f-billdate" value="${v(o,'billDate')}"></label></div>
@@ -809,16 +836,23 @@ function renderDrawer(){
     D.innerHTML = dh(c ? esc(c.name) : 'Новый контрагент') + `<form class="d-body" data-form="cp"><div class="form">
       <label class="wide">Название<input class="in" id="cp-name" value="${v(c,'name')}" placeholder="ООО «ЭлектроКомплект»" required></label>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Роль</span><div class="row-g" style="margin-top:6px">${Object.entries(CP_ROLES).map(([k,l]) => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="cp-role" value="${k}" ${roles.includes(k)?'checked':''}> ${l}</label>`).join('')}</div></div>
-      <label>ИНН / КПП<input class="in mono" id="cp-inn" value="${v(c,'inn')}" placeholder="7701234567 / 770101001"></label>
-      <label>Контактное лицо<input class="in" id="cp-person" value="${v(c,'person')}" placeholder="Петров Иван Сергеевич"></label>
-      <label>Телефон<input class="in" id="cp-phone" type="tel" value="${v(c,'phone')}" placeholder="+7 900 123-45-67"></label>
-      <label>Эл. почта<input class="in" id="cp-email" type="email" value="${v(c,'email')}" placeholder="zakaz@example.ru"></label>
-      <label class="wide">Адрес<input class="in" id="cp-addr" value="${v(c,'address')}"></label>
-      <label class="wide">Банковские реквизиты<textarea id="cp-bank" rows="3">${v(c,'bank')}</textarea></label>
-      <label class="wide">Заметки<textarea id="cp-notes" rows="3">${v(c,'notes')}</textarea></label></div>
+      <label class="wide">Сайт<input class="in" id="cp-site" value="${v(c,'site')}" placeholder="example.ru" inputmode="url"></label>
+      ${c ? '' : `<div class="wide" style="font-size:13px;color:var(--ink-2);margin-top:4px">Первый контакт (можно не заполнять, контакты добавляются и потом)</div>
+      <label class="wide">Контактное лицо<input class="in" id="cp-person" placeholder="Петров Иван Сергеевич"></label>
+      <label>Телефон<input class="in" id="cp-phone" type="tel" placeholder="+7 900 123-45-67"></label>
+      <label>Эл. почта<input class="in" id="cp-email" type="email" placeholder="zakaz@example.ru"></label>`}</div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${c?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button>
       ${c ? (used ? '<span class="dim" style="font-size:13px">Контрагент указан в заказах, удалить нельзя</span>' : armBtn('cp','Удалить','delCp',c.id)) : ''}</div></form>`;
+  }
+  if (d.kind === 'contact') {
+    const c = cpOf(d.id), k = contactsOf(c).find(x => x.id === d.ctx);
+    D.innerHTML = dh((k ? 'Контакт · ' : 'Новый контакт · ') + esc(c?.name || '')) + `<form class="d-body" data-form="contact"><div class="form">
+      <label class="wide">Контактное лицо<input class="in" id="ct-name" value="${v(k,'name')}" placeholder="Петров Иван Сергеевич" required></label>
+      <label>Телефон<input class="in" id="ct-phone" type="tel" value="${v(k,'phone')}" placeholder="+7 900 123-45-67"></label>
+      <label>Эл. почта<input class="in" id="ct-email" type="email" value="${v(k,'email')}" placeholder="zakaz@example.ru"></label></div>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">${k?'Сохранить':'Добавить контакт'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'contract') {
     const c = cpOf(d.id);
@@ -948,7 +982,8 @@ async function onSubmit(e){
       if (!val('f-num') || !val('f-title')) return fail('Укажите номер и наименование заказа.');
       const dup = S.orders.find(x => x.id !== d.id && String(x.number||'').trim().toLowerCase() === val('f-num').toLowerCase());
       if (dup) return fail(`Номер ${val('f-num')} уже есть у заказа «${dup.title}». Укажите другой.`);
-      let cust = cpByName(val('f-cust'));
+      const picked = cpOf(val('f-cust-id'));
+      let cust = picked && picked.name.trim().toLowerCase() === val('f-cust').toLowerCase() ? picked : cpByName(val('f-cust'));
       if (!cust && val('f-cust')) { const cid = await add('counterparties', { name:val('f-cust'), roles:['customer'], contracts:[], createdAt:now }); cust = cpOf(cid) || { id:cid, name:val('f-cust') }; toast('Контрагент «' + val('f-cust') + '» добавлен'); }
       const data = { number:val('f-num'), status:val('f-st'), title:val('f-title'), customerId: cust ? cust.id : null, customer: cust ? cust.name : '', deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
       if (d.id) { await upd('orders', d.id, data); }
@@ -958,10 +993,24 @@ async function onSubmit(e){
     if (kind === 'cp') {
       const name = val('cp-name'); if (!name) return fail('Укажите название контрагента.');
       const same = cpByName(name); if (same && same.id !== d.id) return fail('Контрагент с таким названием уже есть.');
-      const data = { name, roles:[...f.querySelectorAll('[name=cp-role]:checked')].map(x => x.value), inn:val('cp-inn'), person:val('cp-person'), phone:val('cp-phone'), email:val('cp-email'), address:val('cp-addr'), bank:$('cp-bank').value.trim(), notes:$('cp-notes').value.trim() };
+      const data = { name, roles:[...f.querySelectorAll('[name=cp-role]:checked')].map(x => x.value), site:val('cp-site') };
       if (d.id) await upd('counterparties', d.id, data);
-      else { const id = await add('counterparties', { ...data, contracts:[], createdAt:now }); ui.cp = id; }
+      else {
+        const first = { id:uid(), name:val('cp-person'), phone:val('cp-phone'), email:val('cp-email') };
+        const id = await add('counterparties', { ...data, contacts: first.name || first.phone || first.email ? [first] : [], contracts:[], createdAt:now }); ui.cp = id;
+      }
       closeDrawer(); render(); toast(d.id ? 'Сохранено' : 'Контрагент добавлен');
+    }
+    if (kind === 'contact') {
+      if (!val('ct-name') && !val('ct-phone') && !val('ct-email')) return fail('Заполните хотя бы одно поле.');
+      const c = cpOf(d.id);
+      const list = contactsOf(c).map(x => x.id === 'legacy' ? { ...x, id:uid(), was:'legacy' } : { ...x });
+      const item = { name:val('ct-name'), phone:val('ct-phone'), email:val('ct-email') };
+      const idx = d.ctx ? list.findIndex(x => x.id === d.ctx || (d.ctx === 'legacy' && x.was === 'legacy')) : -1;
+      if (idx >= 0) list[idx] = { id:list[idx].id, ...item }; else list.push({ id:uid(), ...item });
+      list.forEach(x => delete x.was);
+      await upd('counterparties', d.id, { contacts:list, person:'', phone:'', email:'' });
+      closeDrawer(); render(); toast(idx >= 0 ? 'Контакт сохранён' : 'Контакт добавлен');
     }
     if (kind === 'contract') {
       const file = $('k-file').files[0]; if (!file) return fail('Выберите файл договора.');
@@ -1041,11 +1090,33 @@ function custHint(){
   const h = $('cp-hint'); if (!h) return;
   const name = val2('f-cust');
   if (!name) { h.hidden = true; return; }
-  const c = cpByName(name);
+  const c = cpOf(val2('f-cust-id')) || cpByName(name);
   h.hidden = false;
-  h.innerHTML = c ? `<span style="color:var(--ok)">✓ Контрагент из списка</span>`
-    : canEdit() ? `<span class="dim">«${esc(name)}» нет в списке контрагентов.</span><button type="button" class="btn sm" data-act="quickCp">+ Добавить в контрагенты</button><span class="dim">или он добавится при сохранении</span>`
-    : `<span class="dim">«${esc(name)}» нет в списке контрагентов.</span>`;
+  h.innerHTML = c && c.name.trim().toLowerCase() === name.toLowerCase() ? `<span style="color:var(--ok)">✓ Контрагент из списка</span>`
+    : `<span class="dim">Нового контрагента «${esc(name)}» добавим в список при сохранении заказа.</span>`;
+}
+function comboOpen(){
+  const pop = $('cust-pop'), inp = $('f-cust'); if (!pop || !inp) return;
+  const raw = inp.value.trim(), q = raw.toLowerCase();
+  let list = cpsSorted();
+  if (q) list = list.filter(c => c.name.toLowerCase().includes(q)).sort((a,b) => (b.name.toLowerCase().startsWith(q)) - (a.name.toLowerCase().startsWith(q)));
+  const exact = cpByName(raw);
+  let html = list.slice(0, 50).map(c => `<div class="combo-opt" role="option" data-cp="${c.id}">${esc(c.name)}<small>${esc((c.roles||[]).map(r => CP_ROLES[r]).join(', '))}</small></div>`).join('');
+  if (q && !exact) html += `<div class="combo-opt new" role="option" data-new="1">+ Новый контрагент «${esc(raw)}» <small>добавится при сохранении</small></div>`;
+  if (!html) html = '<div class="combo-empty">Контрагентов пока нет. Введите название — он будет добавлен.</div>';
+  pop.innerHTML = html; pop.hidden = false; ui.comboIdx = -1; inp.setAttribute('aria-expanded', 'true');
+}
+function comboClose(){ const pop = $('cust-pop'); if (pop) pop.hidden = true; $('f-cust')?.setAttribute('aria-expanded', 'false'); }
+function comboPick(el){
+  if (el.dataset.cp) { const c = cpOf(el.dataset.cp); if (c) { $('f-cust').value = c.name; $('f-cust-id').value = c.id; } }
+  comboClose(); custHint();
+}
+function comboMove(step){
+  const pop = $('cust-pop'); if (pop.hidden) comboOpen();
+  const opts = [...pop.querySelectorAll('.combo-opt')]; if (!opts.length) return;
+  ui.comboIdx = ((ui.comboIdx ?? -1) + step + opts.length) % opts.length;
+  opts.forEach((o, i) => o.classList.toggle('active', i === ui.comboIdx));
+  opts[ui.comboIdx].scrollIntoView({ block:'nearest' });
 }
 function disarm(){ ui.armed = null; document.querySelectorAll('[data-arm].armed').forEach(b => { b.classList.remove('armed'); b.textContent = b.dataset.label; }); }
 function drawerBusy(){ const a = document.activeElement; return $('drawer').contains(a) && a.matches('input,textarea,select'); }
@@ -1076,20 +1147,23 @@ async function act(el){
     case 'editCp': return openDrawer('cpForm', id);
     case 'delCp': await guard(del('counterparties', id)); if (ui.cp === id) ui.cp = null; closeDrawer(); render(); return toast('Контрагент удалён');
     case 'newContract': return openDrawer('contract', id);
-    case 'delContract': { const [cid, kid] = id.split('|'); const c = cpOf(cid); await guard(upd('counterparties', cid, { contracts:(c.contracts||[]).filter(k => k.id !== kid) })); return render(); }
-    case 'quickCp': {
-      const name = val2('f-cust'); if (!name || cpByName(name)) return;
-      try { await add('counterparties', { name, roles:['customer'], contracts:[], createdAt:new Date().toISOString() }); custHint(); toast('Контрагент «' + name + '» добавлен'); } catch(e) { toast(errText(e)); }
-      return;
+    case 'newContact': return openDrawer('contact', id);
+    case 'editContact': { const [cid, kid] = id.split('|'); return openDrawer('contact', cid, kid); }
+    case 'delContact': {
+      const [cid, kid] = id.split('|'); const c = cpOf(cid);
+      const list = contactsOf(c).filter(x => x.id !== kid).map(x => x.id === 'legacy' ? { ...x, id:uid() } : x);
+      await guard(upd('counterparties', cid, { contacts:list, person:'', phone:'', email:'' })); return render();
     }
+    case 'delContract': { const [cid, kid] = id.split('|'); const c = cpOf(cid); await guard(upd('counterparties', cid, { contracts:(c.contracts||[]).filter(k => k.id !== kid) })); return render(); }
     case 'addComment': {
+      const [col, did] = id.split('|');
       const ta = $('c-text'); const text = (ta?.value || '').trim(); if (!text) { ta?.focus(); return; }
       el.disabled = true;
-      try { await api('POST', `/api/orders/${id}/comments`, { text }); ui.drafts[id] = ''; ta.value = ''; document.activeElement?.blur(); await refresh(); }
+      try { await api('POST', `/api/${col}/${did}/comments`, { text }); ui.drafts[col + ':' + did] = ''; ta.value = ''; document.activeElement?.blur(); await refresh(); }
       catch(e) { toast(errText(e)); } finally { el.disabled = false; }
       return;
     }
-    case 'delComment': { const [oid, cid] = id.split('|'); try { await api('DELETE', `/api/orders/${oid}/comments/${cid}`); await refresh(); } catch(e) { toast(errText(e)); } return; }
+    case 'delComment': { const [col, did, cid] = id.split('|'); try { await api('DELETE', `/api/${col}/${did}/comments/${cid}`); await refresh(); } catch(e) { toast(errText(e)); } return; }
     case 'editOrder': return openDrawer('order', id);
     case 'newInvoice': return openDrawer('invoiceForm', null, id);
     case 'editInvoice': return openDrawer('invoiceForm', id);
@@ -1143,6 +1217,17 @@ document.addEventListener('click', e => {
   act(el);
 });
 document.addEventListener('keydown', e => {
+  if (e.target.id === 'f-cust') {
+    const pop = $('cust-pop'), open = pop && !pop.hidden;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); return comboMove(e.key === 'ArrowDown' ? 1 : -1); }
+    if (e.key === 'Enter' && open) {
+      const act = pop.querySelectorAll('.combo-opt')[ui.comboIdx];
+      if (act) { e.preventDefault(); return comboPick(act); }
+      comboClose();
+    }
+    if (e.key === 'Escape' && open) { e.preventDefault(); e.stopPropagation(); return comboClose(); }
+    if (e.key === 'Tab') comboClose();
+  }
   if (e.key === 'Escape' && !$('upop').hidden) { $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded','false'); $('ubtn').focus(); return; }
   if (e.key === 'Escape' && ui.drawer) return closeDrawer();
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.id === 'c-text') { e.preventDefault(); const b = document.querySelector('[data-act=addComment]'); if (b) act(b); return; }
@@ -1152,8 +1237,8 @@ $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.id === 'c-text') { ui.drafts[t.dataset.oid] = t.value; return; }
-  if (t.id === 'f-cust') return custHint();
+  if (t.id === 'c-text') { ui.drafts[t.dataset.key] = t.value; return; }
+  if (t.id === 'f-cust') { $('f-cust-id').value = ''; comboOpen(); return custHint(); }
   if (t.id !== 'oq' && t.id !== 'cq') return;
   const q = t.value.trim().toLowerCase(); let any = false;
   if (t.id === 'oq') ui.oq = t.value; else ui.cq = t.value;
@@ -1162,6 +1247,10 @@ document.addEventListener('input', e => {
   document.querySelectorAll(box + ' details').forEach(dt => { const vis = [...dt.querySelectorAll('.oitem')].some(b => !b.hidden); dt.hidden = !vis; if (q && vis) dt.open = true; });
   const none = $(t.id === 'oq' ? 'onone' : 'cnone'); if (none) none.hidden = any;
 });
+document.addEventListener('mousedown', e => { const o = e.target.closest('.combo-opt'); if (o) { e.preventDefault(); comboPick(o); } });
+document.addEventListener('focusin', e => { if (e.target.id === 'f-cust') comboOpen(); });
+document.addEventListener('click', e => { if (e.target.id === 'f-cust' && $('cust-pop')?.hidden) comboOpen(); });
+document.addEventListener('focusout', e => { if (e.target.id === 'f-cust') setTimeout(comboClose, 120); });
 document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-st=closed]')) ui.openClosed = e.target.open; }, true);
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; });
 document.addEventListener('change', async e => {

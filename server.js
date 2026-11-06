@@ -307,10 +307,10 @@ async function api(req, res, url) {
     return send(res, 200, { id, url: '/files/' + id, name, size: buf.length, at: db.files[id].at, by: user.id });
   }
 
-  /* comments on orders: everyone except «Просмотр» may write; author or admin may delete */
-  if (p[1] === 'orders' && p[3] === 'comments') {
-    const o = db.orders[p[2]];
-    if (!o) return fail(res, 404, 'Заказ не найден');
+  /* comments on orders and counterparties: everyone except «Просмотр» may write; author or admin may delete */
+  if ((p[1] === 'orders' || p[1] === 'counterparties') && p[3] === 'comments') {
+    const o = db[p[1]][p[2]];
+    if (!o) return fail(res, 404, 'Запись не найдена');
     o.comments = Array.isArray(o.comments) ? o.comments : [];
     if (m === 'POST' && p.length === 4) {
       if (user.role === 'viewer') return fail(res, 403, 'Недостаточно прав');
@@ -338,7 +338,7 @@ async function api(req, res, url) {
     if (!(col === 'invoices' ? canAddInvoice(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
     const data = clean(await readJsonBody(req));
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
-    if (col === 'orders') data.comments = [];
+    if (col === 'orders' || col === 'counterparties') data.comments = [];
     if (col === 'invoices') {
       if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
       data.projectId = db.orders[data.orderId].projectId || null;
@@ -352,7 +352,7 @@ async function api(req, res, url) {
   if (m === 'PATCH') {
     const patch = clean(await readJsonBody(req));
     delete patch.createdBy; delete patch.createdAt;
-    if (col === 'orders') delete patch.comments;   // comments go through their own endpoint
+    if (col === 'orders' || col === 'counterparties') delete patch.comments;   // comments go through their own endpoint
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     const keys = Object.keys(patch);
     const payKeys = col === 'invoices' ? keys.filter(k => PAY_FIELDS.includes(k)) : [];
