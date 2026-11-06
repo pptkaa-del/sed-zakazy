@@ -479,7 +479,7 @@ async function sendInvoicesZip(res, user, orderFilter) {
       } else inZip = 'файл не найден на сервере';
     }
     total += Number(i.amount) || 0;
-    rows.push([`${o.number || ''} ${o.title || ''}`.trim(), o.billNo ? `№ ${o.billNo}${o.billDate ? ' от ' + fmtD(o.billDate) : ''}` : '',
+    rows.push([`${o.number || ''} ${o.title || ''}${o.orderNo ? ` (заказ № ${o.orderNo})` : ''}`.trim(), o.billNo ? `№ ${o.billNo}${o.billDate ? ' от ' + fmtD(o.billDate) : ''}` : '',
       i.number, fmtD(i.date), i.supplier, i.purpose, money(i.amount), fmtD(i.due), inZip]);
   }
   rows.push(['Итого', '', '', '', '', '', money(total), '', '']);

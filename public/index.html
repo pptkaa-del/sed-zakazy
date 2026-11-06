@@ -165,7 +165,7 @@ main{padding-block:20px 48px}
 .files small{color:var(--ink-2);white-space:nowrap}
 
 .tscroll{overflow-x:auto;border:1px solid var(--rule-2);border-radius:8px}
-table.comp{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
+table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .comp th{background:var(--mute-soft);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:7px 8px;white-space:nowrap}
 .comp th.r{text-align:right}
 .comp td{border-top:1px solid var(--rule-2);padding:3px 4px;vertical-align:middle}
@@ -174,7 +174,7 @@ table.comp{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
 .comp input:hover,.comp select:hover{border-color:var(--rule)}
 .comp input:focus{border-color:var(--stamp);background:var(--sheet);outline:none}
 .comp input.num{text-align:right;font-family:var(--f-mono)}
-.comp .csum{text-align:right;font-family:var(--f-mono);white-space:nowrap;padding-right:8px}
+.comp input.sup:placeholder-shown::placeholder{color:var(--ok);font-style:italic;opacity:1}
 .comp tfoot td{font-weight:600;padding:8px;white-space:nowrap}
 .comp td.emptyrow{text-align:center;color:var(--ink-2);padding:20px}
 
@@ -412,12 +412,11 @@ const MAX_MB = 50;
 
 const ORDER_ST = { new:'Планируется', work:'В работе', closed:'Закрыт' };
 const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', contractor:'Подрядчик' };
-const COMP_ST = { need:'Нужно заказать', ordered:'Заказано', got:'Получено' };
 const KIND = { buy:'Закупка', work:'Работа' };
 const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', user:'Сотрудник', viewer:'Просмотр' };
 const ROLE_INFO = {
   admin:'Всё, включая управление пользователями.',
-  manager:'Заказы, контрагенты и договоры, документы, компоненты, счета, план-график. Оплату не отмечает.',
+  manager:'Заказы, контрагенты и договоры, документы, строки для закупки, счета, план-график. Оплату не отмечает.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
   user:'Видит всё, загружает счета в заказы, правит и удаляет свои неоплаченные счета.',
   viewer:'Только просмотр.'
@@ -528,7 +527,7 @@ function armBtn(key, label, act, id, cls='btn sm danger'){
 
 /* ===== Orders view ===== */
 function vOrders(){
-  if (!S.orders.length) return `<div class="empty"><h3>Пока нет ни одного заказа</h3>Создайте заказ: в нём хранятся спецификации, компоненты, счета и задачи план-графика.<div class="row-g"><button class="btn primary" data-act="newOrder">+ Заказ</button></div></div>`;
+  if (!S.orders.length) return `<div class="empty"><h3>Пока нет ни одного заказа</h3>Создайте заказ: в нём хранятся документы, строки для закупки, счета и задачи план-графика.<div class="row-g"><button class="btn primary" data-act="newOrder">+ Заказ</button></div></div>`;
   const o = ord(ui.order);
   const q = ui.oq.trim().toLowerCase();
   const items = Object.entries(ORDER_ST).map(([st, label]) => {
@@ -539,20 +538,20 @@ function vOrders(){
   }).join('');
   return `<div class="split ${o?'has-sel':''}">
     <nav class="olist" aria-label="Заказы">
-      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" placeholder="Поиск: номер, название, заказчик" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button></div>
+      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" placeholder="Поиск: идентификатор, номер, название, заказчик" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button></div>
       <div class="pgroup" id="olist">${items}<p class="pad dim" id="onone" ${ordersSorted().some(x => matchOrder(x, q)) ? 'hidden' : ''}>Ничего не найдено</p></div>
     </nav>
-    <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Откройте заказ слева, чтобы загрузить спецификацию, заполнить компоненты и добавить счета.</div>`}</section>
+    <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Откройте заказ слева, чтобы загрузить документы, заполнить строки для закупки и добавить счета.</div>`}</section>
   </div>`;
 }
-const orderHay = x => [x.number, x.title, custName(x), x.billNo].join(' ').toLowerCase();
+const orderHay = x => [x.number, x.orderNo, x.title, custName(x), x.billNo].join(' ').toLowerCase();
 const matchOrder = (x, q) => !q || orderHay(x).includes(q);
 const billText = o => !!(o && o.billNo);
 function orderItem(x, q){
   const cm = Array.isArray(x.comments) ? x.comments : [];
   const last = cm[cm.length - 1];
   return `<button class="oitem ${ui.order===x.id?'on':''}" data-act="selOrder" data-id="${x.id}" data-q="${esc(orderHay(x))}" ${matchOrder(x, q)?'':'hidden'}>
-    <span class="mono">Заказ ${esc(x.number)}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>${custName(x)?`<span class="oc">${esc(custName(x))}</span>`:''}
+    <span class="mono">Заказ ${esc(x.number)}${x.orderNo?` · № ${esc(x.orderNo)}`:''}${x.billNo?` · сч. ${esc(x.billNo)}`:''}</span><span class="ot">${esc(x.title)}${exTag(x)}</span>${custName(x)?`<span class="oc">${esc(custName(x))}</span>`:''}
     ${last ? `<span class="ocm" title="${esc(last.text)}"><b>${esc(who(last.by))}:</b> ${esc(last.text.slice(0,120))}${cm.length > 1 ? ` · ещё ${cm.length - 1}` : ''}</span>` : ''}
   </button>`;
 }
@@ -575,7 +574,7 @@ function orderDetail(o){
   <div class="ohead">
     <div style="min-width:0">
       <h2>Заказ ${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
-      <div class="dim">${[custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
+      <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button></div>
   </div>
@@ -584,10 +583,10 @@ function orderDetail(o){
     <div class="ch"><h3>Документы по заказу <span class="dim">${specs.length||''}</span></h3>
       <label class="btn sm">Загрузить файл<input type="file" data-up="spec" data-id="${o.id}" accept="${ACCEPT}" multiple hidden></label></div>
     ${specs.length ? `<ul class="files">${specs.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at||'').slice(0,10))}</small>${armBtn('spec:'+f.id,'✕','delSpec',o.id+'|'+f.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документы не загружены.</p>'}
-    <p class="hint">Спецификации, чертежи, письма и другие файлы: любой формат, до 50 МБ. Строки спецификации из Excel можно вставить в таблицу компонентов.</p>
+    <p class="hint">Спецификации, чертежи, письма и другие файлы: любой формат, до 50 МБ. Строки из Excel можно вставить в таблицу «Строки для закупки».</p>
   </section>
   <section class="card">
-    <div class="ch"><h3>Компоненты <span class="dim">${comps.length||''}</span></h3>
+    <div class="ch"><h3>Строки для закупки <span class="dim">${comps.length||''}</span></h3>
       <div class="row-g"><button class="btn sm" data-act="paste" data-id="${o.id}">Вставить из Excel</button><button class="btn sm primary" data-act="addComp" data-id="${o.id}">+ Строка</button></div></div>
     ${compTable(o)}
   </section>
@@ -602,24 +601,23 @@ function orderDetail(o){
 }
 function compTable(o){
   const comps = o.components || [];
-  const total = sum(comps, c => num(c.qty)*num(c.price));
+  const invNos = [...new Set(invOf(o.id).map(i => i.number).filter(Boolean))];
   const rows = comps.map((c,i) => `<tr data-cid="${esc(c.id)}">
     <td class="n">${i+1}</td>
-    <td><input class="ci" data-f="name" value="${esc(c.name)}" aria-label="Наименование" style="min-width:200px"></td>
-    <td><input class="ci" data-f="pn" value="${esc(c.pn)}" aria-label="Артикул" style="min-width:120px"></td>
+    <td><input class="ci" data-f="name" value="${esc(c.name)}" aria-label="Наименование" style="min-width:220px"></td>
     <td><input class="ci num" data-f="qty" value="${esc(c.qty)}" inputmode="decimal" aria-label="Количество" style="width:70px"></td>
     <td><input class="ci" data-f="unit" value="${esc(c.unit)}" aria-label="Единица" style="width:56px"></td>
-    <td><input class="ci num" data-f="price" value="${esc(c.price)}" inputmode="decimal" aria-label="Цена" style="width:100px"></td>
-    <td class="csum">${money(num(c.qty)*num(c.price)).replace(' ₽','')}</td>
-    <td><input class="ci" data-f="supplier" value="${esc(c.supplier)}" aria-label="Поставщик" style="min-width:120px"></td>
-    <td><select class="ci" data-f="st" aria-label="Статус">${Object.entries(COMP_ST).map(([k,v]) => `<option value="${k}" ${c.st===k?'selected':''}>${v}</option>`).join('')}</select></td>
+    <td><input class="ci sup" data-f="supplier" value="${esc(c.supplier)}" placeholder="в наличии" aria-label="Поставщик (пусто — в наличии)" list="sup-${o.id}" style="min-width:150px"></td>
+    <td><input class="ci" data-f="invNo" value="${esc(c.invNo)}" aria-label="Номер счёта" list="inv-${o.id}" style="min-width:110px"></td>
     <td><button class="icon" data-act="delComp" data-id="${o.id}|${esc(c.id)}" aria-label="Удалить строку" title="Удалить строку">✕</button></td>
   </tr>`).join('');
   return `<div class="tscroll" data-keep><table class="comp" data-oid="${o.id}">
-    <thead><tr><th>№</th><th>Наименование</th><th>Артикул / PN</th><th class="r">Кол-во</th><th>Ед.</th><th class="r">Цена, ₽</th><th class="r">Сумма, ₽</th><th>Поставщик</th><th>Статус</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="10" class="emptyrow">Компонентов нет. Добавьте строку или вставьте таблицу из Excel.</td></tr>'}</tbody>
-    <tfoot><tr><td colspan="6">Итого</td><td class="r mono ctotal">${money(total)}</td><td colspan="3"></td></tr></tfoot>
-  </table></div>`;
+    <thead><tr><th>№</th><th>Наименование</th><th class="r">Кол-во</th><th>Ед.</th><th>Поставщик</th><th>№ счёта</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="emptyrow">Строк нет. Добавьте строку или вставьте таблицу из Excel.</td></tr>'}</tbody>
+  </table>
+  <datalist id="inv-${o.id}">${invNos.map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist>
+  <datalist id="sup-${o.id}">${cpsSorted().map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist></div>
+  ${comps.length ? '<p class="hint">Если поставщик не указан, позиция считается имевшейся в наличии. Номер счёта можно выбрать из счетов заказа или ввести вручную.</p>' : ''}`;
 }
 function invRow(i, withPay){
   const [cc, cl] = invChip(i);
@@ -814,8 +812,10 @@ function renderDrawer(){
   if (d.kind === 'order') {
     const o = ord(d.id), hasInv = o && invOf(o.id).length;
     D.innerHTML = dh(o ? 'Заказ ' + esc(o.number) : 'Новый заказ') + `<form class="d-body" data-form="order"><div class="form">
-      <label>Номер заказа<input class="in" id="f-num" value="${o ? v(o,'number') : esc(nextOrderNumber())}" required>${o?'':'<small class="dim" style="font-size:12px">Присвоен автоматически, можно изменить</small>'}</label>
+      <label>Идентификатор заказа<input class="in" id="f-num" value="${o ? v(o,'number') : esc(nextOrderNumber())}" required>${o?'':'<small class="dim" style="font-size:12px">Присвоен автоматически, можно изменить</small>'}</label>
       <label>Статус<select class="in" id="f-st">${opt(ORDER_ST, o?.status||'new')}</select></label>
+      <label class="wide">Номер заказа<input class="in" id="f-ordno" value="${v(o,'orderNo')}" placeholder="Например, 4500123456 или 15 по договору № 7/2026">
+        <small class="dim" style="font-size:12px">Для заказов по рамочным договорам: номер заказа (заявки) заказчика. Можно не заполнять.</small></label>
       <label class="wide">Наименование<input class="in" id="f-title" value="${v(o,'title')}" placeholder="Шкаф управления ШУ-3" required></label>
       <div class="wide fld"><label for="f-cust">Заказчик / получатель</label>
         <div class="combo"><input class="in" id="f-cust" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cust-pop" value="${esc(custName(o))}" placeholder="Выберите из списка или начните вводить название">
@@ -954,9 +954,9 @@ function renderDrawer(){
   }
   if (d.kind === 'paste') {
     const o = ord(d.id);
-    D.innerHTML = dh('Вставка компонентов из Excel') + `<form class="d-body" data-form="paste">
-      <p style="margin:0">Скопируйте строки в Excel и вставьте сюда. Порядок столбцов:<br><b>Наименование · Артикул · Кол-во · Ед. · Цена · Поставщик</b>. Строку заголовков можно не удалять.</p>
-      <textarea id="paste-t" rows="10" class="mono" placeholder="Автоматический выключатель 3P 16А&#9;BA47-29&#9;12&#9;шт&#9;845,50&#9;ЭлектроКомплект"></textarea>
+    D.innerHTML = dh('Вставка строк из Excel') + `<form class="d-body" data-form="paste">
+      <p style="margin:0">Скопируйте строки в Excel и вставьте сюда. Порядок столбцов:<br><b>Наименование · Кол-во · Ед. · Поставщик · № счёта</b>. Строку заголовков можно не удалять. Пустой поставщик — позиция в наличии.</p>
+      <textarea id="paste-t" rows="10" class="mono" placeholder="Автоматический выключатель 3P 16А&#9;12&#9;шт&#9;ЭлектроКомплект&#9;1482"></textarea>
       <div class="dim" id="paste-info">Строк к добавлению: 0</div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Добавить в заказ ${esc(o?.number||'')}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -964,8 +964,8 @@ function renderDrawer(){
 }
 function parsePaste(text){
   const lines = text.split(/\r?\n/).map(l => l.trim() ? l.split(l.includes('\t') ? '\t' : ';') : null).filter(Boolean);
-  if (lines.length && !num(lines[0][2]) && /наимен|name|артик|кол/i.test(lines[0].join(' '))) lines.shift();
-  return lines.map(c => ({ id:uid(), name:(c[0]||'').trim(), pn:(c[1]||'').trim(), qty:num(c[2]) || 1, unit:(c[3]||'шт').trim() || 'шт', price:num(c[4]), supplier:(c[5]||'').trim(), st:'need' })).filter(c => c.name);
+  if (lines.length && !num(lines[0][1]) && /наимен|name|кол|ед\.|постав/i.test(lines[0].join(' '))) lines.shift();
+  return lines.map(c => ({ id:uid(), name:(c[0]||'').trim(), qty:num(c[1]) || 1, unit:(c[2]||'шт').trim() || 'шт', supplier:(c[3]||'').trim(), invNo:(c[4]||'').trim() })).filter(c => c.name);
 }
 
 /* ---------- submit ---------- */
@@ -979,13 +979,13 @@ async function onSubmit(e){
   try {
     btn.disabled = true;
     if (kind === 'order') {
-      if (!val('f-num') || !val('f-title')) return fail('Укажите номер и наименование заказа.');
+      if (!val('f-num') || !val('f-title')) return fail('Укажите идентификатор и наименование заказа.');
       const dup = S.orders.find(x => x.id !== d.id && String(x.number||'').trim().toLowerCase() === val('f-num').toLowerCase());
-      if (dup) return fail(`Номер ${val('f-num')} уже есть у заказа «${dup.title}». Укажите другой.`);
+      if (dup) return fail(`Идентификатор ${val('f-num')} уже есть у заказа «${dup.title}». Укажите другой.`);
       const picked = cpOf(val('f-cust-id'));
       let cust = picked && picked.name.trim().toLowerCase() === val('f-cust').toLowerCase() ? picked : cpByName(val('f-cust'));
       if (!cust && val('f-cust')) { const cid = await add('counterparties', { name:val('f-cust'), roles:['customer'], contracts:[], createdAt:now }); cust = cpOf(cid) || { id:cid, name:val('f-cust') }; toast('Контрагент «' + val('f-cust') + '» добавлен'); }
-      const data = { number:val('f-num'), status:val('f-st'), title:val('f-title'), customerId: cust ? cust.id : null, customer: cust ? cust.name : '', deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
+      const data = { number:val('f-num'), orderNo:val('f-ordno'), status:val('f-st'), title:val('f-title'), customerId: cust ? cust.id : null, customer: cust ? cust.name : '', deadline:val('f-dl'), billNo:val('f-bill'), billDate:val('f-billdate') };
       if (d.id) { await upd('orders', d.id, data); }
       else { const id = await add('orders', { ...data, components:[], specs:[], createdAt:now }); ui.order = id; remember(); }
       closeDrawer(); render(); toast(d.id ? 'Заказ сохранён' : 'Заказ создан');
@@ -1174,7 +1174,7 @@ async function act(el){
     case 'payF': ui.payF = id; return render();
     case 'scale': ui.scale = id; remember(); return render();
     case 'addComp': {
-      const o = ord(id); const comps = [...(o.components||[]), { id:uid(), name:'', pn:'', qty:1, unit:'шт', price:0, supplier:'', st:'need' }];
+      const o = ord(id); const comps = [...(o.components||[]), { id:uid(), name:'', qty:1, unit:'шт', supplier:'', invNo:'' }];
       await guard(upd('orders', id, { components:comps })); render();
       const ins = document.querySelectorAll('.comp tbody tr:last-child input'); ins[0] && ins[0].focus(); return;
     }
@@ -1262,12 +1262,8 @@ document.addEventListener('change', async e => {
     const tr = t.closest('tr'), table = t.closest('table'), o = ord(table.dataset.oid); if (!o) return;
     const comps = (o.components||[]).map(c => ({ ...c }));
     const c = comps.find(c => c.id === tr.dataset.cid); if (!c) return;
-    const f = t.dataset.f; c[f] = (f === 'qty' || f === 'price') ? num(t.value) : t.value.trim();
-    if (f === 'qty' || f === 'price') {
-      t.value = c[f];
-      tr.querySelector('.csum').textContent = money(num(c.qty)*num(c.price)).replace(' ₽','');
-      table.querySelector('.ctotal').textContent = money(sum(comps, x => num(x.qty)*num(x.price)));
-    }
+    const f = t.dataset.f; c[f] = f === 'qty' ? num(t.value) : t.value.trim();
+    if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
   }
   if (t.dataset.up) {
