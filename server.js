@@ -47,7 +47,7 @@ const SESSION_DAYS = Number(process.env.SESSION_DAYS || 14);
 const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 
-const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points'];
+const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points', 'stock'];
 const ROLES = {
   admin:      'Администратор',
   manager:    'Менеджер',
@@ -65,6 +65,9 @@ const SEEN_FIELDS = ['seenAt', 'seenBy', 'seenLastAt', 'seenCount'];
 /* Map points: everyone except «Просмотр» adds points and marks them done; author, manager or admin edits and deletes */
 const POINT_STATUS_FIELDS = ['status', 'doneAt', 'doneBy'];
 const canWork = u => u.role !== 'viewer';
+/* Warehouse: managers and admins keep the item list; they and «Сотрудник» record receipts and issues */
+const canMoveStock = u => canEdit(u) || u.role === 'user';
+const qtyOk = v => Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) < 1e9;
 const mayEditPoint = (u, pt) => canEdit(u) || pt.createdBy === u.id;
 const validPoint = d => Number.isFinite(Number(d.lat)) && Number.isFinite(Number(d.lng)) && Math.abs(d.lat) <= 90 && Math.abs(d.lng) <= 180;
 
@@ -318,6 +321,27 @@ async function api(req, res, url) {
     return send(res, 200, { id, url: '/files/' + id, name, size: buf.length, at: db.files[id].at, by: user.id });
   }
 
+  /* warehouse receipts and issues: the server keeps the balance */
+  if (p[1] === 'stock' && p[3] === 'moves' && m === 'POST' && p.length === 4) {
+    const it = db.stock[p[2]];
+    if (!it) return fail(res, 404, 'Позиция склада не найдена');
+    if (!canMoveStock(user)) return fail(res, 403, 'Недостаточно прав');
+    const b = await readJsonBody(req);
+    if (!['in', 'out'].includes(b.type)) return fail(res, 400, 'Укажите приход или расход');
+    if (!qtyOk(b.qty)) return fail(res, 400, 'Количество должно быть больше нуля');
+    const qty = Math.round(Number(b.qty) * 1000) / 1000;
+    const bal = Number(it.qty) || 0;
+    if (b.type === 'out' && qty > bal + 1e-9) return fail(res, 409, `На складе только ${bal} ${it.unit || ''}`.trim());
+    if (b.orderId && !db.orders[b.orderId]) return fail(res, 400, 'Заказ не найден');
+    it.qty = Math.round((bal + (b.type === 'in' ? qty : -qty)) * 1000) / 1000;
+    it.moves = Array.isArray(it.moves) ? it.moves : [];
+    const mv = { id: newId(), type: b.type, qty, orderId: b.orderId || null, note: String(b.note || '').slice(0, 500), by: user.id, at: new Date().toISOString(), balance: it.qty };
+    it.moves.push(mv);
+    it.updatedAt = mv.at; it.updatedBy = user.id;
+    saveDb();
+    return send(res, 200, { ok: true, qty: it.qty, move: mv });
+  }
+
   /* comments on orders and counterparties: everyone except «Просмотр» may write; author or admin may delete */
   if ((p[1] === 'orders' || p[1] === 'counterparties') && p[3] === 'comments') {
     const o = db[p[1]][p[2]];
@@ -355,6 +379,7 @@ async function api(req, res, url) {
     }
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
     if (col === 'orders' || col === 'counterparties') data.comments = [];
+    if (col === 'stock') { data.qty = 0; data.moves = []; }
     if (col === 'invoices') {
       if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
       data.projectId = db.orders[data.orderId].projectId || null;
@@ -369,6 +394,7 @@ async function api(req, res, url) {
     const patch = clean(await readJsonBody(req));
     delete patch.createdBy; delete patch.createdAt;
     if (col === 'orders' || col === 'counterparties') delete patch.comments;   // comments go through their own endpoint
+    if (col === 'stock') { delete patch.qty; delete patch.moves; }          // balance changes only through receipts and issues
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     const keys = Object.keys(patch);
     /* tasks: everyone except «Просмотр» may tick «Выполнено»; other changes need a manager or admin */
