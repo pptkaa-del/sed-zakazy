@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Управление предприятием</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<script>try{var t=localStorage.getItem('sed-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<script>try{var t=localStorage.getItem('sed-theme');if(t==='light'||t==='dark'||t==='telecom')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&family=Montserrat:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: header with three workspaces (Заказы · Бухгалтерия · План-график); orders = project tree + order sheet; accounting = grouped payables; plan = Gantt. */
 :root{
@@ -23,7 +23,7 @@
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-theme="telecom"]){
   --paper:#11151B; --sheet:#181E26; --ink:#E6EAF0; --ink-2:#9AA5B4; --rule:#2C343F; --rule-2:#222932;
   --stamp:#8C9BFF; --stamp-soft:#252C55; --stamp-ink:#0E1220; --work:#4FD1C5; --work-soft:#173634;
   --ok:#5CCB92; --ok-soft:#173327; --warn:#F0AE55; --warn-soft:#3A2A14; --bad:#FF7B7B; --bad-soft:#3E1C1F;
@@ -51,7 +51,7 @@ a{color:var(--stamp)}
 .r{text-align:right}
 h2,h3{text-wrap:balance;margin:0}
 
-header.top{background:var(--sheet);border-bottom:1px solid var(--rule)}
+header.top{background:var(--sheet);border-bottom:1px solid var(--rule);position:relative;z-index:12}
 header.top .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding-block:14px}
 .brand{display:flex;gap:12px;align-items:center}
 h1{font:600 clamp(16px,2.2vw,20px)/1.2 var(--f-display);margin:0}
@@ -316,6 +316,44 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .g-today{position:absolute;top:0;bottom:0;width:2px;background:var(--bad);opacity:.7;z-index:1;pointer-events:none}
 .g-dl{position:absolute;top:4px;bottom:4px;width:0;border-left:2px dashed var(--warn);pointer-events:none}
 
+/* ===== Theme «Телеком»: светлая, глубокий зелёный, рисунок дорожек ===== */
+:root[data-theme="telecom"]{
+  --paper:#E8ECE9; --sheet:#FFFFFF; --ink:#1B2A26; --ink-2:#56665F; --rule:#D2DAD5; --rule-2:#E5EAE7;
+  --stamp:#1F4D40; --stamp-soft:#DCE8E2; --stamp-ink:#FFFFFF; --work:#2F7A61; --work-soft:#DCEFE6;
+  --ok:#24704F; --ok-soft:#DCEFE4; --warn:#9A5B12; --warn-soft:#F6EAD6; --bad:#A3302A; --bad-soft:#F7E0DE;
+  --info:#285E74; --info-soft:#DCEBF0; --mute:#66756F; --mute-soft:#E3E8E5;
+  --shadow:0 14px 40px rgba(18,45,37,.16); --tile-filter:saturate(.7) contrast(.95);
+  --f-display:"Montserrat","IBM Plex Sans",system-ui,sans-serif;
+  --f-body:"Manrope","IBM Plex Sans",system-ui,sans-serif;
+  color-scheme:light;
+}
+:root[data-theme="telecom"]{background:var(--paper)}
+:root[data-theme="telecom"] body{min-height:100vh;background-repeat:no-repeat,repeat;background:
+  linear-gradient(180deg, rgba(255,255,255,.55), rgba(232,236,233,0) 420px) no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%231F4D40' stroke-opacity='.09' stroke-width='1.4'%3E%3Cpath d='M0 40h70l20 20h60l20-20h90'/%3E%3Cpath d='M0 130h40l25 25h85l20 20h90'/%3E%3Cpath d='M0 215h110l18-18h70l22 22h40'/%3E%3Cpath d='M60 0v25l15 15'/%3E%3Cpath d='M200 0v40'/%3E%3Cpath d='M150 60v45l-20 20v35'/%3E%3Cpath d='M220 175v55l-20 20v10'/%3E%3Cpath d='M30 215v45'/%3E%3C/g%3E%3Cg fill='%231F4D40' fill-opacity='.12'%3E%3Ccircle cx='90' cy='60' r='3.5'/%3E%3Ccircle cx='170' cy='40' r='3.5'/%3E%3Ccircle cx='65' cy='155' r='3.5'/%3E%3Ccircle cx='170' cy='175' r='3.5'/%3E%3Ccircle cx='128' cy='197' r='3.5'/%3E%3Ccircle cx='130' cy='160' r='3.5'/%3E%3Ccircle cx='75' cy='40' r='3'/%3E%3C/g%3E%3C/svg%3E") repeat, var(--paper)}
+:root[data-theme="telecom"] header.top{background:linear-gradient(115deg,rgba(255,255,255,.92) 0%,rgba(255,255,255,.78) 55%,rgba(31,77,64,.10) 100%);backdrop-filter:blur(4px);border-bottom-color:var(--rule)}
+:root[data-theme="telecom"] h1{font-weight:600;letter-spacing:-.01em}
+:root[data-theme="telecom"] nav.views{background:rgba(31,77,64,.07)}
+:root[data-theme="telecom"] nav.views a.on{background:var(--stamp);color:#fff;box-shadow:0 4px 12px rgba(31,77,64,.28)}
+:root[data-theme="telecom"] .btn{border-radius:6px}
+:root[data-theme="telecom"] .btn.primary{background:linear-gradient(180deg,#285E4F,#1F4D40);box-shadow:0 4px 12px rgba(31,77,64,.25)}
+:root[data-theme="telecom"] .card,:root[data-theme="telecom"] .pgroup,:root[data-theme="telecom"] .wgroup,:root[data-theme="telecom"] .pproj,
+:root[data-theme="telecom"] .empty,:root[data-theme="telecom"] .gantt,:root[data-theme="telecom"] .plist{background:rgba(255,255,255,.9);box-shadow:0 6px 22px rgba(18,45,37,.08);border-color:rgba(31,77,64,.12)}
+:root[data-theme="telecom"] .tile{background:linear-gradient(140deg,#24574A,#173F34);border-color:#173F34;color:#fff;box-shadow:0 10px 26px rgba(18,45,37,.25)}
+:root[data-theme="telecom"] .tile span,:root[data-theme="telecom"] .tile small{color:rgba(255,255,255,.75)}
+:root[data-theme="telecom"] .tile b{color:#fff}
+:root[data-theme="telecom"] .wgroup>summary,:root[data-theme="telecom"] .ogroup>summary,:root[data-theme="telecom"] .g-head .g-lab,:root[data-theme="telecom"] .g-head .g-track{background:linear-gradient(90deg,#24574A,#1F4D40);color:rgba(255,255,255,.9)}
+:root[data-theme="telecom"] .g-head .g-m{color:#fff}:root[data-theme="telecom"] .g-head .g-w{color:rgba(255,255,255,.7)}
+:root[data-theme="telecom"] .comp th,:root[data-theme="telecom"] .urow.head{background:#DCE8E2;color:#1F4D40}
+:root[data-theme="telecom"] .oitem.on,:root[data-theme="telecom"] .pitem.on{background:#DCE8E2;box-shadow:inset 3px 0 0 var(--stamp)}
+:root[data-theme="telecom"] .avatar{background:var(--stamp);color:#fff}
+.themes{display:flex;gap:4px;padding:4px 6px 8px;flex-wrap:wrap}
+.upop .themes button{flex:1 1 40%;padding:6px 8px;font-size:12px;border:1px solid var(--rule);border-radius:7px;background:var(--sheet);color:var(--ink);text-align:center}
+.upop .themes button:hover{border-color:var(--ink-2);background:var(--sheet)}
+.upop .themes button.on,.upop .themes button.on:hover{background:var(--stamp);border-color:var(--stamp);color:var(--stamp-ink)}
+.themes .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0;border:1px solid rgba(0,0,0,.15)}
+.upop .tlabel{padding:6px 10px 2px;font-size:12px;color:var(--ink-2)}
+
 /* Map */
 .mapgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
 #map{height:calc(100vh - 230px);min-height:420px;border-radius:12px;border:1px solid var(--rule);background:var(--mute-soft);z-index:0}
@@ -443,7 +481,13 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="upop" id="upop" role="menu" hidden>
         <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
-        <button type="button" role="menuitem" data-act="theme" id="themeBtn">Тема: как в системе</button>
+        <div class="tlabel">Тема оформления</div>
+        <div class="themes" id="themes" role="group" aria-label="Тема оформления">
+          <button type="button" data-act="theme" data-id="system"><span class="sw" style="background:linear-gradient(90deg,#fff 50%,#181E26 50%)"></span>Система</button>
+          <button type="button" data-act="theme" data-id="light"><span class="sw" style="background:#fff"></span>Светлая</button>
+          <button type="button" data-act="theme" data-id="dark"><span class="sw" style="background:#181E26"></span>Тёмная</button>
+          <button type="button" data-act="theme" data-id="telecom"><span class="sw" style="background:#1F4D40"></span>Телеком</button>
+        </div>
         <button type="button" role="menuitem" data-act="password">Сменить пароль</button>
         <button type="button" role="menuitem" class="danger" data-act="logout">Выйти</button>
       </div>
@@ -1387,12 +1431,12 @@ async function onSubmit(e){
 }
 
 /* ---------- theme ---------- */
-const THEME_LABEL = { system:'как в системе', light:'светлая', dark:'тёмная' };
-function themeGet(){ try { const t = localStorage.getItem('sed-theme'); return t === 'light' || t === 'dark' ? t : 'system'; } catch(e) { return 'system'; } }
+const THEMES = ['system', 'light', 'dark', 'telecom'];
+function themeGet(){ try { const t = localStorage.getItem('sed-theme'); return THEMES.includes(t) ? t : 'system'; } catch(e) { return 'system'; } }
 function themeSet(t){
   try { if (t === 'system') localStorage.removeItem('sed-theme'); else localStorage.setItem('sed-theme', t); } catch(e){}
   if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
-  $('themeBtn').textContent = 'Тема: ' + THEME_LABEL[t];
+  document.querySelectorAll('#themes button').forEach(b => { const on = b.dataset.id === t; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
 }
 themeSet(themeGet());
 
@@ -1439,7 +1483,7 @@ async function act(el){
   switch (a) {
     case 'close': return closeDrawer();
     case 'reload': return location.reload();
-    case 'theme': { const order = ['system','light','dark']; const cur = themeGet(); themeSet(order[(order.indexOf(cur) + 1) % 3]); $('upop').hidden = false; return; }
+    case 'theme': themeSet(THEMES.includes(id) ? id : 'system'); $('upop').hidden = false; return;
     case 'mapF': ui.mapF = id; return render();
     case 'addPoint': setAddMode(!ui.addPoint); if (ui.addPoint) map?.closePopup(); return;
     case 'pointByCoords': setAddMode(false); map?.closePopup(); return openDrawer('pointCoords');
