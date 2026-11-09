@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Управление предприятием</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('sed-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&display=swap">
 <style>
@@ -16,6 +18,7 @@
   --ok:#1E7A4F; --ok-soft:#DFF2E7; --warn:#A35A00; --warn-soft:#FBEBD3; --bad:#B42323; --bad-soft:#FBE1E1;
   --info:#255F9E; --info-soft:#DDEBF8; --mute:#6A7380; --mute-soft:#EDEFF2;
   --shadow:0 12px 40px rgba(20,30,50,.18);
+  --tile-filter:none;
   --f-display:"Unbounded","IBM Plex Sans",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
@@ -24,12 +27,14 @@
   --paper:#11151B; --sheet:#181E26; --ink:#E6EAF0; --ink-2:#9AA5B4; --rule:#2C343F; --rule-2:#222932;
   --stamp:#8C9BFF; --stamp-soft:#252C55; --stamp-ink:#0E1220; --work:#4FD1C5; --work-soft:#173634;
   --ok:#5CCB92; --ok-soft:#173327; --warn:#F0AE55; --warn-soft:#3A2A14; --bad:#FF7B7B; --bad-soft:#3E1C1F;
-  --info:#7DB4F0; --info-soft:#1A2D44; --mute:#98A1AD; --mute-soft:#232A33; --shadow:0 12px 40px rgba(0,0,0,.5); color-scheme:dark}}
+  --info:#7DB4F0; --info-soft:#1A2D44; --mute:#98A1AD; --mute-soft:#232A33; --shadow:0 12px 40px rgba(0,0,0,.5); color-scheme:dark;
+  --tile-filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}}
 :root[data-theme="dark"]{
   --paper:#11151B; --sheet:#181E26; --ink:#E6EAF0; --ink-2:#9AA5B4; --rule:#2C343F; --rule-2:#222932;
   --stamp:#8C9BFF; --stamp-soft:#252C55; --stamp-ink:#0E1220; --work:#4FD1C5; --work-soft:#173634;
   --ok:#5CCB92; --ok-soft:#173327; --warn:#F0AE55; --warn-soft:#3A2A14; --bad:#FF7B7B; --bad-soft:#3E1C1F;
-  --info:#7DB4F0; --info-soft:#1A2D44; --mute:#98A1AD; --mute-soft:#232A33; --shadow:0 12px 40px rgba(0,0,0,.5); color-scheme:dark}
+  --info:#7DB4F0; --info-soft:#1A2D44; --mute:#98A1AD; --mute-soft:#232A33; --shadow:0 12px 40px rgba(0,0,0,.5); color-scheme:dark;
+  --tile-filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
 
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -289,6 +294,43 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .g-today{position:absolute;top:0;bottom:0;width:2px;background:var(--bad);opacity:.7;z-index:1;pointer-events:none}
 .g-dl{position:absolute;top:4px;bottom:4px;width:0;border-left:2px dashed var(--warn);pointer-events:none}
 
+/* Map */
+.mapgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+#map{height:calc(100vh - 230px);min-height:420px;border-radius:12px;border:1px solid var(--rule);background:var(--mute-soft);z-index:0}
+#map.adding{cursor:crosshair}
+#map.adding .leaflet-interactive{cursor:crosshair}
+.leaflet-tile-pane{filter:var(--tile-filter)}
+.leaflet-container{font:inherit}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--sheet);color:var(--ink);box-shadow:var(--shadow)}
+.leaflet-popup-content{margin:12px 14px;min-width:220px;font-size:14px;line-height:1.45}
+.leaflet-container a.leaflet-popup-close-button{color:var(--ink-2)}
+.leaflet-bar a,.leaflet-bar a:hover{background:var(--sheet);color:var(--ink);border-color:var(--rule)}
+.leaflet-control-attribution{background:color-mix(in srgb,var(--sheet) 80%,transparent)!important;color:var(--ink-2)}
+.leaflet-control-attribution a{color:var(--stamp)}
+.pin{background:none;border:0}
+.pin svg{display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+.pin.todo{color:var(--bad)}.pin.done{color:var(--ok)}.pin.ghost{color:var(--stamp)}
+.pin.sel svg{transform:scale(1.18);transform-origin:50% 100%}
+.pp h4{margin:0 0 4px;font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.pp p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.pp small{display:block;color:var(--ink-2);font-size:12px}
+.pp .row-g{margin-top:10px}
+.pp .in{width:100%;margin-top:4px}
+.pp label{display:block;font-size:12px;color:var(--ink-2);margin-top:8px}
+.plist{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;overflow:hidden;max-height:calc(100vh - 230px);overflow-y:auto}
+.pitem{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:transparent;border:0;border-top:1px solid var(--rule-2);padding:10px 14px;cursor:pointer}
+.pitem:first-child{border-top:0}
+.pitem:hover{background:var(--paper)}
+.pitem.on{background:var(--stamp-soft)}
+.pitem .dot{margin-top:5px;border-radius:50%}
+.pitem .dot.todo{background:var(--bad)}.pitem .dot.done{background:var(--ok)}
+.pitem b{display:block;font-weight:500;overflow-wrap:anywhere}
+.pitem small{display:block;color:var(--ink-2);font-size:12px;overflow-wrap:anywhere}
+.pitem.done b{color:var(--ink-2);text-decoration:line-through}
+.maphint{font-size:13px;color:var(--stamp)}
+@media (max-width:900px){.mapgrid{grid-template-columns:1fr}#map{height:62vh;min-height:320px}.plist{max-height:none}}
+.updbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border-radius:8px;background:var(--stamp-soft);color:var(--stamp);font-size:14px}
+
 /* Drawer */
 .scrim{position:fixed;inset:0;background:rgba(10,15,25,.35);z-index:20}
 aside.drawer{position:fixed;top:0;right:0;bottom:0;width:min(540px,100%);background:var(--sheet);z-index:21;box-shadow:var(--shadow);display:flex;flex-direction:column;
@@ -369,12 +411,14 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#pay" data-v="pay">Бухгалтерия <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
+      <a href="#map" data-v="map">Карта</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
     </nav>
     <div class="umenu" id="umenu">
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="upop" id="upop" role="menu" hidden>
         <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
+        <button type="button" role="menuitem" data-act="theme" id="themeBtn">Тема: как в системе</button>
         <button type="button" role="menuitem" data-act="password">Сменить пароль</button>
         <button type="button" role="menuitem" class="danger" data-act="logout">Выйти</button>
       </div>
@@ -382,14 +426,25 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
   </div>
 </header>
 <main class="wrap">
+  <div class="updbar" id="updbar" hidden><span>Сервер обновлён до новой версии.</span><button class="btn sm primary" type="button" data-act="reload">Обновить страницу</button></div>
   <div class="banner" id="banner" hidden></div>
   <div id="view"></div>
+  <section id="mapView" hidden>
+    <div class="toolbar">
+      <div class="seg" id="mapSeg"><button data-act="mapF" data-id="todo">Нужно сделать</button><button data-act="mapF" data-id="done">Выполнено</button><button data-act="mapF" data-id="all">Все</button></div>
+      <button class="btn primary" type="button" data-act="addPoint" id="addPointBtn">+ Точка</button>
+      <button class="btn" type="button" data-act="locate">Где я</button>
+      <span class="maphint" id="mapHint"></span>
+    </div>
+    <div class="mapgrid"><div id="map" role="application" aria-label="Карта объектов"></div><div class="plist" id="plist"></div></div>
+  </section>
 </main>
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden role="dialog" aria-modal="true"></aside>
 <div class="toast" id="toast" hidden></div>
 </div>
 
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 (() => {
 const $ = id => document.getElementById(id);
@@ -422,7 +477,7 @@ const ROLE_INFO = {
   viewer:'Только просмотр.'
 };
 
-const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[] };
+const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[] };
 let me = null, rev = -1, mode = 'loading';
 const canEdit = () => me && (me.role === 'admin' || me.role === 'manager');
 const canPay = () => me && (me.role === 'admin' || me.role === 'accountant');
@@ -431,7 +486,7 @@ const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.statu
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
+const ui = { view:'orders', mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
@@ -488,7 +543,7 @@ async function api(method, url, body, headers = {}){
 async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {};
-  ['projects','orders','invoices','tasks','counterparties'].forEach(c => S[c] = d[c] || []);
+  ['projects','orders','invoices','tasks','counterparties','points'].forEach(c => S[c] = d[c] || []);
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
   render();
@@ -516,7 +571,10 @@ function render(){
   const n = S.invoices.filter(i => i.status === 'topay').length;
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
   const V = $('view');
-  if (mode === 'loading') { V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
+  const onMap = ui.view === 'map';
+  V.hidden = onMap; $('mapView').hidden = !onMap;
+  if (mode === 'loading') { V.hidden = false; $('mapView').hidden = true; V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
+  if (onMap) { V.innerHTML = ''; return renderMap(); }
   V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : vOrders();
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
@@ -677,6 +735,102 @@ function cpDetail(c){
     ${orders.length ? `<ul class="tlist">${orders.map(o => `<li data-act="gotoOrder" data-id="${o.id}" tabindex="0" role="button"><span class="t">${esc(o.number)} · ${esc(o.title)}</span><span class="chip c-${o.status||'new'}">${ORDER_ST[o.status||'new']}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Заказов с этим заказчиком нет.</p>'}
   </section>
   ${commentsCard('counterparties', c)}`;
+}
+
+/* ===== Map of objects ===== */
+const canWork = () => me && me.role !== 'viewer';
+const mayEditPoint = pt => me && (canEdit() || pt.createdBy === me.id);
+const ptOf = id => S.points.find(p => p.id === id);
+let map = null, markers = new Map(), ghost = null, fitted = false;
+const PIN = (cls, mark) => L.divIcon({ className:'pin ' + cls, iconSize:[30,40], iconAnchor:[15,39], popupAnchor:[0,-34],
+  html:`<svg width="30" height="40" viewBox="0 0 30 40" aria-hidden="true"><path d="M15 39C15 39 28 24.5 28 14.5A13 13 0 0 0 2 14.5C2 24.5 15 39 15 39Z" fill="currentColor" stroke="#fff" stroke-width="2"/><text x="15" y="19.5" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" font-family="system-ui,sans-serif">${mark}</text></svg>` });
+function ensureMap(){
+  if (map || typeof L === 'undefined') return;
+  let view = null; try { view = JSON.parse(localStorage.getItem('sed-map') || 'null'); } catch(e){}
+  map = L.map('map', { zoomControl:true, tap:true }).setView(view ? [view.lat, view.lng] : [55.7512, 37.6184], view ? view.z : 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(map);
+  fitted = !!view;
+  map.on('moveend', () => { const c = map.getCenter(); try { localStorage.setItem('sed-map', JSON.stringify({ lat:c.lat, lng:c.lng, z:map.getZoom() })); } catch(e){} });
+  map.on('click', e => { if (ui.addPoint) newPointAt(e.latlng); });
+  map.on('contextmenu', e => { if (canWork()) newPointAt(e.latlng); });
+  map.on('popupclose', e => { if (ghost && e.popup === ghost.getPopup()) { map.removeLayer(ghost); ghost = null; } });
+}
+function pointPopup(pt){
+  const o = ord(pt.orderId), done = pt.status === 'done';
+  return `<div class="pp"><h4>${esc(pt.title || 'Без названия')}</h4>
+    <span class="chip ${done ? 'c-ok' : 'c-bad'}">${done ? 'Выполнено' : 'Нужно сделать'}</span>
+    ${pt.todo ? `<p>${esc(pt.todo)}</p>` : '<p class="dim">Что сделать — не указано.</p>'}
+    ${o ? `<small>Заказ: <a href="#orders" data-act="gotoOrder" data-id="${o.id}">${esc(ordName(o))}</a></small>` : ''}
+    <small>Поставил: ${esc(who(pt.createdBy))}${pt.createdAt ? ', ' + esc(fmtDT(pt.createdAt)) : ''}</small>
+    ${done ? `<small>Выполнил: ${esc(who(pt.doneBy))}${pt.doneAt ? ', ' + esc(fmtDT(pt.doneAt)) : ''}</small>` : ''}
+    <div class="row-g">
+      ${canWork() ? (done ? `<button class="btn sm" data-act="pointTodo" data-id="${pt.id}">Вернуть в работу</button>` : `<button class="btn sm ok" data-act="pointDone" data-id="${pt.id}">✓ Выполнено</button>`) : ''}
+      ${mayEditPoint(pt) ? `<button class="btn sm" data-act="editPoint" data-id="${pt.id}">Изменить</button>${armBtn('pt:'+pt.id, 'Удалить', 'delPoint', pt.id)}` : ''}
+    </div></div>`;
+}
+function pointForm(pt){
+  return `<div class="pp" data-keep><h4>${pt ? 'Изменить точку' : 'Новая точка'}</h4>
+    <label>Название<input class="in" id="np-title" value="${esc(pt?.title || '')}" placeholder="Объект на ул. Ленина, 5"></label>
+    <label>Что нужно сделать<textarea class="in" id="np-todo" rows="3" placeholder="Замерить щитовую, сфотографировать ввод">${esc(pt?.todo || '')}</textarea></label>
+    <label>Заказ<select class="in" id="np-order"><option value="">— без заказа —</option>${orderOpts(pt?.orderId || '')}</select></label>
+    <div class="err" id="np-err"></div>
+    <div class="row-g"><button class="btn sm primary" data-act="savePoint" data-id="${pt ? pt.id : ''}">Сохранить</button><button class="btn sm" data-act="cancelPoint">Отмена</button></div></div>`;
+}
+function newPointAt(latlng){
+  setAddMode(false);
+  if (ghost) map.removeLayer(ghost);
+  ghost = L.marker(latlng, { icon:PIN('ghost', '+'), draggable:true }).addTo(map);
+  ghost.bindPopup(pointForm(null), { closeOnClick:false, autoClose:true, minWidth:260 }).openPopup();
+  setTimeout(() => $('np-title')?.focus(), 50);
+}
+function setAddMode(on){
+  ui.addPoint = on;
+  $('map')?.classList.toggle('adding', on);
+  $('addPointBtn').textContent = on ? 'Отмена' : '+ Точка';
+  $('mapHint').textContent = on ? 'Нажмите на карту в нужном месте' : (canWork() ? 'Точку можно поставить и правым кликом или долгим нажатием' : '');
+}
+const pointMatches = pt => ui.mapF === 'all' || (ui.mapF === 'done' ? pt.status === 'done' : pt.status !== 'done');
+function renderMap(){
+  ensureMap();
+  if (!map) { $('plist').innerHTML = '<div class="empty">Не удалось загрузить карту.</div>'; return; }
+  setTimeout(() => map.invalidateSize(), 0);
+  document.querySelectorAll('#mapSeg button').forEach(b => b.classList.toggle('on', b.dataset.id === ui.mapF));
+  $('addPointBtn').hidden = !canWork();
+  if (!ui.addPoint) setAddMode(false);
+  const seen = new Set();
+  S.points.forEach(pt => {
+    seen.add(pt.id);
+    const done = pt.status === 'done';
+    const icon = PIN((done ? 'done' : 'todo') + (ui.point === pt.id ? ' sel' : ''), done ? '✓' : '!');
+    let m = markers.get(pt.id);
+    if (!m) { m = L.marker([pt.lat, pt.lng], { icon, title: pt.title || '' }); m.bindPopup(() => pointPopup(ptOf(pt.id) || pt), { minWidth:240 }); m.on('popupopen', () => { ui.point = pt.id; markList(); }); m.on('popupclose', () => m.setPopupContent(() => pointPopup(ptOf(pt.id) || pt))); markers.set(pt.id, m); }
+    else { m.setLatLng([pt.lat, pt.lng]); m.setIcon(icon); if (m.isPopupOpen() && !m.getPopup().getElement()?.querySelector('[data-keep]')) m.setPopupContent(pointPopup(pt)); }
+    const show = pointMatches(pt) || ui.point === pt.id;
+    if (show && !map.hasLayer(m)) m.addTo(map); else if (!show && map.hasLayer(m)) map.removeLayer(m);
+  });
+  [...markers.keys()].forEach(id => { if (!seen.has(id)) { map.removeLayer(markers.get(id)); markers.delete(id); } });
+  if (!fitted && S.points.length) { fitted = true; map.fitBounds(L.latLngBounds(S.points.map(p => [p.lat, p.lng])).pad(0.2), { maxZoom:15 }); }
+  const list = S.points.filter(pointMatches).sort((a,b) => (a.status === b.status ? 0 : a.status === 'done' ? 1 : -1) || (b.createdAt||'').localeCompare(a.createdAt||''));
+  const nTodo = S.points.filter(p => p.status !== 'done').length;
+  $('mapSeg').querySelector('[data-id=todo]').textContent = 'Нужно сделать' + (nTodo ? ` (${nTodo})` : '');
+  $('plist').innerHTML = list.length ? list.map(pt => `<button class="pitem ${pt.status === 'done' ? 'done' : ''} ${ui.point === pt.id ? 'on' : ''}" data-act="flyPoint" data-id="${pt.id}">
+      <span class="dot ${pt.status === 'done' ? 'done' : 'todo'}"></span><span style="min-width:0"><b>${esc(pt.title || 'Без названия')}</b>${pt.todo ? `<small>${esc(pt.todo.slice(0, 90))}</small>` : ''}${ord(pt.orderId) ? `<small>${esc(ordName(ord(pt.orderId)))}</small>` : ''}</span></button>`).join('')
+    : `<div class="empty" style="border:0">${S.points.length ? 'Нет точек по этому фильтру.' : (canWork() ? 'Точек пока нет. Нажмите «+ Точка» и выберите место на карте.' : 'Точек пока нет.')}</div>`;
+}
+function markList(){ document.querySelectorAll('#plist .pitem').forEach(b => b.classList.toggle('on', b.dataset.id === ui.point)); }
+async function savePoint(id){
+  const title = val2('np-title'), todo = ($('np-todo')?.value || '').trim(), orderId = $('np-order')?.value || null;
+  if (!title && !todo) { $('np-err').textContent = 'Укажите название или что нужно сделать.'; return; }
+  document.activeElement?.blur();   // leave the form so the map can be redrawn right away
+  try {
+    if (id) { await upd('points', id, { title, todo, orderId }); map.closePopup(); toast('Точка сохранена'); markers.get(id)?.openPopup(); }
+    else {
+      const ll = ghost.getLatLng();
+      const nid = await add('points', { title, todo, orderId, lat:ll.lat, lng:ll.lng });
+      map.removeLayer(ghost); ghost = null; ui.point = nid; if (ui.mapF === 'done') ui.mapF = 'todo';
+      render(); markers.get(nid)?.openPopup(); toast('Точка добавлена');
+    }
+  } catch(e) { $('np-err').textContent = errText(e); }
 }
 
 /* ===== Accounting view ===== */
@@ -1084,6 +1238,16 @@ async function onSubmit(e){
   finally { if (btn) btn.disabled = false; }
 }
 
+/* ---------- theme ---------- */
+const THEME_LABEL = { system:'как в системе', light:'светлая', dark:'тёмная' };
+function themeGet(){ try { const t = localStorage.getItem('sed-theme'); return t === 'light' || t === 'dark' ? t : 'system'; } catch(e) { return 'system'; } }
+function themeSet(t){
+  try { if (t === 'system') localStorage.removeItem('sed-theme'); else localStorage.setItem('sed-theme', t); } catch(e){}
+  if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  $('themeBtn').textContent = 'Тема: ' + THEME_LABEL[t];
+}
+themeSet(themeGet());
+
 /* ---------- actions ---------- */
 const val2 = id => ($(id)?.value || '').trim();
 function custHint(){
@@ -1126,6 +1290,24 @@ async function act(el){
   disarm();
   switch (a) {
     case 'close': return closeDrawer();
+    case 'reload': return location.reload();
+    case 'theme': { const order = ['system','light','dark']; const cur = themeGet(); themeSet(order[(order.indexOf(cur) + 1) % 3]); $('upop').hidden = false; return; }
+    case 'mapF': ui.mapF = id; return render();
+    case 'addPoint': setAddMode(!ui.addPoint); if (ui.addPoint) map?.closePopup(); return;
+    case 'locate':
+      if (!navigator.geolocation) return toast('Браузер не умеет определять местоположение');
+      navigator.geolocation.getCurrentPosition(pos => { const ll = [pos.coords.latitude, pos.coords.longitude]; map.flyTo(ll, 16); L.circleMarker(ll, { radius:8, color:'#fff', weight:2, fillColor:'#3446B8', fillOpacity:1 }).addTo(map).bindTooltip('Вы здесь').openTooltip(); },
+        () => toast('Местоположение недоступно. Браузер разрешает его только на сайтах с HTTPS и с вашего согласия.'), { enableHighAccuracy:true, timeout:10000 });
+      return;
+    case 'flyPoint': { const pt = ptOf(id); if (!pt) return; ui.point = id; markList(); const m = markers.get(id); if (m && !map.hasLayer(m)) m.addTo(map); map.flyTo([pt.lat, pt.lng], Math.max(map.getZoom(), 16), { duration:.6 }); setTimeout(() => m?.openPopup(), 650); if (innerWidth < 900) $('map').scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+    case 'pointDone': case 'pointTodo': {
+      try { await upd('points', id, { status: a === 'pointDone' ? 'done' : 'todo' }); toast(a === 'pointDone' ? 'Отмечено как выполненное' : 'Возвращено в работу'); markers.get(id)?.setPopupContent(pointPopup(ptOf(id))); } catch(e) { toast(errText(e)); }
+      return;
+    }
+    case 'editPoint': { const m = markers.get(id); if (m) { m.setPopupContent(pointForm(ptOf(id))); m.openPopup(); setTimeout(() => $('np-title')?.focus(), 50); } return; }
+    case 'savePoint': return savePoint(id);
+    case 'cancelPoint': map.closePopup(); if (ghost) { map.removeLayer(ghost); ghost = null; } return;
+    case 'delPoint': try { map.closePopup(); await del('points', id); if (ui.point === id) ui.point = null; toast('Точка удалена'); } catch(e) { toast(errText(e)); } return;
     case 'logout': await api('POST','/api/logout').catch(() => {}); return showLogin();
     case 'password': return openDrawer('password');
     case 'userNew': return openDrawer('userForm');
@@ -1228,6 +1410,7 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && open) { e.preventDefault(); e.stopPropagation(); return comboClose(); }
     if (e.key === 'Tab') comboClose();
   }
+  if (e.key === 'Enter' && e.target.id === 'np-title') { e.preventDefault(); const b = document.querySelector('[data-act=savePoint]'); if (b) act(b); return; }
   if (e.key === 'Escape' && !$('upop').hidden) { $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded','false'); $('ubtn').focus(); return; }
   if (e.key === 'Escape' && ui.drawer) return closeDrawer();
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.id === 'c-text') { e.preventDefault(); const b = document.querySelector('[data-act=addComment]'); if (b) act(b); return; }
@@ -1283,14 +1466,14 @@ document.addEventListener('change', async e => {
 });
 function route(){
   const h = location.hash.slice(1);
-  ui.view = ['orders','cps','pay','plan'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
+  ui.view = ['orders','cps','pay','plan','map'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   render();
 }
 window.addEventListener('hashchange', route);
 
 /* ---------- boot ---------- */
-let poll = null, setupMode = false;
+let poll = null, setupMode = false, appVersion = null;
 async function loadUsers(){
   try { ui.usersList = await api('GET', '/api/users'); } catch(e) { toast(errText(e)); ui.usersList = []; }
   if (ui.view === 'users') render();
@@ -1325,6 +1508,7 @@ async function start(u){
     try {
       const r = await api('GET', '/api/rev');
       $('banner').hidden = true;
+      if (r.version) { if (!appVersion) appVersion = r.version; else if (r.version !== appVersion) $('updbar').hidden = false; }
       if (r.rev !== rev) await refresh();
     } catch(e) { $('banner').hidden = false; $('banner').textContent = 'Нет связи с сервером. Изменения не сохраняются, пока связь не восстановится.'; }
   }, 5000);

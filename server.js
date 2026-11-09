@@ -47,7 +47,7 @@ const SESSION_DAYS = Number(process.env.SESSION_DAYS || 14);
 const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 
-const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties'];
+const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points'];
 const ROLES = {
   admin:      'Администратор',
   manager:    'Менеджер',
@@ -62,6 +62,17 @@ const canPay = u => u.role === 'admin' || u.role === 'accountant';
 const canAddInvoice = u => canEdit(u) || u.role === 'user';
 const ownsInvoice = (u, inv) => u.role === 'user' && inv.createdBy === u.id && inv.status !== 'paid';
 const SEEN_FIELDS = ['seenAt', 'seenBy', 'seenLastAt', 'seenCount'];
+/* Map points: everyone except «Просмотр» adds points and marks them done; author, manager or admin edits and deletes */
+const POINT_STATUS_FIELDS = ['status', 'doneAt', 'doneBy'];
+const canWork = u => u.role !== 'viewer';
+const mayEditPoint = (u, pt) => canEdit(u) || pt.createdBy === u.id;
+const validPoint = d => Number.isFinite(Number(d.lat)) && Number.isFinite(Number(d.lng)) && Math.abs(d.lat) <= 90 && Math.abs(d.lng) <= 180;
+
+/* Version of the running app: changes when the code is updated, so open pages can offer a reload */
+const APP_VERSION = crypto.createHash('sha1')
+  .update(fs.readFileSync(path.join(__dirname, 'server.js')))
+  .update((() => { try { return fs.readFileSync(path.join(__dirname, 'public', 'index.html')); } catch { return ''; } })())
+  .digest('hex').slice(0, 12);
 
 fs.mkdirSync(FILES_DIR, { recursive: true });
 
@@ -272,7 +283,7 @@ async function api(req, res, url) {
     }
     return fail(res, 405, 'Метод не поддерживается');
   }
-  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev });
+  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION });
   if (p[1] === 'data' && m === 'GET') {
     const out = { rev: db.rev, users: Object.fromEntries(users.map(u => [u.id, u.name])) };
     COLLECTIONS.forEach(c => { out[c] = listOf(c); });
@@ -335,8 +346,13 @@ async function api(req, res, url) {
   if (!COLLECTIONS.includes(col) || p.length > 3) return fail(res, 404, 'Не найдено');
 
   if (m === 'POST' && !id) {
-    if (!(col === 'invoices' ? canAddInvoice(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
+    if (!(col === 'invoices' ? canAddInvoice(user) : col === 'points' ? canWork(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
     const data = clean(await readJsonBody(req));
+    if (col === 'points') {
+      if (!validPoint(data)) return fail(res, 400, 'Неверные координаты точки');
+      data.lat = Number(data.lat); data.lng = Number(data.lng);
+      data.status = 'todo'; delete data.doneAt; delete data.doneBy;
+    }
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
     if (col === 'orders' || col === 'counterparties') data.comments = [];
     if (col === 'invoices') {
@@ -355,6 +371,25 @@ async function api(req, res, url) {
     if (col === 'orders' || col === 'counterparties') delete patch.comments;   // comments go through their own endpoint
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     const keys = Object.keys(patch);
+    if (col === 'points') {
+      const pt = db.points[id];
+      const other = keys.filter(k => !POINT_STATUS_FIELDS.includes(k));
+      if (!canWork(user)) return fail(res, 403, 'Недостаточно прав');
+      if (other.length && !mayEditPoint(user, pt)) return fail(res, 403, 'Изменить точку может её автор, менеджер или администратор');
+      if ('lat' in patch || 'lng' in patch) {
+        const t = { lat: patch.lat ?? pt.lat, lng: patch.lng ?? pt.lng };
+        if (!validPoint(t)) return fail(res, 400, 'Неверные координаты точки');
+        patch.lat = Number(t.lat); patch.lng = Number(t.lng);
+      }
+      if ('status' in patch) {
+        if (!['todo', 'done'].includes(patch.status)) return fail(res, 400, 'Неизвестный статус точки');
+        patch.doneAt = patch.status === 'done' ? new Date().toISOString() : null;
+        patch.doneBy = patch.status === 'done' ? user.id : null;
+      }
+      Object.assign(pt, patch, { updatedAt: new Date().toISOString(), updatedBy: user.id });
+      saveDb();
+      return send(res, 200, { ok: true, rev: db.rev });
+    }
     const payKeys = col === 'invoices' ? keys.filter(k => PAY_FIELDS.includes(k)) : [];
     if (payKeys.length && !canPay(user)) return fail(res, 403, 'Отмечать оплату может только бухгалтер или администратор');
     const mayEdit = canEdit(user) || (col === 'invoices' && ownsInvoice(user, db[col][id]));
@@ -378,7 +413,9 @@ async function api(req, res, url) {
   }
   if (m === 'DELETE') {
     const d = db[col][id];
-    if (!canEdit(user) && !(col === 'invoices' && ownsInvoice(user, d))) return fail(res, 403, 'Недостаточно прав');
+    if (col === 'points') {
+      if (!mayEditPoint(user, d)) return fail(res, 403, 'Удалить точку может её автор, менеджер или администратор');
+    } else if (!canEdit(user) && !(col === 'invoices' && ownsInvoice(user, d))) return fail(res, 403, 'Недостаточно прав');
     if (col === 'projects' && listOf('orders').some(o => o.projectId === id)) return fail(res, 409, 'В проекте есть заказы');
     if (col === 'orders' && listOf('invoices').some(i => i.orderId === id)) return fail(res, 409, 'По заказу есть счета');
     if (col === 'counterparties' && listOf('orders').some(o => o.customerId === id)) return fail(res, 409, 'Контрагент указан заказчиком в заказах');

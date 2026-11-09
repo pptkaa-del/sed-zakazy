@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Управление предприятием: установка и обновление одной командой.
 #
-#   bash install.sh [домен] [--email почта] [--port 80] [--mode shared|server] [--branch main]
+#   bash install.sh [домен] [--email почта] [--port 80] [--no-auto-update] [--mode shared|server] [--branch main]
 #
 # Режим выбирается сам:
 #   shared — виртуальный хостинг без прав root (reg.ru и т. п.): Node.js в ~/node,
@@ -12,6 +12,8 @@
 #            С доменом и --email дополнительно выпускается HTTPS-сертификат Let's Encrypt.
 #
 # Повторный запуск обновляет код (git pull) и перезапускает приложение. Данные не трогаются.
+# Автообновление: раз в минуту проверяется GitHub, новая версия ставится сама
+# (таймер systemd на своём сервере, cron на хостинге). Выключить: --no-auto-update.
 # Репозиторий публичный, токен не нужен. Для приватной копии задайте GITHUB_TOKEN (право чтения).
 set -euo pipefail
 
@@ -30,6 +32,7 @@ BRANCH="main"
 DOMAIN=""
 EMAIL=""
 HTTP_PORT=80
+AUTO=1
 MODE=""
 NODE_NEW="20.18.1"
 NODE_OLD="16.20.2"
@@ -45,6 +48,7 @@ while [ $# -gt 0 ]; do
     --mode)   MODE="${2:-}"; shift 2 ;;
     --branch) BRANCH="${2:-}"; shift 2 ;;
     --port)   HTTP_PORT="${2:-}"; shift 2 ;;
+    --no-auto-update) AUTO=0; shift ;;
     -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) die "Неизвестный параметр $1" ;;
     *)  DOMAIN="$1"; shift ;;
@@ -115,6 +119,9 @@ reexec_if_changed() {   # $1 = app dir: continue with the freshly downloaded ins
   rm -f "${SED_RUNNING_COPY:-}"
   SED_REEXEC=1 SED_SELF_DIR="$1" SED_RUNNING_COPY="" exec bash "$new" "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}"
 }
+save_args() {   # $1 = app dir: remember the parameters for automatic updates
+  printf '%s\n' "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}" > "$1/.install-args"
+}
 set_env() {   # $1 file, $2 key, $3 value — add or replace KEY=value
   local f="$1" k="$2" v="$3"
   touch "$f"
@@ -166,6 +173,7 @@ if [ "$MODE" = shared ]; then
   fi
   fetch_code "$APP_DIR"
   reexec_if_changed "$APP_DIR"
+  save_args "$APP_DIR"
   smoke_test "$NODE" "$APP_DIR"
 
   say "Подключаю приложение к сайту через Passenger"
@@ -185,6 +193,20 @@ if [ "$MODE" = shared ]; then
   else
     warn "Сайт пока не отвечает (код ${code:-нет ответа}). Проверьте, что домен направлен на хостинг, и откройте его в браузере"
     warn "Если видна ошибка 500, уточните у поддержки хостинга, доступен ли Node.js (Passenger) на тарифе"
+  fi
+
+  CRON_TAG='# sed-zakazy-auto-update'
+  if [ "$AUTO" = 1 ]; then
+    if command -v crontab >/dev/null; then
+      LINE="* * * * * bash $APP_DIR/deploy/auto-update.sh >> $HOME/sed-zakazy-update.log 2>&1 $CRON_TAG"
+      if ( crontab -l 2>/dev/null | grep -v "$CRON_TAG"; echo "$LINE" ) | crontab - 2>/dev/null; then ok "Автообновление: раз в минуту (cron), журнал ~/sed-zakazy-update.log"
+      else warn "Не удалось добавить задание cron. Добавьте в панели хостинга задание раз в минуту: bash $APP_DIR/deploy/auto-update.sh"; fi
+    else
+      warn "crontab недоступен. Для автообновления добавьте в панели хостинга задание раз в минуту: bash $APP_DIR/deploy/auto-update.sh"
+    fi
+  elif command -v crontab >/dev/null; then
+    crontab -l 2>/dev/null | grep -v "$CRON_TAG" | crontab - 2>/dev/null || true
+    ok "Автообновление выключено"
   fi
 
   echo
@@ -223,6 +245,7 @@ ok "Node.js: $NODE ($("$NODE" -v))"
 id sed >/dev/null 2>&1 || { useradd --system --home-dir "$DATA_DIR" --shell /usr/sbin/nologin sed; ok "Создан системный пользователь sed"; }
 fetch_code "$APP_DIR"
 reexec_if_changed "$APP_DIR"
+save_args "$APP_DIR"
 mkdir -p "$DATA_DIR"; chown -R sed:sed "$DATA_DIR"; chmod 700 "$DATA_DIR"
 ENV_FILE="$APP_DIR/sed.env"
 set_env "$ENV_FILE" DATA_DIR "$DATA_DIR"
@@ -253,6 +276,35 @@ EOF
 systemctl daemon-reload
 systemctl enable --quiet $SVC
 systemctl restart $SVC
+if [ "$AUTO" = 1 ]; then
+  cat > /etc/systemd/system/$SVC-update.service <<EOF
+[Unit]
+Description=Управление предприятием: проверка обновлений
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $APP_DIR/deploy/auto-update.sh
+EOF
+  cat > /etc/systemd/system/$SVC-update.timer <<EOF
+[Unit]
+Description=Управление предприятием: проверка обновлений раз в минуту
+
+[Timer]
+OnActiveSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --quiet --now $SVC-update.timer
+  ok "Автообновление: раз в минуту (таймер $SVC-update)"
+else
+  systemctl disable --quiet --now $SVC-update.timer 2>/dev/null || true
+  ok "Автообновление выключено"
+fi
 if wait_http "http://127.0.0.1:$APP_PORT/api/setup"; then ok "Служба $SVC работает на 127.0.0.1:$APP_PORT"
 else journalctl -u $SVC -n 30 --no-pager >&2; die "Служба не отвечает, журнал выше"; fi
 
@@ -325,7 +377,7 @@ wait_http "http://127.0.0.1:$APP_PORT/api/setup" || warn "Служба долг�
 PORT_SUFFIX=""; [ "$HTTP_PORT" = 80 ] || PORT_SUFFIX=":$HTTP_PORT"
 if [ -n "$DOMAIN" ]; then ADDR="$DOMAIN$PORT_SUFFIX"
 else ADDR="$(hostname -I 2>/dev/null | awk '{print $1}')$PORT_SUFFIX"; [ "$ADDR" = "$PORT_SUFFIX" ] && ADDR="IP-адрес-сервера$PORT_SUFFIX"; fi
-ARGS="${DOMAIN:+ $DOMAIN}"; [ "$HTTP_PORT" = 80 ] || ARGS="$ARGS --port $HTTP_PORT"
+ARGS="${DOMAIN:+ $DOMAIN}"; [ "$HTTP_PORT" = 80 ] || ARGS="$ARGS --port $HTTP_PORT"; [ "$AUTO" = 1 ] || ARGS="$ARGS --no-auto-update"
 
 echo
 if [ "$HTTPS" = yes ]; then say "Готово. Откройте https://$ADDR и создайте администратора, если ещё не создан."
@@ -334,4 +386,5 @@ else say "Готово. Откройте http://$ADDR и создайте адм
 fi
 echo "    Обновить:  sudo ${GITHUB_TOKEN:+GITHUB_TOKEN=токен }bash $APP_DIR/install.sh$ARGS"
 echo "    Журнал:    journalctl -u $SVC -f"
+[ "$AUTO" = 1 ] && echo "    Обновления: ставятся сами раз в минуту, журнал — journalctl -u $SVC-update"
 echo "    Данные:    $DATA_DIR (сохраняйте в резервных копиях)"

@@ -4,3 +4,4 @@ dist/
 node_modules/
 sed.env
 tmp/
+.install-args
