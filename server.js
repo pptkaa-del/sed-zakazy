@@ -218,7 +218,7 @@ async function api(req, res, url) {
     const err = validateUser(b, true); if (err) return fail(res, 400, err);
     const u = addUser(String(b.login), 'admin', String(b.name).trim(), String(b.password));
     console.log(`Через браузер создан администратор «${u.login}».`);
-    return send(res, 200, publicUser(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
+    return send(res, 200, meInfo(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
   if (p[1] === 'login' && m === 'POST') {
     const { login = '', password = '' } = await readJsonBody(req);
@@ -231,14 +231,14 @@ async function api(req, res, url) {
     }
     if (u.blocked) return fail(res, 403, 'Учётная запись заблокирована. Обратитесь к администратору');
     u.lastLoginAt = new Date().toISOString(); saveUsers();
-    return send(res, 200, publicUser(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
+    return send(res, 200, meInfo(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
   if (p[1] === 'logout' && m === 'POST') return send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, '', 0) });
 
   const user = sessionUser(req);
   if (!user) return fail(res, 401, 'Требуется вход');
 
-  if (p[1] === 'me' && m === 'GET') return send(res, 200, publicUser(user));
+  if (p[1] === 'me' && m === 'GET') return send(res, 200, meInfo(user));
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && users.find(u => u.id === p[2]);
@@ -426,6 +426,14 @@ async function api(req, res, url) {
   return fail(res, 405, 'Метод не поддерживается');
 }
 const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role, roleName: ROLES[u.role] });
+/* Map background: OpenStreetMap by default, another tile source can be set in sed.env */
+const MAP = {
+  tiles: process.env.MAP_TILES || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution: process.env.MAP_ATTRIBUTION || '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+  subdomains: process.env.MAP_SUBDOMAINS || 'abc',
+  maxZoom: Number(process.env.MAP_MAX_ZOOM || 19),
+};
+const meInfo = u => ({ ...publicUser(u), map: MAP });
 const adminUser = u => ({ ...publicUser(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
 /* Remember that the accountant has opened the invoice file(s) */
