@@ -371,6 +371,15 @@ async function api(req, res, url) {
     if (col === 'orders' || col === 'counterparties') delete patch.comments;   // comments go through their own endpoint
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     const keys = Object.keys(patch);
+    /* tasks: everyone except «Просмотр» may tick «Выполнено»; other changes need a manager or admin */
+    if (col === 'tasks' && keys.length && keys.every(k => k === 'done')) {
+      if (!canWork(user)) return fail(res, 403, 'Недостаточно прав');
+      const t = db.tasks[id];
+      t.done = !!patch.done; t.doneAt = t.done ? new Date().toISOString() : null; t.doneBy = t.done ? user.id : null;
+      t.updatedAt = new Date().toISOString(); t.updatedBy = user.id;
+      saveDb();
+      return send(res, 200, { ok: true, rev: db.rev });
+    }
     if (col === 'points') {
       const pt = db.points[id];
       const other = keys.filter(k => !POINT_STATUS_FIELDS.includes(k));

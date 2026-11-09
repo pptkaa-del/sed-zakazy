@@ -218,6 +218,28 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
   .inum small{margin-left:6px}
 }
 
+.wsum{display:flex;gap:10px 22px;flex-wrap:wrap;align-items:baseline;margin:0 0 16px;font-size:14px;color:var(--ink-2)}
+.wsum b{font:600 18px var(--f-display);color:var(--ink);font-variant-numeric:tabular-nums}
+.wgroup{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.wgroup>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:center;padding:11px 16px;background:var(--mute-soft);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+.wgroup>summary::-webkit-details-marker{display:none}
+.wgroup>summary .cnt{margin-left:auto;font-variant-numeric:tabular-nums}
+.wgroup>summary::after{content:"▾"}
+.wgroup:not([open])>summary::after{transform:rotate(-90deg)}
+.wrow{display:grid;grid-template-columns:auto minmax(0,1fr) 150px 170px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px}
+.wrow:first-of-type{border-top:0}
+.wrow.click{cursor:pointer}
+.wrow.click:hover{background:var(--paper)}
+.wrow .wt b{font-weight:500;overflow-wrap:anywhere}
+.wrow .wt small{display:block;color:var(--ink-2);font-size:12px;overflow-wrap:anywhere}
+.wrow .wd{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.wrow .wd b{color:var(--ink);font-weight:500}
+.wrow.done .wt b{text-decoration:line-through;color:var(--ink-2)}
+.wcheck{width:26px;height:26px;border-radius:7px;border:2px solid var(--rule);background:var(--sheet);cursor:pointer;display:grid;place-items:center;color:var(--sheet);font-size:15px;font-weight:700;padding:0;flex:none}
+.wcheck:hover{border-color:var(--ok)}
+.wcheck.on{background:var(--ok);border-color:var(--ok)}
+.wcheck:disabled{cursor:default;opacity:.6}
+@media (max-width:820px){.wrow{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"c t" "c d" "c p" "c k"}.wrow>.wcheck{grid-area:c;align-self:start}.wrow .wt{grid-area:t}.wrow .wd{grid-area:d}.wrow .wp{grid-area:p}.wrow .wk{grid-area:k}}
 .tlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .tlist li{display:flex;gap:10px;align-items:center;font-size:14px;padding:7px 10px;border:1px solid var(--rule-2);border-radius:8px;cursor:pointer;flex-wrap:wrap}
 .tlist li:hover{background:var(--paper)}
@@ -368,7 +390,9 @@ textarea{resize:vertical;min-height:70px}
 .upop button:hover{background:var(--mute-soft)}
 .upop button.danger{color:var(--bad)}
 @media (max-width:640px){.ubtn .uname{display:none}.ubtn{padding-right:6px}}
-@media (max-width:900px){header.top .brand{flex:1;min-width:0}nav.views{order:3;width:100%}}
+/* header: name and user menu on the first row, tabs on the second */
+header.top .brand{flex:1;min-width:0}
+nav.views{order:3;width:100%}
 .login{min-height:100vh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
 .login form{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
 .login h1{font-size:18px}
@@ -407,6 +431,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <div><h1>Управление предприятием</h1><p class="sub">Заказы, контрагенты, документы, счета и план-график</p></div>
     </div>
     <nav class="views" id="views">
+      <a href="#works" data-v="works">Работы</a>
       <a href="#orders" data-v="orders">Заказы</a>
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#pay" data-v="pay">Бухгалтерия <span class="badge" id="payBadge" hidden></span></a>
@@ -487,7 +512,7 @@ const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.statu
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
+const ui = { view:'orders', wq:'', wKind:'all', wOrd:'', mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
@@ -576,12 +601,57 @@ function render(){
   V.hidden = onMap; $('mapView').hidden = !onMap;
   if (mode === 'loading') { V.hidden = false; $('mapView').hidden = true; V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
   if (onMap) { V.innerHTML = ''; return renderMap(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : vOrders();
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
 
 function armBtn(key, label, act, id, cls='btn sm danger'){
   return `<button type="button" class="${cls}" data-act="${act}" data-id="${esc(id)}" data-arm="${esc(key)}" data-label="${esc(label)}">${label}</button>`;
+}
+
+/* ===== Works view: plan-graph tasks as a list ===== */
+function vWorks(){
+  const tn = dnum(today());
+  const q = ui.wq.trim().toLowerCase();
+  const hay = t => [t.title, t.resp, ord(t.orderId) ? ordName(ord(t.orderId)) : 'общие работы'].join(' ').toLowerCase();
+  const all = S.tasks.filter(t => t.start && t.end);
+  const list = all.filter(t => (ui.wKind === 'all' || t.kind === ui.wKind) && (!ui.wOrd || (ui.wOrd === '_' ? !ord(t.orderId) : t.orderId === ui.wOrd)) && (!q || hay(t).includes(q)));
+  const now = all.filter(t => !t.done && dnum(t.start) <= tn);
+  const people = sum(now, t => t.people), brig = sum(now, brigadesOf);
+  const head = `<div class="toolbar">
+    <span data-keep style="display:contents"><input class="in" id="wq" type="search" placeholder="Поиск: работа, ответственный, заказ" value="${esc(ui.wq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск работ"></span>
+    <div class="seg">${[['all','Все'],['work','Работы'],['buy','Закупки']].map(([k,l]) => `<button data-act="wKind" data-id="${k}" class="${ui.wKind===k?'on':''}">${l}</button>`).join('')}</div>
+    <select class="f" id="wOrd" aria-label="Заказ"><option value="">Все заказы</option><option value="_" ${ui.wOrd==='_'?'selected':''}>Общие работы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.wOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
+    <button class="btn primary" data-act="newTask" data-id="${ui.wOrd && ui.wOrd !== '_' ? ui.wOrd : ''}">+ Работа</button>
+  </div>
+  <div class="wsum"><span>Сейчас в работе: <b>${now.length}</b></span><span>своих людей: <b>${people}</b></span><span>бригад подрядчиков: <b>${brig}</b></span></div>`;
+  if (!all.length) return head + `<div class="empty"><h3>Работ пока нет</h3>Добавьте работу или закупку с датами, ответственным и количеством людей. Они появятся и здесь, и в план-графике.</div>`;
+  const groups = [
+    ['now', 'Сейчас', t => !t.done && dnum(t.start) <= tn],
+    ['week', 'Ближайшие 7 дней', t => !t.done && dnum(t.start) > tn && dnum(t.start) <= tn + 7],
+    ['later', 'Позже', t => !t.done && dnum(t.start) > tn + 7],
+    ['done', 'Выполнено', t => t.done],
+  ];
+  const sorters = { done: (a,b) => (b.doneAt || b.end || '').localeCompare(a.doneAt || a.end || ''), def: (a,b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end) };
+  const html = groups.map(([k, label, f]) => {
+    const ts = list.filter(f).sort(sorters[k] || sorters.def);
+    if (!ts.length) return '';
+    const open = k !== 'done' || ui.worksDoneOpen || q;
+    return `<details class="wgroup" data-g="${k}" ${open ? 'open' : ''}><summary>${label}<span class="cnt">${ts.length}</span></summary>${ts.map(t => workRow(t, tn)).join('')}</details>`;
+  }).join('');
+  return head + (html || `<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>`);
+}
+function workRow(t, tn){
+  const o = ord(t.orderId), s = dnum(t.start), e = dnum(t.end);
+  const left = !t.done && s <= tn ? (e >= tn ? (e === tn ? 'последний день' : `ещё ${e - tn} дн.`) : `срок был ${fmtD(t.end)}`) : '';
+  const click = canEdit() ? `data-act="editTask" data-id="${t.id}" role="button" tabindex="0"` : '';
+  return `<div class="wrow ${t.done ? 'done' : ''} ${canEdit() ? 'click' : ''}" ${click}>
+    <button class="wcheck ${t.done ? 'on' : ''}" data-act="taskDone" data-id="${t.id}" title="${t.done ? 'Вернуть в работу' : 'Отметить выполненной'}" aria-label="${t.done ? 'Вернуть в работу' : 'Отметить выполненной'}" aria-pressed="${!!t.done}" ${canWork() ? '' : 'disabled'}>✓</button>
+    <div class="wt"><b>${esc(t.title)}</b><small>${KIND[t.kind] || ''} · ${o ? `<a href="#orders" data-act="gotoOrder" data-id="${o.id}">${esc(ordName(o))}</a>` : 'Общие работы'}${t.resp ? ' · ' + esc(t.resp) : ''}${t.done && t.doneBy ? ' · выполнил ' + esc(who(t.doneBy)) : ''}</small></div>
+    <div class="wd"><b>${fmtD(t.start).slice(0,5)} – ${fmtD(t.end).slice(0,5)}</b>${left ? `<br><small>${left}</small>` : ''}</div>
+    <div class="wp">${crew(t) ? esc(crew(t)) : '<span class="dim">людей не указано</span>'}</div>
+    <span class="wk"></span>
+  </div>`;
 }
 
 /* ===== Orders view ===== */
@@ -1430,6 +1500,8 @@ async function act(el){
     case 'editInvoice': return openDrawer('invoiceForm', id);
     case 'openInvoice': return openDrawer('invoice', id);
     case 'newTask': return openDrawer('task', null, id);
+    case 'wKind': ui.wKind = id; return render();
+    case 'taskDone': { const t = S.tasks.find(x => x.id === id); if (!t) return; try { await upd('tasks', id, { done: !t.done }); render(); toast(t.done ? 'Отмечено как выполненное' : 'Возвращено в работу'); } catch(e) { toast(errText(e)); } return; }
     case 'editTask': return openDrawer('task', id);
     case 'paste': return openDrawer('paste', id);
     case 'payF': ui.payF = id; return render();
@@ -1499,6 +1571,7 @@ $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'wq') { ui.wq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorks(); const n = $('wq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'c-text') { ui.drafts[t.dataset.key] = t.value; return; }
   if (t.id === 'np-coords' || t.id === 'pc-coords') return coordsTyped(t);
   if (t.id === 'f-cust') { $('f-cust-id').value = ''; comboOpen(); return custHint(); }
@@ -1514,11 +1587,13 @@ document.addEventListener('mousedown', e => { const o = e.target.closest('.combo
 document.addEventListener('focusin', e => { if (e.target.id === 'f-cust') comboOpen(); });
 document.addEventListener('click', e => { if (e.target.id === 'f-cust' && $('cust-pop')?.hidden) comboOpen(); });
 document.addEventListener('focusout', e => { if (e.target.id === 'f-cust') setTimeout(comboClose, 120); });
+document.addEventListener('toggle', e => { if (e.target.matches?.('.wgroup[data-g=done]')) ui.worksDoneOpen = e.target.open; }, true);
 document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-st=closed]')) ui.openClosed = e.target.open; }, true);
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; return; }
+  if (t.id === 'wOrd') { ui.wOrd = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
   if (t.classList.contains('ci')) {
@@ -1546,7 +1621,7 @@ document.addEventListener('change', async e => {
 });
 function route(){
   const h = location.hash.slice(1);
-  ui.view = ['orders','cps','pay','plan','map'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
+  ui.view = ['works','orders','cps','pay','plan','map'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   render();
 }
