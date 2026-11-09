@@ -414,6 +414,46 @@ textarea{resize:vertical;min-height:70px}
 @media (max-width:480px){.form{grid-template-columns:1fr}.kv{grid-template-columns:1fr;gap:1px}.kv dd{margin-bottom:8px}}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;z-index:30;font-size:14px;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){aside.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
+/* ===== Animations (off when the device asks for reduced motion) ===== */
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:translateY(-4px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes checkPop{0%{transform:scale(.6)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes drop{0%{opacity:0;transform:translateY(-22px) scale(.8)}70%{opacity:1;transform:translateY(2px)}100%{transform:none}}
+@keyframes grow{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes kenburns{from{transform:scale(1.02) translate(0,0)}to{transform:scale(1.14) translate(-2%,-1.5%)}}
+@keyframes streak{from{stroke-dashoffset:1660}to{stroke-dashoffset:0}}
+@keyframes updIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:no-preference){
+  .login-bg .city{animation:kenburns 38s ease-in-out infinite alternate}
+  .streaks path{animation:streak 7s linear infinite}
+  .login-intro{animation:rise .7s ease-out both}
+  .login form{animation:rise .7s ease-out .12s both}
+  #app:not([hidden]){animation:fade .35s ease-out both}
+  #view.enter>*,#view.enter .odetail>*,#view.enter .pgroup,#view.enter .wgroup,#view.enter .pproj,#view.enter .tile{animation:rise .38s ease-out both}
+  #view.enter .odetail>:nth-child(2),#view.enter .wgroup:nth-of-type(2),#view.enter .pproj:nth-of-type(2){animation-delay:.05s}
+  #view.enter .odetail>:nth-child(3),#view.enter .wgroup:nth-of-type(3),#view.enter .pproj:nth-of-type(3){animation-delay:.1s}
+  #view.enter .odetail>:nth-child(n+4),#view.enter .wgroup:nth-of-type(n+4),#view.enter .pproj:nth-of-type(n+4){animation-delay:.15s}
+  #view.enter .bar{animation:grow .6s cubic-bezier(.2,.7,.2,1) .1s both}
+  #mapView.enter{animation:fade .35s ease-out both}
+  .upop:not([hidden]){animation:pop .16s ease-out both;transform-origin:top right}
+  .toast:not([hidden]){animation:toastIn .25s ease-out both}
+  .updbar:not([hidden]){animation:updIn .3s ease-out both}
+  .combo-pop:not([hidden]){animation:pop .14s ease-out both;transform-origin:top center}
+  .leaflet-popup{animation:pop .18s ease-out both}
+  .pin.new svg{animation:drop .5s cubic-bezier(.3,1.4,.6,1) both}
+  .wcheck.pop{animation:checkPop .35s ease-out}
+  .btn,.wcheck,.icon,.seg button,nav.views a,.themes button{transition:transform .12s ease,background-color .2s ease,color .2s ease,box-shadow .2s ease,border-color .2s ease}
+  .btn:active,.wcheck:active,.seg button:active,nav.views a:active{transform:scale(.96)}
+  .oitem,.pitem,.wrow,.irow,.tlist li,.urow,.contact{transition:background-color .18s ease,transform .18s ease,box-shadow .18s ease}
+  .oitem:hover,.pitem:hover{transform:translateX(2px)}
+  .card,.tile,.pgroup,.wgroup,.pproj{transition:box-shadow .25s ease,transform .25s ease}
+  .tile:hover{transform:translateY(-2px)}
+  .bar{transition:filter .15s ease,transform .15s ease}
+  .bar:hover{filter:brightness(1.12);transform:translateY(-1px)}
+  details>summary::after{transition:transform .2s ease}
+}
 .umenu{position:relative}
 .ubtn{display:flex;gap:8px;align-items:center;border:1px solid var(--rule);background:var(--sheet);border-radius:999px;padding:4px 10px 4px 4px;cursor:pointer;font-size:14px;color:var(--ink);max-width:240px}
 .ubtn:hover{border-color:var(--ink-2)}
@@ -431,8 +471,24 @@ textarea{resize:vertical;min-height:70px}
 /* header: name and user menu on the first row, tabs on the second */
 header.top .brand{flex:1;min-width:0}
 nav.views{order:3;width:100%}
-.login{min-height:100vh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
-.login form{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.login{position:relative;overflow:hidden;min-height:100vh;display:grid;align-items:center;justify-items:start;padding:32px max(16px,6vw)}
+.login-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.login-bg .city{position:absolute;inset:0;background:url(/img/login-city.jpg) 78% 38%/cover no-repeat;transform-origin:62% 40%}
+.login-bg::after{content:"";position:absolute;inset:0;background:
+  linear-gradient(90deg,var(--paper) 0%,var(--paper) 16%,color-mix(in srgb,var(--paper) 96%,transparent) 22%,color-mix(in srgb,var(--paper) 88%,transparent) 28%,color-mix(in srgb,var(--paper) 74%,transparent) 35%,color-mix(in srgb,var(--paper) 54%,transparent) 43%,color-mix(in srgb,var(--paper) 32%,transparent) 52%,color-mix(in srgb,var(--paper) 14%,transparent) 63%,color-mix(in srgb,var(--paper) 4%,transparent) 76%,transparent 90%),
+  linear-gradient(0deg,color-mix(in srgb,var(--paper) 85%,transparent) 0%,transparent 28%)}
+.streaks{position:absolute;inset:0;width:100%;height:100%;z-index:1;opacity:.85;mix-blend-mode:screen}
+.streaks path{fill:none;stroke:url(#sg);stroke-width:2.4;stroke-linecap:round;stroke-dasharray:160 1500;stroke-dashoffset:1660;filter:url(#glow)}
+.login-inner{position:relative;z-index:2;width:min(440px,100%);display:flex;flex-direction:column;gap:24px}
+.login-intro h2{font:600 clamp(28px,3.6vw,44px)/1.12 var(--f-display);margin:0;color:var(--ink);text-wrap:balance;letter-spacing:-.01em}
+.login .login-intro p{margin:12px 0 0;font-size:16px;color:var(--ink-2);max-width:36ch}
+@media (max-width:760px){
+  .login{justify-items:center;padding-block:24px}
+  .login-bg .city{inset:0}
+  .login-bg::after{background:linear-gradient(180deg,color-mix(in srgb,var(--paper) 55%,transparent) 0%,color-mix(in srgb,var(--paper) 88%,transparent) 60%,var(--paper) 100%)}
+  .login-intro{text-align:center}.login .login-intro p{margin-inline:auto}
+}
+.login form{backdrop-filter:blur(8px);background:color-mix(in srgb,var(--sheet) 90%,transparent);border:1px solid var(--rule);border-radius:14px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
 .login h1{font-size:18px}
 .login label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2)}
 .pw{position:relative;display:block}
@@ -452,8 +508,11 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 </head>
 <body>
 <div class="login" id="loginView" hidden>
+  <div class="login-bg" aria-hidden="true"><div class="city"></div><svg class="streaks" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="sg" x1="0" x2="1"><stop offset="0" stop-color="#7CFFD4" stop-opacity="0"/><stop offset=".6" stop-color="#9AFFE0"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient><filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path d="M-40 760 C 220 700, 420 620, 640 560 S 980 430, 1180 360" style="animation-duration:7s;animation-delay:-0s"/><path d="M-40 860 C 260 790, 520 700, 760 610 S 1080 470, 1260 380" style="animation-duration:9s;animation-delay:-1.6s"/><path d="M 300 920 C 520 780, 760 660, 980 560 S 1240 430, 1400 330" style="animation-duration:8s;animation-delay:-3.2s"/><path d="M 700 940 C 860 800, 1000 680, 1120 560 S 1260 420, 1330 300" style="animation-duration:6s;animation-delay:-0.8s"/><path d="M 1660 760 C 1500 690, 1380 620, 1260 540 S 1120 430, 1060 360" style="animation-duration:10s;animation-delay:-2.4s"/><path d="M 1660 520 C 1520 500, 1400 470, 1300 430 S 1140 380, 1080 340" style="animation-duration:7.5s;animation-delay:-4.1s"/></svg></div>
+  <div class="login-inner">
+  <div class="login-intro"><h2>Управление предприятием</h2><p>Заказы, работы, контрагенты, счета и объекты на карте — в одном месте.</p></div>
   <form id="loginForm" novalidate>
-    <div class="brand"><h1>Управление предприятием</h1></div>
+    <div class="brand"><h1>Вход</h1></div>
     <p id="l-hint" hidden>Первый запуск. Создайте учётную запись администратора: он добавит остальных сотрудников.</p>
     <label id="l-name-wrap" hidden>Ваше имя<input class="in" id="l-name" autocomplete="name" placeholder="Иванов И. И."></label>
     <label>Логин<input class="in" id="l-login" autocomplete="username" required></label>
@@ -461,6 +520,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     <div class="err" id="l-err"></div>
     <button class="btn primary" type="submit" id="l-btn">Войти</button>
   </form>
+  </div>
 </div>
 <div id="app" hidden>
 <header class="top">
@@ -634,6 +694,12 @@ function resolveNames(){}
 
 /* ---------- render ---------- */
 let pending = false;
+let lastView = null, enterTimer = null;
+function animateView(el){
+  if (!el) return;
+  el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter');
+  clearTimeout(enterTimer); enterTimer = setTimeout(() => el.classList.remove('enter'), 700);
+}
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
   pending = false;
@@ -644,8 +710,10 @@ function render(){
   const onMap = ui.view === 'map';
   V.hidden = onMap; $('mapView').hidden = !onMap;
   if (mode === 'loading') { V.hidden = false; $('mapView').hidden = true; V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
-  if (onMap) { V.innerHTML = ''; return renderMap(); }
+  const changed = lastView !== ui.view || ui.animNext; lastView = ui.view; ui.animNext = false;
+  if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : vOrders();
+  if (changed) animateView(V);
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
 
@@ -690,7 +758,7 @@ function workRow(t, tn){
   const left = !t.done && s <= tn ? (e >= tn ? (e === tn ? 'последний день' : `ещё ${e - tn} дн.`) : `срок был ${fmtD(t.end)}`) : '';
   const click = canEdit() ? `data-act="editTask" data-id="${t.id}" role="button" tabindex="0"` : '';
   return `<div class="wrow ${t.done ? 'done' : ''} ${canEdit() ? 'click' : ''}" ${click}>
-    <button class="wcheck ${t.done ? 'on' : ''}" data-act="taskDone" data-id="${t.id}" title="${t.done ? 'Вернуть в работу' : 'Отметить выполненной'}" aria-label="${t.done ? 'Вернуть в работу' : 'Отметить выполненной'}" aria-pressed="${!!t.done}" ${canWork() ? '' : 'disabled'}>✓</button>
+    <button class="wcheck ${t.done ? 'on' : ''} ${ui.justDone === t.id ? 'pop' : ''}" data-act="taskDone" data-id="${t.id}" title="${t.done ? 'Вернуть в работу' : 'Отметить выполненной'}" aria-label="${t.done ? 'Вернуть в работу' : 'Отметить выполненной'}" aria-pressed="${!!t.done}" ${canWork() ? '' : 'disabled'}>✓</button>
     <div class="wt"><b>${esc(t.title)}</b><small>${KIND[t.kind] || ''} · ${o ? `<a href="#orders" data-act="gotoOrder" data-id="${o.id}">${esc(ordName(o))}</a>` : 'Общие работы'}${t.resp ? ' · ' + esc(t.resp) : ''}${t.done && t.doneBy ? ' · выполнил ' + esc(who(t.doneBy)) : ''}</small></div>
     <div class="wd"><b>${fmtD(t.start).slice(0,5)} – ${fmtD(t.end).slice(0,5)}</b>${left ? `<br><small>${left}</small>` : ''}</div>
     <div class="wp">${crew(t) ? esc(crew(t)) : '<span class="dim">людей не указано</span>'}</div>
@@ -972,10 +1040,11 @@ function renderMap(){
   S.points.forEach(pt => {
     seen.add(pt.id);
     const done = pt.status === 'done';
-    const icon = PIN((done ? 'done' : 'todo') + (ui.point === pt.id ? ' sel' : ''), done ? '✓' : '!');
+    const cls = (done ? 'done' : 'todo') + (ui.point === pt.id ? ' sel' : '');
+    const icon = PIN(cls, done ? '✓' : '!');
     let m = markers.get(pt.id);
-    if (!m) { m = L.marker([pt.lat, pt.lng], { icon, title: pt.title || '' }); m.bindPopup(() => pointPopup(ptOf(pt.id) || pt), { minWidth:240 }); m.on('popupopen', () => { ui.point = pt.id; markList(); }); m.on('popupclose', () => m.setPopupContent(() => pointPopup(ptOf(pt.id) || pt))); markers.set(pt.id, m); }
-    else { m.setLatLng([pt.lat, pt.lng]); m.setIcon(icon); if (m.isPopupOpen() && !m.getPopup().getElement()?.querySelector('[data-keep]')) m.setPopupContent(pointPopup(pt)); }
+    if (!m) { m = L.marker([pt.lat, pt.lng], { icon: PIN(cls + ' new', done ? '✓' : '!'), title: pt.title || '' }); m._cls = cls; m.bindPopup(() => pointPopup(ptOf(pt.id) || pt), { minWidth:240 }); m.on('popupopen', () => { ui.point = pt.id; markList(); }); m.on('popupclose', () => m.setPopupContent(() => pointPopup(ptOf(pt.id) || pt))); markers.set(pt.id, m); }
+    else { m.setLatLng([pt.lat, pt.lng]); if (m._cls !== cls) { m.setIcon(icon); m._cls = cls; } if (m.isPopupOpen() && !m.getPopup().getElement()?.querySelector('[data-keep]')) m.setPopupContent(pointPopup(pt)); }
     const show = pointMatches(pt) || ui.point === pt.id;
     if (show && !map.hasLayer(m)) m.addTo(map); else if (!show && map.hasLayer(m)) map.removeLayer(m);
   });
@@ -1511,11 +1580,11 @@ async function act(el){
       return loadUsers();
     }
     case 'userDel': try { await api('DELETE', '/api/users/' + id); toast('Пользователь удалён'); } catch(e) { toast(errText(e)); } return loadUsers();
-    case 'selOrder': ui.order = id; remember(); render(); window.scrollTo({top:0}); return;
+    case 'selOrder': ui.order = id; ui.animNext = true; remember(); render(); window.scrollTo({top:0}); return;
     case 'back': ui.order = null; remember(); return render();
     case 'gotoOrder': closeDrawer(); ui.order = id; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); return;
     case 'newOrder': return openDrawer('order');
-    case 'selCp': ui.cp = id; render(); window.scrollTo({top:0}); return;
+    case 'selCp': ui.cp = id; ui.animNext = true; render(); window.scrollTo({top:0}); return;
     case 'backCp': ui.cp = null; return render();
     case 'gotoCp': closeDrawer(); ui.cp = id; if (location.hash !== '#cps') location.hash = 'cps'; else render(); return;
     case 'newCp': return openDrawer('cpForm');
@@ -1545,7 +1614,7 @@ async function act(el){
     case 'openInvoice': return openDrawer('invoice', id);
     case 'newTask': return openDrawer('task', null, id);
     case 'wKind': ui.wKind = id; return render();
-    case 'taskDone': { const t = S.tasks.find(x => x.id === id); if (!t) return; try { await upd('tasks', id, { done: !t.done }); render(); toast(t.done ? 'Отмечено как выполненное' : 'Возвращено в работу'); } catch(e) { toast(errText(e)); } return; }
+    case 'taskDone': { const t = S.tasks.find(x => x.id === id); if (!t) return; try { await upd('tasks', id, { done: !t.done }); ui.justDone = id; setTimeout(() => { if (ui.justDone === id) ui.justDone = null; }, 600); render(); toast(t.done ? 'Отмечено как выполненное' : 'Возвращено в работу'); } catch(e) { toast(errText(e)); } return; }
     case 'editTask': return openDrawer('task', id);
     case 'paste': return openDrawer('paste', id);
     case 'payF': ui.payF = id; return render();
