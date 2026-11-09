@@ -433,6 +433,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     <div class="toolbar">
       <div class="seg" id="mapSeg"><button data-act="mapF" data-id="todo">Нужно сделать</button><button data-act="mapF" data-id="done">Выполнено</button><button data-act="mapF" data-id="all">Все</button></div>
       <button class="btn primary" type="button" data-act="addPoint" id="addPointBtn">+ Точка</button>
+      <button class="btn" type="button" data-act="pointByCoords" id="coordsBtn">+ По координатам</button>
       <button class="btn" type="button" data-act="locate">Где я</button>
       <span class="maphint" id="mapHint"></span>
     </div>
@@ -775,8 +776,44 @@ function pointPopup(pt){
       ${mayEditPoint(pt) ? `<button class="btn sm" data-act="editPoint" data-id="${pt.id}">Изменить</button>${armBtn('pt:'+pt.id, 'Удалить', 'delPoint', pt.id)}` : ''}
     </div></div>`;
 }
-function pointForm(pt){
+/* Coordinates: "55.751244, 37.618423", "55,751244 37,618423", 55°45'04.5"N 37°37'06.3"E, links from Yandex/Google maps */
+function parseCoords(input){
+  let s = String(input || '').trim();
+  if (!s) return null;
+  const ok = (lat, lng) => {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (Math.abs(lat) > 90 && Math.abs(lng) <= 90) [lat, lng] = [lng, lat];
+    return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+  };
+  const n = x => parseFloat(String(x).replace(',', '.'));
+  let m;
+  try { s = decodeURIComponent(s); } catch(e){}
+  if (/yandex\.|ya\.ru/i.test(s)) {   // Yandex: долгота,широта; отмеченная точка важнее центра карты
+    for (const key of ['whatshere\\[point\\]', 'pt', 'll']) {
+      if ((m = new RegExp('[?&]' + key + '=(-?\\d+(?:\\.\\d+)?),(-?\\d+(?:\\.\\d+)?)', 'i').exec(s))) return ok(n(m[2]), n(m[1]));
+    }
+  }
+  if ((m = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(s)) || (m = /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/.exec(s))) return ok(n(m[1]), n(m[2]));
+  s = s.replace(/[″”“]/g, '"').replace(/[′’‘]/g, "'").replace(/''/g, '"');
+  if (/°/.test(s)) {
+    const parts = [...s.matchAll(/(-?\d+(?:[.,]\d+)?)\s*°\s*(?:(\d+(?:[.,]\d+)?)\s*'\s*)?(?:(\d+(?:[.,]\d+)?)\s*"\s*)?([NSEWСЮВЗ])?/gi)];
+    if (parts.length !== 2) return null;
+    const v = parts.map(p => { let d = Math.abs(n(p[1])) + n(p[2] || 0) / 60 + n(p[3] || 0) / 3600; const h = (p[4] || '').toUpperCase(); if (p[1].startsWith('-') || /[SWЮЗ]/.test(h)) d = -d; return { d, h }; });
+    if (/[EWВЗ]/.test(v[0].h) && /[NSСЮ]/.test(v[1].h)) v.reverse();
+    return ok(v[0].d, v[1].d);
+  }
+  const nums = s.match(/-?\d+(?:[.,]\d+)?/g);
+  return nums && nums.length === 2 ? ok(n(nums[0]), n(nums[1])) : null;
+}
+const fmtCoords = ll => `${(+ll.lat).toFixed(6)}, ${(+ll.lng).toFixed(6)}`;
+const COORDS_HINT = 'Широта, долгота: 55.751244, 37.618423 или 55°45\'04"N 37°37\'06"E. Можно вставить ссылку из Яндекс Карт или Google Maps.';
+function coordsField(ll, id){
+  return `<label>Координаты<input class="in mono" id="${id}" value="${ll ? fmtCoords(ll) : ''}" placeholder="55.751244, 37.618423" autocomplete="off" inputmode="text"></label>
+    <small class="dim" style="font-size:12px">${esc(COORDS_HINT)}</small>`;
+}
+function pointForm(pt, ll){
   return `<div class="pp" data-keep><h4>${pt ? 'Изменить точку' : 'Новая точка'}</h4>
+    ${coordsField(pt ? pt : ll, 'np-coords')}
     <label>Название<input class="in" id="np-title" value="${esc(pt?.title || '')}" placeholder="Объект на ул. Ленина, 5"></label>
     <label>Что нужно сделать<textarea class="in" id="np-todo" rows="3" placeholder="Замерить щитовую, сфотографировать ввод">${esc(pt?.todo || '')}</textarea></label>
     <label>Заказ<select class="in" id="np-order"><option value="">— без заказа —</option>${orderOpts(pt?.orderId || '')}</select></label>
@@ -787,14 +824,27 @@ function newPointAt(latlng){
   setAddMode(false);
   if (ghost) map.removeLayer(ghost);
   ghost = L.marker(latlng, { icon:PIN('ghost', '+'), draggable:true }).addTo(map);
-  ghost.bindPopup(pointForm(null), { closeOnClick:false, autoClose:true, minWidth:260 }).openPopup();
+  ghost.bindPopup(pointForm(null, latlng), { closeOnClick:false, autoClose:true, minWidth:270 }).openPopup();
+  ghost.on('dragend', () => { const f = $('np-coords'); if (f) f.value = fmtCoords(ghost.getLatLng()); ghost.openPopup(); });
   setTimeout(() => $('np-title')?.focus(), 50);
+}
+/* typing coordinates in the map popup moves the marker */
+function coordsTyped(el){
+  const c = parseCoords(el.value);
+  const err = el.id === 'np-coords' ? $('np-err') : $('ferr');
+  if (!el.value.trim()) { if (err) err.textContent = ''; return; }
+  if (!c) { if (err) err.textContent = 'Не удалось разобрать координаты — пример формата под полем.'; return; }
+  if (err) err.textContent = '';
+  if (el.id === 'np-coords' && map) {
+    if (ghost && map.hasLayer(ghost)) { ghost.setLatLng(c); map.panTo(c); }
+    else if (ui.point && markers.get(ui.point)) { markers.get(ui.point).setLatLng(c); map.panTo(c); }
+  }
 }
 function setAddMode(on){
   ui.addPoint = on;
   $('map')?.classList.toggle('adding', on);
   $('addPointBtn').textContent = on ? 'Отмена' : '+ Точка';
-  $('mapHint').textContent = on ? 'Нажмите на карту в нужном месте' : (ui.tileMsg || (canWork() ? 'Точку можно поставить и правым кликом или долгим нажатием' : ''));
+  $('mapHint').innerHTML = on ? 'Нажмите на карту в нужном месте или <button class="linkish" style="color:var(--stamp);text-decoration:underline" data-act="pointByCoords">введите координаты</button>' : esc(ui.tileMsg || (canWork() ? 'Точку можно поставить и правым кликом или долгим нажатием' : ''));
 }
 const pointMatches = pt => ui.mapF === 'all' || (ui.mapF === 'done' ? pt.status === 'done' : pt.status !== 'done');
 function renderMap(){
@@ -802,7 +852,7 @@ function renderMap(){
   if (!map) { $('plist').innerHTML = '<div class="empty">Не удалось загрузить карту.</div>'; return; }
   setTimeout(() => map.invalidateSize(), 0);
   document.querySelectorAll('#mapSeg button').forEach(b => b.classList.toggle('on', b.dataset.id === ui.mapF));
-  $('addPointBtn').hidden = !canWork();
+  $('addPointBtn').hidden = !canWork(); $('coordsBtn').hidden = !canWork();
   if (!ui.addPoint) setAddMode(false);
   const seen = new Set();
   S.points.forEach(pt => {
@@ -827,13 +877,14 @@ function renderMap(){
 function markList(){ document.querySelectorAll('#plist .pitem').forEach(b => b.classList.toggle('on', b.dataset.id === ui.point)); }
 async function savePoint(id){
   const title = val2('np-title'), todo = ($('np-todo')?.value || '').trim(), orderId = $('np-order')?.value || null;
+  const c = parseCoords(val2('np-coords'));
+  if (!c) { $('np-err').textContent = 'Укажите координаты — пример формата под полем.'; return; }
   if (!title && !todo) { $('np-err').textContent = 'Укажите название или что нужно сделать.'; return; }
   document.activeElement?.blur();   // leave the form so the map can be redrawn right away
   try {
-    if (id) { await upd('points', id, { title, todo, orderId }); map.closePopup(); toast('Точка сохранена'); markers.get(id)?.openPopup(); }
+    if (id) { await upd('points', id, { title, todo, orderId, lat:c.lat, lng:c.lng }); map.closePopup(); render(); toast('Точка сохранена'); markers.get(id)?.openPopup(); }
     else {
-      const ll = ghost.getLatLng();
-      const nid = await add('points', { title, todo, orderId, lat:ll.lat, lng:ll.lng });
+      const nid = await add('points', { title, todo, orderId, lat:c.lat, lng:c.lng });
       map.removeLayer(ghost); ghost = null; ui.point = nid; if (ui.mapF === 'done') ui.mapF = 'todo';
       render(); markers.get(nid)?.openPopup(); toast('Точка добавлена');
     }
@@ -1006,6 +1057,16 @@ function renderDrawer(){
       <div class="row-g"><button class="btn primary" type="submit">${c?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button>
       ${c ? (used ? '<span class="dim" style="font-size:13px">Контрагент указан в заказах, удалить нельзя</span>' : armBtn('cp','Удалить','delCp',c.id)) : ''}</div></form>`;
   }
+  if (d.kind === 'pointCoords') {
+    D.innerHTML = dh('Точка по координатам') + `<form class="d-body" data-form="pointCoords"><div class="form">
+      <label class="wide">Координаты<input class="in mono" id="pc-coords" placeholder="55.751244, 37.618423" autocomplete="off" required>
+        <small class="dim" style="font-size:12px">${esc(COORDS_HINT)}</small></label>
+      <label class="wide">Название<input class="in" id="pc-title" placeholder="Объект на ул. Ленина, 5"></label>
+      <label class="wide">Что нужно сделать<textarea id="pc-todo" rows="3" placeholder="Замерить щитовую, сфотографировать ввод"></textarea></label>
+      <label class="wide">Заказ<select class="in" id="pc-order"><option value="">— без заказа —</option>${orderOpts('')}</select></label></div>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">Поставить точку</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
+  }
   if (d.kind === 'contact') {
     const c = cpOf(d.id), k = contactsOf(c).find(x => x.id === d.ctx);
     D.innerHTML = dh((k ? 'Контакт · ' : 'Новый контакт · ') + esc(c?.name || '')) + `<form class="d-body" data-form="contact"><div class="form">
@@ -1162,6 +1223,16 @@ async function onSubmit(e){
       }
       closeDrawer(); render(); toast(d.id ? 'Сохранено' : 'Контрагент добавлен');
     }
+    if (kind === 'pointCoords') {
+      const c = parseCoords(val('pc-coords'));
+      if (!c) return fail('Не удалось разобрать координаты — пример формата под полем.');
+      const title = val('pc-title'), todo = $('pc-todo').value.trim();
+      if (!title && !todo) return fail('Укажите название или что нужно сделать.');
+      const nid = await add('points', { title, todo, orderId: val('pc-order') || null, lat:c.lat, lng:c.lng });
+      closeDrawer(); ui.point = nid; if (ui.mapF === 'done') ui.mapF = 'todo'; render();
+      map.flyTo([c.lat, c.lng], Math.max(map.getZoom(), 16), { duration:.6 }); setTimeout(() => markers.get(nid)?.openPopup(), 700);
+      toast('Точка добавлена');
+    }
     if (kind === 'contact') {
       if (!val('ct-name') && !val('ct-phone') && !val('ct-email')) return fail('Заполните хотя бы одно поле.');
       const c = cpOf(d.id);
@@ -1301,6 +1372,7 @@ async function act(el){
     case 'theme': { const order = ['system','light','dark']; const cur = themeGet(); themeSet(order[(order.indexOf(cur) + 1) % 3]); $('upop').hidden = false; return; }
     case 'mapF': ui.mapF = id; return render();
     case 'addPoint': setAddMode(!ui.addPoint); if (ui.addPoint) map?.closePopup(); return;
+    case 'pointByCoords': setAddMode(false); map?.closePopup(); return openDrawer('pointCoords');
     case 'locate':
       if (!navigator.geolocation) return toast('Браузер не умеет определять местоположение');
       navigator.geolocation.getCurrentPosition(pos => { const ll = [pos.coords.latitude, pos.coords.longitude]; map.flyTo(ll, 16); L.circleMarker(ll, { radius:8, color:'#fff', weight:2, fillColor:'#3446B8', fillOpacity:1 }).addTo(map).bindTooltip('Вы здесь').openTooltip(); },
@@ -1428,6 +1500,7 @@ $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'c-text') { ui.drafts[t.dataset.key] = t.value; return; }
+  if (t.id === 'np-coords' || t.id === 'pc-coords') return coordsTyped(t);
   if (t.id === 'f-cust') { $('f-cust-id').value = ''; comboOpen(); return custHint(); }
   if (t.id !== 'oq' && t.id !== 'cq') return;
   const q = t.value.trim().toLowerCase(); let any = false;
