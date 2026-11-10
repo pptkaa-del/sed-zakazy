@@ -69,6 +69,37 @@ const canWork = u => u.role !== 'viewer';
 const canMoveStock = u => canEdit(u) || u.role === 'user';
 const qtyOk = v => Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) < 1e9;
 const mayEditPoint = (u, pt) => canEdit(u) || pt.createdBy === u.id;
+/* Invoice lines (goods): cleaned on every save; the receipt to the warehouse is posted through its own endpoint */
+const r3 = v => Math.round(Number(v) * 1000) / 1000, r2 = v => Math.round(Number(v) * 100) / 100;
+function cleanItems(list){
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 500).map(x => ({
+    id: String(x && x.id || newId()).slice(0, 40),
+    name: String(x && x.name || '').trim().slice(0, 300),
+    sku: String(x && x.sku || '').trim().slice(0, 100),
+    unit: String(x && x.unit || 'шт').trim().slice(0, 20) || 'шт',
+    qty: qtyOk(x && x.qty) ? r3(x.qty) : 0,
+    price: Number.isFinite(Number(x && x.price)) && Number(x.price) >= 0 ? r2(x.price) : 0,
+    sum: Number.isFinite(Number(x && x.sum)) && Number(x.sum) >= 0 ? r2(x.sum) : 0,
+    stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null,
+  })).filter(x => x.name);
+}
+/* Supplier of an invoice: found among counterparties by INN or name, otherwise added */
+function ensureSupplier(name, inn, user, note){
+  name = String(name || '').trim(); inn = String(inn || '').replace(/\D/g, '').slice(0, 12);
+  if (!name) return { id: null, created: false };
+  const all = listOf('counterparties');
+  let c = (inn && all.find(x => x.inn === inn)) || all.find(x => normName(x.name) === normName(name));
+  if (c) {
+    const d = db.counterparties[c.id];
+    if (!(d.roles || []).includes('supplier')) d.roles = [...(d.roles || []), 'supplier'];
+    if (inn && !d.inn) d.inn = inn;
+    return { id: c.id, created: false };
+  }
+  const id = newId();
+  db.counterparties[id] = { name, inn, roles: ['supplier'], contacts: [], contracts: [], comments: [], note, createdAt: new Date().toISOString(), createdBy: user.id };
+  return { id, created: true };
+}
 const validPoint = d => Number.isFinite(Number(d.lat)) && Number.isFinite(Number(d.lng)) && Math.abs(d.lat) <= 90 && Math.abs(d.lng) <= 180;
 
 /* Version of the running app: changes when the code is updated, so open pages can offer a reload */
@@ -388,6 +419,65 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true, qty: it.qty, move: mv });
   }
 
+  /* receipt to the warehouse from the invoice lines: posted with its own button, cancelled by a manager or admin */
+  if (p[1] === 'invoices' && p[3] === 'income' && p.length === 4) {
+    const inv = db.invoices[p[2]];
+    if (!inv) return fail(res, 404, 'Счёт не найден');
+    const label = `счёту № ${inv.number || '—'}${inv.date ? ' от ' + inv.date.split('-').reverse().join('.') : ''}${inv.supplier ? ', ' + inv.supplier : ''}`;
+    if (m === 'POST') {
+      if (!canMoveStock(user)) return fail(res, 403, 'Недостаточно прав');
+      if (inv.income) return fail(res, 409, 'Приход по этому счёту уже оприходован');
+      const b = await readJsonBody(req);
+      const lines = cleanItems(b.lines).filter(x => x.qty > 0);
+      if (!lines.length) return fail(res, 400, 'Нет строк с количеством');
+      const at = new Date().toISOString(), out = [];
+      let created = 0;
+      for (const ln of lines) {
+        let it = ln.stockId && db.stock[ln.stockId];
+        if (!it) {
+          const all = listOf('stock');
+          const f = (ln.sku && all.find(x => x.sku && normName(x.sku) === normName(ln.sku))) || all.find(x => normName(x.name) === normName(ln.name));
+          if (f) it = db.stock[f.id];
+        }
+        let sid;
+        if (it) sid = Object.keys(db.stock).find(k => db.stock[k] === it);
+        else {
+          sid = newId(); created++;
+          it = db.stock[sid] = { name: ln.name, sku: ln.sku, unit: ln.unit, location: '', minQty: 0, note: 'Добавлено по ' + label, qty: 0, moves: [], acctQty: 0, createdAt: at, createdBy: user.id };
+        }
+        it.qty = r3((Number(it.qty) || 0) + ln.qty);
+        it.moves = Array.isArray(it.moves) ? it.moves : [];
+        const mv = { id: newId(), type: 'in', qty: ln.qty, orderId: inv.orderId || null, invoiceId: p[2], note: 'Приход по ' + label, by: user.id, at, balance: it.qty };
+        it.moves.push(mv); it.updatedAt = at; it.updatedBy = user.id;
+        out.push({ ...ln, stockId: sid, moveId: mv.id });
+      }
+      inv.items = out.map(({ moveId, ...x }) => x);
+      inv.income = { at, by: user.id, lines: out };
+      saveDb();
+      return send(res, 200, { ok: true, lines: out.length, created, rev: db.rev });
+    }
+    if (m === 'DELETE') {
+      if (!canEdit(user)) return fail(res, 403, 'Отменить приход может менеджер или администратор');
+      if (!inv.income) return fail(res, 409, 'Приход не оприходован');
+      // first check that every quantity is still on the shelf, then roll back
+      for (const ln of inv.income.lines) {
+        const it = db.stock[ln.stockId];
+        if (it && (it.moves || []).some(x => x.id === ln.moveId) && (Number(it.qty) || 0) + 1e-9 < ln.qty)
+          return fail(res, 409, `«${it.name}»: на складе ${it.qty} ${it.unit || ''}, часть прихода уже израсходована. Отменить приход нельзя`.replace(' ,', ','));
+      }
+      for (const ln of inv.income.lines) {
+        const it = db.stock[ln.stockId]; if (!it) continue;
+        const i = (it.moves || []).findIndex(x => x.id === ln.moveId); if (i < 0) continue;
+        it.moves.splice(i, 1); it.qty = r3((Number(it.qty) || 0) - ln.qty);
+        it.updatedAt = new Date().toISOString(); it.updatedBy = user.id;
+      }
+      delete inv.income; inv.updatedAt = new Date().toISOString(); inv.updatedBy = user.id;
+      saveDb();
+      return send(res, 200, { ok: true, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+
   /* comments on orders and counterparties: everyone except «Просмотр» may write; author or admin may delete */
   if ((p[1] === 'orders' || p[1] === 'counterparties') && p[3] === 'comments') {
     const o = db[p[1]][p[2]];
@@ -430,9 +520,12 @@ async function api(req, res, url) {
       if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
       data.projectId = db.orders[data.orderId].projectId || null;
       data.status = 'topay'; [...PAY_FIELDS.slice(1), ...SEEN_FIELDS].forEach(f => delete data[f]);
+      delete data.income; data.items = cleanItems(data.items);
     }
+    let cpCreated = false;
+    if (col === 'invoices') { const sup = ensureSupplier(data.supplier, data.supplierInn, user, `Добавлен по счёту № ${data.number || '—'}`); data.supplierId = sup.id; cpCreated = sup.created; }
     const nid = newId(); db[col][nid] = data; saveDb();
-    return send(res, 200, { id: nid, rev: db.rev });
+    return send(res, 200, { id: nid, rev: db.rev, cpCreated });
   }
   if (!id || !db[col][id]) return fail(res, 404, 'Запись не найдена');
 
@@ -442,6 +535,7 @@ async function api(req, res, url) {
     if (col === 'orders' || col === 'counterparties') delete patch.comments;   // comments go through their own endpoint
     if (col === 'stock') { delete patch.qty; delete patch.moves; delete patch.acctQty; }   // balances change only through moves and the 1C import
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
+    if (col === 'invoices') { delete patch.income; delete patch.supplierId; if ('items' in patch) { if (db.invoices[id].income) delete patch.items; else patch.items = cleanItems(patch.items); } }
     const keys = Object.keys(patch);
     /* tasks: everyone except «Просмотр» may tick «Выполнено»; other changes need a manager or admin */
     if (col === 'tasks' && keys.length && keys.every(k => k === 'done')) {
@@ -488,9 +582,13 @@ async function api(req, res, url) {
       if (!['topay', 'paid'].includes(patch.status)) return fail(res, 400, 'Неизвестный статус счёта');
       patch.paidBy = patch.status === 'paid' ? user.id : null;
     }
+    let cpCreated = false;
+    if (col === 'invoices' && patch.supplier !== undefined && (normName(patch.supplier) !== normName(db.invoices[id].supplier) || !db.invoices[id].supplierId)) {
+      const sup = ensureSupplier(patch.supplier, patch.supplierInn, user, `Добавлен по счёту № ${patch.number || db.invoices[id].number || '—'}`); patch.supplierId = sup.id; cpCreated = sup.created;
+    }
     Object.assign(db[col][id], patch, { updatedAt: new Date().toISOString(), updatedBy: user.id });
     saveDb();
-    return send(res, 200, { ok: true, rev: db.rev });
+    return send(res, 200, { ok: true, rev: db.rev, cpCreated });
   }
   if (m === 'DELETE') {
     const d = db[col][id];
@@ -501,6 +599,7 @@ async function api(req, res, url) {
     if (col === 'orders' && listOf('invoices').some(i => i.orderId === id)) return fail(res, 409, 'По заказу есть счета');
     if (col === 'counterparties' && listOf('orders').some(o => o.customerId === id)) return fail(res, 409, 'Контрагент указан заказчиком в заказах');
     if (col === 'invoices' && d.status === 'paid') return fail(res, 409, 'Оплаченный счёт удалить нельзя');
+    if (col === 'invoices' && d.income) return fail(res, 409, 'По счёту оприходован товар на склад. Сначала отмените приход');
     delete db[col][id]; saveDb();
     return send(res, 200, { ok: true, rev: db.rev });
   }

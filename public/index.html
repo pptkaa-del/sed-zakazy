@@ -231,6 +231,10 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .bal{font:600 15px var(--f-mono);text-align:right}
 .stk .bal.low{color:var(--warn)}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
+.incrow{display:grid;grid-template-columns:minmax(0,1fr) 170px 150px 140px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
+.incrow:first-child{border-top:0}.incrow:hover{background:var(--paper)}
+.incrow b{font-weight:500}.incrow small{display:block;color:var(--ink-2);font-size:12px}.incrow .acts{display:flex;justify-content:flex-end}
+@media (max-width:820px){.incrow{grid-template-columns:1fr auto}.incrow>:nth-child(1){grid-column:1/-1}}
 @media (max-width:820px){.stk{grid-template-columns:1fr auto auto}.stk.head{display:none}.stk>:nth-child(1){grid-column:1/-1}.stk>:nth-child(2),.stk>:nth-child(3){grid-column:1}.stk .bal{grid-row:2}.stk .bal.acct{grid-row:2}.stk .acts{grid-column:1/-1;justify-content:flex-start}}
 .stk .bal small{font:500 11px var(--f-body);color:var(--ink-2);display:block}
 .stk .bal.acct{color:var(--info)}
@@ -446,6 +450,14 @@ aside.drawer{position:fixed;top:0;right:0;bottom:0;width:min(540px,100%);backgro
 .kv dd{margin:0;overflow-wrap:anywhere}
 .box{border:1px solid var(--rule);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px}
 .box.paid{border-color:var(--ok);background:var(--ok-soft)}
+.box.inc-done{border-color:var(--ok)}
+.lnbox{display:flex;flex-direction:column;gap:8px}
+table.lines{width:100%;border-collapse:collapse;font-size:14px}
+table.lines th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:6px;font-weight:500;border-bottom:1px solid var(--rule)}
+table.lines td{padding:4px 6px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+table.lines{table-layout:fixed;min-width:560px}table.lines .r{text-align:right}table.lines .in{width:100%;min-width:0}
+table.lines td small{display:block}table.lines td{overflow-wrap:anywhere}
+table.lines .in{padding:6px 8px}
 .box h4{margin:0;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .form label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2);min-width:0}
@@ -729,7 +741,7 @@ async function refresh(){
 async function add(col, data){ const r = await api('POST', '/api/'+col, data); await refresh(); return r.id; }
 async function upd(col, id, patch){
   const o = S[col].find(x => x.id === id); if (o) Object.assign(o, patch);
-  try { await api('PATCH', `/api/${col}/${id}`, patch); }
+  try { return await api('PATCH', `/api/${col}/${id}`, patch); }
   finally { refresh().catch(() => {}); }
 }
 async function del(col, id){ await api('DELETE', `/api/${col}/${id}`); await refresh(); }
@@ -822,7 +834,59 @@ function parseInvoiceText(raw){
   if (ms) r.supplier = ms[1].replace(/^\([^)]*\)\s*:?\s*/, '').split(/,\s*ИНН|\s+ИНН\s|,\s*\d{6},|,\s*КПП|\s+Сч\.?\s*№|\s+БИК/)[0].trim().replace(/[,;]+$/, '');
   const mi = (ms ? new RegExp('ИНН\\s*(\\d{10,12})').exec(t.slice(ms.index)) : null) || /ИНН\s*(\d{10,12})/.exec(t);
   if (mi) r.inn = mi[1];
+  r.items = parseInvoiceItems(raw);
   return r;
+}
+// table rows of an invoice: «№ Наименование Кол-во Ед. Цена Сумма» (Ед. and Кол-во may swap, a VAT column may sit between);
+// a long name wraps onto several lines, the numbers then stand on the first or the last of them
+function parseInvoiceItems(raw){
+  const lines = String(raw || '').replace(/ /g, ' ').split('\n').map(s => s.replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
+  const STRICT = '\\d{1,3}(?: \\d{3})+[.,]\\d{2}|\\d+[.,]\\d{2}', LOOSE = '\\d{1,3}(?: \\d{3})+(?:[.,]\\d{1,2})?|\\d+(?:[.,]\\d{1,2})?';
+  const QTY = '\\d{1,3}(?: \\d{3})+(?:[.,]\\d+)?|\\d+(?:[.,]\\d+)?';
+  const UNIT = '(?:пог\\.? ?м|п\\.? ?м|[A-Za-zА-Яа-яЁё]{1,6}\\.?[23²³]?)';
+  const VAT = '(?:\\s+(?:без НДС|\\d{1,2} ?%))?';
+  const res = [];
+  for (const M of [STRICT, LOOSE]) {
+    const tail = `\\s+(${M})${VAT}\\s+(${M})${VAT}(?:\\s+(?:${STRICT}))*\\s*$`;
+    for (const lazy of ['.*?', '.*']) {
+      res.push([new RegExp(`^(?:(\\d{1,3})[.)]?\\s+)?(${lazy})\\s*(?:^|\\s)(${QTY})\\s+(${UNIT})${tail}`), 0]);
+      res.push([new RegExp(`^(?:(\\d{1,3})[.)]?\\s+)?(${lazy})\\s*(?:^|\\s)(${UNIT})\\s+(${QTY})${tail}`), 1]);
+    }
+  }
+  const parse = l => {
+    let best = null;
+    for (const [re, uq] of res) {
+      const m = re.exec(l); if (!m) continue;
+      const qty = num(uq ? m[4] : m[3]), unit = uq ? m[3] : m[4], price = num(m[5]), sum = num(m[6]);
+      if (!(qty > 0) || !(sum > 0) || !/[A-Za-zА-Яа-яЁё]/.test(unit)) continue;
+      const c = { idx: m[1] || '', name: m[2].trim(), qty, unit: unit.replace(/\.$/, ''), price, sum, ok: Math.abs(qty * price - sum) <= Math.max(1, sum * 0.01) };
+      if (!best || (c.ok && !best.ok)) best = c;
+      if (c.ok) break;
+    }
+    return best;
+  };
+  const hdr = lines.findIndex(l => /(товар|наименован|работ)/i.test(l) && /(кол|цена|сумма)/i.test(l));
+  const out = [];
+  let prev = null, pend = '';
+  for (const l of lines.slice(hdr + 1)) {
+    if (/^(итого|всего|в том числе|без налога|ндс\b|сумма ндс)/i.test(l)) { if (hdr >= 0 && out.length) break; prev = null; pend = ''; continue; }
+    const r = parse(l);
+    if (r && (hdr >= 0 || r.ok)) {
+      const name = /[A-Za-zА-Яа-яЁё]/.test(r.name) ? r.name : '';
+      if (!name && pend) r.name = pend;                       // «1 шт 4 500,00 4 500,00» under a wrapped name
+      else if (pend && !r.idx) r.name = (pend + ' ' + name).trim();
+      else r.name = name;
+      if (!r.name) continue;
+      delete r.ok; delete r.idx; out.push(r); prev = r; pend = '';
+      continue;
+    }
+    if (hdr < 0 || /\d[.,]\d{2}\b/.test(l) || l.length > 200) continue;
+    // text without numbers: a new row that begins with its index, or the rest of the previous name
+    if (/^\d{1,3}[.)]?\s+\D/.test(l)) { pend = l.replace(/^\d{1,3}[.)]?\s+/, ''); prev = null; }
+    else if (pend) pend += ' ' + l;
+    else if (prev) prev.name += ' ' + l;
+  }
+  return out;
 }
 async function parseInvoiceFile(file){
   const box = $('f-parse'); if (!box || !file) return;
@@ -841,12 +905,60 @@ async function parseInvoiceFile(file){
   if (r.amount) { $('f-amt').value = r.amount.toLocaleString('ru-RU', { minimumFractionDigits:2, maximumFractionDigits:2 }); got.push('сумма ' + esc(money(r.amount))); }
   if (r.date) { $('f-date').value = r.date; got.push('от ' + fmtD(r.date)); }
   if (r.supplier && !val2('f-sup')) {
-    const cp = cpByName(r.supplier) || (r.inn && S.counterparties.find(c => c.inn === r.inn));
-    $('f-sup').value = cp ? cp.name : r.supplier; got.push('поставщик ' + esc($('f-sup').value));
+    const cp = (r.inn && S.counterparties.find(c => c.inn === r.inn)) || cpByName(r.supplier);
+    $('f-sup').value = cp ? cp.name : r.supplier; ui.invInn = r.inn || '';
+    got.push('поставщик ' + esc($('f-sup').value) + (cp ? '' : ' (новый — добавится в контрагенты)'));
+  }
+  if (r.items.length && !ui.invItems.some(x => x.name)) {
+    ui.invItems = r.items.map(x => ({ id:uid(), ...x })); drawLines('invItems');
+    got.push('строк товаров: ' + r.items.length);
   }
   if (!r.number || !r.amount) return show((got.length ? 'Нашли в файле: ' + got.join(', ') + '. ' : '') + `Не нашли ${!r.number && !r.amount ? 'номер и сумму' : !r.number ? 'номер' : 'сумму'} — введите вручную.`, true);
   show('✓ Из файла подставлены: ' + got.join(', ') + '. Проверьте перед сохранением.');
 }
+
+/* ===== Goods lines of an invoice and the receipt to the warehouse ===== */
+// editable table: ui[key] holds the lines; inputs write straight into it, so a re-render keeps what was typed
+const LN_OPTS = { invItems: { price:true }, incLines: { price:true, match:true } };
+const incMatch = l => (l.stockId && S.stock.find(x => x.id === l.stockId)) || (l.sku && S.stock.find(x => x.sku && normName(x.sku) === normName(l.sku))) || stockByName(l.name);
+const matchCell = l => { if (!String(l.name || '').trim()) return ''; const it = incMatch(l); return it ? `<span class="ok-t">→ ${esc(it.name)}</span><small class="dim">сейчас ${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</small>` : '<span class="dim">новая позиция склада</span>'; };
+function linesTable(key, ro){
+  const L = ui[key] || [], o = LN_OPTS[key] || {};
+  return `<div class="tscroll"><table class="lines"><colgroup><col style="width:34px"><col><col style="width:100px"><col style="width:76px">${o.price ? '<col style="width:116px">' : ''}${o.match ? '<col style="width:230px">' : ''}${ro ? '' : '<col style="width:44px">'}</colgroup><thead><tr><th>№</th><th>Наименование</th><th class="r">Кол-во</th><th>Ед.</th>${o.price ? '<th class="r">Цена</th>' : ''}${o.match ? '<th>На складе</th>' : ''}${ro ? '' : '<th></th>'}</tr></thead><tbody>
+    ${L.map((x, i) => ro ? `<tr><td>${i + 1}</td><td>${esc(x.name)}</td><td class="r mono">${fmtQty(x.qty)}</td><td>${esc(x.unit)}</td>${o.price ? `<td class="r mono">${x.price ? money(x.price) : ''}</td>` : ''}${o.match ? `<td>${x.stockId && S.stock.find(s => s.id === x.stockId) ? `<a href="#stock" data-act="viewStock" data-id="${x.stockId}">${esc(S.stock.find(s => s.id === x.stockId).name)}</a>` : '<span class="dim">—</span>'}</td>` : ''}</tr>`
+      : `<tr><td>${i + 1}</td><td><input class="in" data-ln="${key}|${i}|name" value="${esc(x.name)}" list="stock-names2" aria-label="Наименование"></td>
+      <td><input class="in mono r" data-ln="${key}|${i}|qty" value="${esc(x.qty ?? '')}" inputmode="decimal" aria-label="Количество"></td>
+      <td><input class="in" data-ln="${key}|${i}|unit" value="${esc(x.unit || 'шт')}" aria-label="Единица" style="width:64px"></td>
+      ${o.price ? `<td><input class="in mono r" data-ln="${key}|${i}|price" value="${esc(x.price ?? '')}" inputmode="decimal" aria-label="Цена"></td>` : ''}
+      ${o.match ? `<td data-m="${i}">${matchCell(x)}</td>` : ''}
+      <td><button type="button" class="btn sm ghost" data-act="delLn" data-id="${key}|${i}" aria-label="Удалить строку">✕</button></td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="row-g" style="justify-content:space-between">${ro ? '<span></span>' : `<button type="button" class="btn sm" data-act="addLn" data-id="${key}">+ Строка</button>`}${o.price ? `<span class="dim" id="lnsum-${key}">${lnSum(key)}</span>` : ''}</div>
+  <datalist id="stock-names2">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist>`;
+}
+const lnSum = key => { const t = sum(ui[key] || [], x => num(x.qty) * num(x.price)); return t ? `Сумма по строкам: <b class="mono">${money(t)}</b>` : ''; };
+const lnInner = key => (ui[key] || []).length ? linesTable(key) : `<p class="dim" style="margin:0">Строк нет — они подставятся из PDF-счёта или добавьте вручную.</p><div><button type="button" class="btn sm" data-act="addLn" data-id="${key}">+ Строка</button></div>`;
+function drawLines(key){ const box = $('ln-' + key); if (box) box.innerHTML = lnInner(key); }
+const cleanLines = L => (L || []).filter(x => String(x.name || '').trim()).map(x => ({ id:x.id || uid(), name:String(x.name).trim(), sku:x.sku || '', unit:String(x.unit || 'шт').trim() || 'шт', qty:num(x.qty), price:num(x.price), sum:num(x.sum) || Math.round(num(x.qty) * num(x.price) * 100) / 100, stockId:x.stockId || null }));
+function vIncomes(q){
+  const L = S.invoices.filter(i => incState(i) && (!q || [i.number, i.supplier, ...(i.items || []).map(x => x.name)].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => (incState(a) === 'wait' ? 0 : 1) - (incState(b) === 'wait' ? 0 : 1) || (b.date || '').localeCompare(a.date || ''));
+  if (!L.length) return `<div class="empty"><h3>${q ? 'Ничего не найдено' : 'Приходов пока нет'}</h3>Приход создаётся сам, когда загружают PDF-счёт со строками товаров. Его отмечают кнопкой «Оприходовать на склад».</div>`;
+  return `<section class="card" style="padding:0;overflow:hidden">${L.map(i => { const o = ord(i.orderId), st = incState(i), n = (i.income ? i.income.lines : i.items).length;
+    return `<div class="incrow click" data-act="openIncome" data-id="${i.id}" role="button" tabindex="0">
+      <div><b>Счёт № ${esc(i.number)} от ${fmtD(i.date)}</b><small>${esc(i.supplier)}${o ? ' · ' + esc(ordName(o)) : ''}</small></div>
+      <div class="dim">${n} стр. · ${money(i.amount)}</div>
+      <div>${st === 'done' ? `<span class="chip c-ok">Оприходован ${esc(fmtD(i.income.at.slice(0, 10)))}</span>` : '<span class="chip c-warn">Ожидает</span>'}</div>
+      <div class="acts">${st === 'wait' && canMoveStock() ? `<button class="btn sm ok" data-act="openIncome" data-id="${i.id}">Оприходовать</button>` : ''}</div></div>`; }).join('')}</section>`;
+}
+function incomeBox(i){
+  const st = incState(i), n = (i.income ? i.income.lines : i.items || []).length;
+  if (!st && !canMoveStock()) return '';
+  return `<div class="box ${st === 'done' ? 'inc-done' : ''}"><h4>Приход на склад</h4>
+    <p style="margin:0">${st === 'done' ? `<span class="chip c-ok">Оприходован</span> ${esc(fmtDT(i.income.at))} · ${esc(who(i.income.by))} · строк: ${n}` : st === 'wait' ? `<span class="chip c-warn">Ожидает оприходования</span> строк: ${n}` : '<span class="dim">Строк товаров в счёте нет.</span>'}</p>
+    <div class="row-g"><button class="btn sm ${st === 'wait' && canMoveStock() ? 'ok' : ''}" data-act="openIncome" data-id="${i.id}">${st === 'done' ? 'Открыть приход' : st === 'wait' ? (canMoveStock() ? 'Оприходовать на склад…' : 'Открыть приход') : 'Создать приход вручную…'}</button></div></div>`;
+}
+const incState = i => i.income ? 'done' : (i.items || []).length ? 'wait' : '';
 
 /* ===== 1C export of balances ===== */
 let sheetLib = null;
@@ -915,15 +1027,16 @@ const isLow = it => (Number(it.minQty) || 0) > 0 && (Number(it.qty) || 0) <= Num
 function vStock(){
   const q = ui.sq.trim().toLowerCase();
   const hay = it => [it.name, it.sku, it.location, it.note].join(' ').toLowerCase();
-  const low = S.stock.filter(isLow);
+  const low = S.stock.filter(isLow), incWait = S.invoices.filter(i => incState(i) === 'wait').length;
   const list = S.stock.filter(it => (ui.sF !== 'low' || isLow(it)) && (!q || hay(it).includes(q))).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
   const A = META.acct;
   const acctBar = `<div class="acctbar"><span>Бухгалтерские остатки (1С): ${A ? `обновлены <b>${esc(fmtDT(A.at))}</b>${A.file ? ` из файла «${esc(A.file)}»` : ''}${A.by ? ', ' + esc(who(A.by)) : ''}` : '<b>ещё не загружались</b>'}</span>${canAcct() ? '<button class="btn sm" data-act="acctImport">Загрузить выгрузку 1С</button>' : ''}</div>`;
   const head = acctBar + `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="sq" type="search" placeholder="Поиск: наименование, артикул, место" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
-    <div class="seg"><button data-act="sF" data-id="all" class="${ui.sF!=='low'?'on':''}">Все</button><button data-act="sF" data-id="low" class="${ui.sF==='low'?'on':''}">Мало на складе${low.length ? ` (${low.length})` : ''}</button></div>
+    <div class="seg"><button data-act="sF" data-id="all" class="${ui.sF!=='low'&&ui.sF!=='inc'?'on':''}">Все</button><button data-act="sF" data-id="low" class="${ui.sF==='low'?'on':''}">Мало на складе${low.length ? ` (${low.length})` : ''}</button><button data-act="sF" data-id="inc" class="${ui.sF==='inc'?'on':''}">Приходы по счетам${incWait ? ` (${incWait})` : ''}</button></div>
     ${canEdit() ? '<button class="btn primary" data-act="newStock">+ Позиция</button>' : ''}
   </div>`;
+  if (ui.sF === 'inc') return head + vIncomes(q);
   if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canAcct() ? 'Загрузите выгрузку остатков из 1С — позиции создадутся сами — или ' : ''}${canEdit() ? 'добавьте позиции вручную: наименование, артикул, единицу, место хранения и минимальный запас. Затем отмечайте приход и расход.' : 'Позиции склада добавляют менеджер или администратор.'}</div>`;
   if (!list.length) return head + `<div class="empty"><h3>Ничего не найдено</h3>Измените поиск или фильтр.</div>`;
   return head + `<section class="card" style="padding:0;overflow:hidden">
@@ -1196,6 +1309,7 @@ function cpDetail(c){
       <div class="roles-chips" style="margin-top:6px">${(c.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('') || '<span class="dim">Роль не указана</span>'}</div></div>
     <div class="row-g"><button class="btn sm" data-act="editCp" data-id="${c.id}">Изменить</button></div></div>
   <section class="card"><div class="ch"><h3>Контактные данные <span class="dim">${cts.length||''}</span></h3><button class="btn sm primary" data-act="newContact" data-id="${c.id}">+ Контакт</button></div>
+    ${c.inn ? `<p class="site">ИНН: <span class="mono">${esc(c.inn)}</span></p>` : ''}${c.note ? `<p class="site dim">${esc(c.note)}</p>` : ''}
     ${c.site ? `<p class="site">Сайт: <a href="${esc(siteUrl(c.site))}" target="_blank" rel="noopener">${esc(c.site)}</a></p>` : ''}
     ${cts.length ? `<div class="contacts">${cts.map(k => `<div class="contact">
         <div><b>${esc(k.name || 'Без имени')}</b></div>
@@ -1486,7 +1600,9 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport'); ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
+function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm');
+  if (kind === 'invoiceForm') { const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
+  if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){ ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
@@ -1524,7 +1640,8 @@ function renderDrawer(){
     D.innerHTML = dh(c ? esc(c.name) : 'Новый контрагент') + `<form class="d-body" data-form="cp"><div class="form">
       <label class="wide">Название<input class="in" id="cp-name" value="${v(c,'name')}" placeholder="ООО «ЭлектроКомплект»" required></label>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Роль</span><div class="row-g" style="margin-top:6px">${Object.entries(CP_ROLES).map(([k,l]) => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="cp-role" value="${k}" ${roles.includes(k)?'checked':''}> ${l}</label>`).join('')}</div></div>
-      <label class="wide">Сайт<input class="in" id="cp-site" value="${v(c,'site')}" placeholder="example.ru" inputmode="url"></label>
+      <label>ИНН<input class="in mono" id="cp-inn" value="${v(c,'inn')}" inputmode="numeric" maxlength="12" placeholder="7701234567"></label>
+      <label>Сайт<input class="in" id="cp-site" value="${v(c,'site')}" placeholder="example.ru" inputmode="url"></label>
       ${c ? '' : `<div class="wide" style="font-size:13px;color:var(--ink-2);margin-top:4px">Первый контакт (можно не заполнять, контакты добавляются и потом)</div>
       <label class="wide">Контактное лицо<input class="in" id="cp-person" placeholder="Петров Иван Сергеевич"></label>
       <label>Телефон<input class="in" id="cp-phone" type="tel" placeholder="+7 900 123-45-67"></label>
@@ -1677,9 +1794,24 @@ function renderDrawer(){
       <label>Сумма, ₽ с НДС<input class="in mono" id="f-amt" value="${v(i,'amount')}" inputmode="decimal" placeholder="125 400,00" required></label>
       <label>Оплатить до<input class="in" type="date" id="f-due" value="${v(i,'due')}"></label>
       <label class="wide">Назначение платежа<input class="in" id="f-purp" value="${v(i,'purpose')}" placeholder="Автоматические выключатели по спецификации"></label>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Строки счёта — по ним создаётся приход на склад</span>
+        ${i?.income ? `<p class="dim" style="margin:6px 0 0">Приход по счёту уже оприходован (${esc(fmtDT(i.income.at))}), строки не меняются.</p>` : `<div id="ln-invItems" class="lnbox">${lnInner('invItems')}</div>`}</div>
 </div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${i?'Сохранить':'Добавить счёт'}</button><button class="btn" type="button" data-act="${i?'openInvoice':'close'}" data-id="${i?.id||''}">Отмена</button></div></form>`;
+  }
+  if (d.kind === 'income') {
+    const i = inv(d.id); if (!i) return closeDrawer();
+    const o = ord(i.orderId), done = !!i.income;
+    if (done) ui.incLines = i.income.lines.map(x => ({ ...x }));
+    D.innerHTML = dh(`Приход на склад · счёт № ${esc(i.number)}`) + `<form class="d-body" data-form="income">
+      <dl class="kv"><dt>Поставщик</dt><dd>${esc(i.supplier)}</dd><dt>Счёт</dt><dd><a href="#pay" data-act="openInvoice" data-id="${i.id}">№ ${esc(i.number)} от ${fmtD(i.date)}</a> · ${money(i.amount)}</dd>
+        <dt>Заказ</dt><dd>${esc(o ? ordName(o) : '—')}</dd>
+        <dt>Статус</dt><dd>${done ? `<span class="chip c-ok">Оприходован</span> ${esc(fmtDT(i.income.at))} · ${esc(who(i.income.by))}` : '<span class="chip c-warn">Ожидает оприходования</span>'}</dd></dl>
+      ${done ? linesTable('incLines', true) : `<div id="ln-incLines" class="lnbox">${lnInner('incLines')}</div>
+        <p class="hint" style="margin:0">Проверьте строки, когда товар пришёл. Количество добавится к фактическому остатку склада, позиции, которых на складе нет, будут созданы. Движения привяжутся к заказу.</p>`}
+      <div class="err" id="ferr"></div>
+      <div class="row-g">${done ? (canEdit() ? armBtn('inc', 'Отменить приход', 'cancelIncome', i.id) : '') : canMoveStock() ? '<button class="btn ok" type="submit">Оприходовать на склад</button>' : '<span class="dim">Оприходовать могут сотрудник, менеджер или администратор.</span>'}<button class="btn" type="button" data-act="close">Закрыть</button></div></form>`;
   }
   if (d.kind === 'invoice') {
     const i = inv(d.id); if (!i) return closeDrawer();
@@ -1694,8 +1826,10 @@ function renderDrawer(){
         <dt>Оплатить до</dt><dd>${fmtD(i.due)}</dd>
         <dt>Файл счёта</dt><dd>${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">${esc(i.file.name)}</a>`:'не приложен'}</dd>
         ${i.createdBy?`<dt>Добавил</dt><dd>${esc(who(i.createdBy))}${i.createdAt?' · '+esc(fmtDT(i.createdAt)):''}</dd>`:''}
+        ${i.supplierId && cpOf(i.supplierId) ? `<dt>Контрагент</dt><dd><a href="#cps" data-act="gotoCp" data-id="${i.supplierId}">${esc(cpOf(i.supplierId).name)}</a>${cpOf(i.supplierId).inn ? ` <span class="dim mono">ИНН ${esc(cpOf(i.supplierId).inn)}</span>` : ''}</dd>` : ''}
         ${i.file ? `<dt>Бухгалтер скачал</dt><dd>${i.seenAt ? `<span class="seen">✓ ${esc(fmtDT(i.seenAt))}</span> · ${esc(who(i.seenBy))}${(i.seenCount||0) > 1 ? ` <span class="dim">(открывал ${i.seenCount} раз, последний ${esc(fmtDT(i.seenLastAt))})</span>` : ''}` : '<span class="chip c-warn">ещё не скачивал</span>'}</dd>` : ''}
       </dl>
+      ${incomeBox(i)}
       ${i.status === 'paid' ? `<div class="box paid"><h4>Оплата</h4><dl class="kv">
           <dt>Дата оплаты</dt><dd>${fmtD(i.paidAt)}</dd>
           <dt>Платёжное поручение</dt><dd>${esc(i.payNo||'—')}</dd>
@@ -1794,7 +1928,7 @@ async function onSubmit(e){
     if (kind === 'cp') {
       const name = val('cp-name'); if (!name) return fail('Укажите название контрагента.');
       const same = cpByName(name); if (same && same.id !== d.id) return fail('Контрагент с таким названием уже есть.');
-      const data = { name, roles:[...f.querySelectorAll('[name=cp-role]:checked')].map(x => x.value), site:val('cp-site') };
+      const data = { name, roles:[...f.querySelectorAll('[name=cp-role]:checked')].map(x => x.value), site:val('cp-site'), inn:val('cp-inn').replace(/\D/g, '') };
       if (d.id) await upd('counterparties', d.id, data);
       else {
         const first = { id:uid(), name:val('cp-person'), phone:val('cp-phone'), email:val('cp-email') };
@@ -1890,17 +2024,36 @@ async function onSubmit(e){
       await upd('counterparties', d.id, { contracts:[...(c.contracts||[]), { id:uid(), number:val('k-num'), date:val('k-date'), subject:val('k-subj'), file:up, at:now }] });
       closeDrawer(); render(); toast('Договор загружен');
     }
+    if (kind === 'income') {
+      const L = cleanLines(ui.incLines);
+      if (!L.length) return fail('Добавьте хотя бы одну строку.');
+      if (L.some(x => !(x.qty > 0))) return fail('Укажите количество во всех строках или удалите пустые.');
+      L.forEach(x => { const it = incMatch(x); x.stockId = it ? it.id : null; });
+      fail('Оприходуем…');
+      const r = await api('POST', `/api/invoices/${d.id}/income`, { lines:L });
+      await refresh(); renderDrawer(); render();
+      toast(`Оприходовано строк: ${r.lines}${r.created ? `, новых позиций склада: ${r.created}` : ''}`);
+    }
     if (kind === 'invoice') {
       const o = ord(val('f-ord'));
       if (!o) return fail('Выберите заказ. Если заказов нет, сначала создайте его.');
       if (!val('f-num') || !val('f-sup')) return fail('Укажите номер счёта и поставщика.');
       if (!(num(val('f-amt')) > 0)) return fail('Укажите сумму счёта.');
       const data = { orderId:o.id, number:val('f-num'), date:val('f-date'), supplier:val('f-sup'), amount:num(val('f-amt')), due:val('f-due'), purpose:val('f-purp') };
+      if (ui.invInn) data.supplierInn = ui.invInn;
+      const old = d.id && inv(d.id);
+      if (!old?.income) {
+        const L = cleanLines(ui.invItems);
+        if (L.some(x => !(x.qty > 0))) return fail('Укажите количество во всех строках счёта или удалите пустые строки.');
+        data.items = L;
+      }
       const file = $('f-file').files[0];
       if (file) { fail('Загружаем файл…'); data.file = await upload(file); }
-      if (d.id) { await upd('invoices', d.id, data); openDrawer('invoice', d.id); }
-      else { await add('invoices', { ...data, status:'topay', createdAt:now, createdBy:me }); closeDrawer(); }
-      toast(d.id ? 'Счёт сохранён' : 'Счёт добавлен и передан в бухгалтерию');
+      let r, id = d.id;
+      if (d.id) { r = await upd('invoices', d.id, data); openDrawer('invoice', d.id); }
+      else { r = await api('POST', '/api/invoices', { ...data, status:'topay', createdAt:now, createdBy:me }); id = r.id; await refresh(); closeDrawer(); }
+      const n = (data.items || []).length;
+      toast((d.id ? 'Счёт сохранён' : 'Счёт добавлен и передан в бухгалтерию') + (r?.cpCreated ? `. «${data.supplier}» добавлен в контрагенты` : '') + (!d.id && n ? `. Создан приход на склад: ${n} стр. — оприходуйте его кнопкой в счёте` : ''));
     }
     if (kind === 'pay') {
       if (!val('p-date')) return fail('Укажите дату оплаты.');
@@ -2067,6 +2220,10 @@ async function act(el){
     case 'newInvoice': return openDrawer('invoiceForm', null, id);
     case 'editInvoice': return openDrawer('invoiceForm', id);
     case 'openInvoice': return openDrawer('invoice', id);
+    case 'openIncome': return openDrawer('income', id);
+    case 'cancelIncome': try { await api('DELETE', `/api/invoices/${id}/income`); await refresh(); renderDrawer(); render(); toast('Приход отменён'); } catch(e) { const fe = $('ferr'); if (fe) fe.textContent = errText(e); else toast(errText(e)); } return;
+    case 'addLn': ui[id] = [...(ui[id] || []), { id:uid(), name:'', qty:'', unit:'шт', price:'' }]; drawLines(id); { const ins = document.querySelectorAll(`[data-ln^="${id}|"][data-ln$="|name"]`); ins[ins.length - 1]?.focus(); } return;
+    case 'delLn': { const [k, n] = id.split('|'); ui[k].splice(Number(n), 1); return drawLines(k); }
     case 'newTask': return openDrawer('task', null, id);
     case 'wKind': ui.wKind = id; return render();
     case 'orderTab': ui.orderTab = id; ui.animNext = true; return render();
@@ -2157,6 +2314,7 @@ $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L); } return; }
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wq') { ui.wq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorks(); const n = $('wq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
