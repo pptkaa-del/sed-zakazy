@@ -426,6 +426,30 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .wchip{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--mute-soft);font-size:13px;margin:1px 0;white-space:nowrap}.wchip.me{background:var(--info-soft);color:var(--info);font-weight:600}
 .wpick{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px}
 table.jt{width:100%;border-collapse:collapse;font-size:14px}
+.jgnav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.jgnav b{font-weight:600;margin-left:6px}
+.jgwrap{padding:0;overflow:hidden}
+table.jg{border-collapse:separate;border-spacing:0;font-size:13px;width:100%;min-width:max-content}
+table.jg th,table.jg td{border-bottom:1px solid var(--rule-2);border-left:1px solid var(--rule-2);padding:0;height:46px}
+table.jg thead th{background:var(--mute-soft);font-weight:600;text-align:center;min-width:40px;width:40px;padding:4px 2px;height:auto;font-size:13px;line-height:1.15}
+table.jg thead th small{display:block;font-weight:400;font-size:11px;color:var(--ink-2)}
+table.jg th.we,table.jg td.we{background:color-mix(in srgb,var(--mute-soft) 60%,transparent)}
+table.jg thead th.td{background:var(--stamp);color:#fff}table.jg thead th.td small{color:#fff}
+table.jg td.td{box-shadow:inset 2px 0 0 var(--stamp),inset -2px 0 0 var(--stamp)}
+table.jg .jg-t{position:sticky;left:0;z-index:2;background:var(--sheet);text-align:left;width:300px;min-width:300px;max-width:300px;padding:6px 12px;border-left:0;font-weight:400}
+table.jg thead .jg-t{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);font-weight:500}
+table.jg tbody .jg-t b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+table.jg tbody .jg-t small{display:block;font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.jg tbody .jg-t .chip{font-size:11px;padding:1px 7px}
+table.jg tr.click{cursor:pointer}table.jg tr.click:hover .jg-t,table.jg tr.click:hover td{background:var(--paper)}
+table.jg td{position:relative;text-align:center}
+table.jg td.on::before{content:'';position:absolute;left:0;right:0;top:12px;bottom:12px;background:var(--bar)}
+table.jg td.on::before{left:-1px;z-index:1}table.jg td.on i{z-index:2}
+table.jg td.b0::before{left:4px;border-radius:6px 0 0 6px}table.jg td.b1::before{right:4px;border-radius:0 6px 6px 0}table.jg td.b0.b1::before{border-radius:6px}
+table.jg td.ext::before{opacity:.45}
+table.jg td i{position:relative;font-style:normal;font-size:10px;color:#fff}
+.st-new{--bar:var(--info)}.st-work{--bar:var(--warn)}.st-done{--bar:var(--ok)}.st-late{--bar:var(--bad)}
+.legend2 i.lg{background:var(--bar)}
+@media (max-width:620px){table.jg .jg-t{width:160px;min-width:160px;max-width:160px;padding:6px 8px}table.jg thead th{min-width:34px;width:34px}}
 table.jt th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);text-align:left;padding:8px 12px;background:var(--mute-soft);font-weight:500}
 table.jt td{padding:10px 12px;border-top:1px solid var(--rule-2);vertical-align:top}
 table.jt tr.click{cursor:pointer}table.jt tr.click:hover td{background:var(--paper)}
@@ -697,7 +721,7 @@ const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.statu
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', jq:'', jF:'active', jW:'', mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
+const ui = { view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', jq:'', jF:'active', jW:'', jMode:(() => { try { return localStorage.getItem('sed-jmode') || 'grid'; } catch(e) { return 'grid'; } })(), jFrom:null, jSpan:14, mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
@@ -1361,7 +1385,7 @@ const JOB_CHIP = { new:'c-info', work:'c-warn', done:'c-ok' };
 const jobOf = id => S.jobs.find(j => j.id === id);
 const mayEditJob = j => me && (canEdit() || (me.role === 'user' && (j.createdBy === me.id || j.leaderId === me.id)));
 const onJob = j => me && (j.leaderId === me.id || (j.workers || []).includes(me.id));
-const jobNo = j => { const L = S.jobs.slice().sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')); return L.indexOf(j) + 1; };
+const jobNo = j => j.no || '—';
 const leaders = () => STAFF.filter(u => ['admin', 'manager', 'user'].includes(u.role));
 const workersList = () => STAFF.filter(u => u.role === 'worker');
 const overdue = j => j.status !== 'done' && j.due && j.due < today();
@@ -1377,10 +1401,12 @@ function vJobs(){
     <span data-keep style="display:contents"><input class="in" id="jq" type="search" placeholder="Поиск: задача, работник, место" value="${esc(ui.jq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск задач"></span>
     <div class="seg">${[['active','Текущие'],['new','Назначены'],['work','В работе'],['done','Выполнены'],['all','Все']].map(([k,l]) => `<button data-act="jF" data-id="${k}" class="${ui.jF===k?'on':''}">${l}${k !== 'all' && cnt(k) ? ` (${cnt(k)})` : ''}</button>`).join('')}</div>
     ${isWorker() ? '' : `<select class="f" id="jW" aria-label="Работник"><option value="">Все работники</option><option value="_me" ${ui.jW==='_me'?'selected':''}>Мои задачи</option>${workersList().map(u => `<option value="${u.id}" ${ui.jW===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>`}
+    <div class="seg"><button data-act="jMode" data-id="grid" class="${ui.jMode==='grid'?'on':''}">По датам</button><button data-act="jMode" data-id="list" class="${ui.jMode!=='grid'?'on':''}">Список</button></div>
     ${canLead() ? '<button class="btn primary" data-act="newJob">+ Задача</button>' : ''}
   </div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>${isWorker() ? 'Вам пока не назначено задач' : 'Задач пока нет'}</h3>${isWorker() ? 'Когда руководитель назначит работу, она появится здесь.' : canLead() ? 'Создайте задачу: что нужно сделать, места на карте, ответственного руководителя и работников, которые её выполнят.' + (workersList().length ? '' : '<br>Сначала администратор должен добавить пользователей с ролью «Работник».') : 'Задачи создают руководители, менеджеры и администратор.'}</div>`;
   if (!list.length) return head + `<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>`;
+  if (ui.jMode === 'grid') return head + jobGrid(list);
   return head + `<section class="card" style="padding:0;overflow:hidden"><table class="jt"><thead><tr><th>№</th><th>Что нужно сделать</th><th>Места</th><th>Руководитель</th><th>Работники</th><th>Срок</th><th>Статус</th><th></th></tr></thead><tbody>
     ${list.map(j => { const np = (j.places || []).length, my = (j.workers || []).includes(me.id) || mayEditJob(j);
       return `<tr class="click ${j.status}" data-act="openJob" data-id="${j.id}" tabindex="0">
@@ -1393,6 +1419,36 @@ function vJobs(){
       <td data-l="Статус"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span></td>
       <td class="jt-a">${my && j.status === 'new' ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Начать</button>` : my && j.status === 'work' ? `<button class="btn sm ok" data-act="openJob" data-id="${j.id}">Выполнено…</button>` : ''}</td></tr>`; }).join('')}
   </tbody></table></section>`;
+}
+/* dates of a task: start (or the day it was set) … due (or the start) */
+const jobSpan = j => { const c = (j.createdAt || today()).slice(0, 10); const s = dnum(j.start || (j.due && j.due < c ? j.due : c)); const e = Math.max(s, j.due ? dnum(j.due) : s); return [s, e]; };
+const monday = n => n - ((n + 3) % 7);
+const DOW = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const MON = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+function jobGrid(list){
+  const tn = dnum(today());
+  if (ui.jFrom == null) ui.jFrom = monday(tn);
+  const from = ui.jFrom, days = Array.from({ length: ui.jSpan }, (_, i) => from + i), to = from + ui.jSpan - 1;
+  const lbl = n => { const d = new Date(n * 864e5); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
+  const nav = `<div class="jgnav"><div class="row-g"><button class="btn sm" data-act="jShift" data-id="-7" aria-label="Неделя назад">←</button><button class="btn sm" data-act="jShift" data-id="0">Сегодня</button><button class="btn sm" data-act="jShift" data-id="7" aria-label="Неделя вперёд">→</button>
+      <b>${lbl(from)} – ${lbl(to)} ${new Date(to * 864e5).getUTCFullYear()}</b></div>
+    <div class="seg"><button data-act="jSpan" data-id="7" class="${ui.jSpan===7?'on':''}">Неделя</button><button data-act="jSpan" data-id="14" class="${ui.jSpan===14?'on':''}">2 недели</button><button data-act="jSpan" data-id="28" class="${ui.jSpan===28?'on':''}">4 недели</button></div></div>`;
+  const inView = list.filter(j => { const [s, e] = jobSpan(j); const end = j.status !== 'done' && e < tn ? tn : e; return end >= from && s <= to; });
+  const outside = list.length - inView.length;
+  const cell = (j, n) => {
+    const [s, e] = jobSpan(j), late = j.status !== 'done' && n > e && n <= tn;
+    const cls = [ (n + 3) % 7 >= 5 ? 'we' : '', n === tn ? 'td' : '' ];
+    if (n >= s && n <= e) cls.push('on', 'st-' + (overdue(j) ? 'late' : j.status), n === s ? 'b0' : '', n === e ? 'b1' : '');
+    else if (late) cls.push('on', 'st-late', 'ext', n === tn ? 'b1' : '');
+    const mark = n === e && j.due ? '<i title="Срок">●</i>' : '';
+    return `<td class="${cls.filter(Boolean).join(' ')}">${mark}</td>`;
+  };
+  return nav + `<section class="card jgwrap"><div class="tscroll"><table class="jg"><thead><tr><th class="jg-t">Задача</th>${days.map(n => { const dw = (n + 3) % 7, d = new Date(n * 864e5);
+      return `<th class="${dw >= 5 ? 'we' : ''} ${n === tn ? 'td' : ''}"><small>${DOW[dw]}</small>${d.getUTCDate()}${d.getUTCDate() === 1 || n === from ? `<small>${MON[d.getUTCMonth()]}</small>` : ''}</th>`; }).join('')}</tr></thead><tbody>
+    ${inView.map(j => `<tr class="click" data-act="openJob" data-id="${j.id}" tabindex="0"><th class="jg-t"><span class="chip ${overdue(j) ? 'c-bad' : JOB_CHIP[j.status]}">${overdue(j) ? 'Просрочена' : JOB_ST[j.status]}</span><b>${jobNo(j)}. ${esc(j.title)}</b><small>${esc((j.workers || []).map(who).join(', '))}${(j.places || []).length ? ` · мест: ${j.places.length}` : ''}</small></th>${days.map(n => cell(j, n)).join('')}</tr>`).join('')
+      || `<tr><td colspan="${ui.jSpan + 1}" class="dim" style="padding:18px;text-align:center">В эти даты задач нет.</td></tr>`}
+  </tbody></table></div></section>
+  <div class="legend2" style="margin-top:10px"><span><i class="lg st-new"></i>Назначена</span><span><i class="lg st-work"></i>В работе</span><span><i class="lg st-done"></i>Выполнена</span><span><i class="lg st-late"></i>Просрочена</span><span>● срок</span>${outside ? `<span class="dim">Вне выбранных дат: ${outside}</span>` : ''}</div>`;
 }
 function jobPlacesHtml(j){
   const P = j.places || [];
@@ -1924,7 +1980,7 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Руководитель</dt><dd>${esc(who(j.leaderId))}</dd>
         <dt>Работники</dt><dd>${(j.workers || []).map(id => `<span class="wchip ${id === me.id ? 'me' : ''}">${esc(who(id))}</span>`).join(' ')}</dd>
-        <dt>Срок</dt><dd>${j.due ? fmtD(j.due) : '—'}</dd>
+        <dt>Даты</dt><dd>${j.start ? fmtD(j.start) + ' – ' : ''}${j.due ? 'срок ' + fmtD(j.due) : j.start ? '' : '—'}</dd>
         ${o && !isWorker() ? `<dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${o.id}">${esc(ordName(o))}</a></dd>` : ''}
         <dt>Поставил</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.startedAt ? `<dt>Начата</dt><dd>${esc(fmtDT(j.startedAt))} · ${esc(who(j.startedBy))}</dd>` : ''}
@@ -1949,8 +2005,9 @@ function renderDrawer(){
     D.innerHTML = dh(j ? 'Изменить задачу' : 'Новая задача') + `<form class="d-body" data-form="job"><div class="form">
       <label class="wide">Что нужно сделать<input class="in" id="j-title" value="${v(j,'title')}" placeholder="Монтаж шкафа ШУ-3 на объекте" required></label>
       <label class="wide">Описание<textarea class="in" id="j-desc" rows="3" placeholder="Кратко: что сделать, что взять с собой, к кому обратиться">${esc(j?.description || '')}</textarea></label>
-      <label>Ответственный руководитель<select class="in" id="j-leader" required>${LD.map(u => `<option value="${u.id}" ${u.id === leaderSel ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role])}</option>`).join('')}</select></label>
-      <label>Срок<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
+      <label class="wide">Ответственный руководитель<select class="in" id="j-leader" required>${LD.map(u => `<option value="${u.id}" ${u.id === leaderSel ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role])}</option>`).join('')}</select></label>
+      <label>Начало<input class="in" type="date" id="j-start" value="${esc(j ? (j.start || '') : today())}"></label>
+      <label>Срок (окончание)<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
       <label class="wide">Заказ (необязательно)<select class="in" id="j-order"><option value="">— без заказа —</option>${ordersSorted().map(o => `<option value="${o.id}" ${j?.orderId === o.id ? 'selected' : ''}>${esc(ordName(o))}</option>`).join('')}</select></label>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Работники</span>
         ${W.length || extra.length ? `<div class="wpick">${[...W, ...extra].map(u => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="j-w" value="${u.id}" ${chosen.has(u.id) ? 'checked' : ''}> ${esc(u.name)}</label>`).join('')}</div>`
@@ -2188,10 +2245,11 @@ async function onSubmit(e){
       closeDrawer(); render(); toast('Договор загружен');
     }
     if (kind === 'job') {
-      const data = { title:val('j-title'), description:($('j-desc').value || '').trim(), leaderId:$('j-leader').value, due:val('j-due'), orderId:$('j-order').value || null,
+      const data = { title:val('j-title'), description:($('j-desc').value || '').trim(), leaderId:$('j-leader').value, start:val('j-start'), due:val('j-due'), orderId:$('j-order').value || null,
         workers:[...f.querySelectorAll('[name=j-w]:checked')].map(x => x.value), places:(ui.jPlaces || []).map(x => ({ ...x, label:String(x.label || '').trim() })) };
       if (!data.title) return fail('Укажите, что нужно сделать.');
       if (!data.workers.length) return fail('Отметьте хотя бы одного работника.');
+      if (data.start && data.due && data.due < data.start) return fail('Срок не может быть раньше начала.');
       if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Задача сохранена'); }
       else { const id = await add('jobs', data); openDrawer('job', id); toast('Задача назначена'); }
     }
@@ -2331,6 +2389,9 @@ async function act(el){
   switch (a) {
     case 'close': return closeDrawer();
     case 'jF': ui.jF = id; return render();
+    case 'jMode': ui.jMode = id; try { localStorage.setItem('sed-jmode', id); } catch(e){} return render();
+    case 'jSpan': ui.jSpan = Number(id); return render();
+    case 'jShift': ui.jFrom = Number(id) ? (ui.jFrom ?? monday(dnum(today()))) + Number(id) : monday(dnum(today())); return render();
     case 'newJob': return openDrawer('jobForm');
     case 'editJob': return openDrawer('jobForm', id);
     case 'openJob': return openDrawer('job', id);

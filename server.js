@@ -77,6 +77,7 @@ function cleanJob(d){
   if ('title' in d) out.title = String(d.title || '').trim().slice(0, 200);
   if ('description' in d) out.description = String(d.description || '').slice(0, 4000);
   if ('due' in d) out.due = /^\d{4}-\d{2}-\d{2}$/.test(d.due || '') ? d.due : '';
+  if ('start' in d) out.start = /^\d{4}-\d{2}-\d{2}$/.test(d.start || '') ? d.start : '';
   if ('orderId' in d) out.orderId = d.orderId && db.orders[d.orderId] ? d.orderId : null;
   if ('leaderId' in d) { const l = users.find(u => u.id === d.leaderId); out.leaderId = l && ['admin', 'manager', 'user'].includes(l.role) ? l.id : null; }
   if ('workers' in d) out.workers = [...new Set((Array.isArray(d.workers) ? d.workers : []).filter(id => users.some(u => u.id === id)))].slice(0, 50);
@@ -151,6 +152,9 @@ const SECRET_FILE = path.join(DATA_DIR, 'secret.key');
 function loadDb() {
   const d = readJSON(DB_FILE, { rev: 0, files: {} });
   COLLECTIONS.forEach(c => { d[c] = d[c] || {}; });
+  // permanent task numbers, the same for everyone who sees the task
+  let jn = Math.max(0, ...Object.values(d.jobs).map(j => j.no || 0));
+  Object.values(d.jobs).filter(j => !j.no).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')).forEach(j => { j.no = ++jn; });
   d.files = d.files || {};
   d.meta = d.meta || {};
   return d;
@@ -539,6 +543,7 @@ async function api(req, res, url) {
       if (!data.title) return fail(res, 400, 'Укажите, что нужно сделать');
       if (!data.workers || !data.workers.length) return fail(res, 400, 'Назначьте хотя бы одного работника');
       data.status = 'new'; data.report = ''; data.places = data.places || [];
+      data.no = Math.max(0, ...Object.values(db.jobs).map(j => j.no || 0)) + 1;
       if (!data.leaderId) data.leaderId = canLead(user) ? user.id : null;
     }
     if (col === 'points') {
