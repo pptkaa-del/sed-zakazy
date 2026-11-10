@@ -416,7 +416,26 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .leaflet-control-attribution a{color:var(--stamp)}
 .pin{background:none;border:0}
 .pin svg{display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
-.pin.todo{color:var(--bad)}.pin.done{color:var(--ok)}.pin.ghost{color:var(--stamp)}
+.pin.todo{color:var(--bad)}.pin.done{color:var(--ok)}.pin.ghost{color:var(--stamp)}.pin.job{color:var(--stamp)}
+.minimap{height:260px;border-radius:10px;border:1px solid var(--rule);z-index:0}
+.jplaces{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.jplaces li{display:flex;gap:10px;align-items:center}.jplaces li>span:nth-child(2){flex:1;min-width:0}.jplaces li .in{flex:1;min-width:0}
+.jplaces b{font-weight:500;display:block}.jplaces small{display:block;font-size:12px;color:var(--ink-2)}
+.pnum{flex:none;width:24px;height:24px;border-radius:50%;background:var(--stamp);color:#fff;display:grid;place-items:center;font:600 12px var(--f-mono)}
+.jdesc{white-space:pre-wrap;margin:0;line-height:1.5}
+.wchip{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--mute-soft);font-size:13px;margin:1px 0;white-space:nowrap}.wchip.me{background:var(--info-soft);color:var(--info);font-weight:600}
+.wpick{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px}
+table.jt{width:100%;border-collapse:collapse;font-size:14px}
+table.jt th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);text-align:left;padding:8px 12px;background:var(--mute-soft);font-weight:500}
+table.jt td{padding:10px 12px;border-top:1px solid var(--rule-2);vertical-align:top}
+table.jt tr.click{cursor:pointer}table.jt tr.click:hover td{background:var(--paper)}
+table.jt tr.done td{color:var(--ink-2)}table.jt tr.done .jt-t b{text-decoration:line-through;text-decoration-color:var(--rule)}
+table.jt td small{display:block;font-size:12px;color:var(--ink-2)}.jt-t b{font-weight:500}.jt-t{min-width:200px}.jt-a{text-align:right;white-space:nowrap}
+.bad-t{color:var(--bad)}
+@media (max-width:820px){table.jt thead{display:none}table.jt,table.jt tbody,table.jt tr,table.jt td{display:block}
+  table.jt tr{padding:10px 14px;border-top:1px solid var(--rule-2)}table.jt tr:first-child{border-top:0}
+  table.jt td{border:0;padding:2px 0}table.jt td[data-l]::before{content:attr(data-l) ': ';color:var(--ink-2);font-size:12px}
+  table.jt td[data-l] small{display:inline;margin-left:6px}.jt-a{text-align:left;padding-top:6px!important}table.jt td[data-l="№"]{display:none}}
 .pin.sel svg{transform:scale(1.18);transform-origin:50% 100%}
 .pp h4{margin:0 0 4px;font-size:15px;font-weight:600;overflow-wrap:anywhere}
 .pp p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -586,6 +605,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <div><h1>Управление предприятием</h1><p class="sub">Заказы, контрагенты, документы, счета и план-график</p></div>
     </div>
     <nav class="views" id="views">
+      <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
       <a href="#orders" data-v="orders">Заказы на производство</a>
       <a href="#stock" data-v="stock">Склад</a>
@@ -656,16 +676,18 @@ const MAX_MB = 50;
 const ORDER_ST = { new:'Планируется', work:'В работе', closed:'Закрыт' };
 const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', contractor:'Подрядчик' };
 const KIND = { buy:'Закупка', work:'Работа' };
-const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', user:'Сотрудник', viewer:'Просмотр' };
+const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', user:'Руководитель', worker:'Работник', viewer:'Просмотр' };
 const ROLE_INFO = {
   admin:'Всё, включая управление пользователями.',
   manager:'Заказы, контрагенты и договоры, документы, строки для закупки, счета, план-график. Оплату не отмечает.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
-  user:'Видит всё, загружает счета в заказы, правит и удаляет свои неоплаченные счета.',
+  user:'Видит всё, загружает счета в заказы, правит и удаляет свои неоплаченные счета, отмечает приход и расход на складе, назначает задачи работникам.',
+  worker:'Видит только назначенные ему задачи: что сделать, места на карте, руководителя. Отмечает «В работе» и «Выполнено».',
   viewer:'Только просмотр.'
 };
 
-const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[], stock:[] };
+const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[], stock:[], jobs:[] };
+let STAFF = [];
 let META = {};
 let me = null, rev = -1, mode = 'loading';
 const canEdit = () => me && (me.role === 'admin' || me.role === 'manager');
@@ -675,7 +697,7 @@ const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.statu
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
+const ui = { view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', jq:'', jF:'active', jW:'', mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
@@ -732,11 +754,15 @@ async function api(method, url, body, headers = {}){
 async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {};
-  ['projects','orders','invoices','tasks','counterparties','points','stock'].forEach(c => S[c] = d[c] || []);
+  ['projects','orders','invoices','tasks','counterparties','points','stock','jobs'].forEach(c => S[c] = d[c] || []);
+  STAFF = d.staff || [];
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
   render();
   if (ui.drawer?.kind === 'invoice' && !drawerBusy() && !$('drawer').querySelector('form')) renderDrawer();
+  if (ui.drawer?.kind === 'job' && !drawerBusy()) renderDrawer();
+  const nNew = S.jobs.filter(j => j.status === 'new' && (j.workers || []).includes(me?.id)).length;
+  $('jobBadge').hidden = !nNew; $('jobBadge').textContent = nNew;
 }
 async function add(col, data){ const r = await api('POST', '/api/'+col, data); await refresh(); return r.id; }
 async function upd(col, id, patch){
@@ -771,7 +797,7 @@ function render(){
   if (mode === 'loading') { V.hidden = false; $('mapView').hidden = true; V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
   const changed = lastView !== ui.view || ui.animNext; lastView = ui.view; ui.animNext = false;
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : ui.view === 'stock' ? vStock() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : ui.view === 'stock' ? vStock() : ui.view === 'jobs' ? vJobs() : vOrders();
   if (changed) animateView(V);
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
@@ -1327,6 +1353,84 @@ function cpDetail(c){
   ${commentsCard('counterparties', c)}`;
 }
 
+/* ===== Задачи сотрудникам ===== */
+const isWorker = () => me && me.role === 'worker';
+const canLead = () => me && (canEdit() || me.role === 'user');
+const JOB_ST = { new:'Назначена', work:'В работе', done:'Выполнена' };
+const JOB_CHIP = { new:'c-info', work:'c-warn', done:'c-ok' };
+const jobOf = id => S.jobs.find(j => j.id === id);
+const mayEditJob = j => me && (canEdit() || (me.role === 'user' && (j.createdBy === me.id || j.leaderId === me.id)));
+const onJob = j => me && (j.leaderId === me.id || (j.workers || []).includes(me.id));
+const jobNo = j => { const L = S.jobs.slice().sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')); return L.indexOf(j) + 1; };
+const leaders = () => STAFF.filter(u => ['admin', 'manager', 'user'].includes(u.role));
+const workersList = () => STAFF.filter(u => u.role === 'worker');
+const overdue = j => j.status !== 'done' && j.due && j.due < today();
+const routeUrl = pl => `https://yandex.ru/maps/?rtext=~${pl.lat},${pl.lng}&rtt=auto`;
+function vJobs(){
+  const q = ui.jq.trim().toLowerCase();
+  const hay = j => [j.title, j.description, who(j.leaderId), ...(j.workers || []).map(who), ...(j.places || []).map(p => p.label)].join(' ').toLowerCase();
+  const F = { active: j => j.status !== 'done', new: j => j.status === 'new', work: j => j.status === 'work', done: j => j.status === 'done', all: () => true };
+  const cnt = k => S.jobs.filter(F[k]).length;
+  const list = S.jobs.filter(j => F[ui.jF](j) && (!ui.jW || (ui.jW === '_me' ? onJob(j) : (j.workers || []).includes(ui.jW))) && (!q || hay(j).includes(q)))
+    .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9999').localeCompare(b.due || '9999') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const head = `<div class="toolbar">
+    <span data-keep style="display:contents"><input class="in" id="jq" type="search" placeholder="Поиск: задача, работник, место" value="${esc(ui.jq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск задач"></span>
+    <div class="seg">${[['active','Текущие'],['new','Назначены'],['work','В работе'],['done','Выполнены'],['all','Все']].map(([k,l]) => `<button data-act="jF" data-id="${k}" class="${ui.jF===k?'on':''}">${l}${k !== 'all' && cnt(k) ? ` (${cnt(k)})` : ''}</button>`).join('')}</div>
+    ${isWorker() ? '' : `<select class="f" id="jW" aria-label="Работник"><option value="">Все работники</option><option value="_me" ${ui.jW==='_me'?'selected':''}>Мои задачи</option>${workersList().map(u => `<option value="${u.id}" ${ui.jW===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>`}
+    ${canLead() ? '<button class="btn primary" data-act="newJob">+ Задача</button>' : ''}
+  </div>`;
+  if (!S.jobs.length) return head + `<div class="empty"><h3>${isWorker() ? 'Вам пока не назначено задач' : 'Задач пока нет'}</h3>${isWorker() ? 'Когда руководитель назначит работу, она появится здесь.' : canLead() ? 'Создайте задачу: что нужно сделать, места на карте, ответственного руководителя и работников, которые её выполнят.' + (workersList().length ? '' : '<br>Сначала администратор должен добавить пользователей с ролью «Работник».') : 'Задачи создают руководители, менеджеры и администратор.'}</div>`;
+  if (!list.length) return head + `<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>`;
+  return head + `<section class="card" style="padding:0;overflow:hidden"><table class="jt"><thead><tr><th>№</th><th>Что нужно сделать</th><th>Места</th><th>Руководитель</th><th>Работники</th><th>Срок</th><th>Статус</th><th></th></tr></thead><tbody>
+    ${list.map(j => { const np = (j.places || []).length, my = (j.workers || []).includes(me.id) || mayEditJob(j);
+      return `<tr class="click ${j.status}" data-act="openJob" data-id="${j.id}" tabindex="0">
+      <td class="mono dim" data-l="№">${jobNo(j)}</td>
+      <td class="jt-t"><b>${esc(j.title)}</b>${j.description ? `<small>${esc(j.description.slice(0, 140))}${j.description.length > 140 ? '…' : ''}</small>` : ''}</td>
+      <td data-l="Места">${np ? `${np} ${np === 1 ? 'место' : np < 5 ? 'места' : 'мест'}${j.places[0].label ? `<small>${esc(j.places[0].label)}${np > 1 ? ' и др.' : ''}</small>` : ''}` : '<span class="dim">—</span>'}</td>
+      <td data-l="Руководитель">${esc(who(j.leaderId))}</td>
+      <td data-l="Работники">${(j.workers || []).map(id => `<span class="wchip ${id === me.id ? 'me' : ''}">${esc(who(id))}</span>`).join(' ')}</td>
+      <td data-l="Срок" class="${overdue(j) ? 'bad-t' : ''}">${j.due ? fmtD(j.due) : '<span class="dim">—</span>'}${overdue(j) ? '<small>просрочена</small>' : ''}</td>
+      <td data-l="Статус"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span></td>
+      <td class="jt-a">${my && j.status === 'new' ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Начать</button>` : my && j.status === 'work' ? `<button class="btn sm ok" data-act="openJob" data-id="${j.id}">Выполнено…</button>` : ''}</td></tr>`; }).join('')}
+  </tbody></table></section>`;
+}
+function jobPlacesHtml(j){
+  const P = j.places || [];
+  if (!P.length) return '<p class="dim" style="margin:0">Места на карте не указаны.</p>';
+  return `<div id="jmap" class="minimap"></div><ol class="jplaces">${P.map((pl, i) => `<li><span class="pnum">${i + 1}</span><span style="min-width:0"><b>${esc(pl.label || 'Место ' + (i + 1))}</b><small class="mono">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small></span><a class="btn sm" href="${routeUrl(pl)}" target="_blank" rel="noopener">Маршрут</a></li>`).join('')}</ol>`;
+}
+function jobFormPlaces(){
+  const P = ui.jPlaces || [];
+  return P.length ? `<ol class="jplaces">${P.map((pl, i) => `<li><span class="pnum">${i + 1}</span><input class="in" data-jpl="${i}" value="${esc(pl.label || '')}" placeholder="Подпись: адрес, объект" aria-label="Подпись места ${i + 1}"><small class="mono dim">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small><button type="button" class="btn sm ghost" data-act="delJPlace" data-id="${i}" aria-label="Удалить место">✕</button></li>`).join('')}</ol>`
+    : '<p class="dim" style="margin:0">Мест пока нет — нажмите на карту.</p>';
+}
+let mini = null;
+function tileLayerFor(m){
+  const mc = (me && me.map) || {};
+  return L.tileLayer(mc.tiles || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: mc.maxZoom || 19, subdomains: mc.subdomains || 'abc', referrerPolicy: 'strict-origin-when-cross-origin',
+    attribution: mc.attribution || '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(m);
+}
+function mountMini(){
+  if (mini) { try { mini.remove(); } catch(e){} mini = null; }
+  const el = $('jmap') || $('jfmap'); if (!el || typeof L === 'undefined') return;
+  const form = el.id === 'jfmap';
+  mini = L.map(el, { zoomControl:true, tap:true, scrollWheelZoom: form }); tileLayerFor(mini);
+  mini._pins = L.layerGroup().addTo(mini);
+  const P = () => form ? (ui.jPlaces || []) : (jobOf(ui.drawer.id)?.places || []);
+  const draw = () => {
+    mini._pins.clearLayers();
+    P().forEach((pl, i) => { const mk = L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), draggable: form, title: pl.label || '' }).addTo(mini._pins);
+      if (form) mk.on('dragend', () => { const ll = mk.getLatLng(); pl.lat = ll.lat; pl.lng = ll.lng; $('jf-places').innerHTML = jobFormPlaces(); }); });
+  };
+  mini._draw = draw; draw();
+  const pts = P();
+  if (pts.length) mini.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lng])).pad(0.3), { maxZoom:16 });
+  else { let v = null; try { v = JSON.parse(localStorage.getItem('sed-map') || 'null'); } catch(e){} mini.setView(v ? [v.lat, v.lng] : [55.7512, 37.6184], v ? v.z : 10); }
+  if (form) mini.on('click', e => { ui.jPlaces.push({ id:uid(), lat:e.latlng.lat, lng:e.latlng.lng, label:'' }); draw(); $('jf-places').innerHTML = jobFormPlaces(); });
+  setTimeout(() => mini && mini.invalidateSize(), 50); setTimeout(() => mini && mini.invalidateSize(), 400);
+}
+
 /* ===== Map of objects ===== */
 const canWork = () => me && me.role !== 'viewer';
 const mayEditPoint = pt => me && (canEdit() || pt.createdBy === me.id);
@@ -1456,6 +1560,13 @@ function renderMap(){
     if (show && !map.hasLayer(m)) m.addTo(map); else if (!show && map.hasLayer(m)) map.removeLayer(m);
   });
   [...markers.keys()].forEach(id => { if (!seen.has(id)) { map.removeLayer(markers.get(id)); markers.delete(id); } });
+  // places of current assignments («Задачи сотрудникам»)
+  if (!map._jobs) map._jobs = L.layerGroup().addTo(map);
+  map._jobs.clearLayers();
+  if (ui.mapF !== 'done') S.jobs.filter(j => j.status !== 'done').forEach(j => (j.places || []).forEach((pl, i) => {
+    L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), title: j.title }).addTo(map._jobs)
+      .bindPopup(`<div class="pp"><h4>${esc(j.title)}</h4><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${pl.label ? `<p>${esc(pl.label)}</p>` : ''}<small>Руководитель: ${esc(who(j.leaderId))}</small><small>Работники: ${esc((j.workers || []).map(who).join(', '))}</small><div class="row-g"><button class="btn sm" data-act="openJob" data-id="${j.id}">Открыть задачу</button></div></div>`, { minWidth:240 });
+  }));
   if (!fitted && S.points.length) { fitted = true; map.fitBounds(L.latLngBounds(S.points.map(p => [p.lat, p.lng])).pad(0.2), { maxZoom:15 }); }
   const list = S.points.filter(pointMatches).sort((a,b) => (a.status === b.status ? 0 : a.status === 'done' ? 1 : -1) || (b.createdAt||'').localeCompare(a.createdAt||''));
   const nTodo = S.points.filter(p => p.status !== 'done').length;
@@ -1601,10 +1712,13 @@ function vPlan(){
 
 /* ---------- drawer ---------- */
 function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm');
+  if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
-function closeDrawer(){ ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
+function closeDrawer(){ if (mini) { try { mini.remove(); } catch(e){} mini = null; } ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
+const renderDrawerBase = renderDrawer;
+renderDrawer = function(){ renderDrawerBase(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
 const opt = (obj, sel) => Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?'selected':''}>${v}</option>`).join('');
 const orderOpts = sel => ordersSorted().map(o => `<option value="${o.id}" ${o.id===sel?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('');
@@ -1800,6 +1914,55 @@ function renderDrawer(){
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${i?'Сохранить':'Добавить счёт'}</button><button class="btn" type="button" data-act="${i?'openInvoice':'close'}" data-id="${i?.id||''}">Отмена</button></div></form>`;
   }
+  if (d.kind === 'job') {
+    const j = jobOf(d.id); if (!j) return closeDrawer();
+    const o = ord(j.orderId), mine = (j.workers || []).includes(me.id), act = mine || mayEditJob(j) || j.leaderId === me.id;
+    D.innerHTML = dh(`Задача № ${jobNo(j)}`) + `<div class="d-body">
+      <div class="row-g"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${overdue(j) ? '<span class="chip c-bad">Просрочена</span>' : ''}</div>
+      <h3 style="margin:0;font-size:20px">${esc(j.title)}</h3>
+      ${j.description ? `<p class="jdesc">${esc(j.description)}</p>` : ''}
+      <dl class="kv">
+        <dt>Руководитель</dt><dd>${esc(who(j.leaderId))}</dd>
+        <dt>Работники</dt><dd>${(j.workers || []).map(id => `<span class="wchip ${id === me.id ? 'me' : ''}">${esc(who(id))}</span>`).join(' ')}</dd>
+        <dt>Срок</dt><dd>${j.due ? fmtD(j.due) : '—'}</dd>
+        ${o && !isWorker() ? `<dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${o.id}">${esc(ordName(o))}</a></dd>` : ''}
+        <dt>Поставил</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
+        ${j.startedAt ? `<dt>Начата</dt><dd>${esc(fmtDT(j.startedAt))} · ${esc(who(j.startedBy))}</dd>` : ''}
+        ${j.status === 'done' ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))} · ${esc(who(j.doneBy))}</dd>` : ''}
+      </dl>
+      <div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>
+      ${j.status === 'done' ? (j.report ? `<div class="box paid"><h4>Отчёт</h4><p class="jdesc" style="margin:0">${esc(j.report)}</p></div>` : '')
+        : act ? `<div class="box"><h4>${j.status === 'new' ? 'Начать работу' : 'Отметить выполнение'}</h4>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-2)">Комментарий о выполнении (необязательно)<span data-keep style="display:contents"><textarea class="in" id="j-report" rows="3" placeholder="Что сделано, что осталось">${esc(j.report || '')}</textarea></span></label>
+          <div class="row-g">${j.status === 'new' ? `<button class="btn" data-act="jobStatus" data-id="${j.id}|work">Начать работу</button>` : ''}<button class="btn ok" data-act="jobStatus" data-id="${j.id}|done">✓ Выполнено</button></div></div>` : ''}
+      <div class="err" id="ferr"></div>
+      <div class="row-g">${j.status === 'done' && act ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Вернуть в работу</button>` : ''}
+        ${mayEditJob(j) ? `<button class="btn sm" data-act="editJob" data-id="${j.id}">Изменить</button>${armBtn('job', 'Удалить задачу', 'delJob', j.id)}` : ''}
+        <button class="btn sm" data-act="close">Закрыть</button></div>
+    </div>`;
+  }
+  if (d.kind === 'jobForm') {
+    const j = d.id && jobOf(d.id), W = workersList(), LD = leaders();
+    const chosen = new Set(j ? j.workers || [] : []);
+    const extra = j ? (j.workers || []).filter(id => !W.some(u => u.id === id)).map(id => ({ id, name: who(id) })) : [];
+    const leaderSel = j ? j.leaderId : (me.role === 'user' || me.role === 'manager' || me.role === 'admin' ? me.id : '');
+    D.innerHTML = dh(j ? 'Изменить задачу' : 'Новая задача') + `<form class="d-body" data-form="job"><div class="form">
+      <label class="wide">Что нужно сделать<input class="in" id="j-title" value="${v(j,'title')}" placeholder="Монтаж шкафа ШУ-3 на объекте" required></label>
+      <label class="wide">Описание<textarea class="in" id="j-desc" rows="3" placeholder="Кратко: что сделать, что взять с собой, к кому обратиться">${esc(j?.description || '')}</textarea></label>
+      <label>Ответственный руководитель<select class="in" id="j-leader" required>${LD.map(u => `<option value="${u.id}" ${u.id === leaderSel ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role])}</option>`).join('')}</select></label>
+      <label>Срок<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
+      <label class="wide">Заказ (необязательно)<select class="in" id="j-order"><option value="">— без заказа —</option>${ordersSorted().map(o => `<option value="${o.id}" ${j?.orderId === o.id ? 'selected' : ''}>${esc(ordName(o))}</option>`).join('')}</select></label>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Работники</span>
+        ${W.length || extra.length ? `<div class="wpick">${[...W, ...extra].map(u => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="j-w" value="${u.id}" ${chosen.has(u.id) ? 'checked' : ''}> ${esc(u.name)}</label>`).join('')}</div>`
+          : `<p class="dim" style="margin:6px 0 0">Нет пользователей с ролью «Работник». ${me.role === 'admin' ? 'Добавьте их на вкладке «Пользователи».' : 'Попросите администратора добавить их.'}</p>`}</div>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Место или места проведения работ — нажмите на карту, метку можно перетащить</span>
+        <div id="jfmap" class="minimap" style="margin-top:6px"></div>
+        <div class="row-g" style="margin-top:8px"><input class="in mono" id="jf-coords" placeholder="или координаты: 55.75120, 37.61840" style="flex:1 1 220px;min-width:0"><button type="button" class="btn sm" data-act="addJPlace">Добавить</button></div>
+        <div id="jf-places" style="margin-top:8px">${jobFormPlaces()}</div></div>
+      </div>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">${j ? 'Сохранить' : 'Назначить задачу'}</button><button class="btn" type="button" data-act="${j ? 'openJob' : 'close'}" data-id="${j?.id || ''}">Отмена</button></div></form>`;
+  }
   if (d.kind === 'income') {
     const i = inv(d.id); if (!i) return closeDrawer();
     const o = ord(i.orderId), done = !!i.income;
@@ -1811,7 +1974,7 @@ function renderDrawer(){
       ${done ? linesTable('incLines', true) : `<div id="ln-incLines" class="lnbox">${lnInner('incLines')}</div>
         <p class="hint" style="margin:0">Проверьте строки, когда товар пришёл. Количество добавится к фактическому остатку склада, позиции, которых на складе нет, будут созданы. Движения привяжутся к заказу.</p>`}
       <div class="err" id="ferr"></div>
-      <div class="row-g">${done ? (canEdit() ? armBtn('inc', 'Отменить приход', 'cancelIncome', i.id) : '') : canMoveStock() ? '<button class="btn ok" type="submit">Оприходовать на склад</button>' : '<span class="dim">Оприходовать могут сотрудник, менеджер или администратор.</span>'}<button class="btn" type="button" data-act="close">Закрыть</button></div></form>`;
+      <div class="row-g">${done ? (canEdit() ? armBtn('inc', 'Отменить приход', 'cancelIncome', i.id) : '') : canMoveStock() ? '<button class="btn ok" type="submit">Оприходовать на склад</button>' : '<span class="dim">Оприходовать могут руководитель, менеджер или администратор.</span>'}<button class="btn" type="button" data-act="close">Закрыть</button></div></form>`;
   }
   if (d.kind === 'invoice') {
     const i = inv(d.id); if (!i) return closeDrawer();
@@ -2024,6 +2187,14 @@ async function onSubmit(e){
       await upd('counterparties', d.id, { contracts:[...(c.contracts||[]), { id:uid(), number:val('k-num'), date:val('k-date'), subject:val('k-subj'), file:up, at:now }] });
       closeDrawer(); render(); toast('Договор загружен');
     }
+    if (kind === 'job') {
+      const data = { title:val('j-title'), description:($('j-desc').value || '').trim(), leaderId:$('j-leader').value, due:val('j-due'), orderId:$('j-order').value || null,
+        workers:[...f.querySelectorAll('[name=j-w]:checked')].map(x => x.value), places:(ui.jPlaces || []).map(x => ({ ...x, label:String(x.label || '').trim() })) };
+      if (!data.title) return fail('Укажите, что нужно сделать.');
+      if (!data.workers.length) return fail('Отметьте хотя бы одного работника.');
+      if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Задача сохранена'); }
+      else { const id = await add('jobs', data); openDrawer('job', id); toast('Задача назначена'); }
+    }
     if (kind === 'income') {
       const L = cleanLines(ui.incLines);
       if (!L.length) return fail('Добавьте хотя бы одну строку.');
@@ -2159,6 +2330,27 @@ async function act(el){
   disarm();
   switch (a) {
     case 'close': return closeDrawer();
+    case 'jF': ui.jF = id; return render();
+    case 'newJob': return openDrawer('jobForm');
+    case 'editJob': return openDrawer('jobForm', id);
+    case 'openJob': return openDrawer('job', id);
+    case 'delJob': await guard(del('jobs', id)); closeDrawer(); render(); return toast('Задача удалена');
+    case 'jobStatus': {
+      const [jid, st] = id.split('|'), patch = { status:st };
+      const rep = $('j-report'); if (rep && ui.drawer?.kind === 'job') patch.report = rep.value.trim();
+      try { await api('PATCH', `/api/jobs/${jid}`, patch); await refresh(); if (ui.drawer?.kind === 'job') renderDrawer(); toast(st === 'done' ? 'Задача выполнена' : st === 'work' ? 'Задача в работе' : 'Сохранено'); }
+      catch(e) { const fe = $('ferr'); if (fe && ui.drawer) fe.textContent = errText(e); else toast(errText(e)); }
+      return;
+    }
+    case 'addJPlace': {
+      const m = /(-?\d+(?:[.,]\d+)?)\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)/.exec($('jf-coords').value || '');
+      const lat = m && num(m[1]), lng = m && num(m[2]);
+      if (!m || Math.abs(lat) > 90 || Math.abs(lng) > 180) { $('ferr').textContent = 'Введите координаты в виде «55.75120, 37.61840».'; return; }
+      $('ferr').textContent = ''; ui.jPlaces.push({ id:uid(), lat, lng, label:'' }); $('jf-coords').value = '';
+      $('jf-places').innerHTML = jobFormPlaces(); if (mini) { mini._draw(); mini.setView([lat, lng], Math.max(mini.getZoom(), 14)); }
+      return;
+    }
+    case 'delJPlace': ui.jPlaces.splice(Number(id), 1); $('jf-places').innerHTML = jobFormPlaces(); if (mini) mini._draw(); return;
     case 'reload': return location.reload();
     case 'theme': themeSet(THEMES.includes(id) ? id : 'system'); $('upop').hidden = false; return;
     case 'mapF': ui.mapF = id; return render();
@@ -2317,6 +2509,8 @@ document.addEventListener('input', e => {
   if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L); } return; }
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'jq') { ui.jq = t.value; const pos = t.selectionStart; $('view').innerHTML = vJobs(); const n = $('jq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.dataset.jpl !== undefined) { const pl = ui.jPlaces?.[Number(t.dataset.jpl)]; if (pl) pl.label = t.value; return; }
   if (t.id === 'wq') { ui.wq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorks(); const n = $('wq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'c-text') { ui.drafts[t.dataset.key] = t.value; return; }
   if (t.id === 'np-coords' || t.id === 'pc-coords') return coordsTyped(t);
@@ -2354,6 +2548,7 @@ document.addEventListener('change', async e => {
   if (/^acct-c-/.test(t.id) && ui.acct) { ui.acct.cols[t.id.slice(7)] = Number(t.value); ui.acct.create = $('acct-create')?.checked !== false; return renderDrawer(); }
   if (t.id === 'acct-create' && ui.acct) { ui.acct.create = t.checked; return; }
   if (t.id === 'wOrd') { ui.wOrd = t.value; return render(); }
+  if (t.id === 'jW') { ui.jW = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
   if (t.classList.contains('pci')) {
@@ -2395,7 +2590,7 @@ document.addEventListener('change', async e => {
 });
 function route(){
   const h = location.hash.slice(1);
-  ui.view = ['works','orders','stock','cps','pay','plan','map'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
+  ui.view = isWorker() ? 'jobs' : ['jobs','works','orders','stock','cps','pay','plan','map'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   render();
 }
@@ -2427,6 +2622,9 @@ async function start(u){
   document.body.classList.toggle('no-edit', !canEdit());
   document.body.classList.toggle('can-invoice', canAddInvoice());
   $('usersTab').hidden = u.role !== 'admin';
+  document.querySelectorAll('#views a:not(#usersTab)').forEach(a => a.hidden = isWorker() && a.dataset.v !== 'jobs');
+  $('jobsTab').firstChild.textContent = isWorker() ? 'Мои задачи ' : 'Задачи сотрудникам ';
+  document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
   route();

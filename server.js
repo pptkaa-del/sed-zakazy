@@ -47,12 +47,13 @@ const SESSION_DAYS = Number(process.env.SESSION_DAYS || 14);
 const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 
-const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points', 'stock'];
+const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points', 'stock', 'jobs'];
 const ROLES = {
   admin:      'Администратор',
   manager:    'Менеджер',
   accountant: 'Бухгалтер',
-  user:       'Сотрудник',
+  user:       'Руководитель',
+  worker:     'Работник',
   viewer:     'Просмотр',
 };
 const PAY_FIELDS = ['status', 'paidAt', 'payNo', 'paidAmount', 'paidBy', 'receipt'];
@@ -64,7 +65,28 @@ const ownsInvoice = (u, inv) => u.role === 'user' && inv.createdBy === u.id && i
 const SEEN_FIELDS = ['seenAt', 'seenBy', 'seenLastAt', 'seenCount'];
 /* Map points: everyone except «Просмотр» adds points and marks them done; author, manager or admin edits and deletes */
 const POINT_STATUS_FIELDS = ['status', 'doneAt', 'doneBy'];
-const canWork = u => u.role !== 'viewer';
+const canWork = u => u.role !== 'viewer' && u.role !== 'worker';
+/* Assignments («Задачи сотрудникам»): admins, managers and leaders create them; a worker sees only his own and changes only the status */
+const canLead = u => canEdit(u) || u.role === 'user';
+const JOB_STATUS = ['new', 'work', 'done'];
+const JOB_WORKER_FIELDS = ['status', 'report'];
+const onJob = (u, j) => j.leaderId === u.id || (j.workers || []).includes(u.id);
+const mayEditJob = (u, j) => canEdit(u) || (u.role === 'user' && (j.createdBy === u.id || j.leaderId === u.id));
+function cleanJob(d){
+  const out = {};
+  if ('title' in d) out.title = String(d.title || '').trim().slice(0, 200);
+  if ('description' in d) out.description = String(d.description || '').slice(0, 4000);
+  if ('due' in d) out.due = /^\d{4}-\d{2}-\d{2}$/.test(d.due || '') ? d.due : '';
+  if ('orderId' in d) out.orderId = d.orderId && db.orders[d.orderId] ? d.orderId : null;
+  if ('leaderId' in d) { const l = users.find(u => u.id === d.leaderId); out.leaderId = l && ['admin', 'manager', 'user'].includes(l.role) ? l.id : null; }
+  if ('workers' in d) out.workers = [...new Set((Array.isArray(d.workers) ? d.workers : []).filter(id => users.some(u => u.id === id)))].slice(0, 50);
+  if ('places' in d) out.places = (Array.isArray(d.places) ? d.places : []).slice(0, 50)
+    .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
+    .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200) }));
+  if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
+  if ('status' in d) out.status = d.status;
+  return out;
+}
 /* Warehouse: managers and admins keep the item list; they and «Сотрудник» record receipts and issues */
 const canMoveStock = u => canEdit(u) || u.role === 'user';
 const qtyOk = v => Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) < 1e9;
@@ -274,6 +296,8 @@ async function api(req, res, url) {
   if (!user) return fail(res, 401, 'Требуется вход');
 
   if (p[1] === 'me' && m === 'GET') return send(res, 200, meInfo(user));
+  // «Работник» sees and changes only the assignments given to him
+  if (user.role === 'worker' && !['rev', 'data', 'password', 'jobs'].includes(p[1])) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && users.find(u => u.id === p[2]);
@@ -320,8 +344,10 @@ async function api(req, res, url) {
   }
   if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION });
   if (p[1] === 'data' && m === 'GET') {
-    const out = { rev: db.rev, users: Object.fromEntries(users.map(u => [u.id, u.name])), meta: db.meta };
-    COLLECTIONS.forEach(c => { out[c] = listOf(c); });
+    const out = { rev: db.rev, users: Object.fromEntries(users.map(u => [u.id, u.name])), meta: db.meta,
+      staff: users.filter(u => !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) };
+    COLLECTIONS.forEach(c => { out[c] = user.role === 'worker' ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)) : []) : listOf(c); });
+    if (user.role === 'worker') { out.meta = {}; out.staff = []; }
     return send(res, 200, out);
   }
   if (p[1] === 'password' && m === 'POST') {
@@ -506,8 +532,15 @@ async function api(req, res, url) {
   if (!COLLECTIONS.includes(col) || p.length > 3) return fail(res, 404, 'Не найдено');
 
   if (m === 'POST' && !id) {
-    if (!(col === 'invoices' ? canAddInvoice(user) : col === 'points' ? canWork(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
-    const data = clean(await readJsonBody(req));
+    if (!(col === 'invoices' ? canAddInvoice(user) : col === 'points' ? canWork(user) : col === 'jobs' ? canLead(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
+    let data = clean(await readJsonBody(req));
+    if (col === 'jobs') {
+      data = cleanJob({ ...data, status: undefined, report: undefined });
+      if (!data.title) return fail(res, 400, 'Укажите, что нужно сделать');
+      if (!data.workers || !data.workers.length) return fail(res, 400, 'Назначьте хотя бы одного работника');
+      data.status = 'new'; data.report = ''; data.places = data.places || [];
+      if (!data.leaderId) data.leaderId = canLead(user) ? user.id : null;
+    }
     if (col === 'points') {
       if (!validPoint(data)) return fail(res, 400, 'Неверные координаты точки');
       data.lat = Number(data.lat); data.lng = Number(data.lng);
@@ -543,6 +576,22 @@ async function api(req, res, url) {
       const t = db.tasks[id];
       t.done = !!patch.done; t.doneAt = t.done ? new Date().toISOString() : null; t.doneBy = t.done ? user.id : null;
       t.updatedAt = new Date().toISOString(); t.updatedBy = user.id;
+      saveDb();
+      return send(res, 200, { ok: true, rev: db.rev });
+    }
+    if (col === 'jobs') {
+      const j = db.jobs[id], c = cleanJob(patch), ck = Object.keys(c);
+      const other = ck.filter(k => !JOB_WORKER_FIELDS.includes(k));
+      if (other.length ? !mayEditJob(user, j) : !(mayEditJob(user, j) || onJob(user, j))) return fail(res, 403, 'Недостаточно прав');
+      if ('title' in c && !c.title) return fail(res, 400, 'Укажите, что нужно сделать');
+      if ('workers' in c && !c.workers.length) return fail(res, 400, 'Назначьте хотя бы одного работника');
+      if ('status' in c) {
+        if (!JOB_STATUS.includes(c.status)) return fail(res, 400, 'Неизвестный статус');
+        const t = new Date().toISOString();
+        if (c.status === 'work' && !j.startedAt) { c.startedAt = t; c.startedBy = user.id; }
+        c.doneAt = c.status === 'done' ? t : null; c.doneBy = c.status === 'done' ? user.id : null;
+      }
+      Object.assign(j, c, { updatedAt: new Date().toISOString(), updatedBy: user.id });
       saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
     }
@@ -594,6 +643,8 @@ async function api(req, res, url) {
     const d = db[col][id];
     if (col === 'points') {
       if (!mayEditPoint(user, d)) return fail(res, 403, 'Удалить точку может её автор, менеджер или администратор');
+    } else if (col === 'jobs') {
+      if (!mayEditJob(user, d)) return fail(res, 403, 'Удалить задачу может её автор, руководитель задачи, менеджер или администратор');
     } else if (!canEdit(user) && !(col === 'invoices' && ownsInvoice(user, d))) return fail(res, 403, 'Недостаточно прав');
     if (col === 'projects' && listOf('orders').some(o => o.projectId === id)) return fail(res, 409, 'В проекте есть заказы');
     if (col === 'orders' && listOf('invoices').some(i => i.orderId === id)) return fail(res, 409, 'По заказу есть счета');
