@@ -93,8 +93,11 @@ function cleanJob(d){
   if ('places' in d) out.places = (Array.isArray(d.places) ? d.places : []).slice(0, 5000)
     .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
     .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200),
+      ...(x.assignee && users.some(u => u.id === x.assignee) ? { assignee: String(x.assignee) } : {}),
       ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
+  // which photos a worker must take at every point, e.g. «Общий вид», «До замены», «После замены»
+  if ('photoSpec' in d) out.photoSpec = [...new Set((Array.isArray(d.photoSpec) ? d.photoSpec : String(d.photoSpec || '').split('\n')).map(x => String(x).trim().slice(0, 80)).filter(Boolean))].slice(0, 20);
   if ('status' in d) out.status = d.status;
   return out;
 }
@@ -437,7 +440,8 @@ async function api(req, res, url) {
   if (p[1] === 'data' && m === 'GET') {
     const out = { rev: db.rev, users: Object.fromEntries(orgUsers().map(u => [u.id, u.name])), meta: db.meta,
       staff: orgUsers().filter(u => !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) };
-    COLLECTIONS.forEach(c => { out[c] = user.role === 'worker' ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)) : []) : listOf(c); });
+    const mine = j => ({ ...j, places: (j.places || []).filter(x => !x.assignee || x.assignee === user.id) });
+    COLLECTIONS.forEach(c => { out[c] = user.role === 'worker' ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
     if (user.role === 'worker') { out.meta = {}; out.staff = []; }
     return send(res, 200, out);
   }
@@ -695,6 +699,41 @@ async function api(req, res, url) {
     return fail(res, 405, 'Метод не поддерживается');
   }
 
+  /* a worker's report at a point of a job: the photos the job asks for, extra photos and a comment */
+  if (p[1] === 'jobs' && p[3] === 'places' && p[4]) {
+    const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
+    const pl = (j.places || []).find(x => x.id === p[4]); if (!pl) return fail(res, 404, 'Точка не найдена');
+    const mayReport = mayEditJob(user, j) || ((j.workers || []).includes(user.id) && (!pl.assignee || pl.assignee === user.id)) || j.leaderId === user.id;
+    if (!mayReport) return fail(res, 403, 'Это не ваша точка');
+    const touch = () => { pl.reportAt = new Date().toISOString(); pl.reportBy = user.id; j.updatedAt = pl.reportAt; j.updatedBy = user.id; };
+    pl.photos = pl.photos || {};
+    if (p[5] === 'photo' && m === 'POST') {
+      let slot = ''; try { slot = decodeURIComponent(String(req.headers['x-slot'] || '')).slice(0, 80); } catch {}
+      let name = 'фото.jpg'; try { name = decodeURIComponent(String(req.headers['x-filename'] || 'фото.jpg')).replace(/[\\/\r\n"]/g, '_').slice(0, 200); } catch {}
+      const type = String(req.headers['content-type'] || 'image/jpeg').split(';')[0].trim().toLowerCase();
+      if (!/^image\//.test(type)) return fail(res, 400, 'Нужна фотография (изображение)');
+      const buf = await readBody(req, MAX_FILE); if (!buf.length) return fail(res, 400, 'Пустой файл');
+      const fid = newId(); fs.writeFileSync(path.join(filesDir(), fid), buf);
+      db.files[fid] = { name, type, size: buf.length, at: new Date().toISOString(), by: user.id };
+      const f = { id: fid, name, type, size: buf.length, at: db.files[fid].at, by: user.id };
+      const key = slot && (j.photoSpec || []).includes(slot) ? slot : '_extra';
+      if (key === '_extra') pl.photos._extra = [...(pl.photos._extra || []), f].slice(-20); else pl.photos[key] = f;
+      touch(); saveDb();
+      return send(res, 200, { ok: true, place: pl, rev: db.rev });
+    }
+    if (p[5] === 'photo' && m === 'DELETE') {
+      const b = await readJsonBody(req);
+      if (b.slot === '_extra') pl.photos._extra = (pl.photos._extra || []).filter(f => f.id !== b.id); else delete pl.photos[String(b.slot || '')];
+      touch(); saveDb();
+      return send(res, 200, { ok: true, place: pl, rev: db.rev });
+    }
+    if (p[5] === 'comment' && m === 'PATCH') {
+      const b = await readJsonBody(req); pl.comment = String(b.comment || '').slice(0, 4000); touch(); saveDb();
+      return send(res, 200, { ok: true, place: pl, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+
   /* comments on orders and counterparties: everyone except «Просмотр» may write; author or admin may delete */
   if ((p[1] === 'orders' || p[1] === 'counterparties') && p[3] === 'comments') {
     const o = db[p[1]][p[2]];
@@ -775,6 +814,7 @@ async function api(req, res, url) {
     }
     if (col === 'jobs') {
       const j = db.jobs[id], c = cleanJob(patch), ck = Object.keys(c);
+      if (c.places) { const old = new Map((j.places || []).map(x => [x.id, x])); c.places.forEach(x => { const o = old.get(x.id); if (o && o.photos) { x.photos = o.photos; x.comment = o.comment; x.reportAt = o.reportAt; x.reportBy = o.reportBy; } }); }
       const other = ck.filter(k => !JOB_WORKER_FIELDS.includes(k));
       if (other.length ? !mayEditJob(user, j) : !(mayEditJob(user, j) || onJob(user, j))) return fail(res, 403, 'Недостаточно прав');
       if ('title' in c && !c.title) return fail(res, 400, 'Укажите, что нужно сделать');

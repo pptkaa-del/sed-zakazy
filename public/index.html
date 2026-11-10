@@ -477,6 +477,14 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .leaflet-control-attribution a{color:var(--stamp)}
 .pin{background:none;border:0}
 .pin svg{display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+.pin.job.done{color:#1E9E4F}.pin.job.part{color:#E08A00}
+.jplaces li.click{cursor:pointer;border-radius:8px;padding:4px}.jplaces li.click:hover{background:var(--paper)}
+.slots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.slots li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:8px 10px;border:1px dashed var(--rule);border-radius:10px}
+.slots li.ok{border-style:solid;border-color:var(--ok);background:color-mix(in srgb,var(--ok-soft) 60%,transparent)}
+.slots li>div:first-child b{font-weight:600;display:block}.slots li .row-g{grid-column:1/-1}
+.thumb img{display:block;width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--rule)}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px}.thumbs .tw{position:relative}.thumbs .tw button{position:absolute;top:2px;right:2px;background:rgba(255,255,255,.85)}
 .pin.todo{color:var(--bad)}.pin.done{color:var(--ok)}.pin.ghost{color:var(--stamp)}.pin.job{color:var(--stamp)}
 .minimap{height:260px;border-radius:10px;border:1px solid var(--rule);z-index:0}
 .jplaces{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -867,7 +875,7 @@ async function refresh(){
   $('banner').hidden = true;
   render();
   if (ui.drawer?.kind === 'invoice' && !drawerBusy() && !$('drawer').querySelector('form')) renderDrawer();
-  if (ui.drawer?.kind === 'job' && !drawerBusy()) renderDrawer();
+  if ((ui.drawer?.kind === 'job' || ui.drawer?.kind === 'place') && !drawerBusy()) renderDrawer();
   const nNew = S.jobs.filter(j => j.status === 'new' && (j.workers || []).includes(me?.id)).length;
   $('jobBadge').hidden = !nNew; $('jobBadge').textContent = nNew;
 }
@@ -1600,11 +1608,36 @@ function jobGrid(list){
   <div class="legend2" style="margin-top:10px"><span><i class="lg st-new"></i>Назначена</span><span><i class="lg st-work"></i>В работе</span><span><i class="lg st-done"></i>Выполнена</span><span><i class="lg st-late"></i>Просрочена</span>${canLead() ? '<span class="dim">Щелчок по пустой клетке — назначить задачу работнику на этот день</span>' : ''}${outside ? `<span class="dim">Вне выбранных дат: ${outside}</span>` : ''}</div>`;
 }
 function jobPlacesHtml(j){
+  if (!j) return '';
   const P = j.places || [];
   if (!P.length) return '<p class="dim" style="margin:0">Места на карте не указаны.</p>';
   const MAX = 30, dtc = pl => pl.dtNo ? ` style="background:${DT_COLOR[dtCatOfPlace(pl)]}"` : '';
   const sum = P.some(pl => pl.dtNo) ? `<p class="dim" style="margin:0;font-size:13px">Мест: ${P.length}${['mkad', 'ttk', 'bridge'].map(c => { const n = P.filter(pl => (pl.cats || []).includes(c)).length; return n ? ` · ${c === 'bridge' ? 'эстакады' : DT_CAT[c]} ${n}` : ''; }).join('')}</p>` : '';
-  return `<div id="jmap" class="minimap"></div>${sum}<ol class="jplaces">${P.slice(0, MAX).map((pl, i) => `<li><span class="pnum"${dtc(pl)}>${i + 1}</span><span style="min-width:0"><b>${esc(pl.label || 'Место ' + (i + 1))}</b><small class="mono">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small></span><a class="btn sm" href="${routeUrl(pl)}" target="_blank" rel="noopener">Маршрут</a></li>`).join('')}</ol>${P.length > MAX ? `<p class="dim" style="margin:0;font-size:13px">…и ещё ${P.length - MAX} мест — все они на карте выше.</p>` : ''}`;
+  const rep = pl => { const r = placeDone(j, pl); return r.need ? `<small class="${r.full ? 'ok-t' : r.got ? 'warn-t' : 'dim'}">фото ${r.got} из ${r.need}${r.extra ? ` + ${r.extra} доп.` : ''}${pl.comment ? ' · есть комментарий' : ''}</small>` : (r.extra || pl.comment) ? `<small class="ok-t">отчёт есть</small>` : ''; };
+  const ready = P.filter(pl => placeDone(j, pl).full).length;
+  const top = (j.photoSpec || []).length ? `<p style="margin:0;font-size:13px">Нужные фото: ${j.photoSpec.map(esc).join(', ')}. <b class="${ready === P.length ? 'ok-t' : ''}">Готово точек: ${ready} из ${P.length}</b></p>` : '';
+  const ord = P.map((pl, i) => [pl, i]).sort(([a], [b]) => placeDone(j, a).full - placeDone(j, b).full);
+  return `<div id="jmap" class="minimap"></div>${sum}${top}<p class="dim" style="margin:0;font-size:13px">Нажмите на точку на карте или в списке, чтобы приложить фото и комментарий.</p><ol class="jplaces">${ord.slice(0, MAX).map(([pl, i]) => `<li class="click" data-act="openPlace" data-id="${j.id}|${pl.id}" role="button" tabindex="0"><span class="pnum"${dtc(pl)}>${i + 1}</span><span style="min-width:0"><b>${esc(pl.label || 'Место ' + (i + 1))}</b>${rep(pl)}</span><span class="btn sm">Фото</span></li>`).join('')}</ol>${P.length > MAX ? `<p class="dim" style="margin:0;font-size:13px">…и ещё ${P.length - MAX} мест — они на карте выше, нажмите на точку.</p>` : ''}`;
+}
+/* photo report at a point of a job */
+const placeDone = (j, pl) => { const need = j.photoSpec || []; const ph = pl.photos || {}; const got = need.filter(n => ph[n]).length; return { need: need.length, got, extra: (ph._extra || []).length, full: need.length ? got === need.length : !!((ph._extra || []).length || pl.comment) }; };
+const placeColor = (j, pl) => { const r = placeDone(j, pl); return r.full ? '#1E9E4F' : (r.got || r.extra || pl.comment) ? '#E08A00' : null; };
+const canReport = (j, pl) => me && (mayEditJob(j) || j.leaderId === me.id || ((j.workers || []).includes(me.id) && (!pl.assignee || pl.assignee === me.id)));
+function placeUpdate(jid, place){
+  const j = jobOf(jid); if (!j) return; const k = (j.places || []).findIndex(x => x.id === place.id); if (k >= 0) j.places[k] = place;
+  if (ui.drawer?.kind === 'place') renderDrawer();
+  refresh().catch(() => {});
+}
+async function shrinkImage(file){
+  // phone photos are 4–10 MB: send a 2000 px JPEG instead
+  if (!/^image\//.test(file.type) || file.size < 1.2e6 || typeof createImageBitmap === 'undefined') return file;
+  try {
+    const bmp = await createImageBitmap(file), k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+    return blob && blob.size < file.size ? new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type:'image/jpeg' }) : file;
+  } catch(e) { return file; }
 }
 const dtCatOfPlace = pl => ['mkad', 'ttk', 'bridge', 'other'].find(c => (pl.cats || []).includes(c)) || 'road';
 function jobFormPlaces(){
@@ -1630,8 +1663,10 @@ function mountMini(){
   const draw = () => {
     mini._pins.clearLayers();
     const many = P().length > 40;
-    if (many) { P().forEach(pl => L.circleMarker([pl.lat, pl.lng], { radius:5, weight:1, color:'#fff', fillColor: pl.dtNo ? DT_COLOR[dtCatOfPlace(pl)] : '#3B47B8', fillOpacity:.95 }).bindTooltip(pl.label || '').addTo(mini._pins)); return; }
-    P().forEach((pl, i) => { const mk = L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), draggable: form, title: pl.label || '' }).addTo(mini._pins);
+    const j = !form && jobOf(ui.drawer.id), open = pl => { if (j) openDrawer('place', j.id + '|' + pl.id); };
+    if (many) { P().forEach(pl => { const done = j && placeColor(j, pl); L.circleMarker([pl.lat, pl.lng], { radius: done ? 6 : 5, weight: done ? 3 : 1, color: done || '#fff', fillColor: pl.dtNo ? DT_COLOR[dtCatOfPlace(pl)] : '#3B47B8', fillOpacity:.95 }).bindTooltip((pl.label || '') + (j ? ' — нажмите, чтобы открыть' : '')).on('click', () => open(pl)).addTo(mini._pins); }); return; }
+    P().forEach((pl, i) => { const mk = L.marker([pl.lat, pl.lng], { icon: PIN('job' + (j && placeColor(j, pl) ? (placeDone(j, pl).full ? ' done' : ' part') : ''), i + 1), draggable: form, title: pl.label || '' }).addTo(mini._pins);
+      if (j) mk.on('click', () => open(pl));
       if (form) mk.on('dragend', () => { const ll = mk.getLatLng(); pl.lat = ll.lat; pl.lng = ll.lng; $('jf-places').innerHTML = jobFormPlaces(); }); });
   };
   mini._draw = draw; draw();
@@ -2569,6 +2604,30 @@ function renderDrawer(){
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${o ? 'Сохранить' : 'Создать организацию'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
+  if (d.kind === 'place') {
+    const [jid, pid] = String(d.id).split('|'), j = jobOf(jid), pl = j && (j.places || []).find(x => x.id === pid);
+    if (!pl) return closeDrawer();
+    const can = canReport(j, pl), ph = pl.photos || {}, r = placeDone(j, pl), mo = pl.dtNo ? Math.max(1, String(pl.dtNo).split('/').filter(Boolean).length) : 1;
+    const thumb = f => `<a href="/files/${f.id}" target="_blank" rel="noopener" class="thumb"><img src="/files/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`;
+    const upl = (slot, label, multi) => can ? `<label class="btn sm ${multi ? '' : 'primary'}">${label}<input type="file" accept="image/*" capture="environment" data-up="placePhoto" data-id="${jid}|${pid}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label>` : '';
+    D.innerHTML = dh(esc(pl.label || 'Точка')) + `<div class="d-body">
+      <div class="row-g"><button class="btn sm ghost" data-act="openJob" data-id="${jid}">← ${esc(j.title)}</button></div>
+      ${mo > 1 ? `<div class="modems">Замена ${mo} модемов</div>` : ''}
+      <dl class="kv"><dt>Координаты</dt><dd class="mono">${pl.lat.toFixed(6)}, ${pl.lng.toFixed(6)} · <a href="${routeUrl(pl)}" target="_blank" rel="noopener">Маршрут</a></dd>
+        ${pl.assignee ? `<dt>Исполнитель</dt><dd>${esc(who(pl.assignee))}</dd>` : ''}
+        ${pl.reportAt ? `<dt>Отчёт</dt><dd>${esc(who(pl.reportBy))}, ${esc(fmtDT(pl.reportAt))}</dd>` : ''}</dl>
+      ${(j.photoSpec || []).length ? `<div class="box"><h4>Нужные фото · ${r.got} из ${r.need}</h4>
+        <ul class="slots">${j.photoSpec.map(n => `<li class="${ph[n] ? 'ok' : ''}"><div><b>${ph[n] ? '✓ ' : ''}${esc(n)}</b>${ph[n] ? `<small class="dim">${esc(who(ph[n].by))}, ${esc(fmtDT(ph[n].at))}</small>` : '<small class="dim">ещё нет фото</small>'}</div>
+          ${ph[n] ? thumb(ph[n]) : ''}<div class="row-g">${upl(n, ph[n] ? 'Переснять' : 'Сфотографировать')}${ph[n] && can ? `<button class="btn sm ghost" data-act="placePhotoDel" data-id="${jid}|${pid}|${esc(n)}" aria-label="Удалить фото">✕</button>` : ''}</div></li>`).join('')}</ul></div>` : ''}
+      <div class="box"><h4>Дополнительные фото${(ph._extra || []).length ? ' · ' + ph._extra.length : ''}</h4>
+        ${(ph._extra || []).length ? `<div class="thumbs">${ph._extra.map(f => `<span class="tw">${thumb(f)}${can ? `<button class="btn sm ghost" data-act="placePhotoDel" data-id="${jid}|${pid}|_extra|${f.id}" aria-label="Удалить фото">✕</button>` : ''}</span>`).join('')}</div>` : '<p class="dim" style="margin:0">Нет.</p>'}
+        <div class="row-g">${upl('', '+ Добавить фото', true)}</div></div>
+      <div class="box"><h4>Комментарий (по желанию)</h4>
+        ${can ? `<span data-keep style="display:contents"><textarea class="in" id="pl-comment" rows="3">${esc(pl.comment || '')}</textarea></span><div class="row-g"><button class="btn sm primary" data-act="placeComment" data-id="${jid}|${pid}">Сохранить комментарий</button></div>` : `<p class="jdesc" style="margin:0">${esc(pl.comment || '—')}</p>`}</div>
+      <div class="err" id="ferr"></div>
+      ${r.full ? '<p class="ok-t" style="margin:0">✓ По этой точке всё сделано.</p>' : ''}
+    </div>`;
+  }
   if (d.kind === 'job') {
     const j = jobOf(d.id); if (!j) return closeDrawer();
     const o = ord(j.orderId), mine = (j.workers || []).includes(me.id), act = mine || mayEditJob(j) || j.leaderId === me.id;
@@ -2603,6 +2662,7 @@ function renderDrawer(){
     const leaderSel = j ? j.leaderId : (me.role === 'user' || me.role === 'manager' || me.role === 'admin' ? me.id : '');
     D.innerHTML = dh(j ? 'Изменить задачу' : 'Новая задача') + `<form class="d-body" data-form="job"><div class="form">
       <label class="wide">Что нужно сделать<input class="in" id="j-title" value="${v(j,'title')}" required></label>
+      <label class="wide">Какие фото нужны на каждой точке — по одному в строке<textarea class="in" id="j-photos" rows="3">${esc(j ? (j.photoSpec || []).join('\n') : 'Общий вид\nДо замены\nПосле замены')}</textarea><small class="dim" style="font-size:12px">Работник увидит эти пункты в окне точки и сфотографирует каждый. Пусто — фото не обязательны.</small></label>
       <label class="wide">Описание<textarea class="in" id="j-desc" rows="3">${esc(j?.description || '')}</textarea></label>
       <label class="wide">Ответственный руководитель<select class="in" id="j-leader" required>${LD.map(u => `<option value="${u.id}" ${u.id === leaderSel ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role])}</option>`).join('')}</select></label>
       <label>Начало<input class="in" type="date" id="j-start" value="${esc(j ? (j.start || '') : d.ctx?.date || today())}"></label>
@@ -2870,7 +2930,7 @@ async function onSubmit(e){
       if (newOpen && newTitle && !newW.length) return fail('Для новой работы отметьте хотя бы одного работника.');
       if (!ids.length && !(newOpen && newTitle)) return fail('Отметьте работу или создайте новую.');
       const label = p => [p.no + (dtModems(p) > 1 ? ` (замена ${dtModems(p)} ${modemsGen(dtModems(p))})` : ''), ...dtGroups(p).map(c => dtGroupLabel(c, p).toLowerCase().replace(/^мкад/, 'МКАД').replace(/^ттк/, 'ТТК')), p.road].filter(Boolean).join(' · ');
-      const asPlace = p => ({ id:uid(), lat:p.lat, lng:p.lng, label:label(p), dtNo:p.no, cats:(p.cats || []).slice(), road:p.road || '' });
+      const asPlace = p => ({ id:uid(), lat:p.lat, lng:p.lng, label:label(p), dtNo:p.no, cats:(p.cats || []).slice(), road:p.road || '', ...(p.assignee ? { assignee:p.assignee } : {}) });
       fail('Сохраняем…');
       let n = 0, jobsDone = 0;
       if (newOpen && newTitle) {
@@ -2908,7 +2968,7 @@ async function onSubmit(e){
       closeDrawer(); await loadOrgs(); toast(d.id ? 'Сохранено' : `Организация «${body.name}» создана. Передайте администратору логин ${body.admin.login} и пароль.`);
     }
     if (kind === 'job') {
-      const data = { title:val('j-title'), description:($('j-desc').value || '').trim(), leaderId:$('j-leader').value, start:val('j-start'), due:val('j-due'), orderId:$('j-order').value || null,
+      const data = { title:val('j-title'), photoSpec:($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean), description:($('j-desc').value || '').trim(), leaderId:$('j-leader').value, start:val('j-start'), due:val('j-due'), orderId:$('j-order').value || null,
         workers:[...f.querySelectorAll('[name=j-w]:checked')].map(x => x.value), places:(ui.jPlaces || []).map(x => ({ ...x, label:String(x.label || '').trim() })) };
       if (!data.title) return fail('Укажите, что нужно сделать.');
       if (!data.workers.length) return fail('Отметьте хотя бы одного работника.');
@@ -3146,6 +3206,17 @@ async function act(el){
     case 'newJobAt': { const [wid, day] = id.split('|'); return openDrawer('jobForm', null, { worker: wid, date: day }); }
     case 'editJob': return openDrawer('jobForm', id);
     case 'openJob': return openDrawer('job', id);
+    case 'openPlace': return openDrawer('place', id);
+    case 'placeComment': {
+      const [jid, pid] = id.split('|');
+      try { const r = await api('PATCH', `/api/jobs/${jid}/places/${pid}/comment`, { comment: $('pl-comment').value }); placeUpdate(jid, r.place); toast('Комментарий сохранён'); } catch(e) { $('ferr').textContent = errText(e); }
+      return;
+    }
+    case 'placePhotoDel': {
+      const [jid, pid, slot, fid] = id.split('|');
+      try { const r = await api('DELETE', `/api/jobs/${jid}/places/${pid}/photo`, { slot, id: fid }); placeUpdate(jid, r.place); } catch(e) { $('ferr').textContent = errText(e); }
+      return;
+    }
     case 'delJob': await guard(del('jobs', id)); closeDrawer(); render(); return toast('Задача удалена');
     case 'jobStatus': {
       const [jid, st] = id.split('|'), patch = { status:st };
@@ -3399,6 +3470,17 @@ document.addEventListener('change', async e => {
     const f = t.dataset.f; c[f] = f === 'qty' ? num(t.value) : t.value.trim();
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
+  }
+  if (t.dataset.up === 'placePhoto') {
+    const files = [...t.files]; if (!files.length) return; const [jid, pid] = t.dataset.id.split('|'), slot = t.dataset.slot || '';
+    const err = $('ferr'); if (err) err.textContent = '';
+    toast(files.length > 1 ? `Загружаем ${files.length} фото…` : 'Загружаем фото…');
+    try {
+      let r;
+      for (const f0 of files) { const f = await shrinkImage(f0); r = await api('POST', `/api/jobs/${jid}/places/${pid}/photo`, f, { 'Content-Type': f.type || 'image/jpeg', 'X-Filename': encodeURIComponent(f.name), 'X-Slot': encodeURIComponent(slot) }); }
+      placeUpdate(jid, r.place); toast(slot ? `Фото «${slot}» сохранено` : 'Фото добавлено');
+    } catch(e) { if (err) err.textContent = errText(e); else toast(errText(e)); }
+    return;
   }
   if (t.dataset.up === 'dtfile' || t.dataset.up === 'dtmarked') {
     const file = t.files[0]; if (!file) return; t.value = '';
