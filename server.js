@@ -470,6 +470,22 @@ async function api(req, res, url) {
       saveDb();
       return send(res, 200, { ok: true, count: points.length, rev: db.rev });
     }
+    if (m === 'POST' && p[2] === 'overpass') {
+      // the same Overpass query from the server, for browsers that cannot reach OpenStreetMap themselves
+      if (!canEdit(user)) return fail(res, 403, 'Недостаточно прав');
+      const b = await readJsonBody(req), q = String(b.q || '');
+      if (!q || q.length > 200000 || !/^\[out:json\]/.test(q)) return fail(res, 400, 'Неверный запрос');
+      const errs = [];
+      for (const url of ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+        try {
+          const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'sed-zakazy' }, signal: AbortSignal.timeout(200e3) });
+          if (!r.ok) { errs.push(new URL(url).host + ': ' + r.status); continue; }
+          const text = await r.text();
+          return send(res, 200, text, { 'Content-Type': 'application/json; charset=utf-8' });
+        } catch (e) { errs.push(new URL(url).host + ': ' + (e.name === 'TimeoutError' ? 'нет ответа' : e.cause?.code || e.message)); }
+      }
+      return fail(res, 502, 'сервер тоже не достучался до OpenStreetMap (' + errs.join('; ') + ')');
+    }
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'stock-acct' && m === 'POST') {

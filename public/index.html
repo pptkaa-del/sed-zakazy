@@ -1604,7 +1604,8 @@ function mountMini(){
 const DT = { loaded:false, points:[], meta:{}, geom:null };
 const DT_CAT = { mkad:'МКАД', ttk:'ТТК', bridge:'Эстакада' };
 const DT_COLOR = { mkad:'#D7263D', ttk:'#7B2CBF', bridge:'#1F6FEB', none:'#8A949E' };
-const OVERPASS = 'https://overpass-api.de/api/interpreter';
+// public Overpass servers (OpenStreetMap); the Russian mirror goes second
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
 let dtMap = null, dtLayer = null, dtMarks = new Map();
 async function loadDt(){
   try { const d = await api('GET', '/api/dt'); DT.points = d.points || []; DT.meta = d; DT.loaded = true; dtFitted = false; } catch(e) { toast(errText(e)); }
@@ -1689,24 +1690,49 @@ function dtParse(aoa){
   }
   return { points: out, bad };
 }
-/* OpenStreetMap: the MKAD and the TTK (their route relations and tagged ways) and road bridges in the area of the points */
-async function overpass(q){
-  const r = await fetch(OVERPASS, { method:'POST', body: 'data=' + encodeURIComponent(q), headers:{ 'Content-Type':'application/x-www-form-urlencoded' } });
-  if (!r.ok) throw { message: `сервер OpenStreetMap ответил ${r.status}${r.status === 429 || r.status === 504 ? ' (занят, попробуйте через минуту)' : ''}` };
-  return r.json();
+/* OpenStreetMap through Overpass: straight from the browser, server after server, and if the browser cannot reach any of them —
+   through our own server. A reply with «remark: runtime error» (timeout, out of memory) counts as a failure too. */
+async function overpass(q, say){
+  const errs = [];
+  const check = j => { if (j && j.remark && /error|timed out|out of memory/i.test(j.remark)) throw new Error(j.remark.replace(/^runtime error:\s*/i, '').slice(0, 160)); return j; };
+  for (const url of OVERPASS) {
+    const host = new URL(url).host;
+    try {
+      const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 200e3);
+      const r = await fetch(url, { method:'POST', body:'data=' + encodeURIComponent(q), headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, signal:ctl.signal }).finally(() => clearTimeout(tm));
+      if (!r.ok) throw new Error('ответ ' + r.status + (r.status === 429 ? ' (слишком много запросов)' : r.status === 504 ? ' (сервер занят)' : ''));
+      return check(await r.json());
+    } catch(e) { errs.push(`${host}: ${e.name === 'AbortError' ? 'нет ответа' : e.message === 'Failed to fetch' ? 'браузер не может подключиться' : e.message}`); say && say('пробуем другой сервер…'); }
+  }
+  try { say && say('через сервер системы…'); return check(await api('POST', '/api/dt/overpass', { q })); }
+  catch(e) { errs.push('через сервер системы: ' + (e.message || 'ошибка')); }
+  throw { message: 'OpenStreetMap недоступен — ' + errs.join('; ') };
 }
 async function dtGeometry(P, say){
-  const lat = P.map(p => p.lat), lng = P.map(p => p.lng), pad = 0.01;
-  const bb = `${Math.min(...lat) - pad},${Math.min(...lng) - pad},${Math.max(...lat) + pad},${Math.max(...lng) + pad}`;
-  const ways = j => (j.elements || []).filter(e => e.type === 'way' && e.geometry);
-  say('МКАД…');
-  const mkad = ways(await overpass(`[out:json][timeout:120];(rel["name"~"^Московская кольцевая автомобильная дорога"];rel["ref"="МКАД"];)->.r;(way(r.r)["highway"];way["highway"]["ref"~"(^|;)МКАД"](${bb});way["highway"]["name"~"^(МКАД|Московская кольцевая автомобильная дорога)"](${bb}););out tags geom;`));
-  say('ТТК…');
-  const ttk = ways(await overpass(`[out:json][timeout:120];(rel["name"~"Третье транспортное кольцо"];rel["ref"="ТТК"];)->.r;(way(r.r)["highway"];way["highway"]["ref"~"(^|;)ТТК"](${bb});way["highway"]["name"~"Третье транспортное кольцо"](${bb}););out tags geom;`));
-  say('эстакады…');
-  const br = ways(await overpass(`[out:json][timeout:180];way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"]["bridge"]["bridge"!="no"](${bb});out tags geom;`))
-    .filter(w => !/мост(?![а-яё])|мостик/i.test((w.tags['bridge:name'] || '') + ' ' + (w.tags.name || '') ) || /эстакад/i.test((w.tags['bridge:name'] || '') + ' ' + (w.tags.name || '')));
-  if (!mkad.length && !ttk.length) throw { message: 'в данных OpenStreetMap не нашлись МКАД и ТТК для этой области' };
+  // the area of the points without stray ones far away (1st…99th percentile), plus a margin
+  const q = (arr, f) => { const v = arr.slice().sort((x, y) => x - y); return v[Math.min(v.length - 1, Math.max(0, Math.floor(f * (v.length - 1))))]; };
+  const la = P.map(p => p.lat), lo = P.map(p => p.lng), pad = 0.03;
+  const bb = `${(q(la, .01) - pad).toFixed(4)},${(q(lo, .01) - pad).toFixed(4)},${(q(la, .99) + pad).toFixed(4)},${(q(lo, .99) + pad).toFixed(4)}`;
+  const ways = j => (j.elements || []).filter(e => e.type === 'way' && e.geometry && e.geometry.length > 1);
+  say('ищем МКАД…');
+  const mkad = ways(await overpass(`[out:json][timeout:120][bbox:${bb}];(rel["ref"="МКАД"];rel["name"~"Московская кольцевая автомобильная дорога"];)->.r;(way(r.r)["highway"];way["highway"]["ref"~"МКАД"];way["highway"]["name"~"^(МКАД|Московская кольцевая автомобильная дорога)"];);out tags geom;`, say));
+  say('ищем ТТК…');
+  const ttk = ways(await overpass(`[out:json][timeout:120][bbox:${bb}];(rel["name"~"Третье транспортное кольцо"];rel["ref"="ТТК"];)->.r;(way(r.r)["highway"];way["highway"]["ref"~"ТТК"];way["highway"]["name"~"Третье транспортное кольцо"];);out tags geom;`, say));
+  // bridges only in small cells around the points: one query, many little boxes
+  const C = 0.02, cells = new Map();
+  P.forEach(p => { const k = Math.floor(p.lat / C) + ':' + Math.floor(p.lng / C); cells.set(k, k); });
+  const boxes = [...cells.keys()].map(k => { const [y, x] = k.split(':').map(Number); return `${(y * C - .002).toFixed(4)},${(x * C - .002).toFixed(4)},${((y + 1) * C + .002).toFixed(4)},${((x + 1) * C + .002).toFixed(4)}`; });
+  const HW = '^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$';
+  let br = [];
+  for (let i = 0; i < boxes.length; i += 120) {
+    say(`ищем эстакады… ${Math.min(100, Math.round(i / boxes.length * 100))}%`);
+    const part = boxes.slice(i, i + 120).map(b => `way["highway"~"${HW}"]["bridge"]["bridge"!="no"](${b});`).join('');
+    br = br.concat(ways(await overpass(`[out:json][timeout:180];(${part});out tags geom;`, say)));
+  }
+  const seen = new Set(); br = br.filter(w => !seen.has(w.id) && seen.add(w.id))
+    .filter(w => { const n = (w.tags['bridge:name'] || '') + ' ' + (w.tags.name || ''); return /эстакад/i.test(n) || !/(^|[^а-яё])мост(?![а-яё])|мостик/i.test(n); });
+  if (!mkad.length && !ttk.length && !br.length) throw { message: 'в OpenStreetMap ничего не нашлось в районе точек — проверьте, что координаты записаны как «широта, долгота»' };
+  say(`найдено линий: МКАД ${mkad.length}, ТТК ${ttk.length}, эстакад ${br.length}`);
   return { mkad, ttk, bridge: br, at: new Date().toISOString() };
 }
 /* nearest distance from each point to the lines of a category, in metres (local flat projection, a grid of cells for speed) */
@@ -1747,7 +1773,7 @@ async function dtClassifyAndSave(file){
   catch(e) { err = e.message || 'нет связи'; }
   await api('PUT', '/api/dt', { points: DT.points, file: file ?? DT.meta.file, classifiedAt: classifiedAt || DT.meta.classifiedAt || null, radius: classifiedAt ? R : DT.meta.radius, source: classifiedAt ? 'OpenStreetMap' : DT.meta.source });
   await loadDt();
-  if (err) toast(`Точки сохранены, но отметки не определены: ${err}. Нажмите «Определить по карте…» позже.`);
+  if (err) { toast(`Точки сохранены, но отметки не определены: ${err}.`); setTimeout(() => { const e = $('dtStatus'); if (e) { e.textContent = 'Не удалось определить: ' + err; e.className = 'warn-t'; } }, 50); }
   else { const n = DT.points.filter(p => p.cats.length).length; toast(`Готово: на МКАД ${DT.points.filter(p => p.cats.includes('mkad')).length}, на ТТК ${DT.points.filter(p => p.cats.includes('ttk')).length}, на эстакадах ${DT.points.filter(p => p.cats.includes('bridge')).length} — всего отмечено ${n} из ${DT.points.length}`); }
 }
 async function dtExport(){
