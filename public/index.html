@@ -432,6 +432,13 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .dtrad{position:relative}.dtrad summary{list-style:none;cursor:pointer}.dtrad summary::-webkit-details-marker{display:none}
 .dtrad-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;width:260px;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);display:flex;flex-direction:column;gap:8px}
 .dtrad-pop label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.dtshow{display:flex;flex-wrap:wrap;gap:6px}
+.dtt{position:relative;display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--rule);border-radius:999px;background:var(--sheet);font-size:14px;cursor:pointer;user-select:none;opacity:.55;transition:opacity .15s,border-color .15s}
+.dtt.on{opacity:1;border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+.dtt input{position:absolute;opacity:0;pointer-events:none}
+.dtt i{width:12px;height:12px;border-radius:50%;background:var(--c)}.dtt.chk i{background:transparent;box-shadow:inset 0 0 0 3px var(--c)}
+.dtt b{font-weight:600;font-family:var(--f-mono);font-size:13px}
+.dtt:has(input:focus-visible){outline:2px solid var(--stamp);outline-offset:2px}
 #dtlist .dot{flex:none;width:12px;height:12px;border-radius:50%;margin-top:4px}
 #dtView.enter{animation:fade .35s ease-out both}
 @media (max-width:900px){#dtmap{height:62vh;min-height:320px}}
@@ -1609,8 +1616,10 @@ function mountMini(){
 
 /* ===== Замена ДТ: objects from a spreadsheet on a map, marked when they stand on the MKAD, the TTK or an overpass ===== */
 const DT = { loaded:false, points:[], meta:{}, geom:null };
-const DT_CAT = { mkad:'МКАД', ttk:'ТТК', bridge:'Эстакада', check:'Проверить' };
-const DT_COLOR = { mkad:'#D7263D', ttk:'#7B2CBF', bridge:'#1F6FEB', check:'#E0A800', none:'#8A949E' };
+const DT_CAT = { road:'Дороги', mkad:'МКАД', ttk:'ТТК', bridge:'Эстакады', check:'Проверить' };
+const DT_COLOR = { road:'#2E9E4F', mkad:'#E02424', ttk:'#7B2CBF', bridge:'#8B1E3F', check:'#E0A800' };
+// which groups are shown on the map (remembered in this browser)
+const DT_SHOW = (() => { try { return { road:true, mkad:true, ttk:true, bridge:true, ...JSON.parse(localStorage.getItem('sed-dt-show') || '{}') }; } catch(e) { return { road:true, mkad:true, ttk:true, bridge:true }; } })();
 // public Overpass servers (OpenStreetMap); the Russian mirror goes second
 const OVERPASS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
 let dtMap = null, dtLayer = null, dtMarks = new Map();
@@ -1618,9 +1627,11 @@ async function loadDt(){
   try { const d = await api('GET', '/api/dt'); DT.points = d.points || []; DT.meta = d; DT.loaded = true; dtFitted = false; } catch(e) { toast(errText(e)); }
   if (ui.view === 'dt') renderDt();
 }
-const dtCatOf = p => ['mkad', 'ttk', 'bridge', 'check'].find(c => (p.cats || []).includes(c)) || 'none';
+// a point's groups: МКАД / ТТК / эстакада from the marks, otherwise «дороги»; «проверить» is an extra mark on top
+const dtGroups = p => { const g = (p.cats || []).filter(c => c !== 'check'); return g.length ? g : ['road']; };
+const dtCatOf = p => ['mkad', 'ttk', 'bridge', 'road'].find(c => dtGroups(p).includes(c));
 const dtFlagged = p => (p.cats || []).some(c => c !== 'check');
-const dtMatch = p => (ui.dtF === 'all' || (ui.dtF === 'none' ? !dtFlagged(p) : (p.cats || []).includes(ui.dtF))) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
+const dtMatch = p => dtGroups(p).some(c => DT_SHOW[c]) && (!ui.dtOnlyCheck || (p.cats || []).includes('check')) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
 let dtFitted = false;
 function ensureDtMap(){
   if (dtMap || typeof L === 'undefined') return;
@@ -1630,52 +1641,53 @@ function ensureDtMap(){
 }
 function dtPopup(p){
   return `<div class="pp"><h4>Объект ${esc(p.no)}</h4>
-    <div class="row-g">${(p.cats || []).map(c => `<span class="chip" style="background:${DT_COLOR[c]};color:${c === 'check' ? '#3a2c00' : '#fff'}">${DT_CAT[c]}</span>`).join('')}${dtFlagged(p) ? '' : '<span class="chip c-mute">Не на МКАД, ТТК и эстакадах</span>'}</div>
+    <div class="row-g">${(p.cats || []).map(c => `<span class="chip" style="background:${DT_COLOR[c]};color:${c === 'check' ? '#3a2c00' : '#fff'}">${c === 'bridge' ? 'Эстакада' : DT_CAT[c]}</span>`).join('')}${dtFlagged(p) ? '' : `<span class="chip" style="background:${DT_COLOR.road};color:#fff">Дорога</span>`}</div>
     ${p.road ? `<small>Дорога: ${esc(p.road)}</small>` : ''}${p.bridge && p.bridge !== p.road ? `<small>Эстакада: ${esc(p.bridge)}</small>` : ''}${p.dist != null ? `<small>До оси дороги: ~${p.dist} м</small>` : ''}
     <small class="mono">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</small>
     <div class="row-g"><a class="btn sm" href="https://yandex.ru/maps/?pt=${p.lng},${p.lat}&z=18&l=map" target="_blank" rel="noopener">Яндекс.Карты</a><a class="btn sm" href="https://yandex.ru/maps/?rtext=~${p.lat},${p.lng}&rtt=auto" target="_blank" rel="noopener">Маршрут</a></div></div>`;
 }
 function renderDt(){
   const P = DT.points, M = DT.meta || {}, ed = canEdit();
-  const cnt = k => k === 'all' ? P.length : k === 'none' ? P.filter(p => !dtFlagged(p)).length : P.filter(p => (p.cats || []).includes(k)).length;
+  const cnt = k => k === 'all' ? P.length : k === 'road' ? P.filter(p => !dtFlagged(p)).length : P.filter(p => (p.cats || []).includes(k)).length;
   const flagged = P.filter(dtFlagged).length;
   $('dtInfo').innerHTML = !DT.loaded ? 'Загружаем…' : P.length
     ? `<span>Точек: <b>${P.length}</b>${M.file ? ` из файла «${esc(M.file)}»` : ''}${M.at ? `, загружено ${esc(fmtDT(M.at))}` : ''}${M.by ? ' · ' + esc(who(M.by)) : ''}.</span>
        <span>${M.classifiedAt ? `На МКАД, ТТК или эстакадах: <b>${flagged}</b> — ${/из файла/.test(M.source || '') ? esc(M.source) : `определено ${esc(fmtDT(M.classifiedAt))} по данным ${esc(M.source || 'OpenStreetMap')} (© участники OpenStreetMap, ODbL)`}${M.radius ? ` (дороги до ${M.radius.road} м, эстакады до ${M.radius.bridge} м)` : ''}.${cnt('check') ? ` Проверить: <b>${cnt('check')}</b>.` : ''}` : '<b>Отметки ещё не определены.</b>'}</span>`
     : `<span>Точек пока нет. ${ed ? 'Загрузите Excel с номерами объектов и координатами.' : 'Их загружает менеджер или администратор.'}</span>`;
-  ui.dtF = ui.dtF || 'all';
   const R = ui.dtR || M.radius || { road:35, bridge:20 };
   $('dtTools').innerHTML = `
     <span data-keep style="display:contents"><input class="in" id="dtq" type="search" aria-label="Поиск по номеру объекта" value="${esc(ui.dtQ || '')}" style="flex:0 1 200px;min-width:0"></span>
-    <div class="seg">${[['all','Все'],['mkad','МКАД'],['ttk','ТТК'],['bridge','Эстакады'], ...(cnt('check') ? [['check','Проверить']] : []), ['none','Остальные']].map(([k,l]) => `<button data-act="dtF" data-id="${k}" class="${ui.dtF===k?'on':''}">${l} (${cnt(k)})</button>`).join('')}</div>
+    <div class="dtshow" role="group" aria-label="Что показывать на карте">${['road', 'mkad', 'ttk', 'bridge'].map(k => `<label class="dtt ${DT_SHOW[k] ? 'on' : ''}" style="--c:${DT_COLOR[k]}"><input type="checkbox" data-dtshow="${k}" ${DT_SHOW[k] ? 'checked' : ''}><i></i>${DT_CAT[k]} <b>${cnt(k)}</b></label>`).join('')}
+      ${cnt('check') ? `<label class="dtt chk ${ui.dtOnlyCheck ? 'on' : ''}" style="--c:${DT_COLOR.check}"><input type="checkbox" data-dtshow="check" ${ui.dtOnlyCheck ? 'checked' : ''}><i></i>Только «проверить» <b>${cnt('check')}</b></label>` : ''}</div>
     ${P.length ? '<button class="btn" data-act="dtExport">Скачать Excel</button>' : ''}
-    ${ed ? `<label class="btn primary">Загрузить Excel<input type="file" data-up="dtfile" accept=".xlsx,.xls,.csv" hidden></label>
+    ${ed ? `<label class="btn primary">Вставить размеченный файл<input type="file" data-up="dtmarked" accept=".xlsx,.xls,.csv" hidden></label>
+      <label class="btn">Загрузить точки без отметок<input type="file" data-up="dtfile" accept=".xlsx,.xls,.csv" hidden></label>
       ${P.length ? `<details class="dtrad"><summary class="btn">Определить по карте…</summary><div class="dtrad-pop">
         <label>Дорога МКАД/ТТК, м<input class="in mono" id="dt-rr" value="${R.road}" inputmode="numeric"></label>
         <label>Эстакада, м<input class="in mono" id="dt-rb" value="${R.bridge}" inputmode="numeric"></label>
         <button class="btn primary sm" data-act="dtClassify">Определить</button>
         <small class="dim">Наибольшее расстояние от точки до оси дороги или эстакады по данным OpenStreetMap.</small></div></details>` : ''}` : ''}
     <span class="dim" id="dtStatus"></span>`;
-  $('dtLegend').innerHTML = P.length ? Object.entries({ ...DT_CAT, none:'Остальные' }).filter(([k]) => k !== 'check' || cnt('check')).map(([k, l]) => `<span><i style="background:${DT_COLOR[k]};border-radius:50%"></i>${l}</span>`).join('') + '<span class="dim">Обводка: синяя — точка на МКАД или ТТК стоит и на эстакаде, жёлтая — её нужно проверить.</span>' : '';
+  $('dtLegend').innerHTML = P.length ? `<span class="dim">Обводка: бордовая — точка на МКАД или ТТК стоит и на эстакаде${cnt('check') ? ', жёлтая — точку нужно проверить' : ''}. Щелчок по группе вверху скрывает или показывает её на карте.</span>` : '';
   ensureDtMap(); if (!dtMap) return;
   setTimeout(() => dtMap.invalidateSize(), 0);
   // markers: canvas circles, one per point
   const seen = new Set();
   P.forEach((p, i) => {
     const key = p.no + '|' + i; seen.add(key);
-    const c = dtCatOf(p), cs = p.cats || [], ring = (c === 'mkad' || c === 'ttk') && cs.includes('bridge') ? DT_COLOR.bridge : c !== 'check' && cs.includes('check') ? DT_COLOR.check : null;
-    const style = { radius: c === 'none' ? 4 : 6.5, color: ring || '#fff', weight: ring ? 3 : 1, fillColor: DT_COLOR[c], fillOpacity: c === 'none' ? .55 : .95 };
+    const c = dtCatOf(p), cs = p.cats || [], ring = cs.includes('check') ? DT_COLOR.check : (c === 'mkad' || c === 'ttk') && cs.includes('bridge') ? DT_COLOR.bridge : null;
+    const style = { radius: c === 'road' ? 4.5 : 7, color: ring || '#fff', weight: ring ? 3 : 1, fillColor: DT_COLOR[c], fillOpacity: c === 'road' ? .75 : .95 };
     let m = dtMarks.get(key);
     if (!m) { m = L.circleMarker([p.lat, p.lng], style); m.bindPopup(() => dtPopup(p), { minWidth:220 }); m.bindTooltip(String(p.no), { direction:'top', offset:[0,-6] }); dtMarks.set(key, m); }
     else { m.setLatLng([p.lat, p.lng]); m.setStyle(style); m.setPopupContent(() => dtPopup(p)); }
     const show = dtMatch(p);
     if (show && !dtLayer.hasLayer(m)) dtLayer.addLayer(m); else if (!show && dtLayer.hasLayer(m)) dtLayer.removeLayer(m);
-    if (show && c !== 'none') m.bringToFront();
+    if (show && c !== 'road') m.bringToFront();
   });
   [...dtMarks.keys()].forEach(k => { if (!seen.has(k)) { dtLayer.removeLayer(dtMarks.get(k)); dtMarks.delete(k); } });
   if (!dtFitted && P.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(P.map(p => [p.lat, p.lng])).pad(0.05)); }
   const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => (dtFlagged(b) ? 2 : (b.cats || []).length ? 1 : 0) - (dtFlagged(a) ? 2 : (a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
-  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem" data-act="dtFly" data-id="${i}"><span class="dot" style="background:${DT_COLOR[dtCatOf(p)]}"></span><span style="min-width:0"><b>${esc(p.no)}</b><small>${(p.cats || []).map(c => DT_CAT[c]).join(' · ') || 'не на МКАД, ТТК и эстакадах'}${!dtFlagged(p) && (p.cats || []).length ? ' · не на МКАД, ТТК и эстакадах' : ''}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
+  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem" data-act="dtFly" data-id="${i}"><span class="dot" style="background:${DT_COLOR[dtCatOf(p)]}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${esc(p.no)}</b><small>${[...dtGroups(p).map(c => c === 'bridge' ? 'Эстакада' : c === 'road' ? 'Дорога' : DT_CAT[c]), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · ')}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
     : `<div class="empty" style="border:0">${P.length ? 'Нет точек по этому фильтру.' : 'Точек пока нет.'}</div>`;
 }
 /* the spreadsheet: a column with the object number and one with «lat, lng» (or two columns: latitude and longitude) */
@@ -1827,7 +1839,7 @@ async function dtExport(){
   const rows = DT.points.filter(dtMatch).map(p => ({ 'Номер объекта': p.no, 'Широта': p.lat, 'Долгота': p.lng, 'МКАД': (p.cats || []).includes('mkad') ? 'да' : '', 'ТТК': (p.cats || []).includes('ttk') ? 'да' : '', 'Эстакада': (p.cats || []).includes('bridge') ? 'да' : '', 'Проверить': (p.cats || []).includes('check') ? 'да' : '', 'Дорога': p.road || '', 'Эстакада (название)': p.bridge || '', 'До оси, м': p.dist ?? '' }));
   const ws = X.utils.json_to_sheet(rows); ws['!cols'] = [12, 11, 11, 7, 7, 9, 10, 28, 32, 9].map(w => ({ wch: w }));
   const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Замена ДТ');
-  X.writeFile(wb, `Замена ДТ — ${{ all:'все', mkad:'МКАД', ttk:'ТТК', bridge:'эстакады', none:'остальные' }[ui.dtF || 'all']} — ${today()}.xlsx`);
+  X.writeFile(wb, `Замена ДТ — ${['road', 'mkad', 'ttk', 'bridge'].filter(k => DT_SHOW[k]).map(k => DT_CAT[k]).join(', ')}${ui.dtOnlyCheck ? ', только проверить' : ''} — ${today()}.xlsx`);
 }
 
 /* ===== Map of objects ===== */
@@ -2825,7 +2837,6 @@ async function act(el){
   disarm();
   switch (a) {
     case 'close': return closeDrawer();
-    case 'dtF': ui.dtF = id; return renderDt();
     case 'dtFly': { const p = DT.points[Number(id)]; if (!p || !dtMap) return; dtMap.flyTo([p.lat, p.lng], Math.max(dtMap.getZoom(), 17), { duration:.6 }); const m = dtMarks.get(p.no + '|' + id); if (m) setTimeout(() => m.openPopup(), 650); return; }
     case 'dtExport': return dtExport().catch(e => toast(errText(e)));
     case 'dtClassify': { el.disabled = true; el.closest('details')?.removeAttribute('open'); try { await dtClassifyAndSave(); } catch(e) { toast(errText(e)); } finally { el.disabled = false; } return; }
@@ -3067,6 +3078,10 @@ document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t' && ui.drawer?.kind === 'paste') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; else if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + e.target.value.split(/\r?\n/).filter(l => l.trim() && !/наимен|компон/i.test(l)).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.dataset.dtshow) {
+    if (t.dataset.dtshow === 'check') ui.dtOnlyCheck = t.checked; else { DT_SHOW[t.dataset.dtshow] = t.checked; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} }
+    return renderDt();
+  }
   if (t.dataset.feat) {
     const [oid, fid] = t.dataset.feat.split('|'), text = t.value.trim(), o = ord(oid);
     const F = (o.features || []).map(f => f.id === fid ? { ...f, text, editedBy:me.id, editedAt:new Date().toISOString() } : f).filter(f => f.text);
@@ -3107,10 +3122,11 @@ document.addEventListener('change', async e => {
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
   }
-  if (t.dataset.up === 'dtfile') {
+  if (t.dataset.up === 'dtfile' || t.dataset.up === 'dtmarked') {
     const file = t.files[0]; if (!file) return; t.value = '';
     try {
       const { points, bad, flags } = dtParse(await readTable(file, { fills:true }));
+      if (t.dataset.up === 'dtmarked' && !flags) return toast('В файле нет отметок. Нужны столбцы «МКАД», «ТТК», «Эстакада» со значениями «да»/«нет» и координаты. Файл только с координатами загрузите кнопкой «Загрузить точки без отметок».');
       if (!points.length) return toast('В файле не нашлось координат. Нужны столбцы «Номер объекта» и «Координаты» (широта, долгота) или «Широта» и «Долгота».');
       DT.points = points; DT.geom = null; dtFitted = false;
       if (flags) {
@@ -3118,7 +3134,7 @@ document.addEventListener('change', async e => {
         await api('PUT', '/api/dt', { points, file: file.name, classifiedAt: new Date().toISOString(), radius: null, source: `отметки из файла «${file.name}»` });
         await loadDt();
         const c = k => points.filter(p => p.cats.includes(k)).length;
-        toast(`Отметки взяты из файла: МКАД ${c('mkad')}, ТТК ${c('ttk')}, эстакады ${c('bridge')}${c('check') ? `, проверить ${c('check')}` : ''} — из ${points.length} точек${bad ? `, без координат пропущено ${bad}` : ''}`);
+        toast(`Точки на карте: МКАД ${c('mkad')}, ТТК ${c('ttk')}, эстакады ${c('bridge')}, дороги ${points.filter(p => !dtFlagged(p)).length}${c('check') ? `, проверить ${c('check')}` : ''} — всего ${points.length}${bad ? `, без координат пропущено ${bad}` : ''}`);
         return;
       }
       toast(`Прочитано точек: ${points.length}${bad ? `, без координат пропущено: ${bad}` : ''}. Определяем МКАД, ТТК и эстакады…`);
