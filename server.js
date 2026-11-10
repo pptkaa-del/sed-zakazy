@@ -466,6 +466,7 @@ async function api(req, res, url) {
         road: String(x.road || '').slice(0, 200), bridge: String(x.bridge || '').slice(0, 200),
         dist: x.dist != null && x.dist !== '' && Number.isFinite(Number(x.dist)) ? Math.round(Number(x.dist) * 10) / 10 : null, note: String(x.note || '').slice(0, 300),
         ...(x.checkedAt ? { checkedAt: String(x.checkedAt).slice(0, 40), checkedBy: String(x.checkedBy || '').slice(0, 40), checkedWas: String(x.checkedWas || '').slice(0, 40) } : {}),
+        ...(x.addedAt ? { addedAt: String(x.addedAt).slice(0, 40), addedBy: String(x.addedBy || '').slice(0, 40) } : {}),
       })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180);
       if (!points.length) return fail(res, 400, 'Не нашлось ни одной точки с координатами');
       db.dt = { points, file: String(b.file || '').slice(0, 200), at: new Date().toISOString(), by: user.id,
@@ -484,6 +485,26 @@ async function api(req, res, url) {
       pt.cats = [...new Set(cats)]; pt.checkedAt = new Date().toISOString(); pt.checkedBy = user.id;
       saveDb();
       return send(res, 200, { ok: true, point: pt, rev: db.rev });
+    }
+    /* a point added by hand on the map, and removing a point */
+    if (m === 'POST' && p[2] === 'point') {
+      if (!(canEdit(user) || user.role === 'user')) return fail(res, 403, 'Добавлять точки может руководитель, менеджер или администратор');
+      const b = await readJsonBody(req), lat = Number(b.lat), lng = Number(b.lng), no = String(b.no ?? '').trim().slice(0, 60);
+      if (!no) return fail(res, 400, 'Укажите номер объекта');
+      if (!(Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng))) return fail(res, 400, 'Неверные координаты');
+      if (!db.dt) db.dt = { points: [], file: '', at: new Date().toISOString(), by: user.id, classifiedAt: null, radius: null, source: '' };
+      if (db.dt.points.some(x => x.no === no)) return fail(res, 409, `Объект ${no} уже есть на карте`);
+      const pt = { no, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, cats: (Array.isArray(b.cats) ? b.cats : []).filter(c => ['mkad', 'ttk', 'bridge'].includes(c)),
+        road: String(b.road || '').trim().slice(0, 200), bridge: '', dist: null, note: String(b.note || '').slice(0, 300), addedAt: new Date().toISOString(), addedBy: user.id };
+      db.dt.points.push(pt); saveDb();
+      return send(res, 200, { ok: true, i: db.dt.points.length - 1, point: pt, rev: db.rev });
+    }
+    if (m === 'DELETE' && p[2] === 'point') {
+      if (!canEdit(user)) return fail(res, 403, 'Удалять точки может менеджер или администратор');
+      const b = await readJsonBody(req), P = db.dt && db.dt.points, i = Number(b.i);
+      if (!P || !Number.isInteger(i) || !P[i] || P[i].no !== String(b.no ?? '')) return fail(res, 409, 'Точка не найдена — обновите страницу');
+      P.splice(i, 1); saveDb();
+      return send(res, 200, { ok: true, rev: db.rev });
     }
     if (m === 'POST' && p[2] === 'overpass') {
       // the same Overpass query from the server, for browsers that cannot reach OpenStreetMap themselves
