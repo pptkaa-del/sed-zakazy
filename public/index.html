@@ -206,6 +206,11 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .orow{display:grid;grid-template-columns:minmax(0,1fr) 90px minmax(0,1fr) 170px 300px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}
 .orow:first-child{border-top:0}.orow.head{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px}
 .orow b{font-weight:500;overflow-wrap:anywhere}.orow small{display:block;color:var(--ink-2);font-size:12px;overflow-wrap:anywhere}.orow .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.brow{display:grid;grid-template-columns:170px minmax(0,1.4fr) 110px minmax(0,1fr) 300px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px}
+.brow:first-child{border-top:0}.brow.head{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px}
+.brow small{display:block;color:var(--ink-2);font-size:12px;overflow-wrap:anywhere}.brow b{overflow-wrap:anywhere}.brow .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.brow.auto{background:color-mix(in srgb,var(--mute-soft) 50%,transparent)}.brow small.lbl{display:none}
+@media (max-width:900px){.brow{grid-template-columns:1fr auto}.brow.head{display:none}.brow>:nth-child(2){grid-column:1/-1;grid-row:1}.brow .acts{grid-column:1/-1;justify-content:flex-start}.brow small.lbl{display:inline;margin-right:4px}}
 .orow small.lbl{display:none}@media (max-width:900px){.orow small.lbl{display:block}}
 .orow.off{background:color-mix(in srgb,var(--bad-soft) 45%,transparent)}
 @media (max-width:900px){.orow{grid-template-columns:1fr auto}.orow.head{display:none}.orow>:nth-child(1){grid-column:1/-1}.orow .acts{grid-column:1/-1;justify-content:flex-start}}
@@ -1745,10 +1750,26 @@ function vOrgs(){
       <div><small class="lbl">Пользователей</small>${o.users}</div>
       <div><small class="lbl">Администраторы</small>${o.admins.length ? o.admins.map(a => `${esc(a.name)} <span class="mono dim">${esc(a.login)}</span>${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}`).join('<br>') : '<span class="dim">нет</span>'}</div>
       <div><span class="chip ${cc}">${cl}</span><small>${o.until ? 'до ' + fmtD(o.until) + ' включительно' : 'без срока'}</small></div>
-      <div class="acts"><button class="btn sm" data-act="orgEdit" data-id="${o.id}">Изменить</button>
+      <div class="acts"><button class="btn sm" data-act="orgEdit" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="mkBackup" data-id="${o.id}" title="Резервная копия этой организации">Копия</button>
         ${mine ? '' : o.blocked ? `<button class="btn sm ok" data-act="orgBlock" data-id="${o.id}|0">Разблокировать</button>` : armBtn('org:' + o.id, 'Заблокировать', 'orgBlock', o.id + '|1')}</div></div>`;
   }).join('');
-  return head + `<section class="card" style="padding:0;overflow:hidden"><div class="orow head"><span>Организация</span><span>Польз.</span><span>Администраторы</span><span>Доступ</span><span></span></div>${rows}</section>`;
+  return head + `<section class="card" style="padding:0;overflow:hidden"><div class="orow head"><span>Организация</span><span>Польз.</span><span>Администраторы</span><span>Доступ</span><span></span></div>${rows}</section>` + vBackups();
+}
+function vBackups(){
+  const B = ui.backups || [];
+  const what = b => b.type === 'system' ? `<b>Вся система</b><small>организаций: ${(b.orgs || []).length} — ${esc((b.orgs || []).map(o => o.name).join(', '))}</small>` : `<b>${esc(b.orgName || b.orgId)}</b><small>организация · ${esc(b.orgId)}</small>`;
+  return `<div class="ch" style="margin:26px 0 10px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><h3 style="margin:0">Резервные копии</h3>
+      <div class="row-g"><button class="btn primary" data-act="mkBackup" data-id="">Копия всей системы</button>
+      <label class="btn">Загрузить копию из файла<input type="file" data-up="backup" accept=".zip,application/zip" hidden></label></div></div>
+    <p class="dim" style="margin:0 0 12px;font-size:14px">Копия содержит данные, файлы и пользователей. Хранится на сервере в папке <span class="mono">backups</span>, её можно скачать. Восстановить можно всю систему или одну организацию — из копии системы или из копии организации. Перед восстановлением текущее состояние сохраняется в отдельную копию автоматически.</p>
+    ${B.length ? `<section class="card" style="padding:0;overflow:hidden"><div class="brow head"><span>Создана</span><span>Что в копии</span><span>Размер</span><span>Примечание</span><span></span></div>
+      ${B.map(b => `<div class="brow ${b.auto ? 'auto' : ''}">
+        <div><b style="font-weight:500">${esc(fmtDT(b.createdAt))}</b><small>${esc(b.by || '')}</small></div>
+        <div>${what(b)}</div>
+        <div><small class="lbl">Размер</small>${fmtSize(b.size)}<small>файлов: ${b.files || 0}</small></div>
+        <div><small>${esc(b.note || (b.auto ? 'автоматически' : ''))}</small></div>
+        <div class="acts"><a class="btn sm" href="/api/backups/${b.id}/download" download>Скачать</a><button class="btn sm" data-act="restoreBackup" data-id="${b.id}">Восстановить…</button>${armBtn('bk:' + b.id, 'Удалить', 'delBackup', b.id)}</div></div>`).join('')}</section>`
+      : '<div class="empty" style="padding:22px"><h3>Копий пока нет</h3>Создайте копию всей системы или отдельной организации (кнопка «Копия» в строке организации).</div>'}`;
 }
 
 /* ===== Users view (admin) ===== */
@@ -2040,6 +2061,20 @@ function renderDrawer(){
 </div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${i?'Сохранить':'Добавить счёт'}</button><button class="btn" type="button" data-act="${i?'openInvoice':'close'}" data-id="${i?.id||''}">Отмена</button></div></form>`;
+  }
+  if (d.kind === 'restore') {
+    const b = (ui.backups || []).find(x => x.id === d.id); if (!b) return closeDrawer();
+    const sys = b.type === 'system', sel = ui.rsScope || (sys ? 'system' : b.orgId);
+    D.innerHTML = dh('Восстановление из копии') + `<form class="d-body" data-form="restore">
+      <dl class="kv"><dt>Копия</dt><dd>${esc(fmtDT(b.createdAt))}${b.by ? ' · ' + esc(b.by) : ''}</dd><dt>В копии</dt><dd>${sys ? 'вся система: ' + esc((b.orgs || []).map(o => o.name).join(', ')) : 'организация «' + esc(b.orgName) + '»'}</dd><dt>Размер</dt><dd>${fmtSize(b.size)}, файлов ${b.files || 0}</dd></dl>
+      ${sys ? `<div class="box"><h4>Что восстановить</h4>
+        <label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="rs" value="system" ${sel === 'system' ? 'checked' : ''}> <span><b style="font-weight:500">Всю систему</b><br><small class="dim">Все организации, их данные, файлы и пользователи станут такими, как в копии. Организации, созданные позже, пропадут из списка.</small></span></label>
+        ${(b.orgs || []).map(o => `<label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="rs" value="${esc(o.id)}" ${sel === o.id ? 'checked' : ''}> <span>Только организацию «${esc(o.name)}»<br><small class="dim">Остальные организации не меняются.</small></span></label>`).join('')}</div>`
+        : `<p style="margin:0">Данные, файлы и пользователи организации «${esc(b.orgName)}» станут такими, как в копии. Другие организации не меняются.${orgOf(b.orgId) ? '' : ' Сейчас такой организации нет — она будет создана заново.'}</p>`}
+      <p class="box" style="margin:0;border-color:var(--warn);background:var(--warn-soft)">Текущее состояние будет заменено. Перед восстановлением система автоматически сохранит копию текущего состояния — к нему можно будет вернуться. Ваша учётная запись и пароль не изменятся.</p>
+      <label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="checkbox" id="rs-ok" required> Понимаю, что текущие данные будут заменены данными из копии</label>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn danger" type="submit">Восстановить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'orgForm') {
     const o = d.id && orgOf(d.id), mine = o && o.id === me.org?.id;
@@ -2337,6 +2372,19 @@ async function onSubmit(e){
       await upd('counterparties', d.id, { contracts:[...(c.contracts||[]), { id:uid(), number:val('k-num'), date:val('k-date'), subject:val('k-subj'), file:up, at:now }] });
       closeDrawer(); render(); toast('Договор загружен');
     }
+    if (kind === 'restore') {
+      if (!$('rs-ok').checked) return fail('Подтвердите восстановление.');
+      const b = (ui.backups || []).find(x => x.id === d.id);
+      const pick = f.querySelector('[name=rs]:checked')?.value || b.orgId;
+      const scope = pick === 'system' ? 'system' : 'org';
+      fail('Восстанавливаем…');
+      const r = await api('POST', `/api/backups/${d.id}/restore`, { scope, orgId: scope === 'org' ? pick : undefined });
+      closeDrawer();
+      const mineTouched = scope === 'system' || pick === me.org?.id;
+      toast(`Восстановлено: ${scope === 'system' ? 'вся система' : 'организация'}. Прежнее состояние сохранено в копию.${r.skipped?.length ? ' Не восстановлены логины (заняты в других организациях): ' + r.skipped.join(', ') : ''}`);
+      if (mineTouched) { await refresh().catch(() => {}); }
+      await loadOrgs();
+    }
     if (kind === 'org') {
       const body = { name:val('o-name'), until:val('o-until'), note:val('o-note') };
       if ($('o-blocked')) { body.blocked = $('o-blocked').checked; body.blockNote = val('o-bnote'); }
@@ -2489,6 +2537,13 @@ async function act(el){
   switch (a) {
     case 'close': return closeDrawer();
     case 'orgNew': return openDrawer('orgForm');
+    case 'mkBackup': {
+      el.disabled = true; toast('Создаём копию…');
+      try { const b = await api('POST', '/api/backups', { orgId: id || null }); await loadOrgs(); toast(`Копия ${b.type === 'system' ? 'всей системы' : 'организации «' + b.orgName + '»'} создана: ${fmtSize(b.size)}`); }
+      catch(e) { toast(errText(e)); } finally { el.disabled = false; } return;
+    }
+    case 'restoreBackup': ui.rsScope = null; return openDrawer('restore', id);
+    case 'delBackup': try { await api('DELETE', `/api/backups/${id}`); await loadOrgs(); toast('Копия удалена'); } catch(e) { toast(errText(e)); } return;
     case 'orgEdit': return openDrawer('orgForm', id);
     case 'orgBlock': { const [oid, on] = id.split('|'); try { await api('PATCH', `/api/orgs/${oid}`, { blocked: on === '1' }); await loadOrgs(); toast(on === '1' ? 'Организация заблокирована' : 'Организация разблокирована'); } catch(e) { toast(errText(e)); } return; }
     case 'orgAdmAdd': {
@@ -2740,6 +2795,13 @@ document.addEventListener('change', async e => {
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
   }
+  if (t.dataset.up === 'backup') {
+    const file = t.files[0]; if (!file) return; t.value = '';
+    toast('Загружаем копию…');
+    try { const b = await api('POST', '/api/backups/upload', file, { 'Content-Type':'application/zip', 'X-Filename': encodeURIComponent(file.name) }); await loadOrgs(); toast(`Копия загружена: ${b.type === 'system' ? 'вся система' : 'организация «' + b.orgName + '»'}. Чтобы восстановить, нажмите «Восстановить…».`); }
+    catch(e) { toast(errText(e)); }
+    return;
+  }
   if (t.dataset.up) {
     const files = [...t.files]; if (!files.length) return;
     try {
@@ -2773,7 +2835,7 @@ window.addEventListener('hashchange', route);
 /* ---------- boot ---------- */
 let poll = null, setupMode = false, appVersion = null;
 async function loadOrgs(){
-  try { ui.orgsList = await api('GET', '/api/orgs'); } catch(e) { toast(errText(e)); ui.orgsList = ui.orgsList || []; }
+  try { [ui.orgsList, ui.backups] = await Promise.all([api('GET', '/api/orgs'), api('GET', '/api/backups')]); } catch(e) { toast(errText(e)); ui.orgsList = ui.orgsList || []; ui.backups = ui.backups || []; }
   if (ui.view === 'orgs') render();
   if (ui.drawer?.kind === 'orgForm' && !drawerBusy()) renderDrawer();
 }

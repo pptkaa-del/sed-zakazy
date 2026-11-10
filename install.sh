@@ -335,6 +335,14 @@ server {
     server_name $SERVER_NAME;
     client_max_body_size 55m;
     proxy_request_buffering off;
+    location = /api/backups/upload {
+        client_max_body_size 2048m;
+        proxy_pass http://127.0.0.1:$APP_PORT;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s;
+    }
     location / {
         proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_set_header Host \$host;

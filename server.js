@@ -13,6 +13,8 @@
  *   node server.js backup  [файл.json]     выгрузить все записи основной организации в JSON
  *   node server.js orgs                    организации и их состояние
  *   node server.js orgunblock <id>         снять блокировку организации и срок
+ *   node server.js archive [код]           резервная копия всей системы или организации (папка backups)
+ *   node server.js restore <файл.zip> [код] восстановить систему или организацию из копии
  *
  * Настройки берутся из переменных окружения и из файла sed.env рядом с server.js
  * (строки вида КЛЮЧ=значение; переменные окружения важнее файла).
@@ -46,6 +48,8 @@ const HOST = process.env.HOST || '0.0.0.0';
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(os.homedir(), 'sed-zakazy-data'));
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_FILE = Number(process.env.MAX_FILE_MB || 50) * 1048576;
+const MAX_BACKUP = Number(process.env.BACKUP_MAX_MB || 2048) * 1048576;
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const MAX_JSON = 4 * 1048576;
 const SESSION_DAYS = Number(process.env.SESSION_DAYS || 14);
 const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
@@ -360,6 +364,7 @@ async function api(req, res, url) {
   if (ost.blocked) return blockedFail(ost);
   if (p[1] === 'me' && m === 'GET') return send(res, 200, meInfo(user));
   if (p[1] === 'orgs') return orgsApi(req, res, p, m, user);
+  if (p[1] === 'backups') return backupsApi(req, res, p, m, user);
   // «Работник» sees and changes only the assignments given to him
   if (user.role === 'worker' && !['rev', 'data', 'password', 'jobs'].includes(p[1])) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
@@ -792,6 +797,153 @@ async function orgsApi(req, res, p, m, user) {
   }
   return fail(res, 405, 'Метод не поддерживается');
 }
+/* ---------- backups: a whole system or one organization, a ZIP in DATA_DIR/backups ----------
+   inside: manifest.json, orgs.json, users.json, orgs/<id>/db.json, orgs/<id>/files/<file id> */
+function readZip(buf) {
+  let e = buf.length - 22;
+  while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e--;
+  if (e < 0) throw Object.assign(new Error('Файл не похож на резервную копию (не ZIP)'), { status: 400 });
+  const n = buf.readUInt16LE(e + 10); let o = buf.readUInt32LE(e + 16);
+  const out = new Map();
+  for (let i = 0; i < n; i++) {
+    if (buf.readUInt32LE(o) !== 0x02014b50) throw Object.assign(new Error('Повреждённый архив'), { status: 400 });
+    const method = buf.readUInt16LE(o + 10), csize = buf.readUInt32LE(o + 20), nl = buf.readUInt16LE(o + 28), xl = buf.readUInt16LE(o + 30), cl = buf.readUInt16LE(o + 32), lo = buf.readUInt32LE(o + 42);
+    const name = buf.slice(o + 46, o + 46 + nl).toString('utf8');
+    const start = lo + 30 + buf.readUInt16LE(lo + 26) + buf.readUInt16LE(lo + 28), raw = buf.slice(start, start + csize);
+    if (!name.endsWith('/')) out.set(name, method === 0 ? raw : method === 8 ? require('node:zlib').inflateRawSync(raw) : null);
+    o += 46 + nl + xl + cl;
+  }
+  return out;
+}
+const safeFile = s => /^[\w.-]+$/.test(s) && !s.startsWith('.');
+const bIndexFile = () => path.join(BACKUP_DIR, 'index.json');
+function backupList() {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const L = readJSON(bIndexFile(), []);
+  return L.filter(b => fs.existsSync(path.join(BACKUP_DIR, b.file)));
+}
+const saveBackupList = L => writeJSON(bIndexFile(), L);
+const stampName = () => new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+function orgFilesEntries(id) {
+  const e = orgEntry(id), out = [{ name: `orgs/${id}/db.json`, data: JSON.stringify(e.db) }];
+  for (const fid of Object.keys(e.db.files || {})) {
+    const fp = path.join(e.files, fid);
+    if (safeFile(fid) && fs.existsSync(fp)) out.push({ name: `orgs/${id}/files/${fid}`, data: fs.readFileSync(fp) });
+  }
+  return out;
+}
+function makeBackup(orgId, user, note = '', auto = false) {
+  const scope = orgId ? [orgById(orgId)] : orgs.slice();
+  if (orgId && !scope[0]) throw Object.assign(new Error('Организация не найдена'), { status: 404 });
+  const ids = scope.map(o => o.id);
+  const manifest = { app: 'sed-zakazy', format: 1, type: orgId ? 'org' : 'system', orgId: orgId || null, orgName: orgId ? scope[0].name : null,
+    orgs: scope.map(o => ({ id: o.id, name: o.name })), createdAt: new Date().toISOString(), by: user ? user.name : 'CLI', note };
+  const entries = [{ name: 'manifest.json', data: JSON.stringify(manifest, null, 1) }, { name: 'orgs.json', data: JSON.stringify(scope, null, 1) },
+    { name: 'users.json', data: JSON.stringify(users.filter(u => ids.includes(u.orgId)), null, 1) }];
+  ids.forEach(id => entries.push(...orgFilesEntries(id)));
+  const buf = zipStore(entries);
+  const file = `${orgId ? 'org-' + orgId : 'system'}-${stampName()}-${crypto.randomBytes(2).toString('hex')}.zip`;
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  fs.writeFileSync(path.join(BACKUP_DIR, file), buf, { mode: 0o600 });
+  const rec = { id: newId(), file, type: manifest.type, orgId: orgId || null, orgName: manifest.orgName, orgs: manifest.orgs, createdAt: manifest.createdAt, by: manifest.by, size: buf.length,
+    files: entries.filter(x => x.name.includes('/files/')).length, note, auto };
+  const L = backupList(); L.unshift(rec); saveBackupList(L);
+  return rec;
+}
+function loadBackup(rec) {
+  const z = readZip(fs.readFileSync(path.join(BACKUP_DIR, rec.file)));
+  const j = n => { const b = z.get(n); if (!b) throw Object.assign(new Error(`В копии нет ${n}`), { status: 400 }); return JSON.parse(b.toString('utf8')); };
+  const manifest = j('manifest.json');
+  if (manifest.app !== 'sed-zakazy') throw Object.assign(new Error('Это не резервная копия «Управления предприятием»'), { status: 400 });
+  return { z, manifest, orgs: j('orgs.json'), users: j('users.json') };
+}
+/* replace one organization's data and attachments with those from the archive */
+function writeOrgData(z, id) {
+  const dbBuf = z.get(`orgs/${id}/db.json`); if (!dbBuf) throw Object.assign(new Error('В копии нет данных этой организации'), { status: 400 });
+  const dir = orgDir(id), fdir = path.join(dir, 'files');
+  fs.mkdirSync(fdir, { recursive: true });
+  for (const f of fs.readdirSync(fdir)) fs.rmSync(path.join(fdir, f), { force: true, recursive: true });
+  const pre = `orgs/${id}/files/`;
+  for (const [n, b] of z) if (n.startsWith(pre) && b && safeFile(n.slice(pre.length))) fs.writeFileSync(path.join(fdir, n.slice(pre.length)), b);
+  writeJSON(path.join(dir, 'db.json'), JSON.parse(dbBuf.toString('utf8')));
+  dbs.delete(id);
+}
+function restoreBackup(rec, scope, orgId, user) {
+  const B = loadBackup(rec);
+  const keepMe = u => user && u.id === user.id;     // the administrator who restores keeps his own account and password
+  let safety, skipped = [];
+  if (scope === 'system') {
+    if (B.manifest.type !== 'system') throw Object.assign(new Error('Это копия одной организации — восстановить из неё всю систему нельзя'), { status: 400 });
+    safety = makeBackup(null, user, 'Автоматически перед восстановлением системы', true);
+    const ids = B.orgs.map(o => o.id);
+    if (!ids.includes(MAIN_ORG)) throw Object.assign(new Error('В копии нет основной организации'), { status: 400 });
+    ids.forEach(id => writeOrgData(B.z, id));
+    // organizations that appeared after the copy was made: their folders stay on disk but they leave the list
+    orgs = B.orgs; saveOrgs();
+    const me = user && users.find(keepMe);
+    users = B.users.filter(u => !keepMe(u)); if (me) users.push(me);
+    normUsers(); saveUsers(); dbs.clear();
+  } else {
+    const src = B.manifest.type === 'org' ? B.manifest.orgId : orgId;
+    const o = B.orgs.find(x => x.id === src); if (!o) throw Object.assign(new Error('В копии нет такой организации'), { status: 400 });
+    if (orgById(src)) safety = makeBackup(src, user, 'Автоматически перед восстановлением организации', true);
+    writeOrgData(B.z, src);
+    const cur = orgById(src); if (cur) Object.assign(cur, { name: o.name, until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '' }); else orgs.push(o);
+    saveOrgs();
+    const me = user && users.find(keepMe);
+    const incoming = B.users.filter(u => u.orgId === src && !keepMe(u));
+    users = users.filter(u => u.orgId !== src || keepMe(u));
+    for (const u of incoming) { if (users.some(x => x.login === u.login)) skipped.push(u.login); else users.push(u); }
+    if (me && !users.includes(me)) users.push(me);
+    saveUsers();
+  }
+  return { safety, skipped };
+}
+const backupOut = b => ({ ...b });
+async function backupsApi(req, res, p, m, user) {
+  if (!user.sys) return fail(res, 403, 'Резервными копиями управляет только администратор системы');
+  if (m === 'GET' && !p[2]) return send(res, 200, backupList().map(backupOut));
+  if (m === 'POST' && !p[2]) {
+    const b = await readJsonBody(req);
+    const rec = makeBackup(b.orgId || null, user, String(b.note || '').slice(0, 300));
+    return send(res, 200, backupOut(rec));
+  }
+  if (m === 'POST' && p[2] === 'upload') {
+    const buf = await readBody(req, MAX_BACKUP);
+    if (!buf.length) return fail(res, 400, 'Пустой файл');
+    const tmp = path.join(BACKUP_DIR, 'upload-' + newId() + '.zip');
+    fs.mkdirSync(BACKUP_DIR, { recursive: true }); fs.writeFileSync(tmp, buf, { mode: 0o600 });
+    let B;
+    try { B = loadBackup({ file: path.basename(tmp) }); } catch (e) { fs.rmSync(tmp, { force: true }); throw e.status ? e : Object.assign(new Error('Не удалось прочитать архив: ' + e.message), { status: 400 }); }
+    const M = B.manifest;
+    const file = `uploaded-${M.type === 'org' ? 'org-' + M.orgId : 'system'}-${stampName()}-${crypto.randomBytes(2).toString('hex')}.zip`;
+    fs.renameSync(tmp, path.join(BACKUP_DIR, file));
+    const rec = { id: newId(), file, type: M.type, orgId: M.orgId, orgName: M.orgName, orgs: M.orgs || B.orgs.map(o => ({ id: o.id, name: o.name })), createdAt: M.createdAt, by: M.by, size: buf.length,
+      files: [...B.z.keys()].filter(n => n.includes('/files/')).length, note: 'Загружена из файла' + (req.headers['x-filename'] ? ' ' + decodeURIComponent(String(req.headers['x-filename'])).slice(0, 120) : ''), uploadedAt: new Date().toISOString(), uploaded: true };
+    const L = backupList(); L.unshift(rec); saveBackupList(L);
+    return send(res, 200, backupOut(rec));
+  }
+  const L = backupList(), rec = L.find(b => b.id === p[2]);
+  if (!rec) return fail(res, 404, 'Копия не найдена');
+  if (m === 'GET' && p[3] === 'download') {
+    const fp = path.join(BACKUP_DIR, rec.file), st = fs.statSync(fp);
+    res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': 'application/zip', 'Content-Length': st.size, 'Content-Disposition': `attachment; filename="${rec.file}"`, 'Cache-Control': 'no-store' });
+    return fs.createReadStream(fp).pipe(res);
+  }
+  if (m === 'POST' && p[3] === 'restore') {
+    const b = await readJsonBody(req);
+    const scope = b.scope === 'system' ? 'system' : 'org';
+    const r = restoreBackup(rec, scope, b.orgId, user);
+    console.log(`${user.login} восстановил ${scope === 'system' ? 'систему' : 'организацию ' + (b.orgId || rec.orgId)} из копии ${rec.file}`);
+    return send(res, 200, { ok: true, safety: r.safety ? backupOut(r.safety) : null, skipped: r.skipped });
+  }
+  if (m === 'DELETE' && p.length === 3) {
+    fs.rmSync(path.join(BACKUP_DIR, rec.file), { force: true });
+    saveBackupList(L.filter(b => b !== rec));
+    return send(res, 200, { ok: true });
+  }
+  return fail(res, 405, 'Метод не поддерживается');
+}
 const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role, roleName: ROLES[u.role] });
 /* Map background: OpenStreetMap by default, another tile source can be set in sed.env */
 const MAP = {
@@ -1158,6 +1310,19 @@ async function cli(cmd, args) {
     const e = orgEntry(args[1] || MAIN_ORG);
     writeJSON(path.resolve(file), e.db);
     console.log(`Записи выгружены в ${file}. Файлы вложений лежат в ${e.files}.`);
+  } else if (cmd === 'archive') {
+    const r = makeBackup(args[0] || null, null, 'Создана из командной строки');
+    console.log(`Резервная копия: ${path.join(BACKUP_DIR, r.file)} (${(r.size / 1048576).toFixed(1)} МБ)`);
+  } else if (cmd === 'restore') {
+    need(1);
+    const src = path.resolve(args[0]); if (!fs.existsSync(src)) { console.error('Нет такого файла'); process.exit(1); }
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const file = path.dirname(src) === BACKUP_DIR ? path.basename(src) : 'cli-' + stampName() + '-' + path.basename(src).replace(/[^\w.-]/g, '_');
+    if (path.dirname(src) !== BACKUP_DIR) fs.copyFileSync(src, path.join(BACKUP_DIR, file));
+    const B = loadBackup({ file });
+    const scope = B.manifest.type === 'system' && !args[1] ? 'system' : 'org';
+    const r = restoreBackup({ file }, scope, args[1] || B.manifest.orgId, null);
+    console.log(`Восстановлено: ${scope === 'system' ? 'вся система' : 'организация ' + (args[1] || B.manifest.orgId)}. Копия прежнего состояния: ${r.safety ? path.join(BACKUP_DIR, r.safety.file) : '—'}${r.skipped.length ? '. Пропущены логины (заняты): ' + r.skipped.join(', ') : ''}`);
   } else if (cmd === 'orgs') {
     orgs.forEach(o => { const st = orgState(o); console.log(`${o.id.padEnd(14)} ${(st.blocked ? (st.reason === 'expired' ? 'СРОК ИСТЁК' : 'ЗАБЛОКИРОВАНА') : 'работает').padEnd(14)} ${(o.until ? 'до ' + ruDate(o.until) : '').padEnd(14)} ${o.name}  (пользователей: ${users.filter(u => u.orgId === o.id).length})`); });
   } else if (cmd === 'orgunblock') {
