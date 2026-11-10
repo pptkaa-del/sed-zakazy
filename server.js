@@ -10,17 +10,22 @@
  *   node server.js userdel <логин>
  *   node server.js unblock <логин>         снять блокировку
  *   node server.js users
- *   node server.js backup  [файл.json]     выгрузить все записи в JSON
+ *   node server.js backup  [файл.json]     выгрузить все записи основной организации в JSON
+ *   node server.js orgs                    организации и их состояние
+ *   node server.js orgunblock <id>         снять блокировку организации и срок
  *
  * Настройки берутся из переменных окружения и из файла sed.env рядом с server.js
  * (строки вида КЛЮЧ=значение; переменные окружения важнее файла).
  *
- * Роли: admin, manager, accountant, user, viewer.
+ * Роли: admin, manager, accountant, user (руководитель), worker (работник), viewer.
+ * Организации: у каждой свои данные и пользователи. «Основная» хранится прямо в DATA_DIR,
+ * остальные — в DATA_DIR/orgs/<id>/. Администратор системы (флаг sys) заводит и блокирует организации.
  */
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { AsyncLocalStorage } = require('node:async_hooks');
 const readline = require('node:readline');
 const os = require('node:os');
 
@@ -39,7 +44,6 @@ const PORT = LISTEN_SOCKET ? null : Number(RAW_PORT);
 const HOST = process.env.HOST || '0.0.0.0';
 /* Data lives outside the app folder by default, so a web server can never serve it as static files. */
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(os.homedir(), 'sed-zakazy-data'));
-const FILES_DIR = path.join(DATA_DIR, 'files');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_FILE = Number(process.env.MAX_FILE_MB || 50) * 1048576;
 const MAX_JSON = 4 * 1048576;
@@ -79,8 +83,8 @@ function cleanJob(d){
   if ('due' in d) out.due = /^\d{4}-\d{2}-\d{2}$/.test(d.due || '') ? d.due : '';
   if ('start' in d) out.start = /^\d{4}-\d{2}-\d{2}$/.test(d.start || '') ? d.start : '';
   if ('orderId' in d) out.orderId = d.orderId && db.orders[d.orderId] ? d.orderId : null;
-  if ('leaderId' in d) { const l = users.find(u => u.id === d.leaderId); out.leaderId = l && ['admin', 'manager', 'user'].includes(l.role) ? l.id : null; }
-  if ('workers' in d) out.workers = [...new Set((Array.isArray(d.workers) ? d.workers : []).filter(id => users.some(u => u.id === id)))].slice(0, 50);
+  if ('leaderId' in d) { const l = orgUsers().find(u => u.id === d.leaderId); out.leaderId = l && ['admin', 'manager', 'user'].includes(l.role) ? l.id : null; }
+  if ('workers' in d) out.workers = [...new Set((Array.isArray(d.workers) ? d.workers : []).filter(id => orgUsers().some(u => u.id === id)))].slice(0, 50);
   if ('places' in d) out.places = (Array.isArray(d.places) ? d.places : []).slice(0, 50)
     .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
     .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200) }));
@@ -131,7 +135,7 @@ const APP_VERSION = crypto.createHash('sha1')
   .update((() => { try { return fs.readFileSync(path.join(__dirname, 'public', 'index.html')); } catch { return ''; } })())
   .digest('hex').slice(0, 12);
 
-fs.mkdirSync(FILES_DIR, { recursive: true });
+fs.mkdirSync(path.join(DATA_DIR, 'files'), { recursive: true });
 
 /* ---------- storage: JSON files with atomic writes ---------- */
 function readJSON(file, fallback) {
@@ -145,12 +149,12 @@ function writeJSON(file, value) {
   fs.writeFileSync(tmp, JSON.stringify(value, null, 1));
   fs.renameSync(tmp, file);
 }
-const DB_FILE = path.join(DATA_DIR, 'db.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const ORGS_FILE = path.join(DATA_DIR, 'orgs.json');
 const SECRET_FILE = path.join(DATA_DIR, 'secret.key');
 
-function loadDb() {
-  const d = readJSON(DB_FILE, { rev: 0, files: {} });
+function loadDb(file) {
+  const d = readJSON(file, { rev: 0, files: {} });
   COLLECTIONS.forEach(c => { d[c] = d[c] || {}; });
   // permanent task numbers, the same for everyone who sees the task
   let jn = Math.max(0, ...Object.values(d.jobs).map(j => j.no || 0));
@@ -162,14 +166,65 @@ function loadDb() {
 /* The hosting may run several copies of the app (e.g. Passenger) or a CLI command may edit
    users while the server runs: re-read files when another process has changed them. */
 const stamp = f => { try { const st = fs.statSync(f); return st.mtimeMs + ':' + st.size + ':' + st.ino; } catch { return ''; } };
-let db = loadDb(), dbStamp = stamp(DB_FILE);
-let users = readJSON(USERS_FILE, []), usersStamp = stamp(USERS_FILE);
-function syncFromDisk() {
-  const a = stamp(DB_FILE); if (a !== dbStamp) { db = loadDb(); dbStamp = a; }
-  const b = stamp(USERS_FILE); if (b !== usersStamp) { users = readJSON(USERS_FILE, []); usersStamp = b; }
+
+/* ---------- organizations: each has its own data file and attachments ---------- */
+const MAIN_ORG = 'main';
+const orgDir = id => id === MAIN_ORG ? DATA_DIR : path.join(DATA_DIR, 'orgs', id);
+const firstRun = !fs.existsSync(ORGS_FILE);
+let orgs = readJSON(ORGS_FILE, null), orgsStamp;
+let users = readJSON(USERS_FILE, []), usersStamp;
+if (!orgs) {
+  // update from a single-company install: its data and users become the main organization, its admins — system administrators
+  orgs = [{ id: MAIN_ORG, name: process.env.ORG_NAME || 'Основная организация', createdAt: new Date().toISOString() }];
+  users.forEach(u => { if (!u.orgId) { u.orgId = MAIN_ORG; if (u.role === 'admin') u.sys = true; } });
+  if (users.length) writeJSON(USERS_FILE, users);
+  writeJSON(ORGS_FILE, orgs);
 }
-const saveDb = () => { db.rev++; writeJSON(DB_FILE, db); dbStamp = stamp(DB_FILE); };
+orgsStamp = stamp(ORGS_FILE); usersStamp = stamp(USERS_FILE);
+const normUsers = () => users.forEach(u => { if (!u.orgId) u.orgId = MAIN_ORG; });
+normUsers();
+function syncFromDisk() {
+  const b = stamp(USERS_FILE); if (b !== usersStamp) { users = readJSON(USERS_FILE, []); normUsers(); usersStamp = b; }
+  const c = stamp(ORGS_FILE); if (c !== orgsStamp) { orgs = readJSON(ORGS_FILE, orgs); orgsStamp = c; }
+}
 const saveUsers = () => { writeJSON(USERS_FILE, users); usersStamp = stamp(USERS_FILE); };
+const saveOrgs = () => { writeJSON(ORGS_FILE, orgs); orgsStamp = stamp(ORGS_FILE); };
+const orgById = id => orgs.find(o => o.id === id);
+
+/* the database of the organization the current request works in (AsyncLocalStorage keeps it per request) */
+const dbs = new Map();
+function orgEntry(id) {
+  let e = dbs.get(id);
+  if (!e) {
+    const dir = orgDir(id);
+    e = { id, file: path.join(dir, 'db.json'), files: path.join(dir, 'files') };
+    fs.mkdirSync(e.files, { recursive: true });
+    e.db = loadDb(e.file); e.stamp = stamp(e.file);
+    dbs.set(id, e);
+  } else { const st = stamp(e.file); if (st !== e.stamp) { e.db = loadDb(e.file); e.stamp = st; } }
+  return e;
+}
+const als = new AsyncLocalStorage();
+const ctx = () => { const e = als.getStore(); if (!e) throw new Error('Нет контекста организации'); return e; };
+const db = new Proxy({}, {
+  get: (_, k) => ctx().db[k],
+  set: (_, k, v) => { ctx().db[k] = v; return true; },
+  has: (_, k) => k in ctx().db,
+});
+const filesDir = () => ctx().files;
+const saveDb = () => { const e = ctx(); e.db.rev++; writeJSON(e.file, e.db); e.stamp = stamp(e.file); };
+const orgUsers = () => { const id = ctx().id; return users.filter(u => u.orgId === id); };
+
+/* blocked by the system administrator or the paid term is over (the last day still works) */
+const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const ruDate = s => s ? s.split('-').reverse().join('.') : '';
+function orgState(o) {
+  if (!o) return { blocked: true, message: 'Организация не найдена. Обратитесь к администратору системы.' };
+  if (o.blocked) return { blocked: true, reason: 'manual', message: `Доступ организации «${o.name}» заблокирован администратором системы.${o.blockNote ? ' ' + o.blockNote : ''} Обратитесь к администратору системы.` };
+  if (o.until && localDate() > o.until) return { blocked: true, reason: 'expired', message: `Срок работы организации «${o.name}» истёк ${ruDate(o.until)}. Доступ заблокирован. Для продления обратитесь к администратору системы.` };
+  const left = o.until ? Math.round((Date.parse(o.until) - Date.parse(localDate())) / 864e5) : null;
+  return { blocked: false, left, warn: left !== null && left <= 7 ? `Доступ организации действует до ${ruDate(o.until)} включительно${left === 0 ? ' (последний день)' : ` (осталось ${left} дн.)`}.` : '' };
+}
 
 let secret;
 try { secret = fs.readFileSync(SECRET_FILE); } catch {
@@ -273,12 +328,13 @@ async function api(req, res, url) {
   if (m !== 'GET' && req.headers['x-sed'] !== '1') return fail(res, 403, 'Запрос отклонён');
 
   if (p[1] === 'setup' && m === 'GET') return send(res, 200, { needed: users.length === 0 });
+  const blockedFail = st => send(res, 423, { error: st.message, orgBlocked: true });
   if (p[1] === 'setup' && m === 'POST') {
     if (users.length) return fail(res, 409, 'Администратор уже создан. Войдите со своим логином');
     const b = await readJsonBody(req);
     const err = validateUser(b, true); if (err) return fail(res, 400, err);
-    const u = addUser(String(b.login), 'admin', String(b.name).trim(), String(b.password));
-    console.log(`Через браузер создан администратор «${u.login}».`);
+    const u = addUser(String(b.login), 'admin', String(b.name).trim(), String(b.password), MAIN_ORG, true);
+    console.log(`Через браузер создан администратор системы «${u.login}».`);
     return send(res, 200, meInfo(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
   if (p[1] === 'login' && m === 'POST') {
@@ -291,6 +347,7 @@ async function api(req, res, url) {
       return fail(res, 401, 'Неверный логин или пароль');
     }
     if (u.blocked) return fail(res, 403, 'Учётная запись заблокирована. Обратитесь к администратору');
+    const ost = orgState(orgById(u.orgId)); if (ost.blocked) return blockedFail(ost);
     u.lastLoginAt = new Date().toISOString(); saveUsers();
     return send(res, 200, meInfo(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
@@ -299,20 +356,24 @@ async function api(req, res, url) {
   const user = sessionUser(req);
   if (!user) return fail(res, 401, 'Требуется вход');
 
+  const ost = orgState(orgById(user.orgId));
+  if (ost.blocked) return blockedFail(ost);
   if (p[1] === 'me' && m === 'GET') return send(res, 200, meInfo(user));
+  if (p[1] === 'orgs') return orgsApi(req, res, p, m, user);
   // «Работник» sees and changes only the assignments given to him
   if (user.role === 'worker' && !['rev', 'data', 'password', 'jobs'].includes(p[1])) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
-    const target = p[2] && users.find(u => u.id === p[2]);
-    if (m === 'GET' && !p[2]) return send(res, 200, users.map(adminUser));
+    const target = p[2] && orgUsers().find(u => u.id === p[2]);
+    if (m === 'GET' && !p[2]) return send(res, 200, orgUsers().map(adminUser));
     if (m === 'POST' && !p[2]) {
       const b = await readJsonBody(req);
       const err = validateUser(b, true); if (err) return fail(res, 400, err);
       if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
-      return send(res, 200, adminUser(addUser(String(b.login), b.role, String(b.name).trim(), String(b.password))));
+      return send(res, 200, adminUser(addUser(String(b.login), b.role, String(b.name).trim(), String(b.password), user.orgId)));
     }
     if (!target) return fail(res, 404, 'Пользователь не найден');
+    if (target.sys && !user.sys) return fail(res, 403, 'Учётную запись администратора системы меняет только он сам');
     if (m === 'PATCH') {
       const b = await readJsonBody(req);
       if (b.role !== undefined) {
@@ -341,6 +402,7 @@ async function api(req, res, url) {
     }
     if (m === 'DELETE') {
       if (target.id === user.id) return fail(res, 400, 'Нельзя удалить самого себя');
+      if (target.sys) return fail(res, 400, 'Администратора системы удалить нельзя');
       users = users.filter(u => u.id !== target.id); saveUsers();
       return send(res, 200, { ok: true });
     }
@@ -348,8 +410,8 @@ async function api(req, res, url) {
   }
   if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION });
   if (p[1] === 'data' && m === 'GET') {
-    const out = { rev: db.rev, users: Object.fromEntries(users.map(u => [u.id, u.name])), meta: db.meta,
-      staff: users.filter(u => !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) };
+    const out = { rev: db.rev, users: Object.fromEntries(orgUsers().map(u => [u.id, u.name])), meta: db.meta,
+      staff: orgUsers().filter(u => !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) };
     COLLECTIONS.forEach(c => { out[c] = user.role === 'worker' ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)) : []) : listOf(c); });
     if (user.role === 'worker') { out.meta = {}; out.staff = []; }
     return send(res, 200, out);
@@ -421,7 +483,7 @@ async function api(req, res, url) {
     const buf = await readBody(req, MAX_FILE);
     if (!buf.length) return fail(res, 400, 'Пустой файл');
     const id = newId();
-    fs.writeFileSync(path.join(FILES_DIR, id), buf);
+    fs.writeFileSync(path.join(filesDir(), id), buf);
     const type = String(req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim().toLowerCase();
     db.files[id] = { name, type, size: buf.length, at: new Date().toISOString(), by: user.id };
     saveDb();
@@ -661,6 +723,75 @@ async function api(req, res, url) {
   }
   return fail(res, 405, 'Метод не поддерживается');
 }
+/* ---------- organizations: only the system administrator ---------- */
+const ORG_ID = /^[a-z0-9][a-z0-9-]{1,30}$/;
+const orgOut = o => {
+  const st = orgState(o), us = users.filter(u => u.orgId === o.id);
+  return { id: o.id, name: o.name, until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '', createdAt: o.createdAt || null,
+    state: st.blocked ? st.reason : 'active', left: st.left ?? null, users: us.length,
+    admins: us.filter(u => u.role === 'admin').map(u => ({ id: u.id, login: u.login, name: u.name, blocked: !!u.blocked, sys: !!u.sys, lastLoginAt: u.lastLoginAt || null })) };
+};
+const validDate = v => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v);
+async function orgsApi(req, res, p, m, user) {
+  if (!user.sys) return fail(res, 403, 'Организациями управляет только администратор системы');
+  const o = p[2] && orgById(p[2]);
+  if (m === 'GET' && !p[2]) return send(res, 200, orgs.map(orgOut));
+  if (m === 'POST' && !p[2]) {
+    const b = await readJsonBody(req);
+    const name = String(b.name || '').trim().slice(0, 200);
+    if (!name) return fail(res, 400, 'Укажите название организации');
+    if (orgs.some(x => x.name.toLowerCase() === name.toLowerCase())) return fail(res, 400, 'Организация с таким названием уже есть');
+    const until = String(b.until || ''); if (!validDate(until)) return fail(res, 400, 'Неверная дата');
+    const a = b.admin || {};
+    const err = validateUser(a, true); if (err) return fail(res, 400, 'Администратор организации: ' + err);
+    let id = String(b.id || '').trim().toLowerCase();
+    if (id && (!ORG_ID.test(id) || orgById(id))) return fail(res, 400, 'Код организации: латиница, цифры и дефис, не занятый');
+    if (!id) do { id = 'o' + crypto.randomBytes(4).toString('hex'); } while (orgById(id));
+    const org = { id, name, until, blocked: false, note: String(b.note || '').slice(0, 1000), createdAt: new Date().toISOString(), createdBy: user.id };
+    orgs.push(org); saveOrgs(); orgEntry(id);
+    addUser(String(a.login), 'admin', String(a.name).trim(), String(a.password), id);
+    return send(res, 200, orgOut(org));
+  }
+  if (!o) return fail(res, 404, 'Организация не найдена');
+  if (m === 'PATCH' && p.length === 3) {
+    const b = await readJsonBody(req);
+    if (b.name !== undefined) {
+      const name = String(b.name).trim().slice(0, 200); if (!name) return fail(res, 400, 'Укажите название организации');
+      if (orgs.some(x => x !== o && x.name.toLowerCase() === name.toLowerCase())) return fail(res, 400, 'Организация с таким названием уже есть');
+      o.name = name;
+    }
+    if (b.until !== undefined) { if (!validDate(String(b.until))) return fail(res, 400, 'Неверная дата'); o.until = String(b.until); }
+    if (b.blocked !== undefined) o.blocked = !!b.blocked;
+    if (b.blockNote !== undefined) o.blockNote = String(b.blockNote).slice(0, 500);
+    if (b.note !== undefined) o.note = String(b.note).slice(0, 1000);
+    // the system administrator must not lock himself out
+    if (o.id === user.orgId && orgState(o).blocked) { o.blocked = false; if (o.until && localDate() > o.until) o.until = ''; saveOrgs(); return fail(res, 400, 'Нельзя заблокировать организацию, в которой работает администратор системы'); }
+    o.updatedAt = new Date().toISOString(); saveOrgs();
+    return send(res, 200, orgOut(o));
+  }
+  /* administrators of an organization: add, reset password, block */
+  if (p[3] === 'admins') {
+    if (m === 'POST' && p.length === 4) {
+      const b = await readJsonBody(req);
+      const err = validateUser(b, true); if (err) return fail(res, 400, err);
+      addUser(String(b.login), 'admin', String(b.name).trim(), String(b.password), o.id);
+      return send(res, 200, orgOut(o));
+    }
+    const t = users.find(u => u.id === p[4] && u.orgId === o.id);
+    if (!t) return fail(res, 404, 'Пользователь не найден');
+    if (m === 'PATCH') {
+      const b = await readJsonBody(req);
+      if (b.password !== undefined) {
+        if (String(b.password).length < 8) return fail(res, 400, 'Пароль должен быть не короче 8 символов');
+        Object.assign(t, hashPassword(String(b.password)), { ver: (t.ver || 0) + 1 });
+      }
+      if (b.blocked !== undefined) { if (t.id === user.id) return fail(res, 400, 'Нельзя заблокировать самого себя'); t.blocked = !!b.blocked; if (t.blocked) t.ver = (t.ver || 0) + 1; }
+      saveUsers();
+      return send(res, 200, orgOut(o));
+    }
+  }
+  return fail(res, 405, 'Метод не поддерживается');
+}
 const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role, roleName: ROLES[u.role] });
 /* Map background: OpenStreetMap by default, another tile source can be set in sed.env */
 const MAP = {
@@ -669,8 +800,8 @@ const MAP = {
   subdomains: process.env.MAP_SUBDOMAINS || 'abc',
   maxZoom: Number(process.env.MAP_MAX_ZOOM || 19),
 };
-const meInfo = u => ({ ...publicUser(u), map: MAP });
-const adminUser = u => ({ ...publicUser(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
+const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), map: MAP, sys: !!u.sys, org: o ? { id: o.id, name: o.name, until: o.until || '' } : null, orgWarn: st.warn || '' }; };
+const adminUser = u => ({ ...publicUser(u), sys: !!u.sys, blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
 /* Remember that the accountant has opened the invoice file(s) */
 function markSeen(user, fileIds) {
@@ -860,7 +991,7 @@ async function sendInvoicesZip(res, user, orderFilter) {
     let inZip = 'нет файла';
     const meta = i.file && db.files[i.file.id];
     if (meta) {
-      const fp = path.join(FILES_DIR, i.file.id);
+      const fp = path.join(filesDir(), i.file.id);
       let data = null; try { data = fs.readFileSync(fp); } catch {}
       if (data) {
         const orig = meta.name || i.file.name || '';
@@ -897,9 +1028,10 @@ async function sendInvoicesZip(res, user, orderFilter) {
 function serveFile(req, res, id) {
   const user = sessionUser(req);
   if (!user) return fail(res, 401, 'Требуется вход');
+  if (orgState(orgById(user.orgId)).blocked) return fail(res, 423, 'Доступ организации заблокирован');
   const meta = db.files[id];
   if (!meta || !/^[\w-]+$/.test(id)) return fail(res, 404, 'Файл не найден');
-  const fp = path.join(FILES_DIR, id);
+  const fp = path.join(filesDir(), id);
   if (!fs.existsSync(fp)) return fail(res, 404, 'Файл не найден');
   markSeen(user, id);
   const inline = INLINE.has(meta.type);
@@ -933,14 +1065,21 @@ function serveStatic(req, res, pathname) {
 function startServer() {
   if (!users.length) {
     const login = process.env.ADMIN_LOGIN, pw = process.env.ADMIN_PASSWORD;
-    if (login && pw) { addUser(login, 'admin', process.env.ADMIN_NAME || 'Администратор', pw); console.log(`Создан администратор «${login}».`); }
+    if (login && pw) { addUser(login, 'admin', process.env.ADMIN_NAME || 'Администратор', pw, MAIN_ORG, true); console.log(`Создан администратор системы «${login}».`); }
   }
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     try { syncFromDisk(); } catch (e) { console.error(e); }
     try {
-      if (url.pathname.startsWith('/api/')) return await api(req, res, url);
-      if (url.pathname.startsWith('/files/') && req.method === 'GET') return serveFile(req, res, url.pathname.slice(7));
+      if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/files/')) {
+        // every request works inside the data of the signed-in user's organization
+        const su = sessionUser(req), org = su && orgById(su.orgId) ? su.orgId : MAIN_ORG;
+        return await als.run(orgEntry(org), async () => {
+          if (url.pathname.startsWith('/api/')) return await api(req, res, url);
+          if (req.method === 'GET') return serveFile(req, res, url.pathname.slice(7));
+          fail(res, 405, 'Метод не поддерживается');
+        });
+      }
       if (req.method === 'GET') return serveStatic(req, res, url.pathname);
       fail(res, 405, 'Метод не поддерживается');
     } catch (e) {
@@ -964,8 +1103,8 @@ function startServer() {
 }
 
 /* ---------- CLI ---------- */
-function addUser(login, role, name, pw) {
-  const u = { id: 'u_' + newId(), login: login.toLowerCase(), name, role, ...hashPassword(pw), ver: 0, createdAt: new Date().toISOString() };
+function addUser(login, role, name, pw, orgId = MAIN_ORG, sys = false) {
+  const u = { id: 'u_' + newId(), login: login.toLowerCase(), name, role, orgId, ...(sys ? { sys: true } : {}), ...hashPassword(pw), ver: 0, createdAt: new Date().toISOString() };
   users.push(u); saveUsers(); return u;
 }
 function validateUser(b, isNew) {
@@ -1013,11 +1152,18 @@ async function cli(cmd, args) {
     u.blocked = false; saveUsers(); console.log('Блокировка снята.');
   } else if (cmd === 'users') {
     if (!users.length) console.log('Пользователей нет.');
-    users.forEach(u => console.log(`${u.login.padEnd(20)} ${ROLES[u.role].padEnd(14)} ${u.blocked ? 'ЗАБЛОКИРОВАН  ' : ''}${u.name}`));
+    users.forEach(u => console.log(`${u.login.padEnd(20)} ${ROLES[u.role].padEnd(14)} ${(orgById(u.orgId)?.name || u.orgId).padEnd(24)} ${u.sys ? 'АДМИН СИСТЕМЫ  ' : ''}${u.blocked ? 'ЗАБЛОКИРОВАН  ' : ''}${u.name}`));
   } else if (cmd === 'backup') {
     const file = args[0] || `backup-${new Date().toISOString().slice(0, 10)}.json`;
-    writeJSON(path.resolve(file), db);
-    console.log(`Записи выгружены в ${file}. Файлы вложений лежат в ${FILES_DIR}.`);
+    const e = orgEntry(args[1] || MAIN_ORG);
+    writeJSON(path.resolve(file), e.db);
+    console.log(`Записи выгружены в ${file}. Файлы вложений лежат в ${e.files}.`);
+  } else if (cmd === 'orgs') {
+    orgs.forEach(o => { const st = orgState(o); console.log(`${o.id.padEnd(14)} ${(st.blocked ? (st.reason === 'expired' ? 'СРОК ИСТЁК' : 'ЗАБЛОКИРОВАНА') : 'работает').padEnd(14)} ${(o.until ? 'до ' + ruDate(o.until) : '').padEnd(14)} ${o.name}  (пользователей: ${users.filter(u => u.orgId === o.id).length})`); });
+  } else if (cmd === 'orgunblock') {
+    need(1);
+    const o = orgById(args[0]); if (!o) { console.error('Нет такой организации. Список: node server.js orgs'); process.exit(1); }
+    o.blocked = false; o.until = ''; saveOrgs(); console.log(`Организация «${o.name}» разблокирована, срок снят.`);
   } else {
     console.error(`Неизвестная команда «${cmd}». См. README.md`); process.exit(1);
   }

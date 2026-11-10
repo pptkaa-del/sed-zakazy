@@ -199,6 +199,18 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .unseen-note{color:var(--ink-2);font-size:12px;white-space:nowrap}
 .irow.unseen{box-shadow:inset 3px 0 0 var(--stamp);background:color-mix(in srgb,var(--stamp-soft) 45%,transparent)}
 .irow.unseen .isup b{font-weight:600}
+.blockscr{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:16px;background:var(--paper)}
+.blockbox{max-width:480px;width:100%;background:var(--sheet);border:1px solid var(--rule);border-top:4px solid var(--bad);border-radius:14px;padding:28px 24px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.12)}
+.blockbox h2{margin:8px 0 10px;font-size:22px}.blockbox p{margin:0 0 20px;line-height:1.55;color:var(--ink)}.blk-ic{font-size:36px}
+.orgwarn{margin:0 0 14px;padding:10px 14px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-size:14px;font-weight:500}
+.orow{display:grid;grid-template-columns:minmax(0,1fr) 90px minmax(0,1fr) 170px 300px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}
+.orow:first-child{border-top:0}.orow.head{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px}
+.orow b{font-weight:500;overflow-wrap:anywhere}.orow small{display:block;color:var(--ink-2);font-size:12px;overflow-wrap:anywhere}.orow .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.orow small.lbl{display:none}@media (max-width:900px){.orow small.lbl{display:block}}
+.orow.off{background:color-mix(in srgb,var(--bad-soft) 45%,transparent)}
+@media (max-width:900px){.orow{grid-template-columns:1fr auto}.orow.head{display:none}.orow>:nth-child(1){grid-column:1/-1}.orow .acts{grid-column:1/-1;justify-content:flex-start}}
+.adm{display:flex;flex-direction:column;gap:8px}.adm li{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--rule-2)}
+.adm ul{list-style:none;margin:0;padding:0}.adm .in{max-width:180px}
 .urow{display:grid;grid-template-columns:minmax(0,1fr) 130px 130px 160px 310px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}
 .urow:first-child{border-top:0}
 .urow.head{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px}
@@ -620,7 +632,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
   <div class="login-intro"><h2>Управление предприятием</h2><p>Заказы, работы, контрагенты, счета и объекты на карте — в одном месте.</p></div>
   <form id="loginForm" novalidate>
     <div class="brand"><h1>Вход</h1></div>
-    <p id="l-hint" hidden>Первый запуск. Создайте учётную запись администратора: он добавит остальных сотрудников.</p>
+    <p id="l-hint" hidden>Первый запуск. Создайте учётную запись администратора системы: он заведёт организации и добавит пользователей.</p>
     <label id="l-name-wrap" hidden>Ваше имя<input class="in" id="l-name" autocomplete="name" placeholder="Иванов И. И."></label>
     <label>Логин<input class="in" id="l-login" autocomplete="username" required></label>
     <label>Пароль<span class="pw"><input class="in" id="l-pass" type="password" autocomplete="current-password" required><button type="button" class="pw-eye" data-pw-toggle aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></span></label>
@@ -633,7 +645,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <div><h1>Управление предприятием</h1><p class="sub">Заказы, контрагенты, документы, счета и план-график</p></div>
+      <div><h1>Управление предприятием</h1><p class="sub" id="hsub">Заказы, контрагенты, документы, счета и план-график</p></div>
     </div>
     <nav class="views" id="views">
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
@@ -645,6 +657,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
+      <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
     </nav>
     <div class="umenu" id="umenu">
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -666,6 +679,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <main class="wrap">
   <div class="updbar" id="updbar" hidden><span>Сервер обновлён до новой версии.</span><button class="btn sm primary" type="button" data-act="reload">Обновить страницу</button></div>
   <div class="banner" id="banner" hidden></div>
+  <div class="orgwarn" id="orgwarn" hidden></div>
   <div id="view"></div>
   <section id="mapView" hidden>
     <div class="toolbar">
@@ -681,6 +695,10 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden role="dialog" aria-modal="true"></aside>
 <div class="toast" id="toast" hidden></div>
+</div>
+<div class="blockscr" id="blockscr" hidden role="alertdialog" aria-labelledby="blk-h" aria-describedby="blk-msg">
+  <div class="blockbox"><div class="blk-ic" aria-hidden="true">🔒</div><h2 id="blk-h">Доступ заблокирован</h2><p id="blk-msg"></p>
+    <button class="btn" type="button" id="blk-out">Выйти</button></div>
 </div>
 
 <script src="/vendor/leaflet/leaflet.js"></script>
@@ -779,6 +797,7 @@ async function api(method, url, body, headers = {}){
   } catch(e) { throw { message:'Нет связи с сервером' }; }
   const j = await r.json().catch(() => ({}));
   if (r.status === 401 && !url.endsWith('/login')) { showLogin(); throw { message:'Сеанс завершён, войдите снова' }; }
+  if (r.status === 423 && j.orgBlocked && !url.endsWith('/login')) { showBlocked(j.error); throw { message: j.error, status:423 }; }
   if (!r.ok) throw { message: j.error || ('Ошибка сервера ' + r.status), status:r.status };
   return j;
 }
@@ -828,7 +847,7 @@ function render(){
   if (mode === 'loading') { V.hidden = false; $('mapView').hidden = true; V.innerHTML = `<div class="empty"><h3>Загружаем данные…</h3>Подключаемся к общему хранилищу.</div>`; return; }
   const changed = lastView !== ui.view || ui.animNext; lastView = ui.view; ui.animNext = false;
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : ui.view === 'stock' ? vStock() : ui.view === 'jobs' ? vJobs() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : ui.view === 'stock' ? vStock() : ui.view === 'jobs' ? vJobs() : ui.view === 'orgs' ? vOrgs() : vOrders();
   if (changed) animateView(V);
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
@@ -1710,6 +1729,28 @@ function vPay(){
   }).join('');
 }
 
+/* ===== Организации (администратор системы) ===== */
+const orgOf = id => (ui.orgsList || []).find(o => o.id === id);
+const ORG_STATE = o => o.state === 'manual' ? ['c-bad', 'Заблокирована'] : o.state === 'expired' ? ['c-bad', 'Срок истёк'] : o.left !== null && o.left <= 7 ? ['c-warn', o.left === 0 ? 'Последний день' : `Осталось ${o.left} дн.`] : ['c-ok', 'Работает'];
+function vOrgs(){
+  const L = ui.orgsList;
+  const head = `<div class="toolbar"><button class="btn primary" data-act="orgNew">+ Организация</button>
+    <span class="dim">${L ? `Организаций: ${L.length}, заблокировано: ${L.filter(o => o.state !== 'active').length}` : ''}</span></div>
+    <p class="dim" style="margin:-4px 0 14px;font-size:14px">У каждой организации свои заказы, склад, счета, задачи и пользователи — организации не видят друг друга. Вы заводите организацию и её администраторов, дальше они сами добавляют своих пользователей.</p>`;
+  if (!L) return head + '<div class="empty"><h3>Загружаем список…</h3></div>';
+  const rows = L.slice().sort((a, b) => (a.id === me.org?.id ? -1 : b.id === me.org?.id ? 1 : 0) || a.name.localeCompare(b.name, 'ru')).map(o => {
+    const [cc, cl] = ORG_STATE(o), mine = o.id === me.org?.id;
+    return `<div class="orow ${o.state !== 'active' ? 'off' : ''}">
+      <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
+      <div><small class="lbl">Пользователей</small>${o.users}</div>
+      <div><small class="lbl">Администраторы</small>${o.admins.length ? o.admins.map(a => `${esc(a.name)} <span class="mono dim">${esc(a.login)}</span>${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}`).join('<br>') : '<span class="dim">нет</span>'}</div>
+      <div><span class="chip ${cc}">${cl}</span><small>${o.until ? 'до ' + fmtD(o.until) + ' включительно' : 'без срока'}</small></div>
+      <div class="acts"><button class="btn sm" data-act="orgEdit" data-id="${o.id}">Изменить</button>
+        ${mine ? '' : o.blocked ? `<button class="btn sm ok" data-act="orgBlock" data-id="${o.id}|0">Разблокировать</button>` : armBtn('org:' + o.id, 'Заблокировать', 'orgBlock', o.id + '|1')}</div></div>`;
+  }).join('');
+  return head + `<section class="card" style="padding:0;overflow:hidden"><div class="orow head"><span>Организация</span><span>Польз.</span><span>Администраторы</span><span>Доступ</span><span></span></div>${rows}</section>`;
+}
+
 /* ===== Users view (admin) ===== */
 function vUsers(){
   const L = ui.usersList;
@@ -1720,12 +1761,12 @@ function vUsers(){
   const rows = L.slice().sort((a,b) => (a.blocked - b.blocked) || (order.indexOf(a.role) - order.indexOf(b.role)) || a.name.localeCompare(b.name,'ru')).map(u => {
     const self = u.id === me.id;
     return `<div class="urow ${u.blocked?'blocked':''}">
-      <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}</small></div>
+      <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}${u.sys ? ' · администратор системы' : ''}</small></div>
       <div><span class="chip ${u.role==='admin'?'c-work':u.role==='accountant'?'c-ok':u.role==='viewer'?'c-mute':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
       <div>${u.blocked ? '<span class="chip c-bad">Заблокирован</span>' : '<span class="chip c-ok">Активен</span>'}</div>
       <div><small>Последний вход</small>${u.lastLoginAt ? esc(fmtDT(u.lastLoginAt)) : '<span class="dim">не входил</span>'}</div>
       <div class="acts"><button class="btn sm" data-act="userEdit" data-id="${u.id}">Изменить</button>
-        ${self ? '' : `<button class="btn sm" data-act="userBlock" data-id="${u.id}">${u.blocked ? 'Разблокировать' : 'Заблокировать'}</button>${armBtn('u:'+u.id, 'Удалить', 'userDel', u.id)}`}</div>
+        ${self || (u.sys && !me.sys) ? '' : `<button class="btn sm" data-act="userBlock" data-id="${u.id}">${u.blocked ? 'Разблокировать' : 'Заблокировать'}</button>${armBtn('u:'+u.id, 'Удалить', 'userDel', u.id)}`}</div>
     </div>`;
   }).join('');
   return head + `<section class="card" style="padding:0;overflow:hidden"><div class="urow head"><span>Сотрудник</span><span>Роль</span><span>Статус</span><span>Вход</span><span></span></div>${rows}</section>
@@ -1999,6 +2040,28 @@ function renderDrawer(){
 </div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${i?'Сохранить':'Добавить счёт'}</button><button class="btn" type="button" data-act="${i?'openInvoice':'close'}" data-id="${i?.id||''}">Отмена</button></div></form>`;
+  }
+  if (d.kind === 'orgForm') {
+    const o = d.id && orgOf(d.id), mine = o && o.id === me.org?.id;
+    D.innerHTML = dh(o ? esc(o.name) : 'Новая организация') + `<form class="d-body" data-form="org"><div class="form">
+      <label class="wide">Название организации<input class="in" id="o-name" value="${v(o,'name')}" placeholder="ООО «Электромонтаж»" required></label>
+      <label>Доступ до (включительно)<input class="in" type="date" id="o-until" value="${v(o,'until')}"><small class="dim" style="font-size:12px">Пусто — без срока. После этой даты всем в организации покажется сообщение о блокировке.</small></label>
+      ${o ? '' : `<label>Код (латиницей, необязательно)<input class="in mono" id="o-id" placeholder="elmontazh" pattern="[a-z0-9][a-z0-9-]{1,30}"></label>`}
+      <label class="wide">Заметка (видна только вам)<input class="in" id="o-note" value="${v(o,'note')}" placeholder="Договор 15/2026, оплата помесячно"></label>
+      ${o && !mine ? `<label class="wide chk" style="flex-direction:row;display:flex;gap:8px"><input type="checkbox" id="o-blocked" ${o.blocked ? 'checked' : ''}> Заблокировать организацию сейчас</label>
+      <label class="wide">Пояснение к блокировке (увидят пользователи)<input class="in" id="o-bnote" value="${v(o,'blockNote')}" placeholder="Не продлён договор обслуживания."></label>` : ''}
+      ${o ? '' : `<div class="wide" style="font-size:13px;color:var(--ink-2);margin-top:6px">Администратор организации — он добавит остальных пользователей</div>
+      <label class="wide">Имя<input class="in" id="oa-name" placeholder="Петров Иван Сергеевич" required></label>
+      <label>Логин (латиницей)<input class="in" id="oa-login" autocomplete="off" placeholder="petrov" required></label>
+      <label>Пароль, не короче 8 символов<input class="in" id="oa-pass" autocomplete="new-password" required></label>`}
+      </div>
+      ${o ? `<div class="box adm"><h4>Администраторы организации</h4>
+        ${o.admins.length ? `<ul>${o.admins.map(a => `<li><span><b style="font-weight:500">${esc(a.name)}</b> <span class="mono dim">${esc(a.login)}</span>${a.sys ? ' <span class="chip c-info">администратор системы</span>' : ''}${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}<br><small class="dim">${a.lastLoginAt ? 'вход ' + esc(fmtDT(a.lastLoginAt)) : 'ещё не входил'}</small></span>
+          ${a.id === me.id ? '' : `<span class="row-g"><input class="in" type="text" data-apw="${a.id}" placeholder="новый пароль" autocomplete="new-password" aria-label="Новый пароль для ${esc(a.login)}"><button type="button" class="btn sm" data-act="orgAdmPw" data-id="${o.id}|${a.id}">Сменить пароль</button><button type="button" class="btn sm" data-act="orgAdmBlock" data-id="${o.id}|${a.id}|${a.blocked ? 0 : 1}">${a.blocked ? 'Разблокировать' : 'Заблокировать'}</button></span>`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Администраторов нет.</p>'}
+        <div class="form" style="margin-top:4px"><label>Имя<input class="in" id="na-name" placeholder="Новый администратор"></label><label>Логин<input class="in" id="na-login" autocomplete="off"></label><label>Пароль<input class="in" id="na-pass" autocomplete="new-password"></label>
+          <div style="display:flex;align-items:flex-end"><button type="button" class="btn sm" data-act="orgAdmAdd" data-id="${o.id}">+ Добавить администратора</button></div></div></div>` : ''}
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">${o ? 'Сохранить' : 'Создать организацию'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'job') {
     const j = jobOf(d.id); if (!j) return closeDrawer();
@@ -2274,6 +2337,13 @@ async function onSubmit(e){
       await upd('counterparties', d.id, { contracts:[...(c.contracts||[]), { id:uid(), number:val('k-num'), date:val('k-date'), subject:val('k-subj'), file:up, at:now }] });
       closeDrawer(); render(); toast('Договор загружен');
     }
+    if (kind === 'org') {
+      const body = { name:val('o-name'), until:val('o-until'), note:val('o-note') };
+      if ($('o-blocked')) { body.blocked = $('o-blocked').checked; body.blockNote = val('o-bnote'); }
+      if (!d.id) { body.id = val('o-id'); body.admin = { name:val('oa-name'), login:val('oa-login'), password:$('oa-pass').value }; }
+      if (d.id) await api('PATCH', `/api/orgs/${d.id}`, body); else await api('POST', '/api/orgs', body);
+      closeDrawer(); await loadOrgs(); toast(d.id ? 'Сохранено' : `Организация «${body.name}» создана. Передайте администратору логин ${body.admin.login} и пароль.`);
+    }
     if (kind === 'job') {
       const data = { title:val('j-title'), description:($('j-desc').value || '').trim(), leaderId:$('j-leader').value, start:val('j-start'), due:val('j-due'), orderId:$('j-order').value || null,
         workers:[...f.querySelectorAll('[name=j-w]:checked')].map(x => x.value), places:(ui.jPlaces || []).map(x => ({ ...x, label:String(x.label || '').trim() })) };
@@ -2418,6 +2488,17 @@ async function act(el){
   disarm();
   switch (a) {
     case 'close': return closeDrawer();
+    case 'orgNew': return openDrawer('orgForm');
+    case 'orgEdit': return openDrawer('orgForm', id);
+    case 'orgBlock': { const [oid, on] = id.split('|'); try { await api('PATCH', `/api/orgs/${oid}`, { blocked: on === '1' }); await loadOrgs(); toast(on === '1' ? 'Организация заблокирована' : 'Организация разблокирована'); } catch(e) { toast(errText(e)); } return; }
+    case 'orgAdmAdd': {
+      try { await api('POST', `/api/orgs/${id}/admins`, { name:$('na-name').value.trim(), login:$('na-login').value.trim(), password:$('na-pass').value }); await loadOrgs(); renderDrawer(); toast('Администратор добавлен'); }
+      catch(e) { $('ferr').textContent = errText(e); } return;
+    }
+    case 'orgAdmPw': { const [oid, uid2] = id.split('|'); const inp = document.querySelector(`[data-apw="${uid2}"]`);
+      try { await api('PATCH', `/api/orgs/${oid}/admins/${uid2}`, { password: inp.value }); inp.value = ''; toast('Пароль изменён, прежние входы завершены'); } catch(e) { $('ferr').textContent = errText(e); } return; }
+    case 'orgAdmBlock': { const [oid, uid2, on] = id.split('|');
+      try { await api('PATCH', `/api/orgs/${oid}/admins/${uid2}`, { blocked: on === '1' }); await loadOrgs(); renderDrawer(); } catch(e) { $('ferr').textContent = errText(e); } return; }
     case 'jF': ui.jF = id; return render();
     case 'jMode': ui.jMode = id; try { localStorage.setItem('sed-jmode', id); } catch(e){} return render();
     case 'jSpan': ui.jSpan = Number(id); return render();
@@ -2682,14 +2763,20 @@ document.addEventListener('change', async e => {
 });
 function route(){
   const h = location.hash.slice(1);
-  ui.view = isWorker() ? 'jobs' : ['jobs','works','orders','stock','cps','pay','plan','map'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'orders';
+  ui.view = isWorker() ? 'jobs' : ['jobs','works','orders','stock','cps','pay','plan','map'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'orgs' && me?.sys) ? h : 'orders';
   if (ui.view === 'users' && !ui.usersList) loadUsers();
+  if (ui.view === 'orgs') loadOrgs();
   render();
 }
 window.addEventListener('hashchange', route);
 
 /* ---------- boot ---------- */
 let poll = null, setupMode = false, appVersion = null;
+async function loadOrgs(){
+  try { ui.orgsList = await api('GET', '/api/orgs'); } catch(e) { toast(errText(e)); ui.orgsList = ui.orgsList || []; }
+  if (ui.view === 'orgs') render();
+  if (ui.drawer?.kind === 'orgForm' && !drawerBusy()) renderDrawer();
+}
 async function loadUsers(){
   try { ui.usersList = await api('GET', '/api/users'); } catch(e) { toast(errText(e)); ui.usersList = []; }
   if (ui.view === 'users') render();
@@ -2700,6 +2787,13 @@ function setSetup(on){
   $('l-btn').textContent = on ? 'Создать администратора' : 'Войти';
   $('l-pass').autocomplete = on ? 'new-password' : 'current-password';
 }
+/* the organization is blocked or its term is over: one message for everyone in it */
+function showBlocked(msg){
+  clearInterval(poll); poll = null; closeDrawer(); $('upop').hidden = true;
+  $('blk-msg').textContent = msg || 'Доступ организации заблокирован. Обратитесь к администратору системы.';
+  $('app').hidden = true; $('loginView').hidden = true; $('blockscr').hidden = false;
+}
+$('blk-out').addEventListener('click', async () => { await fetch('/api/logout', { method:'POST', headers:{ 'X-Sed':'1' } }).catch(() => {}); $('blockscr').hidden = true; showLogin(); });
 function showLogin(){
   clearInterval(poll); poll = null; me = null; mode = 'loading'; closeDrawer(); $('upop').hidden = true;
   $('app').hidden = true; $('loginView').hidden = false; $('l-err').textContent = '';
@@ -2714,7 +2808,12 @@ async function start(u){
   document.body.classList.toggle('no-edit', !canEdit());
   document.body.classList.toggle('can-invoice', canAddInvoice());
   $('usersTab').hidden = u.role !== 'admin';
-  document.querySelectorAll('#views a:not(#usersTab)').forEach(a => a.hidden = isWorker() && a.dataset.v !== 'jobs');
+  $('orgsTab').hidden = !u.sys; ui.orgsList = null;
+  $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
+  $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
+  $('orgwarn').hidden = !u.orgWarn; $('orgwarn').textContent = u.orgWarn ? '⚠ ' + u.orgWarn + ' Для продления обратитесь к администратору системы.' : '';
+  $('blockscr').hidden = true;
+  document.querySelectorAll('#views a:not(#usersTab):not(#orgsTab)').forEach(a => a.hidden = isWorker() && a.dataset.v !== 'jobs');
   $('jobsTab').firstChild.textContent = isWorker() ? 'Мои задачи ' : 'Задачи сотрудникам ';
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
@@ -2744,7 +2843,8 @@ $('loginForm').addEventListener('submit', async e => {
   catch(err) { $('l-err').textContent = errText(err); }
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && me) refresh().catch(() => {}); });
-fetch('/api/me', { credentials:'same-origin' }).then(r => r.ok ? r.json() : null).then(async u => {
+fetch('/api/me', { credentials:'same-origin' }).then(async r => r.status === 423 ? { blocked: (await r.json()).error } : r.ok ? r.json() : null).then(async u => {
+  if (u && u.blocked) return showBlocked(u.blocked);
   if (u) return start(u);
   const st = await fetch('/api/setup').then(r => r.json()).catch(() => ({}));
   setSetup(!!st.needed); showLogin();
