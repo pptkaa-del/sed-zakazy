@@ -428,28 +428,35 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 table.jt{width:100%;border-collapse:collapse;font-size:14px}
 .jgnav{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.jgnav b{font-weight:600;margin-left:6px}
 .jgwrap{padding:0;overflow:hidden}
-table.jg{border-collapse:separate;border-spacing:0;font-size:13px;width:100%;min-width:max-content}
+table.jg{--nw:190px;border-collapse:separate;border-spacing:0;font-size:13px;width:100%;table-layout:fixed}
+table.jg col.cw{width:var(--nw)}
 table.jg th,table.jg td{border-bottom:1px solid var(--rule-2);border-left:1px solid var(--rule-2);padding:0;height:46px}
-table.jg thead th{background:var(--mute-soft);font-weight:600;text-align:center;min-width:40px;width:40px;padding:4px 2px;height:auto;font-size:13px;line-height:1.15}
+table.jg thead th{background:var(--mute-soft);font-weight:600;text-align:center;padding:4px 2px;height:auto;font-size:13px;line-height:1.15}
 table.jg thead th small{display:block;font-weight:400;font-size:11px;color:var(--ink-2)}
 table.jg th.we,table.jg td.we{background:color-mix(in srgb,var(--mute-soft) 60%,transparent)}
 table.jg thead th.td{background:var(--stamp);color:#fff}table.jg thead th.td small{color:#fff}
 table.jg td.td{box-shadow:inset 2px 0 0 var(--stamp),inset -2px 0 0 var(--stamp)}
-table.jg .jg-t{position:sticky;left:0;z-index:2;background:var(--sheet);text-align:left;width:300px;min-width:300px;max-width:300px;padding:6px 12px;border-left:0;font-weight:400}
+table.jg .jg-t{position:sticky;left:0;z-index:2;background:var(--sheet);text-align:left;padding:6px 12px;border-left:0;font-weight:400}
 table.jg thead .jg-t{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);font-weight:500}
 table.jg tbody .jg-t b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
 table.jg tbody .jg-t small{display:block;font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 table.jg tbody .jg-t .chip{font-size:11px;padding:1px 7px}
 table.jg tr.click{cursor:pointer}table.jg tr.click:hover .jg-t,table.jg tr.click:hover td{background:var(--paper)}
-table.jg td{position:relative;text-align:center}
-table.jg td.on::before{content:'';position:absolute;left:0;right:0;top:12px;bottom:12px;background:var(--bar)}
-table.jg td.on::before{left:-1px;z-index:1}table.jg td.on i{z-index:2}
-table.jg td.b0::before{left:4px;border-radius:6px 0 0 6px}table.jg td.b1::before{right:4px;border-radius:0 6px 6px 0}table.jg td.b0.b1::before{border-radius:6px}
-table.jg td.ext::before{opacity:.45}
-table.jg td i{position:relative;font-style:normal;font-size:10px;color:#fff}
+table.jg td{position:relative}
+table.jg tr.last td,table.jg tr.last th{border-bottom:1px solid var(--rule)}
+table.jg tbody tr:not(.last) td{border-bottom-color:transparent}
+table.jg td.free{cursor:copy}table.jg td.free:hover{background:var(--info-soft)}
+table.jg td.jcell{padding:3px 2px;vertical-align:top}
+.jbar{display:block;width:100%;min-height:40px;text-align:left;border:0;border-radius:6px;padding:4px 8px;cursor:pointer;color:#fff;background:var(--bar);font:inherit;overflow:hidden}
+.jbar b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;font-weight:600;font-size:13px;line-height:1.25;overflow:hidden;overflow-wrap:anywhere;hyphens:auto}
+.jbar small{display:block;font-size:11px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jbar:hover{filter:brightness(1.08)}.jbar:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.jbar.cut0{border-top-left-radius:0;border-bottom-left-radius:0}.jbar.cut1{border-top-right-radius:0;border-bottom-right-radius:0}
+.jbar.st-done{opacity:.75}
+table.jg tbody .jg-t{vertical-align:top;padding-top:10px}
 .st-new{--bar:var(--info)}.st-work{--bar:var(--warn)}.st-done{--bar:var(--ok)}.st-late{--bar:var(--bad)}
 .legend2 i.lg{background:var(--bar)}
-@media (max-width:620px){table.jg .jg-t{width:160px;min-width:160px;max-width:160px;padding:6px 8px}table.jg thead th{min-width:34px;width:34px}}
+@media (max-width:620px){table.jg{--nw:110px}table.jg .jg-t{padding:6px 8px}}
 table.jt th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);text-align:left;padding:8px 12px;background:var(--mute-soft);font-weight:500}
 table.jt td{padding:10px 12px;border-top:1px solid var(--rule-2);vertical-align:top}
 table.jt tr.click{cursor:pointer}table.jt tr.click:hover td{background:var(--paper)}
@@ -1433,22 +1440,45 @@ function jobGrid(list){
   const nav = `<div class="jgnav"><div class="row-g"><button class="btn sm" data-act="jShift" data-id="-7" aria-label="Неделя назад">←</button><button class="btn sm" data-act="jShift" data-id="0">Сегодня</button><button class="btn sm" data-act="jShift" data-id="7" aria-label="Неделя вперёд">→</button>
       <b>${lbl(from)} – ${lbl(to)} ${new Date(to * 864e5).getUTCFullYear()}</b></div>
     <div class="seg"><button data-act="jSpan" data-id="7" class="${ui.jSpan===7?'on':''}">Неделя</button><button data-act="jSpan" data-id="14" class="${ui.jSpan===14?'on':''}">2 недели</button><button data-act="jSpan" data-id="28" class="${ui.jSpan===28?'on':''}">4 недели</button></div></div>`;
-  const inView = list.filter(j => { const [s, e] = jobSpan(j); const end = j.status !== 'done' && e < tn ? tn : e; return end >= from && s <= to; });
+  // days a task occupies on screen: start … due, an overdue task stretches to today
+  const span = j => { const [s, e] = jobSpan(j); const end = j.status !== 'done' && e < tn ? tn : e; return [s, end, e]; };
+  const inView = list.filter(j => { const [s, end] = span(j); return end >= from && s <= to; });
+  // rows: every worker (in the filter), plus anyone else a visible task is assigned to
+  let people = isWorker() ? [{ id: me.id, name: me.name }] : workersList().map(u => ({ id: u.id, name: u.name }));
+  if (!isWorker()) inView.forEach(j => (j.workers || []).forEach(id => { if (!people.some(p => p.id === id)) people.push({ id, name: who(id) }); }));
+  if (ui.jW && ui.jW !== '_me') people = people.filter(p => p.id === ui.jW);
+  if (ui.jW === '_me') people = people.filter(p => inView.some(j => (j.workers || []).includes(p.id) && onJob(j)));
+  people.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const dayCls = n => [(n + 3) % 7 >= 5 ? 'we' : '', n === tn ? 'td' : ''].filter(Boolean).join(' ');
+  const rows = people.map(p => {
+    const mine = inView.filter(j => (j.workers || []).includes(p.id)).sort((a, b) => span(a)[0] - span(b)[0] || span(b)[1] - span(a)[1]);
+    const lanes = [];   // tasks that overlap in time go to separate lines
+    mine.forEach(j => { const [s] = span(j); let L = lanes.find(l => l.end < Math.max(s, from)); if (!L) lanes.push(L = { end: -1e9, items: [] }); L.items.push(j); L.end = Math.min(span(j)[1], to); });
+    if (!lanes.length) lanes.push({ items: [] });
+    return lanes.map((L, li) => {
+      let html = li === 0 ? `<th class="jg-t" rowspan="${lanes.length}"><b>${esc(p.name)}</b><small>${mine.length ? `задач: ${mine.length}` : 'свободен'}</small></th>` : '';
+      for (let n = from; n <= to;) {
+        const j = L.items.find(x => Math.max(span(x)[0], from) === n);
+        if (j) {
+          const [s, end, e] = span(j), a = Math.max(s, from), z = Math.min(end, to), late = overdue(j);
+          const pl = (j.places || [])[0];
+          html += `<td colspan="${z - a + 1}" class="jcell"><button class="jbar st-${late ? 'late' : j.status} ${s < from ? 'cut0' : ''} ${end > to ? 'cut1' : ''}" data-act="openJob" data-id="${j.id}" title="${esc(j.title + (j.description ? '\n' + j.description : '') + (pl?.label ? '\nМесто: ' + pl.label : ''))}">
+            <b>${esc(j.title)}</b><small>${JOB_ST[j.status]}${late ? ' · просрочена' : ''}${j.due ? ' · срок ' + fmtD(j.due).slice(0, 5) : ''}${pl?.label ? ' · ' + esc(pl.label) : ''}</small></button></td>`;
+          n = z + 1;
+        } else {
+          html += canLead() ? `<td class="${dayCls(n)} free" data-act="newJobAt" data-id="${p.id}|${dstr(n)}" title="Назначить задачу на ${fmtD(dstr(n))}"></td>` : `<td class="${dayCls(n)}"></td>`;
+          n++;
+        }
+      }
+      return `<tr class="${li === lanes.length - 1 ? 'last' : ''}">${html}</tr>`;
+    }).join('');
+  }).join('');
   const outside = list.length - inView.length;
-  const cell = (j, n) => {
-    const [s, e] = jobSpan(j), late = j.status !== 'done' && n > e && n <= tn;
-    const cls = [ (n + 3) % 7 >= 5 ? 'we' : '', n === tn ? 'td' : '' ];
-    if (n >= s && n <= e) cls.push('on', 'st-' + (overdue(j) ? 'late' : j.status), n === s ? 'b0' : '', n === e ? 'b1' : '');
-    else if (late) cls.push('on', 'st-late', 'ext', n === tn ? 'b1' : '');
-    const mark = n === e && j.due ? '<i title="Срок">●</i>' : '';
-    return `<td class="${cls.filter(Boolean).join(' ')}">${mark}</td>`;
-  };
-  return nav + `<section class="card jgwrap"><div class="tscroll"><table class="jg"><thead><tr><th class="jg-t">Задача</th>${days.map(n => { const dw = (n + 3) % 7, d = new Date(n * 864e5);
-      return `<th class="${dw >= 5 ? 'we' : ''} ${n === tn ? 'td' : ''}"><small>${DOW[dw]}</small>${d.getUTCDate()}${d.getUTCDate() === 1 || n === from ? `<small>${MON[d.getUTCMonth()]}</small>` : ''}</th>`; }).join('')}</tr></thead><tbody>
-    ${inView.map(j => `<tr class="click" data-act="openJob" data-id="${j.id}" tabindex="0"><th class="jg-t"><span class="chip ${overdue(j) ? 'c-bad' : JOB_CHIP[j.status]}">${overdue(j) ? 'Просрочена' : JOB_ST[j.status]}</span><b>${jobNo(j)}. ${esc(j.title)}</b><small>${esc((j.workers || []).map(who).join(', '))}${(j.places || []).length ? ` · мест: ${j.places.length}` : ''}</small></th>${days.map(n => cell(j, n)).join('')}</tr>`).join('')
-      || `<tr><td colspan="${ui.jSpan + 1}" class="dim" style="padding:18px;text-align:center">В эти даты задач нет.</td></tr>`}
+  return nav + `<section class="card jgwrap"><div class="tscroll"><table class="jg" style="min-width:calc(var(--nw) + ${ui.jSpan * (ui.jSpan > 14 ? 38 : 46)}px)"><colgroup><col class="cw">${days.map(() => '<col>').join('')}</colgroup><thead><tr><th class="jg-t">Работник</th>${days.map(n => { const dw = (n + 3) % 7, d = new Date(n * 864e5);
+      return `<th class="${dayCls(n)}"><small>${DOW[dw]}</small>${d.getUTCDate()}${d.getUTCDate() === 1 || n === from ? `<small>${MON[d.getUTCMonth()]}</small>` : ''}</th>`; }).join('')}</tr></thead><tbody>
+    ${rows || `<tr><td colspan="${ui.jSpan + 1}" class="dim" style="padding:18px;text-align:center">Нет работников. ${me.role === 'admin' ? 'Добавьте пользователей с ролью «Работник» на вкладке «Пользователи».' : ''}</td></tr>`}
   </tbody></table></div></section>
-  <div class="legend2" style="margin-top:10px"><span><i class="lg st-new"></i>Назначена</span><span><i class="lg st-work"></i>В работе</span><span><i class="lg st-done"></i>Выполнена</span><span><i class="lg st-late"></i>Просрочена</span><span>● срок</span>${outside ? `<span class="dim">Вне выбранных дат: ${outside}</span>` : ''}</div>`;
+  <div class="legend2" style="margin-top:10px"><span><i class="lg st-new"></i>Назначена</span><span><i class="lg st-work"></i>В работе</span><span><i class="lg st-done"></i>Выполнена</span><span><i class="lg st-late"></i>Просрочена</span>${canLead() ? '<span class="dim">Щелчок по пустой клетке — назначить задачу работнику на этот день</span>' : ''}${outside ? `<span class="dim">Вне выбранных дат: ${outside}</span>` : ''}</div>`;
 }
 function jobPlacesHtml(j){
   const P = j.places || [];
@@ -1999,15 +2029,15 @@ function renderDrawer(){
   }
   if (d.kind === 'jobForm') {
     const j = d.id && jobOf(d.id), W = workersList(), LD = leaders();
-    const chosen = new Set(j ? j.workers || [] : []);
+    const chosen = new Set(j ? j.workers || [] : d.ctx?.worker ? [d.ctx.worker] : []);
     const extra = j ? (j.workers || []).filter(id => !W.some(u => u.id === id)).map(id => ({ id, name: who(id) })) : [];
     const leaderSel = j ? j.leaderId : (me.role === 'user' || me.role === 'manager' || me.role === 'admin' ? me.id : '');
     D.innerHTML = dh(j ? 'Изменить задачу' : 'Новая задача') + `<form class="d-body" data-form="job"><div class="form">
       <label class="wide">Что нужно сделать<input class="in" id="j-title" value="${v(j,'title')}" placeholder="Монтаж шкафа ШУ-3 на объекте" required></label>
       <label class="wide">Описание<textarea class="in" id="j-desc" rows="3" placeholder="Кратко: что сделать, что взять с собой, к кому обратиться">${esc(j?.description || '')}</textarea></label>
       <label class="wide">Ответственный руководитель<select class="in" id="j-leader" required>${LD.map(u => `<option value="${u.id}" ${u.id === leaderSel ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role])}</option>`).join('')}</select></label>
-      <label>Начало<input class="in" type="date" id="j-start" value="${esc(j ? (j.start || '') : today())}"></label>
-      <label>Срок (окончание)<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
+      <label>Начало<input class="in" type="date" id="j-start" value="${esc(j ? (j.start || '') : d.ctx?.date || today())}"></label>
+      <label>Срок (окончание)<input class="in" type="date" id="j-due" value="${esc(j ? (j.due || '') : d.ctx?.date || '')}"></label>
       <label class="wide">Заказ (необязательно)<select class="in" id="j-order"><option value="">— без заказа —</option>${ordersSorted().map(o => `<option value="${o.id}" ${j?.orderId === o.id ? 'selected' : ''}>${esc(ordName(o))}</option>`).join('')}</select></label>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Работники</span>
         ${W.length || extra.length ? `<div class="wpick">${[...W, ...extra].map(u => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="j-w" value="${u.id}" ${chosen.has(u.id) ? 'checked' : ''}> ${esc(u.name)}</label>`).join('')}</div>`
@@ -2393,6 +2423,7 @@ async function act(el){
     case 'jSpan': ui.jSpan = Number(id); return render();
     case 'jShift': ui.jFrom = Number(id) ? (ui.jFrom ?? monday(dnum(today()))) + Number(id) : monday(dnum(today())); return render();
     case 'newJob': return openDrawer('jobForm');
+    case 'newJobAt': { const [wid, day] = id.split('|'); return openDrawer('jobForm', null, { worker: wid, date: day }); }
     case 'editJob': return openDrawer('jobForm', id);
     case 'openJob': return openDrawer('job', id);
     case 'delJob': await guard(del('jobs', id)); closeDrawer(); render(); return toast('Задача удалена');
