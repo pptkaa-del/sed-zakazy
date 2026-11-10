@@ -463,12 +463,25 @@ async function api(req, res, url) {
         cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => CATS.includes(c)),
         road: String(x.road || '').slice(0, 200), bridge: String(x.bridge || '').slice(0, 200),
         dist: x.dist != null && x.dist !== '' && Number.isFinite(Number(x.dist)) ? Math.round(Number(x.dist) * 10) / 10 : null, note: String(x.note || '').slice(0, 300),
+        ...(x.checkedAt ? { checkedAt: String(x.checkedAt).slice(0, 40), checkedBy: String(x.checkedBy || '').slice(0, 40), checkedWas: String(x.checkedWas || '').slice(0, 40) } : {}),
       })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180);
       if (!points.length) return fail(res, 400, 'Не нашлось ни одной точки с координатами');
       db.dt = { points, file: String(b.file || '').slice(0, 200), at: new Date().toISOString(), by: user.id,
         classifiedAt: b.classifiedAt || null, radius: b.radius || null, source: String(b.source || '').slice(0, 200) };
       saveDb();
       return send(res, 200, { ok: true, count: points.length, rev: db.rev });
+    }
+    /* the answer for a point marked «проверить»: what it really stands on */
+    if (m === 'PATCH' && p[2] === 'point') {
+      if (!(canEdit(user) || user.role === 'user')) return fail(res, 403, 'Отмечать проверку может руководитель, менеджер или администратор');
+      const b = await readJsonBody(req), P = db.dt && db.dt.points, i = Number(b.i);
+      if (!P || !Number.isInteger(i) || !P[i] || P[i].no !== String(b.no ?? '')) return fail(res, 409, 'Точка не найдена — обновите страницу');
+      const cats = (Array.isArray(b.cats) ? b.cats : []).filter(c => ['mkad', 'ttk', 'bridge'].includes(c));
+      const pt = P[i];
+      if (!pt.checkedAt) pt.checkedWas = (pt.cats || []).join(',');
+      pt.cats = [...new Set(cats)]; pt.checkedAt = new Date().toISOString(); pt.checkedBy = user.id;
+      saveDb();
+      return send(res, 200, { ok: true, point: pt, rev: db.rev });
     }
     if (m === 'POST' && p[2] === 'overpass') {
       // the same Overpass query from the server, for browsers that cannot reach OpenStreetMap themselves
