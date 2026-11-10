@@ -707,6 +707,30 @@ async function api(req, res, url) {
     if (!mayReport) return fail(res, 403, 'Это не ваша точка');
     const touch = () => { pl.reportAt = new Date().toISOString(); pl.reportBy = user.id; j.updatedAt = pl.reportAt; j.updatedBy = user.id; };
     pl.photos = pl.photos || {};
+    // a closed point stays editable for the worker for 24 hours; managers and the leader may always correct it
+    const boss = mayEditJob(user, j) || j.leaderId === user.id;
+    if (pl.doneAt && !boss && Date.now() - Date.parse(pl.doneAt) > 864e5 && m !== 'GET') return fail(res, 409, 'Прошло больше суток после закрытия точки — изменить данные может руководитель');
+    if (p[5] === 'done' && m === 'POST') {
+      const b = await readJsonBody(req), notWorking = !!b.notWorking;
+      const missing = (j.photoSpec || []).filter(n => !pl.photos[n]);
+      if (missing.length && !notWorking) return fail(res, 400, 'Не хватает фото: ' + missing.join(', '));
+      const at = new Date().toISOString(), first = !pl.doneAt;
+      Object.assign(pl, { notWorking, comment: String(b.comment ?? pl.comment ?? '').slice(0, 4000) });
+      if (first) { pl.doneAt = at; pl.doneBy = user.id; } else { pl.editedAt = at; pl.editedBy = user.id; }
+      touch();
+      // the job follows its points: in work after the first one, done when every point is closed
+      const all = j.places || [], left = all.filter(x => !x.doneAt).length;
+      if (!left && j.status !== 'done') Object.assign(j, { status: 'done', doneAt: at, doneBy: user.id });
+      else if (left && j.status === 'new') Object.assign(j, { status: 'work', startedAt: at, startedBy: user.id });
+      saveDb();
+      return send(res, 200, { ok: true, place: pl, left, status: j.status, rev: db.rev });
+    }
+    if (p[5] === 'done' && m === 'DELETE') {
+      if (!boss) return fail(res, 403, 'Открыть точку снова может руководитель');
+      delete pl.doneAt; delete pl.doneBy; if (j.status === 'done') j.status = 'work';
+      touch(); saveDb();
+      return send(res, 200, { ok: true, place: pl, rev: db.rev });
+    }
     if (p[5] === 'photo' && m === 'POST') {
       let slot = ''; try { slot = decodeURIComponent(String(req.headers['x-slot'] || '')).slice(0, 80); } catch {}
       let name = 'фото.jpg'; try { name = decodeURIComponent(String(req.headers['x-filename'] || 'фото.jpg')).replace(/[\\/\r\n"]/g, '_').slice(0, 200); } catch {}
@@ -814,7 +838,7 @@ async function api(req, res, url) {
     }
     if (col === 'jobs') {
       const j = db.jobs[id], c = cleanJob(patch), ck = Object.keys(c);
-      if (c.places) { const old = new Map((j.places || []).map(x => [x.id, x])); c.places.forEach(x => { const o = old.get(x.id); if (o && o.photos) { x.photos = o.photos; x.comment = o.comment; x.reportAt = o.reportAt; x.reportBy = o.reportBy; } }); }
+      if (c.places) { const old = new Map((j.places || []).map(x => [x.id, x])); c.places.forEach(x => { const o = old.get(x.id); if (o) ['photos', 'comment', 'reportAt', 'reportBy', 'doneAt', 'doneBy', 'notWorking', 'editedAt', 'editedBy'].forEach(k => { if (o[k] !== undefined) x[k] = o[k]; }); }); }
       const other = ck.filter(k => !JOB_WORKER_FIELDS.includes(k));
       if (other.length ? !mayEditJob(user, j) : !(mayEditJob(user, j) || onJob(user, j))) return fail(res, 403, 'Недостаточно прав');
       if ('title' in c && !c.title) return fail(res, 400, 'Укажите, что нужно сделать');
