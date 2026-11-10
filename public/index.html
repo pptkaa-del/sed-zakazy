@@ -1633,7 +1633,7 @@ function renderDt(){
   const flagged = P.filter(p => (p.cats || []).length).length;
   $('dtInfo').innerHTML = !DT.loaded ? 'Загружаем…' : P.length
     ? `<span>Точек: <b>${P.length}</b>${M.file ? ` из файла «${esc(M.file)}»` : ''}${M.at ? `, загружено ${esc(fmtDT(M.at))}` : ''}${M.by ? ' · ' + esc(who(M.by)) : ''}.</span>
-       <span>${M.classifiedAt ? `На МКАД, ТТК или эстакадах: <b>${flagged}</b> — определено по OpenStreetMap ${esc(fmtDT(M.classifiedAt))}${M.radius ? ` (дороги до ${M.radius.road} м, эстакады до ${M.radius.bridge} м)` : ''}.` : '<b>Отметки ещё не определены.</b>'}</span>`
+       <span>${M.classifiedAt ? `На МКАД, ТТК или эстакадах: <b>${flagged}</b> — определено ${esc(fmtDT(M.classifiedAt))} по данным ${esc(M.source || 'OpenStreetMap')} (© участники OpenStreetMap, ODbL)${M.radius ? ` (дороги до ${M.radius.road} м, эстакады до ${M.radius.bridge} м)` : ''}.` : '<b>Отметки ещё не определены.</b>'}</span>`
     : `<span>Точек пока нет. ${ed ? 'Загрузите Excel с номерами объектов и координатами.' : 'Их загружает менеджер или администратор.'}</span>`;
   ui.dtF = ui.dtF || 'all';
   const R = ui.dtR || M.radius || { road:35, bridge:20 };
@@ -1708,7 +1708,27 @@ async function overpass(q, say){
   catch(e) { errs.push('через сервер системы: ' + (e.message || 'ошибка')); }
   throw { message: 'OpenStreetMap недоступен — ' + errs.join('; ') };
 }
+/* lines of the MKAD, the TTK and road overpasses of Moscow, cut from an OpenStreetMap extract and shipped with the app
+   (public/vendor/osm-moscow/roads.json, built by tools/osm-roads.js): no public server is needed when the points lie inside its area */
+let roadsFile = null;
+async function bundledRoads(){
+  if (!roadsFile) roadsFile = fetch('/vendor/osm-moscow/roads.json').then(r => { if (!r.ok) throw new Error('нет файла'); return r.json(); }).catch(e => { roadsFile = null; throw e; });
+  const R = await roadsFile;
+  // compact lines → the shape the distance code works with; coordinates are stored as integer micro-degrees, deltas after the first point
+  const dec = l => { const g = []; let la = 0, lo = 0; for (let i = 0; i < l.c.length; i += 2) { la += l.c[i]; lo += l.c[i + 1]; g.push({ lat: la / 1e6, lon: lo / 1e6 }); } return { id: l.i, tags: l.t || {}, geometry: g }; };
+  return { mkad: R.mkad.map(dec), ttk: R.ttk.map(dec), bridge: R.bridge.map(dec), bbox: R.bbox, date: R.date, source: R.source };
+}
 async function dtGeometry(P, say){
+  try {
+    say('берём линии из встроенной выгрузки OpenStreetMap…');
+    const B = await bundledRoads(), [s, w, n, e] = B.bbox;
+    const out = P.filter(p => p.lat < s || p.lat > n || p.lng < w || p.lng > e).length;
+    if (out <= P.length * 0.01) { say(`встроенная выгрузка OpenStreetMap от ${fmtD(B.date)}`); return { ...B, at: B.date, bundled: true }; }
+    say(`часть точек (${out}) вне Москвы — запрашиваем сервер OpenStreetMap…`);
+  } catch(e) { say('встроенной выгрузки нет — запрашиваем сервер OpenStreetMap…'); }
+  return dtLiveGeometry(P, say);
+}
+async function dtLiveGeometry(P, say){
   // the area of the points without stray ones far away (1st…99th percentile), plus a margin
   const q = (arr, f) => { const v = arr.slice().sort((x, y) => x - y); return v[Math.min(v.length - 1, Math.max(0, Math.floor(f * (v.length - 1))))]; };
   const la = P.map(p => p.lat), lo = P.map(p => p.lng), pad = 0.03;
@@ -1771,7 +1791,7 @@ async function dtClassifyAndSave(file){
   let classifiedAt = null, err = null;
   try { DT.geom = DT.geom || await dtGeometry(DT.points, say); dtApply(DT.points, DT.geom, R); classifiedAt = new Date().toISOString(); }
   catch(e) { err = e.message || 'нет связи'; }
-  await api('PUT', '/api/dt', { points: DT.points, file: file ?? DT.meta.file, classifiedAt: classifiedAt || DT.meta.classifiedAt || null, radius: classifiedAt ? R : DT.meta.radius, source: classifiedAt ? 'OpenStreetMap' : DT.meta.source });
+  await api('PUT', '/api/dt', { points: DT.points, file: file ?? DT.meta.file, classifiedAt: classifiedAt || DT.meta.classifiedAt || null, radius: classifiedAt ? R : DT.meta.radius, source: classifiedAt ? (DT.geom?.bundled ? `OpenStreetMap, выгрузка от ${fmtD(DT.geom.date)}` : 'OpenStreetMap') : DT.meta.source });
   await loadDt();
   if (err) { toast(`Точки сохранены, но отметки не определены: ${err}.`); setTimeout(() => { const e = $('dtStatus'); if (e) { e.textContent = 'Не удалось определить: ' + err; e.className = 'warn-t'; } }, 50); }
   else { const n = DT.points.filter(p => p.cats.length).length; toast(`Готово: на МКАД ${DT.points.filter(p => p.cats.includes('mkad')).length}, на ТТК ${DT.points.filter(p => p.cats.includes('ttk')).length}, на эстакадах ${DT.points.filter(p => p.cats.includes('bridge')).length} — всего отмечено ${n} из ${DT.points.length}`); }
