@@ -41,6 +41,7 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0}
 img{max-width:100%}
 [hidden]{display:none!important}
+input[type=search].in{padding-left:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23889' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:11px 50%}
 body{background:var(--paper);color:var(--ink);font:15px/1.5 var(--f-body)}
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--stamp);outline-offset:2px}
@@ -638,7 +639,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
   <form id="loginForm" novalidate>
     <div class="brand"><h1>Вход</h1></div>
     <p id="l-hint" hidden>Первый запуск. Создайте учётную запись администратора системы: он заведёт организации и добавит пользователей.</p>
-    <label id="l-name-wrap" hidden>Ваше имя<input class="in" id="l-name" autocomplete="name" placeholder="Иванов И. И."></label>
+    <label id="l-name-wrap" hidden>Ваше имя<input class="in" id="l-name" autocomplete="name"></label>
     <label>Логин<input class="in" id="l-login" autocomplete="username" required></label>
     <label>Пароль<span class="pw"><input class="in" id="l-pass" type="password" autocomplete="current-password" required><button type="button" class="pw-eye" data-pw-toggle aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></span></label>
     <div class="err" id="l-err"></div>
@@ -908,10 +909,20 @@ function parseInvoiceText(raw){
   for (const re of amountPatterns) { const m = re.exec(t); if (m) { r.amount = num(m[1]); break; } }
   if (r.amount == null) { const all = [...t.matchAll(new RegExp('Итого[^\\d\\n]{0,30}' + NUM, 'gi'))].map(m => num(m[1])); if (all.length) r.amount = Math.max(...all); }
   // «Поставщик: ООО …», «Поставщик (Исполнитель): …» или, как в 1С, «Поставщик ООО …» без двоеточия; запасной вариант — «Получатель» в банковском блоке
-  const ORG = /(ООО|ОАО|ЗАО|ПАО|АО|ИП|НКО|ГУП|МУП|ФГУП|[«"])/;
-  let ms = /Поставщик(?:\s*\([^)\n]*\))?\s*:?\s*([^\n]+)/i.exec(t);
-  if (ms && !ORG.test(ms[1])) ms = null;
-  if (!ms) { const mg = /Получатель\s*:?\s*([^\n]+)/i.exec(t); if (mg && ORG.test(mg[1])) ms = mg; }
+  const ORG = /(ООО|ОАО|ЗАО|ПАО|АО|ИП|НКО|ГУП|МУП|ФГУП|Общество с ограниченной|Акционерное общество|Индивидуальный предприниматель|[«"])/i;
+  const BUYER = /^(Покупатель|Плательщик|Заказчик|Грузополучатель)/i;
+  // «Поставщик ООО …» on one line, or the label alone and the name on the next line (tables in 1C and other forms)
+  const byLabel = re => {
+    const m = re.exec(t); if (!m) return null;
+    if (ORG.test(m[1])) return m;
+    const next = t.slice(m.index + m[0].length).split('\n').slice(1, 3).map(s => s.trim()).find(l => ORG.test(l) && !BUYER.test(l));
+    return next ? { index: m.index, 1: next } : null;
+  };
+  let ms = byLabel(/Поставщик(?:\s*\([^)\n]*\))?\s*:?\s*([^\n]*)/i) || byLabel(/(?:Продавец|Исполнитель)\s*:?\s*([^\n]*)/i) || byLabel(/Получатель\s*:?\s*([^\n]*)/i);
+  if (!ms) {   // the first organization in the document that is not the buyer
+    let pos = 0;
+    for (const line of t.split('\n')) { if (ORG.test(line) && !BUYER.test(line.trim()) && /ИНН|ООО|АО|ИП/.test(line)) { ms = { index: pos, 1: line.replace(/^.*?(?=(ООО|ОАО|ЗАО|ПАО|АО|ИП|Общество|Акционерное|Индивидуальный)\b)/i, '') }; break; } pos += line.length + 1; }
+  }
   if (ms) r.supplier = ms[1].replace(/^\([^)]*\)\s*:?\s*/, '').split(/,\s*ИНН|\s+ИНН\s|,\s*\d{6},|,\s*КПП|\s+Сч\.?\s*№|\s+БИК/)[0].trim().replace(/[,;]+$/, '');
   const mi = (ms ? new RegExp('ИНН\\s*(\\d{10,12})').exec(t.slice(ms.index)) : null) || /ИНН\s*(\d{10,12})/.exec(t);
   if (mi) r.inn = mi[1];
@@ -985,9 +996,9 @@ async function parseInvoiceFile(file){
   if (r.number) { $('f-num').value = r.number; got.push('№ ' + esc(r.number)); }
   if (r.amount) { $('f-amt').value = r.amount.toLocaleString('ru-RU', { minimumFractionDigits:2, maximumFractionDigits:2 }); got.push('сумма ' + esc(money(r.amount))); }
   if (r.date) { $('f-date').value = r.date; got.push('от ' + fmtD(r.date)); }
-  if (r.supplier && !val2('f-sup')) {
+  if (r.supplier && (!val2('f-sup') || val2('f-sup') === ui.supAuto)) {
     const cp = (r.inn && S.counterparties.find(c => c.inn === r.inn)) || cpByName(r.supplier);
-    $('f-sup').value = cp ? cp.name : r.supplier; ui.invInn = r.inn || '';
+    $('f-sup').value = cp ? cp.name : r.supplier; ui.invInn = r.inn || ''; ui.supAuto = $('f-sup').value;
     got.push('поставщик ' + esc($('f-sup').value) + (cp ? '' : ' (новый — добавится в контрагенты)'));
   }
   if (r.items.length && !ui.invItems.some(x => x.name)) {
@@ -1113,7 +1124,7 @@ function vStock(){
   const A = META.acct;
   const acctBar = `<div class="acctbar"><span>Бухгалтерские остатки (1С): ${A ? `обновлены <b>${esc(fmtDT(A.at))}</b>${A.file ? ` из файла «${esc(A.file)}»` : ''}${A.by ? ', ' + esc(who(A.by)) : ''}` : '<b>ещё не загружались</b>'}</span>${canAcct() ? '<button class="btn sm" data-act="acctImport">Загрузить выгрузку 1С</button>' : ''}</div>`;
   const head = acctBar + `<div class="toolbar">
-    <span data-keep style="display:contents"><input class="in" id="sq" type="search" placeholder="Поиск: наименование, артикул, место" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
+    <span data-keep style="display:contents"><input class="in" id="sq" type="search" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
     <div class="seg"><button data-act="sF" data-id="all" class="${ui.sF!=='low'&&ui.sF!=='inc'?'on':''}">Все</button><button data-act="sF" data-id="low" class="${ui.sF==='low'?'on':''}">Мало на складе${low.length ? ` (${low.length})` : ''}</button><button data-act="sF" data-id="inc" class="${ui.sF==='inc'?'on':''}">Приходы по счетам${incWait ? ` (${incWait})` : ''}</button></div>
     ${canEdit() ? '<button class="btn primary" data-act="newStock">+ Позиция</button>' : ''}
   </div>`;
@@ -1144,7 +1155,7 @@ function vWorks(){
   const now = all.filter(t => !t.done && dnum(t.start) <= tn);
   const people = sum(now, t => t.people), brig = sum(now, brigadesOf);
   const head = `<div class="toolbar">
-    <span data-keep style="display:contents"><input class="in" id="wq" type="search" placeholder="Поиск: работа, ответственный, заказ" value="${esc(ui.wq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск работ"></span>
+    <span data-keep style="display:contents"><input class="in" id="wq" type="search" value="${esc(ui.wq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск работ"></span>
     <div class="seg">${[['all','Все'],['work','Работы'],['buy','Закупки']].map(([k,l]) => `<button data-act="wKind" data-id="${k}" class="${ui.wKind===k?'on':''}">${l}</button>`).join('')}</div>
     <select class="f" id="wOrd" aria-label="Заказ"><option value="">Все заказы</option><option value="_" ${ui.wOrd==='_'?'selected':''}>Общие работы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.wOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
     <button class="btn primary" data-act="newTask" data-id="${ui.wOrd && ui.wOrd !== '_' ? ui.wOrd : ''}">+ Работа</button>
@@ -1192,7 +1203,7 @@ function vOrders(){
   }).join('');
   return `<div class="split ${o?'has-sel':''}">
     <nav class="olist" aria-label="Заказы">
-      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" placeholder="Поиск: идентификатор, номер, название, заказчик" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button></div>
+      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button></div>
       <div class="pgroup" id="olist">${items}<p class="pad dim" id="onone" ${ordersSorted().some(x => matchOrder(x, q)) ? 'hidden' : ''}>Ничего не найдено</p></div>
     </nav>
     <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Откройте заказ слева, чтобы загрузить документы, заполнить строки для закупки и добавить счета.</div>`}</section>
@@ -1216,7 +1227,7 @@ function commentsCard(col, doc){
   return `<section class="card">
     <div class="ch"><h3>Комментарии <span class="dim">${cm.length||''}</span></h3></div>
     ${cm.length ? `<div class="comments">${cm.map(c => `<div class="cmt"><span class="avatar">${esc(initials(who(c.by)))}</span><div class="body"><div class="meta"><b style="color:var(--ink)">${esc(who(c.by))}</b><span>${esc(fmtDT(c.at))}</span>${me && (c.by === me.id || me.role === 'admin') ? armBtn('c:'+c.id,'✕','delComment',col+'|'+doc.id+'|'+c.id,'icon') : ''}</div><p>${esc(c.text)}</p></div></div>`).join('')}</div>` : '<p class="dim" style="margin:0">Комментариев пока нет.</p>'}
-    ${canComment ? `<div class="cform" data-keep><textarea class="in" id="c-text" data-key="${key}" rows="2" placeholder="Написать комментарий… (Ctrl+Enter — отправить)" aria-label="Комментарий">${esc(ui.drafts[key]||'')}</textarea><button class="btn primary" data-act="addComment" data-id="${col}|${doc.id}">Отправить</button></div>` : ''}
+    ${canComment ? `<div class="cform" data-keep><textarea class="in" id="c-text" data-key="${key}" rows="2" aria-label="Комментарий">${esc(ui.drafts[key]||'')}</textarea><button class="btn primary" data-act="addComment" data-id="${col}|${doc.id}">Отправить</button></div>` : ''}
   </section>`;
 }
 function orderDetail(o){
@@ -1375,7 +1386,7 @@ function vCps(){
       <span class="ometa">${(x.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('')}${(x.contracts||[]).length ? `<span class="chip c-mute">договоров: ${x.contracts.length}</span>` : ''}</span></button>`).join('');
   return `<div class="split ${c?'has-sel':''}">
     <nav class="olist" aria-label="Контрагенты">
-      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="cq" type="search" placeholder="Поиск: название, контакт, телефон" value="${esc(ui.cq)}" aria-label="Поиск контрагента"></span><button class="btn primary" data-act="newCp">+ Контрагент</button></div>
+      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="cq" type="search" value="${esc(ui.cq)}" aria-label="Поиск контрагента"></span><button class="btn primary" data-act="newCp">+ Контрагент</button></div>
       <div class="pgroup" id="cplist">${list}<p class="pad dim" id="cnone" ${cpsSorted().some(x => !q || cpHay(x).includes(q)) ? 'hidden' : ''}>Ничего не найдено</p></div>
     </nav>
     <section class="odetail">${c ? cpDetail(c) : `<div class="empty"><h3>Выберите контрагента</h3>Слева список организаций. Откройте карточку, чтобы посмотреть контакты и загрузить договоры.</div>`}</section>
@@ -1429,7 +1440,7 @@ function vJobs(){
   const list = S.jobs.filter(j => F[ui.jF](j) && (!ui.jW || (ui.jW === '_me' ? onJob(j) : (j.workers || []).includes(ui.jW))) && (!q || hay(j).includes(q)))
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9999').localeCompare(b.due || '9999') || (b.createdAt || '').localeCompare(a.createdAt || ''));
   const head = `<div class="toolbar">
-    <span data-keep style="display:contents"><input class="in" id="jq" type="search" placeholder="Поиск: задача, работник, место" value="${esc(ui.jq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск задач"></span>
+    <span data-keep style="display:contents"><input class="in" id="jq" type="search" value="${esc(ui.jq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск задач"></span>
     <div class="seg">${[['active','Текущие'],['new','Назначены'],['work','В работе'],['done','Выполнены'],['all','Все']].map(([k,l]) => `<button data-act="jF" data-id="${k}" class="${ui.jF===k?'on':''}">${l}${k !== 'all' && cnt(k) ? ` (${cnt(k)})` : ''}</button>`).join('')}</div>
     ${isWorker() ? '' : `<select class="f" id="jW" aria-label="Работник"><option value="">Все работники</option><option value="_me" ${ui.jW==='_me'?'selected':''}>Мои задачи</option>${workersList().map(u => `<option value="${u.id}" ${ui.jW===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>`}
     <div class="seg"><button data-act="jMode" data-id="grid" class="${ui.jMode==='grid'?'on':''}">По датам</button><button data-act="jMode" data-id="list" class="${ui.jMode!=='grid'?'on':''}">Список</button></div>
@@ -1511,7 +1522,7 @@ function jobPlacesHtml(j){
 }
 function jobFormPlaces(){
   const P = ui.jPlaces || [];
-  return P.length ? `<ol class="jplaces">${P.map((pl, i) => `<li><span class="pnum">${i + 1}</span><input class="in" data-jpl="${i}" value="${esc(pl.label || '')}" placeholder="Подпись: адрес, объект" aria-label="Подпись места ${i + 1}"><small class="mono dim">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small><button type="button" class="btn sm ghost" data-act="delJPlace" data-id="${i}" aria-label="Удалить место">✕</button></li>`).join('')}</ol>`
+  return P.length ? `<ol class="jplaces">${P.map((pl, i) => `<li><span class="pnum">${i + 1}</span><input class="in" data-jpl="${i}" value="${esc(pl.label || '')}" aria-label="Подпись места ${i + 1}"><small class="mono dim">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small><button type="button" class="btn sm ghost" data-act="delJPlace" data-id="${i}" aria-label="Удалить место">✕</button></li>`).join('')}</ol>`
     : '<p class="dim" style="margin:0">Мест пока нет — нажмите на карту.</p>';
 }
 let mini = null;
@@ -1611,14 +1622,14 @@ function parseCoords(input){
 const fmtCoords = ll => `${(+ll.lat).toFixed(6)}, ${(+ll.lng).toFixed(6)}`;
 const COORDS_HINT = 'Широта, долгота: 55.751244, 37.618423 или 55°45\'04"N 37°37\'06"E. Можно вставить ссылку из Яндекс Карт или Google Maps.';
 function coordsField(ll, id){
-  return `<label>Координаты<input class="in mono" id="${id}" value="${ll ? fmtCoords(ll) : ''}" placeholder="55.751244, 37.618423" autocomplete="off" inputmode="text"></label>
+  return `<label>Координаты<input class="in mono" id="${id}" value="${ll ? fmtCoords(ll) : ''}" autocomplete="off" inputmode="text"></label>
     <small class="dim" style="font-size:12px">${esc(COORDS_HINT)}</small>`;
 }
 function pointForm(pt, ll){
   return `<div class="pp" data-keep><h4>${pt ? 'Изменить точку' : 'Новая точка'}</h4>
     ${coordsField(pt ? pt : ll, 'np-coords')}
-    <label>Название<input class="in" id="np-title" value="${esc(pt?.title || '')}" placeholder="Объект на ул. Ленина, 5"></label>
-    <label>Что нужно сделать<textarea class="in" id="np-todo" rows="3" placeholder="Замерить щитовую, сфотографировать ввод">${esc(pt?.todo || '')}</textarea></label>
+    <label>Название<input class="in" id="np-title" value="${esc(pt?.title || '')}"></label>
+    <label>Что нужно сделать<textarea class="in" id="np-todo" rows="3">${esc(pt?.todo || '')}</textarea></label>
     <label>Заказ<select class="in" id="np-order"><option value="">— без заказа —</option>${orderOpts(pt?.orderId || '')}</select></label>
     <div class="err" id="np-err"></div>
     <div class="row-g"><button class="btn sm primary" data-act="savePoint" data-id="${pt ? pt.id : ''}">Сохранить</button><button class="btn sm" data-act="cancelPoint">Отмена</button></div></div>`;
@@ -1861,7 +1872,7 @@ function vPlan(){
 /* ---------- drawer ---------- */
 function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
-  if (kind === 'invoiceForm') { const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
+  if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){ if (mini) { try { mini.remove(); } catch(e){} mini = null; } ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
@@ -1880,16 +1891,16 @@ function renderDrawer(){
     D.innerHTML = dh(o ? 'Заказ ' + esc(o.number) : 'Новый заказ') + `<form class="d-body" data-form="order"><div class="form">
       <label>Идентификатор заказа<input class="in" id="f-num" value="${o ? v(o,'number') : esc(nextOrderNumber())}" required>${o?'':'<small class="dim" style="font-size:12px">Присвоен автоматически, можно изменить</small>'}</label>
       <label>Статус<select class="in" id="f-st">${opt(ORDER_ST, o?.status||'new')}</select></label>
-      <label class="wide">Номер заказа<input class="in" id="f-ordno" value="${v(o,'orderNo')}" placeholder="Например, 4500123456 или 15 по договору № 7/2026">
+      <label class="wide">Номер заказа<input class="in" id="f-ordno" value="${v(o,'orderNo')}">
         <small class="dim" style="font-size:12px">Для заказов по рамочным договорам: номер заказа (заявки) заказчика. Можно не заполнять.</small></label>
-      <label class="wide">Наименование<input class="in" id="f-title" value="${v(o,'title')}" placeholder="Шкаф управления ШУ-3" required></label>
+      <label class="wide">Наименование<input class="in" id="f-title" value="${v(o,'title')}" required></label>
       <div class="wide fld"><label for="f-cust">Заказчик / получатель</label>
-        <div class="combo"><input class="in" id="f-cust" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cust-pop" value="${esc(custName(o))}" placeholder="Выберите из списка или начните вводить название">
+        <div class="combo"><input class="in" id="f-cust" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cust-pop" value="${esc(custName(o))}">
           <input type="hidden" id="f-cust-id" value="${esc(o?.customerId || '')}">
           <div class="combo-pop" id="cust-pop" role="listbox" hidden></div></div>
         <span class="cphint" id="cp-hint" hidden></span></div>
       <label>Срок сдачи<input class="in" type="date" id="f-dl" value="${v(o,'deadline')}"></label>
-      <label>№ выставленного счёта<input class="in" id="f-bill" value="${v(o,'billNo')}" placeholder="СЧ-0142"></label>
+      <label>№ выставленного счёта<input class="in" id="f-bill" value="${v(o,'billNo')}"></label>
       <label>Дата выставленного счёта<input class="in" type="date" id="f-billdate" value="${v(o,'billDate')}"></label></div>
       <p class="hint" style="margin:0">Счёт, который вы выставили заказчику по этому заказу. Можно заполнить позже.</p>
       <div class="err" id="ferr"></div>
@@ -1900,14 +1911,14 @@ function renderDrawer(){
     const c = cpOf(d.id), used = c && S.orders.some(o => o.customerId === c.id);
     const roles = c ? (c.roles || []) : (d.ctx ? [d.ctx] : ['customer']);
     D.innerHTML = dh(c ? esc(c.name) : 'Новый контрагент') + `<form class="d-body" data-form="cp"><div class="form">
-      <label class="wide">Название<input class="in" id="cp-name" value="${v(c,'name')}" placeholder="ООО «ЭлектроКомплект»" required></label>
+      <label class="wide">Название<input class="in" id="cp-name" value="${v(c,'name')}" required></label>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Роль</span><div class="row-g" style="margin-top:6px">${Object.entries(CP_ROLES).map(([k,l]) => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="cp-role" value="${k}" ${roles.includes(k)?'checked':''}> ${l}</label>`).join('')}</div></div>
-      <label>ИНН<input class="in mono" id="cp-inn" value="${v(c,'inn')}" inputmode="numeric" maxlength="12" placeholder="7701234567"></label>
-      <label>Сайт<input class="in" id="cp-site" value="${v(c,'site')}" placeholder="example.ru" inputmode="url"></label>
+      <label>ИНН<input class="in mono" id="cp-inn" value="${v(c,'inn')}" inputmode="numeric" maxlength="12"></label>
+      <label>Сайт<input class="in" id="cp-site" value="${v(c,'site')}" inputmode="url"></label>
       ${c ? '' : `<div class="wide" style="font-size:13px;color:var(--ink-2);margin-top:4px">Первый контакт (можно не заполнять, контакты добавляются и потом)</div>
-      <label class="wide">Контактное лицо<input class="in" id="cp-person" placeholder="Петров Иван Сергеевич"></label>
-      <label>Телефон<input class="in" id="cp-phone" type="tel" placeholder="+7 900 123-45-67"></label>
-      <label>Эл. почта<input class="in" id="cp-email" type="email" placeholder="zakaz@example.ru"></label>`}</div>
+      <label class="wide">Контактное лицо<input class="in" id="cp-person"></label>
+      <label>Телефон<input class="in" id="cp-phone" type="tel"></label>
+      <label>Эл. почта<input class="in" id="cp-email" type="email"></label>`}</div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${c?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button>
       ${c ? (used ? '<span class="dim" style="font-size:13px">Контрагент указан в заказах, удалить нельзя</span>' : armBtn('cp','Удалить','delCp',c.id)) : ''}</div></form>`;
@@ -1938,7 +1949,7 @@ function renderDrawer(){
     const [poid, ppid] = String(d.id || '').split('|'), pp = prodOf(poid, ppid);
     const had = it => pp && (pp.components || []).find(c => c.stockId === it.id || (!c.stockId && normName(c.name) === normName(it.name)));
     D.innerHTML = dh('Компоненты со склада') + `<form class="d-body" data-form="pickStock">
-      <span data-keep style="display:contents"><input class="in" id="pick-q" type="search" placeholder="Поиск по складу" value="${esc(ui.pickQ || '')}"></span>
+      <span data-keep style="display:contents"><input class="in" id="pick-q" type="search" aria-label="Поиск по складу" value="${esc(ui.pickQ || '')}"></span>
       ${S.stock.length ? `<ul class="pick">${S.stock.slice().sort((a,b) => a.name.localeCompare(b.name,'ru')).map(it => `<li data-q="${esc(normName(it.name + ' ' + (it.sku || '')))}" ${pickHit(normName(it.name + ' ' + (it.sku || '')), ui.pickQ) ? '' : 'hidden'}>
         <input type="checkbox" name="pick" value="${it.id}" aria-label="${esc(it.name)}" ${had(it) ? 'checked' : ''}><span><b style="font-weight:500">${esc(it.name)}</b><small>${esc([it.sku, 'факт ' + fmtQty(it.qty), 'бух ' + fmtQty(it.acctQty), it.unit, had(it) ? 'уже в изделии' : ''].filter(Boolean).join(' · '))}</small></span>
         <input class="in mono" data-pq="${it.id}" value="${esc(had(it) ? had(it).qty : 1)}" inputmode="decimal" aria-label="Количество на одно изделие" title="на одно изделие"></li>`).join('')}</ul>` : '<p class="dim">Склад пуст. Загрузите выгрузку 1С или добавьте позиции на вкладке «Склад».</p>'}
@@ -1962,17 +1973,17 @@ function renderDrawer(){
   if (d.kind === 'product') {
     const [oid, pid] = String(d.id || '').split('|'); const p = pid ? prodOf(oid, pid) : null;
     D.innerHTML = dh(p ? 'Изделие' : 'Новое изделие') + `<form class="d-body" data-form="product"><div class="form">
-      <label class="wide">Наименование изделия<input class="in" id="pr-name" value="${v(p,'name')}" placeholder="Шкаф управления ШУ-3" required></label>
+      <label class="wide">Наименование изделия<input class="in" id="pr-name" value="${v(p,'name')}" required></label>
       <label>Количество<input class="in mono" id="pr-qty" value="${esc(p ? p.qty : 1)}" inputmode="decimal" required></label>
       <label>Единица<input class="in" id="pr-unit" value="${esc(p?.unit || 'шт')}"></label>
-      <label class="wide">Примечание<input class="in" id="pr-note" value="${v(p,'note')}" placeholder="Исполнение IP54, цвет RAL 7035"></label></div>
+      <label class="wide">Примечание<input class="in" id="pr-note" value="${v(p,'note')}"></label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${p ? 'Сохранить' : 'Добавить изделие'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'pastePComp') {
     D.innerHTML = dh('Компоненты из Excel') + `<form class="d-body" data-form="pastePComp">
       <p style="margin:0">Скопируйте строки в Excel и вставьте сюда. Порядок столбцов:<br><b>Компонент · Кол-во на одно изделие · Ед.</b> Строку заголовков можно не удалять.</p>
-      <textarea id="paste-t" rows="10" class="mono" placeholder="Автоматический выключатель 3P 16А&#9;2&#9;шт"></textarea>
+      <textarea id="paste-t" rows="10" class="mono" aria-label="Строки из Excel"></textarea>
       <div class="dim" id="paste-info">Строк к добавлению: 0</div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Добавить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -1980,12 +1991,12 @@ function renderDrawer(){
   if (d.kind === 'stockItem') {
     const it = S.stock.find(x => x.id === d.id);
     D.innerHTML = dh(it ? 'Позиция склада' : 'Новая позиция склада') + `<form class="d-body" data-form="stockItem"><div class="form">
-      <label class="wide">Наименование<input class="in" id="st-name" value="${v(it,'name')}" placeholder="Автоматический выключатель 3P 16А" required></label>
-      <label>Артикул<input class="in mono" id="st-sku" value="${v(it,'sku')}" placeholder="BA47-29"></label>
+      <label class="wide">Наименование<input class="in" id="st-name" value="${v(it,'name')}" required></label>
+      <label>Артикул<input class="in mono" id="st-sku" value="${v(it,'sku')}"></label>
       <label>Единица<input class="in" id="st-unit" value="${esc(it?.unit || 'шт')}"></label>
-      <label>Место хранения<input class="in" id="st-loc" value="${v(it,'location')}" placeholder="Стеллаж А-3"></label>
-      <label>Минимальный запас<input class="in mono" id="st-min" value="${esc(it?.minQty || '')}" inputmode="decimal" placeholder="0"></label>
-      ${it ? '' : '<label>Начальный остаток<input class="in mono" id="st-init" inputmode="decimal" placeholder="0"></label>'}
+      <label>Место хранения<input class="in" id="st-loc" value="${v(it,'location')}"></label>
+      <label>Минимальный запас<input class="in mono" id="st-min" value="${esc(it?.minQty || '')}" inputmode="decimal"></label>
+      ${it ? '' : '<label>Начальный остаток<input class="in mono" id="st-init" inputmode="decimal"></label>'}
       <label class="wide">Примечание<input class="in" id="st-note" value="${v(it,'note')}"></label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${it ? 'Сохранить' : 'Добавить'}</button><button class="btn" type="button" data-act="${it ? 'viewStock' : 'close'}" data-id="${it ? it.id : ''}">Отмена</button>${it ? armBtn('st:'+it.id, 'Удалить позицию', 'delStock', it.id) : ''}</div></form>`;
@@ -1993,10 +2004,10 @@ function renderDrawer(){
   if (d.kind === 'stockMove') {
     const it = S.stock.find(x => x.id === d.id), isIn = d.ctx === 'in';
     D.innerHTML = dh((isIn ? 'Приход: ' : 'Расход: ') + esc(it?.name || '')) + `<form class="d-body" data-form="stockMove"><div class="form">
-      <label>Количество, ${esc(it?.unit || 'шт')}<input class="in mono" id="mv-qty" inputmode="decimal" required placeholder="0"></label>
+      <label>Количество, ${esc(it?.unit || 'шт')}<input class="in mono" id="mv-qty" inputmode="decimal" required></label>
       <div class="fld"><span>Сейчас на складе</span><b style="font:600 18px var(--f-mono);color:var(--ink);padding-top:6px">${fmtQty(it?.qty)} ${esc(it?.unit || 'шт')}</b></div>
       <label class="wide">${isIn ? 'Заказ (если приход под заказ)' : 'На какой заказ'}<select class="in" id="mv-order"><option value="">— без заказа —</option>${orderOpts(ui.order || '')}</select></label>
-      <label class="wide">Комментарий<input class="in" id="mv-note" placeholder="${isIn ? 'Поставщик, № накладной' : 'Кому выдано, для чего'}"></label></div>
+      <label class="wide">Комментарий<input class="in" id="mv-note"></label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn ${isIn ? 'ok' : 'primary'}" type="submit">${isIn ? 'Оприходовать' : 'Списать со склада'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
@@ -2014,10 +2025,10 @@ function renderDrawer(){
   }
   if (d.kind === 'pointCoords') {
     D.innerHTML = dh('Точка по координатам') + `<form class="d-body" data-form="pointCoords"><div class="form">
-      <label class="wide">Координаты<input class="in mono" id="pc-coords" placeholder="55.751244, 37.618423" autocomplete="off" required>
+      <label class="wide">Координаты<input class="in mono" id="pc-coords" autocomplete="off" required>
         <small class="dim" style="font-size:12px">${esc(COORDS_HINT)}</small></label>
-      <label class="wide">Название<input class="in" id="pc-title" placeholder="Объект на ул. Ленина, 5"></label>
-      <label class="wide">Что нужно сделать<textarea id="pc-todo" rows="3" placeholder="Замерить щитовую, сфотографировать ввод"></textarea></label>
+      <label class="wide">Название<input class="in" id="pc-title"></label>
+      <label class="wide">Что нужно сделать<textarea id="pc-todo" rows="3"></textarea></label>
       <label class="wide">Заказ<select class="in" id="pc-order"><option value="">— без заказа —</option>${orderOpts('')}</select></label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Поставить точку</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -2025,18 +2036,18 @@ function renderDrawer(){
   if (d.kind === 'contact') {
     const c = cpOf(d.id), k = contactsOf(c).find(x => x.id === d.ctx);
     D.innerHTML = dh((k ? 'Контакт · ' : 'Новый контакт · ') + esc(c?.name || '')) + `<form class="d-body" data-form="contact"><div class="form">
-      <label class="wide">Контактное лицо<input class="in" id="ct-name" value="${v(k,'name')}" placeholder="Петров Иван Сергеевич" required></label>
-      <label>Телефон<input class="in" id="ct-phone" type="tel" value="${v(k,'phone')}" placeholder="+7 900 123-45-67"></label>
-      <label>Эл. почта<input class="in" id="ct-email" type="email" value="${v(k,'email')}" placeholder="zakaz@example.ru"></label></div>
+      <label class="wide">Контактное лицо<input class="in" id="ct-name" value="${v(k,'name')}" required></label>
+      <label>Телефон<input class="in" id="ct-phone" type="tel" value="${v(k,'phone')}"></label>
+      <label>Эл. почта<input class="in" id="ct-email" type="email" value="${v(k,'email')}"></label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${k?'Сохранить':'Добавить контакт'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'contract') {
     const c = cpOf(d.id);
     D.innerHTML = dh('Договор с ' + esc(c?.name || '')) + `<form class="d-body" data-form="contract"><div class="form">
-      <label>Номер договора<input class="in" id="k-num" placeholder="12/2026-П"></label>
+      <label>Номер договора<input class="in" id="k-num"></label>
       <label>Дата<input class="in" type="date" id="k-date" value="${today()}"></label>
-      <label class="wide">Предмет договора<input class="in" id="k-subj" placeholder="Поставка электрооборудования"></label>
+      <label class="wide">Предмет договора<input class="in" id="k-subj"></label>
       <label class="wide">Файл договора<input class="in" type="file" id="k-file" required></label></div>
       <p class="hint" style="margin:0">Любой формат: скан PDF, Word, изображение. До 50 МБ.</p>
       <div class="err" id="ferr"></div>
@@ -2049,13 +2060,13 @@ function renderDrawer(){
         <small class="dim" style="font-size:12px">Из PDF-счёта номер, сумма, дата и поставщик подставятся сами — проверьте их.</small></label>
       <div class="wide" id="f-parse" hidden></div>
       <label class="wide">Заказ<select class="in" id="f-ord" required>${orderOpts(i?.orderId || d.ctx)}</select></label>
-      <label>Номер счёта<input class="in" id="f-num" value="${v(i,'number')}" placeholder="1482" required></label>
+      <label>Номер счёта<input class="in" id="f-num" value="${v(i,'number')}" required></label>
       <label>Дата счёта<input class="in" type="date" id="f-date" value="${esc(i?.date || today())}"></label>
-      <label class="wide">Поставщик<input class="in" id="f-sup" list="sup-list" autocomplete="off" value="${v(i,'supplier')}" placeholder="ООО «ЭлектроКомплект»" required>
+      <label class="wide">Поставщик<input class="in" id="f-sup" list="sup-list" autocomplete="off" value="${v(i,'supplier')}" required>
         <datalist id="sup-list">${cpsSorted().map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist></label>
-      <label>Сумма, ₽ с НДС<input class="in mono" id="f-amt" value="${v(i,'amount')}" inputmode="decimal" placeholder="125 400,00" required></label>
+      <label>Сумма, ₽ с НДС<input class="in mono" id="f-amt" value="${v(i,'amount')}" inputmode="decimal" required></label>
       <label>Оплатить до<input class="in" type="date" id="f-due" value="${v(i,'due')}"></label>
-      <label class="wide">Назначение платежа<input class="in" id="f-purp" value="${v(i,'purpose')}" placeholder="Автоматические выключатели по спецификации"></label>
+      <label class="wide">Назначение платежа<input class="in" id="f-purp" value="${v(i,'purpose')}"></label>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Строки счёта — по ним создаётся приход на склад</span>
         ${i?.income ? `<p class="dim" style="margin:6px 0 0">Приход по счёту уже оприходован (${esc(fmtDT(i.income.at))}), строки не меняются.</p>` : `<div id="ln-invItems" class="lnbox">${lnInner('invItems')}</div>`}</div>
 </div>
@@ -2079,21 +2090,21 @@ function renderDrawer(){
   if (d.kind === 'orgForm') {
     const o = d.id && orgOf(d.id), mine = o && o.id === me.org?.id;
     D.innerHTML = dh(o ? esc(o.name) : 'Новая организация') + `<form class="d-body" data-form="org"><div class="form">
-      <label class="wide">Название организации<input class="in" id="o-name" value="${v(o,'name')}" placeholder="ООО «Электромонтаж»" required></label>
+      <label class="wide">Название организации<input class="in" id="o-name" value="${v(o,'name')}" required></label>
       <label>Доступ до (включительно)<input class="in" type="date" id="o-until" value="${v(o,'until')}"><small class="dim" style="font-size:12px">Пусто — без срока. После этой даты всем в организации покажется сообщение о блокировке.</small></label>
-      ${o ? '' : `<label>Код (латиницей, необязательно)<input class="in mono" id="o-id" placeholder="elmontazh" pattern="[a-z0-9][a-z0-9-]{1,30}"></label>`}
-      <label class="wide">Заметка (видна только вам)<input class="in" id="o-note" value="${v(o,'note')}" placeholder="Договор 15/2026, оплата помесячно"></label>
+      ${o ? '' : `<label>Код (латиницей, необязательно)<input class="in mono" id="o-id" pattern="[a-z0-9][a-z0-9-]{1,30}"></label>`}
+      <label class="wide">Заметка (видна только вам)<input class="in" id="o-note" value="${v(o,'note')}"></label>
       ${o && !mine ? `<label class="wide chk" style="flex-direction:row;display:flex;gap:8px"><input type="checkbox" id="o-blocked" ${o.blocked ? 'checked' : ''}> Заблокировать организацию сейчас</label>
-      <label class="wide">Пояснение к блокировке (увидят пользователи)<input class="in" id="o-bnote" value="${v(o,'blockNote')}" placeholder="Не продлён договор обслуживания."></label>` : ''}
+      <label class="wide">Пояснение к блокировке (увидят пользователи)<input class="in" id="o-bnote" value="${v(o,'blockNote')}"></label>` : ''}
       ${o ? '' : `<div class="wide" style="font-size:13px;color:var(--ink-2);margin-top:6px">Администратор организации — он добавит остальных пользователей</div>
-      <label class="wide">Имя<input class="in" id="oa-name" placeholder="Петров Иван Сергеевич" required></label>
-      <label>Логин (латиницей)<input class="in" id="oa-login" autocomplete="off" placeholder="petrov" required></label>
+      <label class="wide">Имя<input class="in" id="oa-name" required></label>
+      <label>Логин (латиницей)<input class="in" id="oa-login" autocomplete="off" required></label>
       <label>Пароль, не короче 8 символов<input class="in" id="oa-pass" autocomplete="new-password" required></label>`}
       </div>
       ${o ? `<div class="box adm"><h4>Администраторы организации</h4>
         ${o.admins.length ? `<ul>${o.admins.map(a => `<li><span><b style="font-weight:500">${esc(a.name)}</b> <span class="mono dim">${esc(a.login)}</span>${a.sys ? ' <span class="chip c-info">администратор системы</span>' : ''}${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}<br><small class="dim">${a.lastLoginAt ? 'вход ' + esc(fmtDT(a.lastLoginAt)) : 'ещё не входил'}</small></span>
-          ${a.id === me.id ? '' : `<span class="row-g"><input class="in" type="text" data-apw="${a.id}" placeholder="новый пароль" autocomplete="new-password" aria-label="Новый пароль для ${esc(a.login)}"><button type="button" class="btn sm" data-act="orgAdmPw" data-id="${o.id}|${a.id}">Сменить пароль</button><button type="button" class="btn sm" data-act="orgAdmBlock" data-id="${o.id}|${a.id}|${a.blocked ? 0 : 1}">${a.blocked ? 'Разблокировать' : 'Заблокировать'}</button></span>`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Администраторов нет.</p>'}
-        <div class="form" style="margin-top:4px"><label>Имя<input class="in" id="na-name" placeholder="Новый администратор"></label><label>Логин<input class="in" id="na-login" autocomplete="off"></label><label>Пароль<input class="in" id="na-pass" autocomplete="new-password"></label>
+          ${a.id === me.id ? '' : `<span class="row-g"><input class="in" type="text" data-apw="${a.id}" autocomplete="new-password" aria-label="Новый пароль для ${esc(a.login)}"><button type="button" class="btn sm" data-act="orgAdmPw" data-id="${o.id}|${a.id}">Сменить пароль</button><button type="button" class="btn sm" data-act="orgAdmBlock" data-id="${o.id}|${a.id}|${a.blocked ? 0 : 1}">${a.blocked ? 'Разблокировать' : 'Заблокировать'}</button></span>`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Администраторов нет.</p>'}
+        <div class="form" style="margin-top:4px"><label>Имя<input class="in" id="na-name"></label><label>Логин<input class="in" id="na-login" autocomplete="off"></label><label>Пароль<input class="in" id="na-pass" autocomplete="new-password"></label>
           <div style="display:flex;align-items:flex-end"><button type="button" class="btn sm" data-act="orgAdmAdd" data-id="${o.id}">+ Добавить администратора</button></div></div></div>` : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${o ? 'Сохранить' : 'Создать организацию'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -2117,7 +2128,7 @@ function renderDrawer(){
       <div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>
       ${j.status === 'done' ? (j.report ? `<div class="box paid"><h4>Отчёт</h4><p class="jdesc" style="margin:0">${esc(j.report)}</p></div>` : '')
         : act ? `<div class="box"><h4>${j.status === 'new' ? 'Начать работу' : 'Отметить выполнение'}</h4>
-          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-2)">Комментарий о выполнении (необязательно)<span data-keep style="display:contents"><textarea class="in" id="j-report" rows="3" placeholder="Что сделано, что осталось">${esc(j.report || '')}</textarea></span></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-2)">Комментарий о выполнении (необязательно)<span data-keep style="display:contents"><textarea class="in" id="j-report" rows="3">${esc(j.report || '')}</textarea></span></label>
           <div class="row-g">${j.status === 'new' ? `<button class="btn" data-act="jobStatus" data-id="${j.id}|work">Начать работу</button>` : ''}<button class="btn ok" data-act="jobStatus" data-id="${j.id}|done">✓ Выполнено</button></div></div>` : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g">${j.status === 'done' && act ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Вернуть в работу</button>` : ''}
@@ -2131,8 +2142,8 @@ function renderDrawer(){
     const extra = j ? (j.workers || []).filter(id => !W.some(u => u.id === id)).map(id => ({ id, name: who(id) })) : [];
     const leaderSel = j ? j.leaderId : (me.role === 'user' || me.role === 'manager' || me.role === 'admin' ? me.id : '');
     D.innerHTML = dh(j ? 'Изменить задачу' : 'Новая задача') + `<form class="d-body" data-form="job"><div class="form">
-      <label class="wide">Что нужно сделать<input class="in" id="j-title" value="${v(j,'title')}" placeholder="Монтаж шкафа ШУ-3 на объекте" required></label>
-      <label class="wide">Описание<textarea class="in" id="j-desc" rows="3" placeholder="Кратко: что сделать, что взять с собой, к кому обратиться">${esc(j?.description || '')}</textarea></label>
+      <label class="wide">Что нужно сделать<input class="in" id="j-title" value="${v(j,'title')}" required></label>
+      <label class="wide">Описание<textarea class="in" id="j-desc" rows="3">${esc(j?.description || '')}</textarea></label>
       <label class="wide">Ответственный руководитель<select class="in" id="j-leader" required>${LD.map(u => `<option value="${u.id}" ${u.id === leaderSel ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role])}</option>`).join('')}</select></label>
       <label>Начало<input class="in" type="date" id="j-start" value="${esc(j ? (j.start || '') : d.ctx?.date || today())}"></label>
       <label>Срок (окончание)<input class="in" type="date" id="j-due" value="${esc(j ? (j.due || '') : d.ctx?.date || '')}"></label>
@@ -2142,7 +2153,7 @@ function renderDrawer(){
           : `<p class="dim" style="margin:6px 0 0">Нет пользователей с ролью «Работник». ${me.role === 'admin' ? 'Добавьте их на вкладке «Пользователи».' : 'Попросите администратора добавить их.'}</p>`}</div>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Место или места проведения работ — нажмите на карту, метку можно перетащить</span>
         <div id="jfmap" class="minimap" style="margin-top:6px"></div>
-        <div class="row-g" style="margin-top:8px"><input class="in mono" id="jf-coords" placeholder="или координаты: 55.75120, 37.61840" style="flex:1 1 220px;min-width:0"><button type="button" class="btn sm" data-act="addJPlace">Добавить</button></div>
+        <div class="row-g" style="margin-top:8px"><span class="dim" style="font-size:13px">или координаты</span><input class="in mono" id="jf-coords" aria-label="Координаты места" style="flex:1 1 220px;min-width:0"><button type="button" class="btn sm" data-act="addJPlace">Добавить</button></div>
         <div id="jf-places" style="margin-top:8px">${jobFormPlaces()}</div></div>
       </div>
       <div class="err" id="ferr"></div>
@@ -2190,7 +2201,7 @@ function renderDrawer(){
         <div class="row-g"><button class="btn sm${ownInv(i)?' own':''}" data-act="editInvoice" data-id="${i.id}">Изменить счёт</button>${armBtn('inv','Удалить счёт','delInvoice',i.id,'btn sm danger'+(ownInv(i)?' own':''))}</div>`
       : `<form class="box" data-form="pay"><h4>Отметить оплату</h4><div class="form">
           <label>Дата оплаты<input class="in" type="date" id="p-date" value="${today()}" required></label>
-          <label>№ платёжного поручения<input class="in" id="p-no" placeholder="845"></label>
+          <label>№ платёжного поручения<input class="in" id="p-no"></label>
           <label>Сумма оплаты, ₽<input class="in mono" id="p-amt" value="${esc(i.amount)}" inputmode="decimal"></label>
           <label>Чек / платёжка<input class="in" type="file" id="p-file" accept="${ACCEPT}"></label></div>
           <div class="err" id="ferr"></div>
@@ -2205,12 +2216,12 @@ function renderDrawer(){
     D.innerHTML = dh(t ? 'Задача план-графика' : 'Новая задача') + `<form class="d-body" data-form="task"><div class="form">
       <label class="wide">Заказ<select class="in" id="t-target">${targetOpts(sel)}</select></label>
       <label>Тип<select class="in" id="t-kind">${opt(KIND, t?.kind||'buy')}</select></label>
-      <label>Ответственный<input class="in" id="t-resp" value="${v(t,'resp')}" placeholder="Смирнов Д. В."></label>
-      <label class="wide">Название<input class="in" id="t-title" value="${v(t,'title')}" placeholder="Закупка кабельной продукции" required></label>
+      <label>Ответственный<input class="in" id="t-resp" value="${v(t,'resp')}"></label>
+      <label class="wide">Название<input class="in" id="t-title" value="${v(t,'title')}" required></label>
       <label>Начало<input class="in" type="date" id="t-start" value="${esc(st)}" required></label>
       <label>Окончание<input class="in" type="date" id="t-end" value="${esc(t?.end || dstr(dnum(st)+7))}" required></label>
-      <label>Своих людей, чел.<input class="in mono" type="number" id="t-people" min="0" max="999" step="1" inputmode="numeric" value="${esc(t?.people || '')}" placeholder="0"></label>
-      <label>Бригад подрядчиков<input class="in mono" type="number" id="t-brig" min="0" max="99" step="1" inputmode="numeric" value="${esc(t ? (brigadesOf(t) || '') : '')}" placeholder="0"></label>
+      <label>Своих людей, чел.<input class="in mono" type="number" id="t-people" min="0" max="999" step="1" inputmode="numeric" value="${esc(t?.people || '')}"></label>
+      <label>Бригад подрядчиков<input class="in mono" type="number" id="t-brig" min="0" max="99" step="1" inputmode="numeric" value="${esc(t ? (brigadesOf(t) || '') : '')}"></label>
       <label class="wide chk"><input type="checkbox" id="t-done" ${t?.done?'checked':''}> Выполнено</label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${t?'Сохранить':'Добавить в график'}</button><button class="btn" type="button" data-act="close">Отмена</button>${t?armBtn('task','Удалить','delTask',t.id):''}</div></form>`;
@@ -2219,8 +2230,8 @@ function renderDrawer(){
     const u = (ui.usersList || []).find(x => x.id === d.id);
     const self = u && u.id === me.id;
     D.innerHTML = dh(u ? 'Пользователь: ' + esc(u.name) : 'Новый пользователь') + `<form class="d-body" data-form="userForm"><div class="form">
-      <label class="wide">Имя<input class="in" id="uf-name" value="${v(u,'name')}" placeholder="Петрова А. С." required></label>
-      <label>Логин (латиницей)<input class="in" id="uf-login" value="${v(u,'login')}" autocomplete="off" placeholder="petrova" required></label>
+      <label class="wide">Имя<input class="in" id="uf-name" value="${v(u,'name')}" required></label>
+      <label>Логин (латиницей)<input class="in" id="uf-login" value="${v(u,'login')}" autocomplete="off" required></label>
       <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(ROLE_NAMES, u?.role || 'user')}</select></label>
       <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<input class="in" id="uf-pass" autocomplete="new-password" ${u?'':'required'}></label></div>
       <p class="hint dim" id="uf-info" style="margin:0">${esc(ROLE_INFO[u?.role || 'user'])}</p>
@@ -2239,7 +2250,7 @@ function renderDrawer(){
     const o = ord(d.id);
     D.innerHTML = dh('Вставка строк из Excel') + `<form class="d-body" data-form="paste">
       <p style="margin:0">Скопируйте строки в Excel и вставьте сюда. Порядок столбцов:<br><b>Наименование · Кол-во · Ед. · Поставщик · № счёта</b>. Строку заголовков можно не удалять. Пустой поставщик — позиция в наличии.</p>
-      <textarea id="paste-t" rows="10" class="mono" placeholder="Автоматический выключатель 3P 16А&#9;12&#9;шт&#9;ЭлектроКомплект&#9;1482"></textarea>
+      <textarea id="paste-t" rows="10" class="mono" aria-label="Строки из Excel"></textarea>
       <div class="dim" id="paste-info">Строк к добавлению: 0</div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Добавить в заказ ${esc(o?.number||'')}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -2430,7 +2441,7 @@ async function onSubmit(e){
       if (d.id) { r = await upd('invoices', d.id, data); openDrawer('invoice', d.id); }
       else { r = await api('POST', '/api/invoices', { ...data, status:'topay', createdAt:now, createdBy:me }); id = r.id; await refresh(); closeDrawer(); }
       const n = (data.items || []).length;
-      toast((d.id ? 'Счёт сохранён' : 'Счёт добавлен и передан в бухгалтерию') + (r?.cpCreated ? `. «${data.supplier}» добавлен в контрагенты` : '') + (!d.id && n ? `. Создан приход на склад: ${n} стр. — оприходуйте его кнопкой в счёте` : ''));
+      toast((d.id ? 'Счёт сохранён' : 'Счёт добавлен и передан в бухгалтерию') + (r?.cpCreated ? `. «${data.supplier}» добавлен в контрагенты` : '') + (r?.linesFilled ? `. Поставщик вставлен в строки для закупки: ${r.linesFilled}` : '') + (!d.id && n ? `. Создан приход на склад: ${n} стр. — оприходуйте его кнопкой в счёте` : ''));
     }
     if (kind === 'pay') {
       if (!val('p-date')) return fail('Укажите дату оплаты.');

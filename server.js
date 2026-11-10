@@ -115,6 +115,23 @@ function cleanItems(list){
     stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null,
   })).filter(x => x.name);
 }
+/* The order's purchase lines bought by this invoice get its supplier and number:
+   lines whose name matches a line of the invoice, or that already carry its number; a line with a supplier is left alone */
+function fillOrderSuppliers(inv){
+  const o = inv && db.orders[inv.orderId];
+  if (!o || !Array.isArray(o.components) || !String(inv.supplier || '').trim()) return 0;
+  const names = (inv.items || []).map(x => normName(x.name)).filter(Boolean), num = String(inv.number || '').trim();
+  let n = 0;
+  for (const c of o.components) {
+    if (String(c.supplier || '').trim()) continue;
+    const cn = normName(c.name); if (!cn) continue;
+    const hit = (num && String(c.invNo || '').trim() === num) || names.some(x => x === cn || (cn.length >= 6 && x.includes(cn)) || (x.length >= 6 && cn.includes(x)));
+    if (!hit) continue;
+    c.supplier = inv.supplier; if (!String(c.invNo || '').trim() && num) c.invNo = num; n++;
+  }
+  if (n) { o.updatedAt = new Date().toISOString(); }
+  return n;
+}
 /* Supplier of an invoice: found among counterparties by INN or name, otherwise added */
 function ensureSupplier(name, inn, user, note){
   name = String(name || '').trim(); inn = String(inn || '').replace(/\D/g, '').slice(0, 12);
@@ -550,6 +567,7 @@ async function api(req, res, url) {
       }
       inv.items = out.map(({ moveId, ...x }) => x);
       inv.income = { at, by: user.id, lines: out };
+      fillOrderSuppliers(inv);
       saveDb();
       return send(res, 200, { ok: true, lines: out.length, created, rev: db.rev });
     }
@@ -629,8 +647,10 @@ async function api(req, res, url) {
     }
     let cpCreated = false;
     if (col === 'invoices') { const sup = ensureSupplier(data.supplier, data.supplierInn, user, `Добавлен по счёту № ${data.number || '—'}`); data.supplierId = sup.id; cpCreated = sup.created; }
-    const nid = newId(); db[col][nid] = data; saveDb();
-    return send(res, 200, { id: nid, rev: db.rev, cpCreated });
+    const nid = newId(); db[col][nid] = data;
+    const linesFilled = col === 'invoices' ? fillOrderSuppliers(data) : 0;
+    saveDb();
+    return send(res, 200, { id: nid, rev: db.rev, cpCreated, linesFilled });
   }
   if (!id || !db[col][id]) return fail(res, 404, 'Запись не найдена');
 
@@ -708,8 +728,9 @@ async function api(req, res, url) {
       const sup = ensureSupplier(patch.supplier, patch.supplierInn, user, `Добавлен по счёту № ${patch.number || db.invoices[id].number || '—'}`); patch.supplierId = sup.id; cpCreated = sup.created;
     }
     Object.assign(db[col][id], patch, { updatedAt: new Date().toISOString(), updatedBy: user.id });
+    const linesFilled = col === 'invoices' && ['supplier', 'number', 'items', 'orderId'].some(k => k in patch) ? fillOrderSuppliers(db[col][id]) : 0;
     saveDb();
-    return send(res, 200, { ok: true, rev: db.rev, cpCreated });
+    return send(res, 200, { ok: true, rev: db.rev, cpCreated, linesFilled });
   }
   if (m === 'DELETE') {
     const d = db[col][id];
