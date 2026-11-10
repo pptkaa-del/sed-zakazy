@@ -697,7 +697,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#pay" data-v="pay">Бухгалтерия <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
-      <a href="#dt" data-v="dt">Замена ДТ</a>
+      <a href="#dt" data-v="dt">Редактор карты</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
     </nav>
@@ -736,7 +736,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
   <section id="dtView" hidden>
     <div class="dtbar" id="dtInfo"></div>
     <div class="toolbar" id="dtTools"></div>
-    <div class="mapgrid"><div id="dtmap" role="application" aria-label="Карта «Замена ДТ»"></div><div class="plist" id="dtlist"></div></div>
+    <div class="mapgrid"><div id="dtmap" role="application" aria-label="Редактор карты"></div><div class="plist" id="dtlist"></div></div>
     <div class="legend2" id="dtLegend" style="margin-top:10px"></div>
   </section>
 </main>
@@ -1633,7 +1633,7 @@ function mountMini(){
   setTimeout(() => mini && mini.invalidateSize(), 50); setTimeout(() => mini && mini.invalidateSize(), 400);
 }
 
-/* ===== Замена ДТ: objects from a spreadsheet on a map, marked when they stand on the MKAD, the TTK or an overpass ===== */
+/* ===== Редактор карты: objects from a spreadsheet on a map, marked when they stand on the MKAD, the TTK or an overpass ===== */
 const DT = { loaded:false, points:[], meta:{}, geom:null };
 const DT_CAT = { road:'Дороги', mkad:'МКАД', ttk:'ТТК', bridge:'Эстакады', check:'Проверить' };
 const DT_COLOR = { road:'#2E9E4F', mkad:'#E02424', ttk:'#7B2CBF', bridge:'#8B1E3F', check:'#E0A800' };
@@ -1888,8 +1888,8 @@ async function dtExport(){
   const X = await loadSheetJS();
   const rows = DT.points.filter(dtMatch).map(p => ({ 'Номер объекта': p.no, 'Модемов': dtModems(p), 'Широта': p.lat, 'Долгота': p.lng, 'МКАД': (p.cats || []).includes('mkad') ? 'да' : '', 'ТТК': (p.cats || []).includes('ttk') ? 'да' : '', 'Эстакада': (p.cats || []).includes('bridge') ? 'да' : '', 'Проверить': (p.cats || []).includes('check') ? 'да' : '', 'Проверено': p.checkedAt ? `${fmtDT(p.checkedAt)}, ${who(p.checkedBy)}` : '', 'Дорога': p.road || '', 'Эстакада (название)': p.bridge || '', 'До оси, м': p.dist ?? '' }));
   const ws = X.utils.json_to_sheet(rows); ws['!cols'] = [12, 9, 11, 11, 7, 7, 9, 10, 24, 28, 32, 9].map(w => ({ wch: w }));
-  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Замена ДТ');
-  X.writeFile(wb, `Замена ДТ — ${['road', 'mkad', 'ttk', 'bridge'].filter(k => DT_SHOW[k]).map(k => DT_CAT[k]).join(', ')}${ui.dtOnlyCheck ? ', только проверить' : ''} — ${today()}.xlsx`);
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Редактор карты');
+  X.writeFile(wb, `Редактор карты — ${['road', 'mkad', 'ttk', 'bridge'].filter(k => DT_SHOW[k]).map(k => DT_CAT[k]).join(', ')}${ui.dtOnlyCheck ? ', только проверить' : ''} — ${today()}.xlsx`);
 }
 
 /* ===== Map of objects ===== */
@@ -2780,7 +2780,7 @@ async function onSubmit(e){
       fail('Сохраняем…');
       let n = 0, jobsDone = 0;
       if (newOpen && newTitle) {
-        await api('POST', '/api/jobs', { title:newTitle, description:'Точки из «Замена ДТ»' + (DT.meta.file ? ` (файл «${DT.meta.file}»)` : ''), workers:newW, leaderId:me.id, start:val('dtn-start'), due:val('dtn-due'), places:pts.map(asPlace) });
+        await api('POST', '/api/jobs', { title:newTitle, description:'Точки из «Редактора карты»' + (DT.meta.file ? ` (файл «${DT.meta.file}»)` : ''), workers:newW, leaderId:me.id, start:val('dtn-start'), due:val('dtn-due'), places:pts.map(asPlace) });
         n += pts.length; jobsDone++;
       }
       for (const id of ids) {

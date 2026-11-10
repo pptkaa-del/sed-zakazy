@@ -89,7 +89,7 @@ function cleanJob(d){
   if ('orderId' in d) out.orderId = d.orderId && db.orders[d.orderId] ? d.orderId : null;
   if ('leaderId' in d) { const l = orgUsers().find(u => u.id === d.leaderId); out.leaderId = l && ['admin', 'manager', 'user'].includes(l.role) ? l.id : null; }
   if ('workers' in d) out.workers = [...new Set((Array.isArray(d.workers) ? d.workers : []).filter(id => orgUsers().some(u => u.id === id)))].slice(0, 50);
-  // up to 5000 places: points from «Замена ДТ» keep the object number and its marks
+  // up to 5000 places: points from «Редактор карты» keep the object number and its marks
   if ('places' in d) out.places = (Array.isArray(d.places) ? d.places : []).slice(0, 5000)
     .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
     .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200),
@@ -451,7 +451,7 @@ async function api(req, res, url) {
   }
 
   /* accounting balances from a 1C export: rows are matched by article, then by name */
-  /* «Замена ДТ»: objects with coordinates from a spreadsheet; which of them stand on the MKAD, the TTK or an overpass
+  /* «Редактор карты»: objects with coordinates from a spreadsheet; which of them stand on the MKAD, the TTK or an overpass
      is worked out in the browser from OpenStreetMap and stored here, so everybody sees the same result */
   if (p[1] === 'dt') {
     if (m === 'GET') return send(res, 200, db.dt || { points: [] });
