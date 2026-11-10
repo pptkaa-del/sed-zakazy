@@ -433,6 +433,8 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .dtrad-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;width:260px;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);display:flex;flex-direction:column;gap:8px}
 .dtrad-pop label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 .dtshow{display:flex;flex-wrap:wrap;gap:6px}
+.dtjobs{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px}.dtjobs small{display:block}
+.dtnew summary{cursor:pointer;color:var(--stamp);font-weight:500}
 .dtq{display:flex;flex-direction:column;gap:6px;margin:8px 0 4px;padding:8px 10px;border-radius:8px;background:var(--warn-soft)}
 .dtq b{font-weight:600;font-size:13px}
 .dtq-b{display:grid;grid-template-columns:1fr 1fr;gap:5px}
@@ -1585,10 +1587,14 @@ function jobGrid(list){
 function jobPlacesHtml(j){
   const P = j.places || [];
   if (!P.length) return '<p class="dim" style="margin:0">Места на карте не указаны.</p>';
-  return `<div id="jmap" class="minimap"></div><ol class="jplaces">${P.map((pl, i) => `<li><span class="pnum">${i + 1}</span><span style="min-width:0"><b>${esc(pl.label || 'Место ' + (i + 1))}</b><small class="mono">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small></span><a class="btn sm" href="${routeUrl(pl)}" target="_blank" rel="noopener">Маршрут</a></li>`).join('')}</ol>`;
+  const MAX = 30, dtc = pl => pl.dtNo ? ` style="background:${DT_COLOR[dtCatOfPlace(pl)]}"` : '';
+  const sum = P.some(pl => pl.dtNo) ? `<p class="dim" style="margin:0;font-size:13px">Мест: ${P.length}${['mkad', 'ttk', 'bridge'].map(c => { const n = P.filter(pl => (pl.cats || []).includes(c)).length; return n ? ` · ${c === 'bridge' ? 'эстакады' : DT_CAT[c]} ${n}` : ''; }).join('')}</p>` : '';
+  return `<div id="jmap" class="minimap"></div>${sum}<ol class="jplaces">${P.slice(0, MAX).map((pl, i) => `<li><span class="pnum"${dtc(pl)}>${i + 1}</span><span style="min-width:0"><b>${esc(pl.label || 'Место ' + (i + 1))}</b><small class="mono">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small></span><a class="btn sm" href="${routeUrl(pl)}" target="_blank" rel="noopener">Маршрут</a></li>`).join('')}</ol>${P.length > MAX ? `<p class="dim" style="margin:0;font-size:13px">…и ещё ${P.length - MAX} мест — все они на карте выше.</p>` : ''}`;
 }
+const dtCatOfPlace = pl => ['mkad', 'ttk', 'bridge'].find(c => (pl.cats || []).includes(c)) || 'road';
 function jobFormPlaces(){
   const P = ui.jPlaces || [];
+  if (P.length > 30) return `<p class="dim" style="margin:0">Мест: <b>${P.length}</b> (показаны на карте). Подписи мест при таком количестве не редактируются здесь.</p><button type="button" class="btn sm danger" data-act="clearJPlaces">Убрать все места</button>`;
   return P.length ? `<ol class="jplaces">${P.map((pl, i) => `<li><span class="pnum">${i + 1}</span><input class="in" data-jpl="${i}" value="${esc(pl.label || '')}" aria-label="Подпись места ${i + 1}"><small class="mono dim">${pl.lat.toFixed(5)}, ${pl.lng.toFixed(5)}</small><button type="button" class="btn sm ghost" data-act="delJPlace" data-id="${i}" aria-label="Удалить место">✕</button></li>`).join('')}</ol>`
     : '<p class="dim" style="margin:0">Мест пока нет — нажмите на карту.</p>';
 }
@@ -1603,11 +1609,13 @@ function mountMini(){
   if (mini) { try { mini.remove(); } catch(e){} mini = null; }
   const el = $('jmap') || $('jfmap'); if (!el || typeof L === 'undefined') return;
   const form = el.id === 'jfmap';
-  mini = L.map(el, { zoomControl:true, tap:true, scrollWheelZoom: form }); tileLayerFor(mini);
+  mini = L.map(el, { zoomControl:true, tap:true, scrollWheelZoom: form, preferCanvas:true }); tileLayerFor(mini);
   mini._pins = L.layerGroup().addTo(mini);
   const P = () => form ? (ui.jPlaces || []) : (jobOf(ui.drawer.id)?.places || []);
   const draw = () => {
     mini._pins.clearLayers();
+    const many = P().length > 40;
+    if (many) { P().forEach(pl => L.circleMarker([pl.lat, pl.lng], { radius:5, weight:1, color:'#fff', fillColor: pl.dtNo ? DT_COLOR[dtCatOfPlace(pl)] : '#3B47B8', fillOpacity:.95 }).bindTooltip(pl.label || '').addTo(mini._pins)); return; }
     P().forEach((pl, i) => { const mk = L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), draggable: form, title: pl.label || '' }).addTo(mini._pins);
       if (form) mk.on('dragend', () => { const ll = mk.getLatLng(); pl.lat = ll.lat; pl.lng = ll.lng; $('jf-places').innerHTML = jobFormPlaces(); }); });
   };
@@ -1681,6 +1689,7 @@ function renderDt(){
     <div class="dtshow" role="group" aria-label="Что показывать на карте">${['road', 'mkad', 'ttk', 'bridge'].map(k => `<label class="dtt ${DT_SHOW[k] ? 'on' : ''}" style="--c:${DT_COLOR[k]}"><input type="checkbox" data-dtshow="${k}" ${DT_SHOW[k] ? 'checked' : ''}><i></i>${DT_CAT[k]} <b>${cnt(k)}</b></label>`).join('')}
       ${cnt('check') ? `<label class="dtt chk ${ui.dtOnlyCheck ? 'on' : ''}" style="--c:${DT_COLOR.check}"><input type="checkbox" data-dtshow="check" ${ui.dtOnlyCheck ? 'checked' : ''}><i></i>Только «проверить» <b>${cnt('check')}</b></label>` : ''}</div>
     ${P.length ? '<button class="btn" data-act="dtExport">Скачать Excel</button>' : ''}
+    ${P.length && canLead() ? '<button class="btn primary" data-act="dtSave">Сохранить точки в БД</button>' : ''}
     ${ed ? `<label class="btn primary">Вставить размеченный файл<input type="file" data-up="dtmarked" accept=".xlsx,.xls,.csv" hidden></label>
       <label class="btn">Загрузить точки без отметок<input type="file" data-up="dtfile" accept=".xlsx,.xls,.csv" hidden></label>
       ${P.length ? `<details class="dtrad"><summary class="btn">Определить по карте…</summary><div class="dtrad-pop">
@@ -1996,7 +2005,7 @@ function renderMap(){
   if (!map._jobs) map._jobs = L.layerGroup().addTo(map);
   map._jobs.clearLayers();
   if (ui.mapF !== 'done') S.jobs.filter(j => j.status !== 'done').forEach(j => (j.places || []).forEach((pl, i) => {
-    L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), title: j.title }).addTo(map._jobs)
+    ((j.places || []).length > 40 ? L.circleMarker([pl.lat, pl.lng], { radius:5, weight:1, color:'#fff', fillColor:'#3B47B8', fillOpacity:.9 }) : L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), title: j.title })).addTo(map._jobs)
       .bindPopup(`<div class="pp"><h4>${esc(j.title)}</h4><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${pl.label ? `<p>${esc(pl.label)}</p>` : ''}<small>Руководитель: ${esc(who(j.leaderId))}</small><small>Работники: ${esc((j.workers || []).map(who).join(', '))}</small><div class="row-g"><button class="btn sm" data-act="openJob" data-id="${j.id}">Открыть задачу</button></div></div>`, { minWidth:240 });
   }));
   if (!fitted && S.points.length) { fitted = true; map.fitBounds(L.latLngBounds(S.points.map(p => [p.lat, p.lng])).pad(0.2), { maxZoom:15 }); }
@@ -2398,6 +2407,30 @@ function renderDrawer(){
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn danger" type="submit">Восстановить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
+  if (d.kind === 'dtSave') {
+    const P = DT.points, vis = P.filter(dtMatch), flag = P.filter(dtFlagged), chk = P.filter(p => (p.cats || []).includes('check'));
+    const which = ui.dtWhich || 'visible', q = (ui.dtJq || '').toLowerCase();
+    const J = S.jobs.filter(j => mayEditJob(j) && (!q || (j.title + ' ' + (j.workers || []).map(who).join(' ')).toLowerCase().includes(q)))
+      .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+    const W = workersList();
+    D.innerHTML = dh('Сохранить точки в БД') + `<form class="d-body" data-form="dtSave">
+      <div class="box"><h4>Какие точки</h4>
+        ${[['visible', `Видимые на карте сейчас`, vis.length], ['flagged', 'Только МКАД, ТТК и эстакады', flag.length], ...(chk.length ? [['check', 'Только «проверить»', chk.length]] : []), ['all', 'Все точки', P.length]].map(([k, l, n]) =>
+          `<label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dtw" value="${k}" ${which === k ? 'checked' : ''}> ${l} <b class="mono">${n}</b></label>`).join('')}</div>
+      <div class="box"><h4>В какие работы</h4>
+        <span data-keep style="display:contents"><input class="in" id="dt-jq" type="search" aria-label="Поиск работы" value="${esc(ui.dtJq || '')}"></span>
+        ${J.length ? `<ul class="dtjobs">${J.map(j => `<li><label class="chk" style="flex-direction:row;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" name="dtj" value="${j.id}" ${(ui.dtJobs || []).includes(j.id) ? 'checked' : ''}><span><b style="font-weight:500">№ ${jobNo(j)} · ${esc(j.title)}</b><small class="dim">${esc(JOB_ST[j.status])} · ${esc((j.workers || []).map(who).join(', ') || 'без работников')} · мест: ${(j.places || []).length}</small></span></label></li>`).join('')}</ul>` : `<p class="dim" style="margin:0">${q ? 'Не найдено.' : 'Работ, которые вы можете менять, пока нет.'}</p>`}
+        <details class="dtnew" ${ui.dtNewOpen ? 'open' : ''}><summary>+ Новая работа</summary>
+          <div class="form" style="margin-top:8px"><label class="wide">Что нужно сделать<input class="in" id="dtn-title" value="${esc(ui.dtNewTitle ?? 'Замена ДТ')}"></label>
+          <label>Начало<input class="in" type="date" id="dtn-start" value="${today()}"></label><label>Срок<input class="in" type="date" id="dtn-due"></label>
+          <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Работники</span>${W.length ? `<div class="wpick">${W.map(u => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="dtn-w" value="${u.id}"> ${esc(u.name)}</label>`).join('')}</div>` : '<p class="dim" style="margin:4px 0 0">Нет пользователей с ролью «Работник».</p>'}</div></div></details></div>
+      <div class="box"><h4>Как записать</h4>
+        <label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dtm" value="add" checked> Добавить к местам работы (точки, которые уже есть, не повторяются)</label>
+        <label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dtm" value="replace"> Заменить все места работы этими точками</label></div>
+      <p class="hint" style="margin:0">Каждая точка станет местом работы: номер объекта, отметка (МКАД, ТТК, эстакада или дорога) и дорога. Работники увидят точки в своих задачах и на карте.</p>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">Сохранить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
+  }
   if (d.kind === 'orgForm') {
     const o = d.id && orgOf(d.id), mine = o && o.id === me.org?.id;
     D.innerHTML = dh(o ? esc(o.name) : 'Новая организация') + `<form class="d-body" data-form="org"><div class="form">
@@ -2694,6 +2727,32 @@ async function onSubmit(e){
       await upd('counterparties', d.id, { contracts:[...(c.contracts||[]), { id:uid(), number:val('k-num'), date:val('k-date'), subject:val('k-subj'), file:up, at:now }] });
       closeDrawer(); render(); toast('Договор загружен');
     }
+    if (kind === 'dtSave') {
+      const which = f.querySelector('[name=dtw]:checked')?.value || 'visible', mode = f.querySelector('[name=dtm]:checked')?.value || 'add';
+      const pts = DT.points.filter(which === 'visible' ? dtMatch : which === 'flagged' ? dtFlagged : which === 'check' ? (p => (p.cats || []).includes('check')) : (() => true));
+      if (!pts.length) return fail('Нет точек для записи — измените выбор или включите группы на карте.');
+      const ids = [...f.querySelectorAll('[name=dtj]:checked')].map(x => x.value);
+      const newOpen = f.querySelector('.dtnew')?.open, newTitle = val('dtn-title'), newW = [...f.querySelectorAll('[name=dtn-w]:checked')].map(x => x.value);
+      if (newOpen && newTitle && !newW.length) return fail('Для новой работы отметьте хотя бы одного работника.');
+      if (!ids.length && !(newOpen && newTitle)) return fail('Отметьте работу или создайте новую.');
+      const label = p => [p.no, ...dtGroups(p).map(c => c === 'road' ? 'дорога' : c === 'bridge' ? 'эстакада' : DT_CAT[c]), p.road].filter(Boolean).join(' · ');
+      const asPlace = p => ({ id:uid(), lat:p.lat, lng:p.lng, label:label(p), dtNo:p.no, cats:(p.cats || []).slice(), road:p.road || '' });
+      fail('Сохраняем…');
+      let n = 0, jobsDone = 0;
+      if (newOpen && newTitle) {
+        await api('POST', '/api/jobs', { title:newTitle, description:'Точки из «Замена ДТ»' + (DT.meta.file ? ` (файл «${DT.meta.file}»)` : ''), workers:newW, leaderId:me.id, start:val('dtn-start'), due:val('dtn-due'), places:pts.map(asPlace) });
+        n += pts.length; jobsDone++;
+      }
+      for (const id of ids) {
+        const j = jobOf(id); if (!j) continue;
+        const keep = mode === 'replace' ? [] : (j.places || []);
+        const has = new Set(keep.map(x => x.dtNo || (x.lat.toFixed(6) + ',' + x.lng.toFixed(6))));
+        const add = pts.filter(p => !has.has(p.no) && !has.has(p.lat.toFixed(6) + ',' + p.lng.toFixed(6))).map(asPlace);
+        await api('PATCH', `/api/jobs/${id}`, { places:[...keep, ...add] }); n += add.length; jobsDone++;
+      }
+      ui.dtJobs = []; ui.dtNewOpen = false; await refresh(); closeDrawer();
+      toast(`Сохранено: ${n} точек в ${jobsDone} ${jobsDone === 1 ? 'работу' : jobsDone < 5 ? 'работы' : 'работ'}`);
+    }
     if (kind === 'restore') {
       if (!$('rs-ok').checked) return fail('Подтвердите восстановление.');
       const b = (ui.backups || []).find(x => x.id === d.id);
@@ -2887,6 +2946,7 @@ async function act(el){
       return act({ dataset: { act:'dtFly', id: String(k) } });
     }
     case 'dtReanswer': { const i = Number(id); const prev = ui.dtEdit; ui.dtEdit = i >= 0 ? i : null; const k = i >= 0 ? i : prev; const p = DT.points[k]; const m = p && dtMarks.get(p.no + '|' + k); if (m) m.setPopupContent(dtPopup(p, k)); return; }
+    case 'dtSave': ui.dtJobs = []; ui.dtJq = ''; ui.dtNewOpen = !S.jobs.some(mayEditJob); return openDrawer('dtSave');
     case 'dtExport': return dtExport().catch(e => toast(errText(e)));
     case 'dtClassify': { el.disabled = true; el.closest('details')?.removeAttribute('open'); try { await dtClassifyAndSave(); } catch(e) { toast(errText(e)); } finally { el.disabled = false; } return; }
     case 'addFeat': {
@@ -2940,6 +3000,7 @@ async function act(el){
       $('jf-places').innerHTML = jobFormPlaces(); if (mini) { mini._draw(); mini.setView([lat, lng], Math.max(mini.getZoom(), 14)); }
       return;
     }
+    case 'clearJPlaces': ui.jPlaces = []; $('jf-places').innerHTML = jobFormPlaces(); if (mini) mini._draw(); return;
     case 'delJPlace': ui.jPlaces.splice(Number(id), 1); $('jf-places').innerHTML = jobFormPlaces(); if (mini) mini._draw(); return;
     case 'reload': return location.reload();
     case 'theme': themeSet(THEMES.includes(id) ? id : 'system'); $('upop').hidden = false; return;
@@ -3101,6 +3162,7 @@ document.addEventListener('input', e => {
   if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L); } return; }
   if (t.id === 'feat-new') ui.drafts['feat:' + t.dataset.o] = t.value;
   if (t.id === 'feat-new' || t.dataset.feat) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; if (t.id === 'feat-new') return; }
+  if (t.id === 'dt-jq') { ui.dtJq = t.value; ui.dtJobs = [...document.querySelectorAll('[name=dtj]:checked')].map(x => x.value); ui.dtWhich = document.querySelector('[name=dtw]:checked')?.value; ui.dtNewOpen = document.querySelector('.dtnew')?.open; ui.dtNewTitle = $('dtn-title')?.value; const pos = t.selectionStart; renderDrawer(); const n = $('dt-jq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'dtq') { ui.dtQ = t.value; const pos = t.selectionStart; renderDt(); const n = $('dtq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -3127,6 +3189,8 @@ document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t' && ui.drawer?.kind === 'paste') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; else if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + e.target.value.split(/\r?\n/).filter(l => l.trim() && !/наимен|компон/i.test(l)).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.name === 'dtj') { ui.dtJobs = [...document.querySelectorAll('[name=dtj]:checked')].map(x => x.value); return; }
+  if (t.name === 'dtw') { ui.dtWhich = t.value; return; }
   if (t.dataset.dtshow) {
     if (t.dataset.dtshow === 'check') ui.dtOnlyCheck = t.checked; else { DT_SHOW[t.dataset.dtshow] = t.checked; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} }
     return renderDt();
