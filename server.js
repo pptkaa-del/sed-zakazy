@@ -440,7 +440,8 @@ async function api(req, res, url) {
   if (p[1] === 'data' && m === 'GET') {
     const out = { rev: db.rev, users: Object.fromEntries(orgUsers().map(u => [u.id, u.name])), meta: db.meta,
       staff: orgUsers().filter(u => !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) };
-    const mine = j => ({ ...j, places: (j.places || []).filter(x => !x.assignee || x.assignee === user.id) });
+    // a worker gets only the points assigned to him; points without an executor only when he is the job's only worker
+    const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = user.role === 'worker' ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
     if (user.role === 'worker') { out.meta = {}; out.staff = []; }
     return send(res, 200, out);
@@ -510,8 +511,14 @@ async function api(req, res, url) {
         if (who) Object.assign(x, { assignee: who.id, assignedAt: at, assignedBy: user.id }); else { delete x.assignee; delete x.assignedAt; delete x.assignedBy; }
         n++;
       }
+      // the same points already written into works get the same executor
+      let inJobs = 0;
+      for (const j of Object.values(db.jobs)) for (const pl of j.places || []) if (pl.dtNo && nos.has(pl.dtNo)) {
+        if (who) { pl.assignee = who.id; if (!(j.workers || []).includes(who.id) && who.role === 'worker') j.workers = [...(j.workers || []), who.id]; } else delete pl.assignee;
+        inJobs++;
+      }
       saveDb();
-      return send(res, 200, { ok: true, count: n, rev: db.rev });
+      return send(res, 200, { ok: true, count: n, inJobs, rev: db.rev });
     }
     /* a point added by hand on the map, and removing a point */
     if (m === 'POST' && p[2] === 'point') {
@@ -703,7 +710,7 @@ async function api(req, res, url) {
   if (p[1] === 'jobs' && p[3] === 'places' && p[4]) {
     const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
     const pl = (j.places || []).find(x => x.id === p[4]); if (!pl) return fail(res, 404, 'Точка не найдена');
-    const mayReport = mayEditJob(user, j) || ((j.workers || []).includes(user.id) && (!pl.assignee || pl.assignee === user.id)) || j.leaderId === user.id;
+    const mayReport = mayEditJob(user, j) || ((j.workers || []).includes(user.id) && (pl.assignee ? pl.assignee === user.id : (j.workers || []).length === 1)) || j.leaderId === user.id;
     if (!mayReport) return fail(res, 403, 'Это не ваша точка');
     const touch = () => { pl.reportAt = new Date().toISOString(); pl.reportBy = user.id; j.updatedAt = pl.reportAt; j.updatedBy = user.id; };
     pl.photos = pl.photos || {};
@@ -838,6 +845,8 @@ async function api(req, res, url) {
     }
     if (col === 'jobs') {
       const j = db.jobs[id], c = cleanJob(patch), ck = Object.keys(c);
+      // photos of a point taken for a list item that was renamed or removed become extra photos
+      if (c.photoSpec) { const keep = new Set(c.photoSpec); for (const pl of (c.places || j.places || [])) { const src = (j.places || []).find(x => x.id === pl.id) || pl; const ph = src.photos; if (!ph) continue; for (const k of Object.keys(ph)) if (k !== '_extra' && !keep.has(k)) { ph._extra = [...(ph._extra || []), { ...ph[k], name: k + ' — ' + (ph[k].name || 'фото') }].slice(-20); delete ph[k]; } } }
       if (c.places) { const old = new Map((j.places || []).map(x => [x.id, x])); c.places.forEach(x => { const o = old.get(x.id); if (o) ['photos', 'comment', 'reportAt', 'reportBy', 'doneAt', 'doneBy', 'notWorking', 'editedAt', 'editedBy'].forEach(k => { if (o[k] !== undefined) x[k] = o[k]; }); }); }
       const other = ck.filter(k => !JOB_WORKER_FIELDS.includes(k));
       if (other.length ? !mayEditJob(user, j) : !(mayEditJob(user, j) || onJob(user, j))) return fail(res, 403, 'Недостаточно прав');
