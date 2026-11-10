@@ -467,8 +467,12 @@ async function api(req, res, url) {
         dist: x.dist != null && x.dist !== '' && Number.isFinite(Number(x.dist)) ? Math.round(Number(x.dist) * 10) / 10 : null, note: String(x.note || '').slice(0, 300),
         ...(x.checkedAt ? { checkedAt: String(x.checkedAt).slice(0, 40), checkedBy: String(x.checkedBy || '').slice(0, 40), checkedWas: String(x.checkedWas || '').slice(0, 40) } : {}),
         ...(x.addedAt ? { addedAt: String(x.addedAt).slice(0, 40), addedBy: String(x.addedBy || '').slice(0, 40) } : {}),
+        ...(x.assignee ? { assignee: String(x.assignee).slice(0, 40), assignedAt: String(x.assignedAt || '').slice(0, 40), assignedBy: String(x.assignedBy || '').slice(0, 40) } : {}),
       })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180);
       if (!points.length) return fail(res, 400, 'Не нашлось ни одной точки с координатами');
+      // a new file of the same objects keeps who they were assigned to
+      const prev = new Map(((db.dt && db.dt.points) || []).filter(x => x.assignee).map(x => [x.no, x]));
+      points.forEach(x => { const o = prev.get(x.no); if (o && !x.assignee) Object.assign(x, { assignee: o.assignee, assignedAt: o.assignedAt, assignedBy: o.assignedBy }); });
       db.dt = { points, file: String(b.file || '').slice(0, 200), at: new Date().toISOString(), by: user.id,
         classifiedAt: b.classifiedAt || null, radius: b.radius || null, source: String(b.source || '').slice(0, 200) };
       saveDb();
@@ -485,6 +489,23 @@ async function api(req, res, url) {
       pt.cats = [...new Set(cats)]; pt.checkedAt = new Date().toISOString(); pt.checkedBy = user.id;
       saveDb();
       return send(res, 200, { ok: true, point: pt, rev: db.rev });
+    }
+    /* assign (or clear) the executor of many points at once */
+    if (m === 'PATCH' && p[2] === 'assign') {
+      if (!(canEdit(user) || user.role === 'user')) return fail(res, 403, 'Назначать исполнителя может руководитель, менеджер или администратор');
+      const b = await readJsonBody(req), P = db.dt && db.dt.points;
+      if (!P) return fail(res, 409, 'Точек нет');
+      const who = b.assignee ? orgUsers().find(u => u.id === b.assignee && !u.blocked) : null;
+      if (b.assignee && !who) return fail(res, 400, 'Исполнитель не найден');
+      const nos = new Set((Array.isArray(b.nos) ? b.nos : []).map(String));
+      if (!nos.size) return fail(res, 400, 'Не выделено ни одной точки');
+      const at = new Date().toISOString(); let n = 0;
+      for (const x of P) if (nos.has(x.no)) {
+        if (who) Object.assign(x, { assignee: who.id, assignedAt: at, assignedBy: user.id }); else { delete x.assignee; delete x.assignedAt; delete x.assignedBy; }
+        n++;
+      }
+      saveDb();
+      return send(res, 200, { ok: true, count: n, rev: db.rev });
     }
     /* a point added by hand on the map, and removing a point */
     if (m === 'POST' && p[2] === 'point') {
