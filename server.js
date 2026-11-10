@@ -182,6 +182,7 @@ function loadDb(file) {
   Object.values(d.jobs).filter(j => !j.no).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || '')).forEach(j => { j.no = ++jn; });
   d.files = d.files || {};
   d.meta = d.meta || {};
+  d.dt = d.dt || null;
   return d;
 }
 /* The hosting may run several copies of the app (e.g. Passenger) or a CLI command may edit
@@ -448,6 +449,29 @@ async function api(req, res, url) {
   }
 
   /* accounting balances from a 1C export: rows are matched by article, then by name */
+  /* «Замена ДТ»: objects with coordinates from a spreadsheet; which of them stand on the MKAD, the TTK or an overpass
+     is worked out in the browser from OpenStreetMap and stored here, so everybody sees the same result */
+  if (p[1] === 'dt') {
+    if (m === 'GET') return send(res, 200, db.dt || { points: [] });
+    if (m === 'PUT') {
+      if (!canEdit(user)) return fail(res, 403, 'Загружать точки может менеджер или администратор');
+      const b = await readJsonBody(req);
+      const CATS = ['mkad', 'ttk', 'bridge'];
+      if (!Array.isArray(b.points) || b.points.length > 50000) return fail(res, 400, 'Нет точек или их слишком много');
+      const points = b.points.map(x => ({
+        no: String(x.no ?? '').trim().slice(0, 60), lat: Number(x.lat), lng: Number(x.lng),
+        cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => CATS.includes(c)),
+        road: String(x.road || '').slice(0, 200), bridge: String(x.bridge || '').slice(0, 200),
+        dist: x.dist != null && x.dist !== '' && Number.isFinite(Number(x.dist)) ? Math.round(Number(x.dist)) : null, note: String(x.note || '').slice(0, 300),
+      })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180);
+      if (!points.length) return fail(res, 400, 'Не нашлось ни одной точки с координатами');
+      db.dt = { points, file: String(b.file || '').slice(0, 200), at: new Date().toISOString(), by: user.id,
+        classifiedAt: b.classifiedAt || null, radius: b.radius || null, source: String(b.source || '').slice(0, 200) };
+      saveDb();
+      return send(res, 200, { ok: true, count: points.length, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'stock-acct' && m === 'POST') {
     if (!canEdit(user) && user.role !== 'accountant') return fail(res, 403, 'Загружать бухгалтерские остатки могут бухгалтер, менеджер или администратор');
     const b = await readJsonBody(req);
