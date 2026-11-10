@@ -93,7 +93,7 @@ function cleanJob(d){
   if ('places' in d) out.places = (Array.isArray(d.places) ? d.places : []).slice(0, 5000)
     .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
     .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200),
-      ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
+      ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
   if ('status' in d) out.status = d.status;
   return out;
@@ -458,12 +458,12 @@ async function api(req, res, url) {
     if (m === 'PUT') {
       if (!canEdit(user)) return fail(res, 403, 'Загружать точки может менеджер или администратор');
       const b = await readJsonBody(req);
-      const CATS = ['mkad', 'ttk', 'bridge', 'check'];
+      const CATS = ['mkad', 'ttk', 'bridge', 'other', 'check'];
       if (!Array.isArray(b.points) || b.points.length > 50000) return fail(res, 400, 'Нет точек или их слишком много');
       const points = b.points.map(x => ({
         no: String(x.no ?? '').trim().slice(0, 60), lat: Number(x.lat), lng: Number(x.lng),
         cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => CATS.includes(c)),
-        road: String(x.road || '').slice(0, 200), bridge: String(x.bridge || '').slice(0, 200),
+        road: String(x.road || '').slice(0, 200), bridge: String(x.bridge || '').slice(0, 200), other: String(x.other || '').slice(0, 300),
         dist: x.dist != null && x.dist !== '' && Number.isFinite(Number(x.dist)) ? Math.round(Number(x.dist) * 10) / 10 : null, note: String(x.note || '').slice(0, 300),
         ...(x.checkedAt ? { checkedAt: String(x.checkedAt).slice(0, 40), checkedBy: String(x.checkedBy || '').slice(0, 40), checkedWas: String(x.checkedWas || '').slice(0, 40) } : {}),
         ...(x.addedAt ? { addedAt: String(x.addedAt).slice(0, 40), addedBy: String(x.addedBy || '').slice(0, 40) } : {}),
@@ -483,10 +483,12 @@ async function api(req, res, url) {
       if (!(canEdit(user) || user.role === 'user')) return fail(res, 403, 'Отмечать проверку может руководитель, менеджер или администратор');
       const b = await readJsonBody(req), P = db.dt && db.dt.points, i = Number(b.i);
       if (!P || !Number.isInteger(i) || !P[i] || P[i].no !== String(b.no ?? '')) return fail(res, 409, 'Точка не найдена — обновите страницу');
-      const cats = (Array.isArray(b.cats) ? b.cats : []).filter(c => ['mkad', 'ttk', 'bridge'].includes(c));
+      const cats = (Array.isArray(b.cats) ? b.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other'].includes(c));
       const pt = P[i];
+      if (cats.includes('other') && !String(b.other || '').trim()) return fail(res, 400, 'Укажите, что именно «другое»');
       if (!pt.checkedAt) pt.checkedWas = (pt.cats || []).join(',');
-      pt.cats = [...new Set(cats)]; pt.checkedAt = new Date().toISOString(); pt.checkedBy = user.id;
+      pt.cats = cats.includes('other') ? ['other'] : [...new Set(cats)]; pt.other = cats.includes('other') ? String(b.other).trim().slice(0, 300) : '';
+      pt.checkedAt = new Date().toISOString(); pt.checkedBy = user.id;
       saveDb();
       return send(res, 200, { ok: true, point: pt, rev: db.rev });
     }
@@ -515,7 +517,9 @@ async function api(req, res, url) {
       if (!(Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng))) return fail(res, 400, 'Неверные координаты');
       if (!db.dt) db.dt = { points: [], file: '', at: new Date().toISOString(), by: user.id, classifiedAt: null, radius: null, source: '' };
       if (db.dt.points.some(x => x.no === no)) return fail(res, 409, `Объект ${no} уже есть на карте`);
-      const pt = { no, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, cats: (Array.isArray(b.cats) ? b.cats : []).filter(c => ['mkad', 'ttk', 'bridge'].includes(c)),
+      const cats = (Array.isArray(b.cats) ? b.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other'].includes(c));
+      if (cats.includes('other') && !String(b.other || '').trim()) return fail(res, 400, 'Укажите, что именно «другое»');
+      const pt = { no, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, cats: cats.includes('other') ? ['other'] : cats, other: cats.includes('other') ? String(b.other).trim().slice(0, 300) : '',
         road: String(b.road || '').trim().slice(0, 200), bridge: '', dist: null, note: String(b.note || '').slice(0, 300), addedAt: new Date().toISOString(), addedBy: user.id };
       db.dt.points.push(pt); saveDb();
       return send(res, 200, { ok: true, i: db.dt.points.length - 1, point: pt, rev: db.rev });
