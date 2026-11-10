@@ -1092,18 +1092,25 @@ function loadSheetJS(){
   sheetLib = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '/vendor/sheetjs/xlsx.full.min.js'; sc.onload = () => res(window.XLSX); sc.onerror = () => { sheetLib = null; rej(new Error('Не удалось загрузить модуль чтения Excel')); }; document.head.appendChild(sc); });
   return sheetLib;
 }
-async function readTable(file){
+async function readTable(file, opt = {}){
   const X = await loadSheetJS();
   const buf = new Uint8Array(await file.arrayBuffer());
   let wb;
   if (/\.(csv|txt)$/i.test(file.name)) {
     let text; try { text = new TextDecoder('utf-8', { fatal:true }).decode(buf); } catch(e) { text = new TextDecoder('windows-1251').decode(buf); }
     wb = X.read(text.replace(/^﻿/, ''), { type:'string', raw:false });
-  } else wb = X.read(buf, { type:'array' });
+  } else wb = X.read(buf, { type:'array', cellStyles: !!opt.fills });
   // the sheet with the most filled rows
-  let best = null;
-  for (const n of wb.SheetNames) { const aoa = X.utils.sheet_to_json(wb.Sheets[n], { header:1, raw:true, defval:'' }); if (!best || aoa.length > best.length) best = aoa; }
-  return (best || []).map(r => r.map(v => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : v));
+  let best = null, bestWs = null;
+  for (const n of wb.SheetNames) { const aoa = X.utils.sheet_to_json(wb.Sheets[n], { header:1, raw:true, defval:'' }); if (!best || aoa.length > best.length) { best = aoa; bestWs = wb.Sheets[n]; } }
+  const rows = (best || []).map(r => r.map(v => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : v));
+  if (opt.fills) {
+    // rows with a coloured (non-white) solid fill in any cell, by row index of the array (sheet rows start at the range's first row)
+    const filled = new Set(), r0 = bestWs && bestWs['!ref'] ? X.utils.decode_range(bestWs['!ref']).s.r : 0;
+    for (const k in bestWs || {}) { if (k[0] === '!') continue; const st = bestWs[k].s; const rgb = st && st.patternType === 'solid' && st.fgColor && st.fgColor.rgb; if (rgb && !/^(FF)?FFFFFF$/i.test(rgb)) filled.add(X.utils.decode_cell(k).r - r0); }
+    rows.filled = filled;
+  }
+  return rows;
 }
 const cellNum = v => typeof v === 'number' ? v : (String(v).trim() && /^-?[\d\s ]+([.,]\d+)?$/.test(String(v).trim()) ? num(v) : null);
 function guessAcct(aoa){
@@ -1602,17 +1609,18 @@ function mountMini(){
 
 /* ===== Замена ДТ: objects from a spreadsheet on a map, marked when they stand on the MKAD, the TTK or an overpass ===== */
 const DT = { loaded:false, points:[], meta:{}, geom:null };
-const DT_CAT = { mkad:'МКАД', ttk:'ТТК', bridge:'Эстакада' };
-const DT_COLOR = { mkad:'#D7263D', ttk:'#7B2CBF', bridge:'#1F6FEB', none:'#8A949E' };
+const DT_CAT = { mkad:'МКАД', ttk:'ТТК', bridge:'Эстакада', check:'Проверить' };
+const DT_COLOR = { mkad:'#D7263D', ttk:'#7B2CBF', bridge:'#1F6FEB', check:'#E0A800', none:'#8A949E' };
 // public Overpass servers (OpenStreetMap); the Russian mirror goes second
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const OVERPASS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
 let dtMap = null, dtLayer = null, dtMarks = new Map();
 async function loadDt(){
   try { const d = await api('GET', '/api/dt'); DT.points = d.points || []; DT.meta = d; DT.loaded = true; dtFitted = false; } catch(e) { toast(errText(e)); }
   if (ui.view === 'dt') renderDt();
 }
-const dtCatOf = p => p.cats && p.cats.length ? p.cats[0] : 'none';
-const dtMatch = p => (ui.dtF === 'all' || (ui.dtF === 'none' ? !(p.cats || []).length : (p.cats || []).includes(ui.dtF))) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
+const dtCatOf = p => ['mkad', 'ttk', 'bridge', 'check'].find(c => (p.cats || []).includes(c)) || 'none';
+const dtFlagged = p => (p.cats || []).some(c => c !== 'check');
+const dtMatch = p => (ui.dtF === 'all' || (ui.dtF === 'none' ? !dtFlagged(p) : (p.cats || []).includes(ui.dtF))) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
 let dtFitted = false;
 function ensureDtMap(){
   if (dtMap || typeof L === 'undefined') return;
@@ -1622,24 +1630,24 @@ function ensureDtMap(){
 }
 function dtPopup(p){
   return `<div class="pp"><h4>Объект ${esc(p.no)}</h4>
-    <div class="row-g">${(p.cats || []).length ? p.cats.map(c => `<span class="chip" style="background:${DT_COLOR[c]};color:#fff">${DT_CAT[c]}</span>`).join('') : '<span class="chip c-mute">Не на МКАД, ТТК и эстакадах</span>'}</div>
-    ${p.road ? `<small>Дорога: ${esc(p.road)}</small>` : ''}${p.bridge ? `<small>Эстакада: ${esc(p.bridge)}</small>` : ''}${p.dist != null && (p.cats || []).length ? `<small>До оси дороги: ~${p.dist} м</small>` : ''}
+    <div class="row-g">${(p.cats || []).map(c => `<span class="chip" style="background:${DT_COLOR[c]};color:${c === 'check' ? '#3a2c00' : '#fff'}">${DT_CAT[c]}</span>`).join('')}${dtFlagged(p) ? '' : '<span class="chip c-mute">Не на МКАД, ТТК и эстакадах</span>'}</div>
+    ${p.road ? `<small>Дорога: ${esc(p.road)}</small>` : ''}${p.bridge && p.bridge !== p.road ? `<small>Эстакада: ${esc(p.bridge)}</small>` : ''}${p.dist != null ? `<small>До оси дороги: ~${p.dist} м</small>` : ''}
     <small class="mono">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</small>
     <div class="row-g"><a class="btn sm" href="https://yandex.ru/maps/?pt=${p.lng},${p.lat}&z=18&l=map" target="_blank" rel="noopener">Яндекс.Карты</a><a class="btn sm" href="https://yandex.ru/maps/?rtext=~${p.lat},${p.lng}&rtt=auto" target="_blank" rel="noopener">Маршрут</a></div></div>`;
 }
 function renderDt(){
   const P = DT.points, M = DT.meta || {}, ed = canEdit();
-  const cnt = k => k === 'all' ? P.length : k === 'none' ? P.filter(p => !(p.cats || []).length).length : P.filter(p => (p.cats || []).includes(k)).length;
-  const flagged = P.filter(p => (p.cats || []).length).length;
+  const cnt = k => k === 'all' ? P.length : k === 'none' ? P.filter(p => !dtFlagged(p)).length : P.filter(p => (p.cats || []).includes(k)).length;
+  const flagged = P.filter(dtFlagged).length;
   $('dtInfo').innerHTML = !DT.loaded ? 'Загружаем…' : P.length
     ? `<span>Точек: <b>${P.length}</b>${M.file ? ` из файла «${esc(M.file)}»` : ''}${M.at ? `, загружено ${esc(fmtDT(M.at))}` : ''}${M.by ? ' · ' + esc(who(M.by)) : ''}.</span>
-       <span>${M.classifiedAt ? `На МКАД, ТТК или эстакадах: <b>${flagged}</b> — определено ${esc(fmtDT(M.classifiedAt))} по данным ${esc(M.source || 'OpenStreetMap')} (© участники OpenStreetMap, ODbL)${M.radius ? ` (дороги до ${M.radius.road} м, эстакады до ${M.radius.bridge} м)` : ''}.` : '<b>Отметки ещё не определены.</b>'}</span>`
+       <span>${M.classifiedAt ? `На МКАД, ТТК или эстакадах: <b>${flagged}</b> — ${/из файла/.test(M.source || '') ? esc(M.source) : `определено ${esc(fmtDT(M.classifiedAt))} по данным ${esc(M.source || 'OpenStreetMap')} (© участники OpenStreetMap, ODbL)`}${M.radius ? ` (дороги до ${M.radius.road} м, эстакады до ${M.radius.bridge} м)` : ''}.${cnt('check') ? ` Проверить: <b>${cnt('check')}</b>.` : ''}` : '<b>Отметки ещё не определены.</b>'}</span>`
     : `<span>Точек пока нет. ${ed ? 'Загрузите Excel с номерами объектов и координатами.' : 'Их загружает менеджер или администратор.'}</span>`;
   ui.dtF = ui.dtF || 'all';
   const R = ui.dtR || M.radius || { road:35, bridge:20 };
   $('dtTools').innerHTML = `
     <span data-keep style="display:contents"><input class="in" id="dtq" type="search" aria-label="Поиск по номеру объекта" value="${esc(ui.dtQ || '')}" style="flex:0 1 200px;min-width:0"></span>
-    <div class="seg">${[['all','Все'],['mkad','МКАД'],['ttk','ТТК'],['bridge','Эстакады'],['none','Остальные']].map(([k,l]) => `<button data-act="dtF" data-id="${k}" class="${ui.dtF===k?'on':''}">${l} (${cnt(k)})</button>`).join('')}</div>
+    <div class="seg">${[['all','Все'],['mkad','МКАД'],['ttk','ТТК'],['bridge','Эстакады'], ...(cnt('check') ? [['check','Проверить']] : []), ['none','Остальные']].map(([k,l]) => `<button data-act="dtF" data-id="${k}" class="${ui.dtF===k?'on':''}">${l} (${cnt(k)})</button>`).join('')}</div>
     ${P.length ? '<button class="btn" data-act="dtExport">Скачать Excel</button>' : ''}
     ${ed ? `<label class="btn primary">Загрузить Excel<input type="file" data-up="dtfile" accept=".xlsx,.xls,.csv" hidden></label>
       ${P.length ? `<details class="dtrad"><summary class="btn">Определить по карте…</summary><div class="dtrad-pop">
@@ -1648,15 +1656,15 @@ function renderDt(){
         <button class="btn primary sm" data-act="dtClassify">Определить</button>
         <small class="dim">Наибольшее расстояние от точки до оси дороги или эстакады по данным OpenStreetMap.</small></div></details>` : ''}` : ''}
     <span class="dim" id="dtStatus"></span>`;
-  $('dtLegend').innerHTML = P.length ? Object.entries({ ...DT_CAT, none:'Остальные' }).map(([k, l]) => `<span><i style="background:${DT_COLOR[k]};border-radius:50%"></i>${l}</span>`).join('') + '<span class="dim">Точка на МКАД или ТТК, которая стоит и на эстакаде, обведена синим.</span>' : '';
+  $('dtLegend').innerHTML = P.length ? Object.entries({ ...DT_CAT, none:'Остальные' }).filter(([k]) => k !== 'check' || cnt('check')).map(([k, l]) => `<span><i style="background:${DT_COLOR[k]};border-radius:50%"></i>${l}</span>`).join('') + '<span class="dim">Обводка: синяя — точка на МКАД или ТТК стоит и на эстакаде, жёлтая — её нужно проверить.</span>' : '';
   ensureDtMap(); if (!dtMap) return;
   setTimeout(() => dtMap.invalidateSize(), 0);
   // markers: canvas circles, one per point
   const seen = new Set();
   P.forEach((p, i) => {
     const key = p.no + '|' + i; seen.add(key);
-    const c = dtCatOf(p), both = c !== 'bridge' && c !== 'none' && (p.cats || []).includes('bridge');
-    const style = { radius: c === 'none' ? 4 : 6.5, color: both ? DT_COLOR.bridge : '#fff', weight: both ? 3 : 1, fillColor: DT_COLOR[c], fillOpacity: c === 'none' ? .55 : .95 };
+    const c = dtCatOf(p), cs = p.cats || [], ring = (c === 'mkad' || c === 'ttk') && cs.includes('bridge') ? DT_COLOR.bridge : c !== 'check' && cs.includes('check') ? DT_COLOR.check : null;
+    const style = { radius: c === 'none' ? 4 : 6.5, color: ring || '#fff', weight: ring ? 3 : 1, fillColor: DT_COLOR[c], fillOpacity: c === 'none' ? .55 : .95 };
     let m = dtMarks.get(key);
     if (!m) { m = L.circleMarker([p.lat, p.lng], style); m.bindPopup(() => dtPopup(p), { minWidth:220 }); m.bindTooltip(String(p.no), { direction:'top', offset:[0,-6] }); dtMarks.set(key, m); }
     else { m.setLatLng([p.lat, p.lng]); m.setStyle(style); m.setPopupContent(() => dtPopup(p)); }
@@ -1666,8 +1674,8 @@ function renderDt(){
   });
   [...dtMarks.keys()].forEach(k => { if (!seen.has(k)) { dtLayer.removeLayer(dtMarks.get(k)); dtMarks.delete(k); } });
   if (!dtFitted && P.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(P.map(p => [p.lat, p.lng])).pad(0.05)); }
-  const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => ((b.cats || []).length ? 1 : 0) - ((a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
-  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem" data-act="dtFly" data-id="${i}"><span class="dot" style="background:${DT_COLOR[dtCatOf(p)]}"></span><span style="min-width:0"><b>${esc(p.no)}</b><small>${(p.cats || []).map(c => DT_CAT[c]).join(' · ') || 'не на МКАД, ТТК и эстакадах'}${[p.bridge, p.road].filter(Boolean).map(x => ' · ' + esc(x)).join('')}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
+  const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => (dtFlagged(b) ? 2 : (b.cats || []).length ? 1 : 0) - (dtFlagged(a) ? 2 : (a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
+  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem" data-act="dtFly" data-id="${i}"><span class="dot" style="background:${DT_COLOR[dtCatOf(p)]}"></span><span style="min-width:0"><b>${esc(p.no)}</b><small>${(p.cats || []).map(c => DT_CAT[c]).join(' · ') || 'не на МКАД, ТТК и эстакадах'}${!dtFlagged(p) && (p.cats || []).length ? ' · не на МКАД, ТТК и эстакадах' : ''}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
     : `<div class="empty" style="border:0">${P.length ? 'Нет точек по этому фильтру.' : 'Точек пока нет.'}</div>`;
 }
 /* the spreadsheet: a column with the object number and one with «lat, lng» (or two columns: latitude and longitude) */
@@ -1677,18 +1685,34 @@ function dtParse(aoa){
   const H = (aoa[hdr] || []).map(low);
   const col = re => H.findIndex(h => re.test(h));
   const cNo = Math.max(0, col(/номер|объект|№|id|код/)), cXY = col(/координат/), cLat = col(/широт|^lat/), cLng = col(/долгот|^lon|^lng/);
+  // a table already marked up: «МКАД», «ТТК», «Эстакада» with да/нет, and optionally road, overpass name, distance, «Проверить»
+  const cM = col(/^мкад/), cT = col(/^ттк/), cB = H.findIndex(h => /^эстакад/.test(h) && !/назв/.test(h)), cBn = H.findIndex(h => /эстакад/.test(h) && /назв/.test(h));
+  const cRoad = col(/^дорога|^улица|^адрес/), cDist = col(/до оси|расстояни/), cChk = col(/провер/);
+  const flags = cM >= 0 || cT >= 0 || cB >= 0;
+  const yes = v => v === true || v === 1 || /^(да|yes|y|1|\+|true|x|х|v|✓)$/i.test(String(v ?? '').trim());
   const out = []; let bad = 0;
-  for (const r of aoa.slice(hdr + 1)) {
+  aoa.slice(hdr + 1).forEach((r, k) => {
+    const rowIdx = hdr + 1 + k;
     let lat, lng;
     if (cXY >= 0) { const m = /(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)/.exec(String(r[cXY] ?? '')); if (m) { lat = num(m[1]); lng = num(m[2]); } }
     else if (cLat >= 0 && cLng >= 0) { lat = num(r[cLat]); lng = num(r[cLng]); }
     const no = String(r[cNo] ?? '').trim();
-    if (!no && lat == null) continue;
-    if (!(Math.abs(lat) > 0 && Math.abs(lat) <= 90 && Math.abs(lng) > 0 && Math.abs(lng) <= 180)) { bad++; continue; }
+    if (!no && lat == null) return;
+    if (!(Math.abs(lat) > 0 && Math.abs(lat) <= 90 && Math.abs(lng) > 0 && Math.abs(lng) <= 180)) { bad++; return; }
     if (Math.abs(lat) < Math.abs(lng) && Math.abs(lng) > 50 && Math.abs(lng) <= 90 && Math.abs(lat) < 50) [lat, lng] = [lng, lat];   // «долгота, широта»
-    out.push({ no, lat, lng, cats:[], road:'', bridge:'', dist:null });
-  }
-  return { points: out, bad };
+    const p = { no, lat, lng, cats:[], road:'', bridge:'', dist:null };
+    if (flags) {
+      if (cM >= 0 && yes(r[cM])) p.cats.push('mkad');
+      if (cT >= 0 && yes(r[cT])) p.cats.push('ttk');
+      if (cB >= 0 && yes(r[cB])) p.cats.push('bridge');
+      if ((cChk >= 0 && yes(r[cChk])) || (aoa.filled && aoa.filled.has(rowIdx))) p.cats.push('check');
+      if (cRoad >= 0) p.road = String(r[cRoad] ?? '').trim();
+      if (cBn >= 0) p.bridge = String(r[cBn] ?? '').trim();
+      if (cDist >= 0 && String(r[cDist] ?? '').trim() !== '') p.dist = num(r[cDist]);
+    }
+    out.push(p);
+  });
+  return { points: out, bad, flags };
 }
 /* OpenStreetMap through Overpass: straight from the browser, server after server, and if the browser cannot reach any of them —
    through our own server. A reply with «remark: runtime error» (timeout, out of memory) counts as a failure too. */
@@ -1699,7 +1723,9 @@ async function overpass(q, say){
     const host = new URL(url).host;
     try {
       const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 200e3);
-      const r = await fetch(url, { method:'POST', body:'data=' + encodeURIComponent(q), headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, signal:ctl.signal }).finally(() => clearTimeout(tm));
+      // GET: the mail.ru mirror refuses POST; a long query (rare) still goes by POST
+      const enc = encodeURIComponent(q), viaGet = enc.length < 7000;
+      const r = await fetch(viaGet ? url + '?data=' + enc : url, viaGet ? { signal:ctl.signal } : { method:'POST', body:'data=' + enc, headers:{ 'Content-Type':'application/x-www-form-urlencoded' }, signal:ctl.signal }).finally(() => clearTimeout(tm));
       if (!r.ok) throw new Error('ответ ' + r.status + (r.status === 429 ? ' (слишком много запросов)' : r.status === 504 ? ' (сервер занят)' : ''));
       return check(await r.json());
     } catch(e) { errs.push(`${host}: ${e.name === 'AbortError' ? 'нет ответа' : e.message === 'Failed to fetch' ? 'браузер не может подключиться' : e.message}`); say && say('пробуем другой сервер…'); }
@@ -1744,10 +1770,10 @@ async function dtLiveGeometry(P, say){
   const boxes = [...cells.keys()].map(k => { const [y, x] = k.split(':').map(Number); return `${(y * C - .002).toFixed(4)},${(x * C - .002).toFixed(4)},${((y + 1) * C + .002).toFixed(4)},${((x + 1) * C + .002).toFixed(4)}`; });
   const HW = '^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$';
   let br = [];
-  for (let i = 0; i < boxes.length; i += 120) {
+  for (let i = 0; i < boxes.length; i += 60) {
     say(`ищем эстакады… ${Math.min(100, Math.round(i / boxes.length * 100))}%`);
-    const part = boxes.slice(i, i + 120).map(b => `way["highway"~"${HW}"]["bridge"]["bridge"!="no"](${b});`).join('');
-    br = br.concat(ways(await overpass(`[out:json][timeout:180];(${part});out tags geom;`, say)));
+    const part = boxes.slice(i, i + 60).map(b => `way["bridge"](${b});`).join('');
+    br = br.concat(ways(await overpass(`[out:json][timeout:180];(${part});way._["highway"~"${HW}"]["bridge"!="no"];out tags geom;`, say)));
   }
   const seen = new Set(); br = br.filter(w => !seen.has(w.id) && seen.add(w.id))
     .filter(w => { const n = (w.tags['bridge:name'] || '') + ' ' + (w.tags.name || ''); return /эстакад/i.test(n) || !/(^|[^а-яё])мост(?![а-яё])|мостик/i.test(n); });
@@ -1794,12 +1820,12 @@ async function dtClassifyAndSave(file){
   await api('PUT', '/api/dt', { points: DT.points, file: file ?? DT.meta.file, classifiedAt: classifiedAt || DT.meta.classifiedAt || null, radius: classifiedAt ? R : DT.meta.radius, source: classifiedAt ? (DT.geom?.bundled ? `OpenStreetMap, выгрузка от ${fmtD(DT.geom.date)}` : 'OpenStreetMap') : DT.meta.source });
   await loadDt();
   if (err) { toast(`Точки сохранены, но отметки не определены: ${err}.`); setTimeout(() => { const e = $('dtStatus'); if (e) { e.textContent = 'Не удалось определить: ' + err; e.className = 'warn-t'; } }, 50); }
-  else { const n = DT.points.filter(p => p.cats.length).length; toast(`Готово: на МКАД ${DT.points.filter(p => p.cats.includes('mkad')).length}, на ТТК ${DT.points.filter(p => p.cats.includes('ttk')).length}, на эстакадах ${DT.points.filter(p => p.cats.includes('bridge')).length} — всего отмечено ${n} из ${DT.points.length}`); }
+  else { const n = DT.points.filter(dtFlagged).length; toast(`Готово: на МКАД ${DT.points.filter(p => p.cats.includes('mkad')).length}, на ТТК ${DT.points.filter(p => p.cats.includes('ttk')).length}, на эстакадах ${DT.points.filter(p => p.cats.includes('bridge')).length} — всего отмечено ${n} из ${DT.points.length}`); }
 }
 async function dtExport(){
   const X = await loadSheetJS();
-  const rows = DT.points.filter(dtMatch).map(p => ({ 'Номер объекта': p.no, 'Широта': p.lat, 'Долгота': p.lng, 'МКАД': (p.cats || []).includes('mkad') ? 'да' : '', 'ТТК': (p.cats || []).includes('ttk') ? 'да' : '', 'Эстакада': (p.cats || []).includes('bridge') ? 'да' : '', 'Дорога': p.road || '', 'Эстакада (название)': p.bridge || '', 'До оси, м': p.dist ?? '' }));
-  const ws = X.utils.json_to_sheet(rows); ws['!cols'] = [12, 11, 11, 7, 7, 9, 28, 32, 9].map(w => ({ wch: w }));
+  const rows = DT.points.filter(dtMatch).map(p => ({ 'Номер объекта': p.no, 'Широта': p.lat, 'Долгота': p.lng, 'МКАД': (p.cats || []).includes('mkad') ? 'да' : '', 'ТТК': (p.cats || []).includes('ttk') ? 'да' : '', 'Эстакада': (p.cats || []).includes('bridge') ? 'да' : '', 'Проверить': (p.cats || []).includes('check') ? 'да' : '', 'Дорога': p.road || '', 'Эстакада (название)': p.bridge || '', 'До оси, м': p.dist ?? '' }));
+  const ws = X.utils.json_to_sheet(rows); ws['!cols'] = [12, 11, 11, 7, 7, 9, 10, 28, 32, 9].map(w => ({ wch: w }));
   const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Замена ДТ');
   X.writeFile(wb, `Замена ДТ — ${{ all:'все', mkad:'МКАД', ttk:'ТТК', bridge:'эстакады', none:'остальные' }[ui.dtF || 'all']} — ${today()}.xlsx`);
 }
@@ -3084,9 +3110,17 @@ document.addEventListener('change', async e => {
   if (t.dataset.up === 'dtfile') {
     const file = t.files[0]; if (!file) return; t.value = '';
     try {
-      const { points, bad } = dtParse(await readTable(file));
+      const { points, bad, flags } = dtParse(await readTable(file, { fills:true }));
       if (!points.length) return toast('В файле не нашлось координат. Нужны столбцы «Номер объекта» и «Координаты» (широта, долгота) или «Широта» и «Долгота».');
       DT.points = points; DT.geom = null; dtFitted = false;
+      if (flags) {
+        // the marks are already in the table: take them as they are
+        await api('PUT', '/api/dt', { points, file: file.name, classifiedAt: new Date().toISOString(), radius: null, source: `отметки из файла «${file.name}»` });
+        await loadDt();
+        const c = k => points.filter(p => p.cats.includes(k)).length;
+        toast(`Отметки взяты из файла: МКАД ${c('mkad')}, ТТК ${c('ttk')}, эстакады ${c('bridge')}${c('check') ? `, проверить ${c('check')}` : ''} — из ${points.length} точек${bad ? `, без координат пропущено ${bad}` : ''}`);
+        return;
+      }
       toast(`Прочитано точек: ${points.length}${bad ? `, без координат пропущено: ${bad}` : ''}. Определяем МКАД, ТТК и эстакады…`);
       renderDt(); await dtClassifyAndSave(file.name);
     } catch(e) { toast('Не удалось загрузить файл: ' + errText(e)); }

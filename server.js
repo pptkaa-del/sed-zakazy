@@ -456,13 +456,13 @@ async function api(req, res, url) {
     if (m === 'PUT') {
       if (!canEdit(user)) return fail(res, 403, 'Загружать точки может менеджер или администратор');
       const b = await readJsonBody(req);
-      const CATS = ['mkad', 'ttk', 'bridge'];
+      const CATS = ['mkad', 'ttk', 'bridge', 'check'];
       if (!Array.isArray(b.points) || b.points.length > 50000) return fail(res, 400, 'Нет точек или их слишком много');
       const points = b.points.map(x => ({
         no: String(x.no ?? '').trim().slice(0, 60), lat: Number(x.lat), lng: Number(x.lng),
         cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => CATS.includes(c)),
         road: String(x.road || '').slice(0, 200), bridge: String(x.bridge || '').slice(0, 200),
-        dist: x.dist != null && x.dist !== '' && Number.isFinite(Number(x.dist)) ? Math.round(Number(x.dist)) : null, note: String(x.note || '').slice(0, 300),
+        dist: x.dist != null && x.dist !== '' && Number.isFinite(Number(x.dist)) ? Math.round(Number(x.dist) * 10) / 10 : null, note: String(x.note || '').slice(0, 300),
       })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180);
       if (!points.length) return fail(res, 400, 'Не нашлось ни одной точки с координатами');
       db.dt = { points, file: String(b.file || '').slice(0, 200), at: new Date().toISOString(), by: user.id,
@@ -476,9 +476,10 @@ async function api(req, res, url) {
       const b = await readJsonBody(req), q = String(b.q || '');
       if (!q || q.length > 200000 || !/^\[out:json\]/.test(q)) return fail(res, 400, 'Неверный запрос');
       const errs = [];
-      for (const url of ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+      for (const url of ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
         try {
-          const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'sed-zakazy' }, signal: AbortSignal.timeout(200e3) });
+          const enc = encodeURIComponent(q), viaGet = enc.length < 7000;   // GET: the mail.ru mirror refuses POST
+          const r = await fetch(viaGet ? url + '?data=' + enc : url, { method: viaGet ? 'GET' : 'POST', body: viaGet ? undefined : 'data=' + enc, headers: { ...(viaGet ? {} : { 'Content-Type': 'application/x-www-form-urlencoded' }), 'User-Agent': 'sed-zakazy' }, signal: AbortSignal.timeout(200e3) });
           if (!r.ok) { errs.push(new URL(url).host + ': ' + r.status); continue; }
           const text = await r.text();
           return send(res, 200, text, { 'Content-Type': 'application/json; charset=utf-8' });
