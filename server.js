@@ -713,7 +713,7 @@ async function api(req, res, url) {
     if (p[5] === 'done' && m === 'POST') {
       const b = await readJsonBody(req), notWorking = !!b.notWorking;
       const missing = (j.photoSpec || []).filter(n => !pl.photos[n]);
-      if (missing.length && !notWorking) return fail(res, 400, 'Не хватает фото: ' + missing.join(', '));
+      if (missing.length) return fail(res, 400, 'Не хватает фото: ' + missing.join(', '));   // photos are required even when the device does not work
       const at = new Date().toISOString(), first = !pl.doneAt;
       Object.assign(pl, { notWorking, comment: String(b.comment ?? pl.comment ?? '').slice(0, 4000) });
       if (first) { pl.doneAt = at; pl.doneBy = user.id; } else { pl.editedAt = at; pl.editedBy = user.id; }

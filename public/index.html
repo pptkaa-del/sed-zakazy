@@ -2696,7 +2696,7 @@ function renderDrawer(){
       ${nw ? `<div class="box"><h4>Комментарий (необязательно)</h4><span data-keep style="display:contents"><textarea class="in" id="w-comment" rows="3" ${ed ? '' : 'disabled'}>${esc(ui.wComment ?? pl.comment ?? '')}</textarea></span></div>` : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g">${ed ? `<button class="btn ok" data-act="wClose" data-id="${jid}|${pid}">${done ? 'Сохранить изменения' : 'Закрыть точку'}</button>` : ''}<button class="btn" data-act="close">${ed ? 'Отмена' : 'Закрыть'}</button></div>
-      ${!done && r.need && r.got < r.need ? `<small class="dim">Чтобы закрыть точку, нужны все фото из списка — или отметьте «Не работает».</small>` : ''}
+      ${!done && r.need && r.got < r.need ? `<small class="dim">Чтобы закрыть точку, нужны все фото из списка (и при отметке «Не работает»).</small>` : ''}
     </div>`;
   }
   if (d.kind === 'place') {
