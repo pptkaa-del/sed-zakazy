@@ -240,6 +240,13 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .otabs button{font-size:15px;padding:8px 16px}
 .prod .sub-h{margin:14px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);font-weight:600}
 .prod .ch{margin-bottom:4px}
+.feat{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}
+.feat li{display:flex;gap:10px;align-items:flex-start}
+.feat .fnum{flex:none;min-width:26px;height:26px;margin-top:5px;border-radius:50%;background:var(--info-soft);color:var(--info);display:grid;place-items:center;font:600 12px var(--f-mono)}
+.feat .fi,.feat-add textarea{flex:1;min-width:0;resize:none;overflow:hidden;line-height:1.45;font:inherit;min-height:38px}
+.feat .ftext{flex:1;min-width:0;padding-top:7px;white-space:pre-wrap;line-height:1.45}
+.feat .fbtn{display:flex;gap:2px;flex:none;padding-top:2px}
+.feat-add{display:flex;gap:8px;align-items:flex-start}
 .ok-t{color:var(--ok);font-weight:600}.warn-t{color:var(--warn);font-weight:600}
 .stk{display:grid;grid-template-columns:minmax(0,1fr) 110px 120px 110px 120px 172px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px}
 .stk:first-child{border-top:0}
@@ -855,6 +862,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : ui.view === 'stock' ? vStock() : ui.view === 'jobs' ? vJobs() : ui.view === 'orgs' ? vOrgs() : vOrders();
   if (changed) animateView(V);
+  V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
 
@@ -1218,7 +1226,7 @@ function vOrders(){
     <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Откройте заказ слева, чтобы загрузить документы, заполнить строки для закупки и добавить счета.</div>`}</section>
   </div>`;
 }
-const orderHay = x => [x.number, x.orderNo, x.title, custName(x), x.billNo].join(' ').toLowerCase();
+const orderHay = x => [x.number, x.orderNo, x.title, custName(x), x.billNo, ...(x.features || []).map(f => f.text)].join(' ').toLowerCase();
 const matchOrder = (x, q) => !q || orderHay(x).includes(q);
 const billText = o => !!(o && o.billNo);
 function orderItem(x, q){
@@ -1239,6 +1247,20 @@ function commentsCard(col, doc){
     ${canComment ? `<div class="cform" data-keep><textarea class="in" id="c-text" data-key="${key}" rows="2" aria-label="Комментарий">${esc(ui.drafts[key]||'')}</textarea><button class="btn primary" data-act="addComment" data-id="${col}|${doc.id}">Отправить</button></div>` : ''}
   </section>`;
 }
+/* «Особенности заказа»: a simple numbered list; managers and admins add, edit, reorder and delete lines */
+function featuresCard(o){
+  const F = o.features || [], ed = canEdit();
+  return `<section class="card feat-card">
+    <div class="ch"><h3>Особенности заказа <span class="dim">${F.length || ''}</span></h3></div>
+    ${F.length ? `<ol class="feat">${F.map((f, i) => `<li><span class="fnum">${i + 1}</span>${ed
+      ? `<span data-keep style="display:contents"><textarea class="in fi" rows="1" data-feat="${o.id}|${f.id}" aria-label="Особенность ${i + 1}">${esc(f.text)}</textarea></span>
+         <span class="fbtn"><button type="button" class="btn sm ghost" data-act="moveFeat" data-id="${o.id}|${f.id}|-1" ${i ? '' : 'disabled'} aria-label="Выше">↑</button><button type="button" class="btn sm ghost" data-act="moveFeat" data-id="${o.id}|${f.id}|1" ${i < F.length - 1 ? '' : 'disabled'} aria-label="Ниже">↓</button><button type="button" class="btn sm ghost" data-act="delFeat" data-id="${o.id}|${f.id}" aria-label="Удалить">✕</button></span>`
+      : `<span class="ftext">${esc(f.text)}</span>`}</li>`).join('')}</ol>` : `<p class="dim" style="margin:0 0 ${ed ? '10px' : '0'}">Особенности не указаны.</p>`}
+    ${ed ? `<div class="feat-add"><span data-keep style="display:contents"><textarea class="in" rows="1" id="feat-new" data-o="${o.id}" aria-label="Новая особенность заказа">${esc(ui.drafts['feat:' + o.id] || '')}</textarea></span><button type="button" class="btn sm primary" data-act="addFeat" data-id="${o.id}">Добавить</button></div>
+      <p class="hint" style="margin:6px 0 0">Enter — добавить строку, Shift+Enter — перенос внутри строки. Текст строки можно исправить прямо в списке.</p>` : ''}
+  </section>`;
+}
+const saveFeatures = (oid, F) => guard(upd('orders', oid, { features: F }));
 function orderDetail(o){
   const comps = o.components || [];
   const is = invOf(o.id).sort((a,b) => (a.date||'').localeCompare(b.date||''));
@@ -1257,6 +1279,7 @@ function orderDetail(o){
     <button role="tab" data-act="orderTab" data-id="products" class="${ui.orderTab === 'products' ? 'on' : ''}" aria-selected="${ui.orderTab === 'products'}">Продукция${(o.products||[]).length ? ` (${o.products.length})` : ''}</button>
   </div>
   ${ui.orderTab === 'products' ? productsPane(o) : `
+  ${featuresCard(o)}
   ${commentsCard('orders', o)}
   <section class="card">
     <div class="ch"><h3>Документы по заказу <span class="dim">${specs.length||''}</span></h3>
@@ -2556,6 +2579,15 @@ async function act(el){
   disarm();
   switch (a) {
     case 'close': return closeDrawer();
+    case 'addFeat': {
+      const ta = $('feat-new'), text = (ta?.value || '').trim(); if (!text) { ta?.focus(); return; }
+      const o = ord(id); ui.drafts['feat:' + id] = ''; ta.value = '';
+      await saveFeatures(id, [...(o.features || []), { id:uid(), text, by:me.id, at:new Date().toISOString() }]);
+      render(); $('feat-new')?.focus(); return;
+    }
+    case 'delFeat': { const [oid, fid] = id.split('|'); await saveFeatures(oid, (ord(oid).features || []).filter(f => f.id !== fid)); return render(); }
+    case 'moveFeat': { const [oid, fid, dir] = id.split('|'); const F = [...(ord(oid).features || [])], i = F.findIndex(f => f.id === fid), j = i + Number(dir);
+      if (i < 0 || j < 0 || j >= F.length) return; [F[i], F[j]] = [F[j], F[i]]; await saveFeatures(oid, F); return render(); }
     case 'orgNew': return openDrawer('orgForm');
     case 'mkBackup': {
       el.disabled = true; toast('Создаём копию…');
@@ -2733,6 +2765,8 @@ document.addEventListener('click', e => {
   act(el);
 });
 document.addEventListener('keydown', e => {
+  if (e.target.id === 'feat-new' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); const b = document.querySelector('[data-act=addFeat]'); if (b) act(b); return; }
+  if (e.target.dataset?.feat && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.target.blur(); return; }
   if (e.target.id === 'f-cust') {
     const pop = $('cust-pop'), open = pop && !pop.hidden;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); return comboMove(e.key === 'ArrowDown' ? 1 : -1); }
@@ -2755,6 +2789,8 @@ $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L); } return; }
+  if (t.id === 'feat-new') ui.drafts['feat:' + t.dataset.o] = t.value;
+  if (t.id === 'feat-new' || t.dataset.feat) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; if (t.id === 'feat-new') return; }
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'jq') { ui.jq = t.value; const pos = t.selectionStart; $('view').innerHTML = vJobs(); const n = $('jq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -2780,6 +2816,11 @@ document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t' && ui.drawer?.kind === 'paste') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; else if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + e.target.value.split(/\r?\n/).filter(l => l.trim() && !/наимен|компон/i.test(l)).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.dataset.feat) {
+    const [oid, fid] = t.dataset.feat.split('|'), text = t.value.trim(), o = ord(oid);
+    const F = (o.features || []).map(f => f.id === fid ? { ...f, text, editedBy:me.id, editedAt:new Date().toISOString() } : f).filter(f => f.text);
+    await saveFeatures(oid, F); return render();
+  }
   if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; return; }
   if (t.id === 'f-file') { parseInvoiceFile(t.files[0]); return; }
   if (t.id === 'acct-file') {
