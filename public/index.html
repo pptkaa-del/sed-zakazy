@@ -908,24 +908,33 @@ function parseInvoiceText(raw){
   ];
   for (const re of amountPatterns) { const m = re.exec(t); if (m) { r.amount = num(m[1]); break; } }
   if (r.amount == null) { const all = [...t.matchAll(new RegExp('Итого[^\\d\\n]{0,30}' + NUM, 'gi'))].map(m => num(m[1])); if (all.length) r.amount = Math.max(...all); }
-  // «Поставщик: ООО …», «Поставщик (Исполнитель): …» или, как в 1С, «Поставщик ООО …» без двоеточия; запасной вариант — «Получатель» в банковском блоке
-  const ORG = /(ООО|ОАО|ЗАО|ПАО|АО|ИП|НКО|ГУП|МУП|ФГУП|Общество с ограниченной|Акционерное общество|Индивидуальный предприниматель|[«"])/i;
-  const BUYER = /^(Покупатель|Плательщик|Заказчик|Грузополучатель)/i;
-  // «Поставщик ООО …» on one line, or the label alone and the name on the next line (tables in 1C and other forms)
-  const byLabel = re => {
-    const m = re.exec(t); if (!m) return null;
-    if (ORG.test(m[1])) return m;
-    const next = t.slice(m.index + m[0].length).split('\n').slice(1, 3).map(s => s.trim()).find(l => ORG.test(l) && !BUYER.test(l));
-    return next ? { index: m.index, 1: next } : null;
-  };
-  let ms = byLabel(/Поставщик(?:\s*\([^)\n]*\))?\s*:?\s*([^\n]*)/i) || byLabel(/(?:Продавец|Исполнитель)\s*:?\s*([^\n]*)/i) || byLabel(/Получатель\s*:?\s*([^\n]*)/i);
-  if (!ms) {   // the first organization in the document that is not the buyer
-    let pos = 0;
-    for (const line of t.split('\n')) { if (ORG.test(line) && !BUYER.test(line.trim()) && /ИНН|ООО|АО|ИП/.test(line)) { ms = { index: pos, 1: line.replace(/^.*?(?=(ООО|ОАО|ЗАО|ПАО|АО|ИП|Общество|Акционерное|Индивидуальный)\b)/i, '') }; break; } pos += line.length + 1; }
-  }
-  if (ms) r.supplier = ms[1].replace(/^\([^)]*\)\s*:?\s*/, '').split(/,\s*ИНН|\s+ИНН\s|,\s*\d{6},|,\s*КПП|\s+Сч\.?\s*№|\s+БИК/)[0].trim().replace(/[,;]+$/, '');
-  const mi = (ms ? new RegExp('ИНН\\s*(\\d{10,12})').exec(t.slice(ms.index)) : null) || /ИНН\s*(\d{10,12})/.exec(t);
-  if (mi) r.inn = mi[1];
+  // Supplier: every organization name / INN in the text belongs to the nearest caption — the supplier's
+  // («Поставщик», «Продавец», «Исполнитель», «Получатель» платежа) or the buyer's («Покупатель», «Заказчик», «Плательщик», «Грузополучатель»).
+  // In 1C forms a caption stands in the middle of its cell, so the name may be above it, beside it or below it.
+  const ORG_RE = /(?:ООО|ОАО|ЗАО|ПАО|НАО|АО|ИП|НКО|ГУП|МУП|ФГУП|Общество с ограниченной ответственностью|Акционерное общество|Публичное акционерное общество|Индивидуальный предприниматель)(?![а-яё])/i;
+  const BANK = /банк|сбербанк|бик\b|к\/с|корр/i;
+  const L = t.split('\n').map(x => x.trim());
+  const SUP = /(?:^|[^а-яё])(Поставщик|Продавец|Исполнитель|Получатель)(?![а-яё])/i, BUY = /(Покупатель|Заказчик|Плательщик|Грузополучатель|Грузоотправитель)/i;
+  const caps = []; L.forEach((l, i) => { const b = BUY.test(l), sp = SUP.test(l.replace(/Грузополучатель|Грузоотправитель/gi, '')); if (b || sp) caps.push({ i, kind: b && !sp ? 'buy' : !b ? 'sup' : (l.search(BUY) < l.search(SUP) ? 'buy' : 'sup') }); });
+  // a caption on the same line wins; otherwise the nearest one, and between equally near ones the caption above
+  // a caption whose own line already holds a name or an INN claims nothing else
+  caps.forEach(c => { c.full = ORG_RE.test(L[c.i].replace(/^.*?(Поставщик|Продавец|Исполнитель|Получатель|Покупатель|Заказчик|Плательщик|Грузополучатель|Грузоотправитель)/i, '')) || /ИНН\s*\d/.test(L[c.i]); });
+  const side = i => { let best = null, bd = 1e9; for (const c of caps) { if (c.full && c.i !== i) continue; const d = Math.abs(c.i - i) * 2 + (c.i > i ? 1 : 0); if (d < bd) { bd = d; best = c; } } return best && bd <= 7 ? best.kind : null; };
+  const nameIn = l => { const m = ORG_RE.exec(l); if (!m) return ''; return l.slice(m.index).split(/,\s*ИНН|\s+ИНН\s|\s*ИНН\s*\d|,\s*\d{6},|,\s*КПП|\s+КПП\s|\s+Сч\.?\s*№|\s+БИК|\s*\(/)[0].trim().replace(/[,;:]+$/, ''); };
+  const inns = [], orgsFound = [];
+  L.forEach((l, i) => {
+    const kind = side(i);
+    for (const m of l.matchAll(/ИНН\s*:?\s*(\d{10}|\d{12})(?!\d)/g)) inns.push({ i, inn: m[1], kind });
+    const nm = nameIn(l); if (nm && !BANK.test(nm)) orgsFound.push({ i, name: nm, kind });
+  });
+  const buyerInns = new Set(inns.filter(x => x.kind === 'buy').map(x => x.inn));
+  const buyerNames = new Set(orgsFound.filter(x => x.kind === 'buy').map(x => normName(x.name)));
+  const supOrg = orgsFound.find(x => x.kind === 'sup' && !buyerNames.has(normName(x.name))) || orgsFound.find(x => !x.kind && !buyerNames.has(normName(x.name)));
+  const supInn = inns.find(x => x.kind === 'sup' && !buyerInns.has(x.inn) && supOrg && x.i === supOrg.i)
+    || inns.find(x => x.kind === 'sup' && !buyerInns.has(x.inn)) || inns.find(x => !x.kind && !buyerInns.has(x.inn));
+  if (supOrg) r.supplier = supOrg.name;
+  else if (supInn) { const near = orgsFound.find(x => Math.abs(x.i - supInn.i) <= 2 && !buyerNames.has(normName(x.name))); if (near) r.supplier = near.name; }
+  if (supInn) r.inn = supInn.inn;
   r.items = parseInvoiceItems(raw);
   return r;
 }
