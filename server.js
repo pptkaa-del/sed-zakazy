@@ -99,6 +99,7 @@ function loadDb() {
   const d = readJSON(DB_FILE, { rev: 0, files: {} });
   COLLECTIONS.forEach(c => { d[c] = d[c] || {}; });
   d.files = d.files || {};
+  d.meta = d.meta || {};
   return d;
 }
 /* The hosting may run several copies of the app (e.g. Passenger) or a CLI command may edit
@@ -288,7 +289,7 @@ async function api(req, res, url) {
   }
   if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION });
   if (p[1] === 'data' && m === 'GET') {
-    const out = { rev: db.rev, users: Object.fromEntries(users.map(u => [u.id, u.name])) };
+    const out = { rev: db.rev, users: Object.fromEntries(users.map(u => [u.id, u.name])), meta: db.meta };
     COLLECTIONS.forEach(c => { out[c] = listOf(c); });
     return send(res, 200, out);
   }
@@ -299,6 +300,51 @@ async function api(req, res, url) {
     Object.assign(user, hashPassword(String(next)), { ver: (user.ver || 0) + 1 });
     saveUsers();
     return send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, makeSession(user), SESSION_DAYS * 86400) });
+  }
+
+  /* accounting balances from a 1C export: rows are matched by article, then by name */
+  if (p[1] === 'stock-acct' && m === 'POST') {
+    if (!canEdit(user) && user.role !== 'accountant') return fail(res, 403, 'Загружать бухгалтерские остатки могут бухгалтер, менеджер или администратор');
+    const b = await readJsonBody(req);
+    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 20000) : [];
+    if (!rows.length) return fail(res, 400, 'В файле не найдено строк с остатками');
+    const agg = new Map();
+    for (const r of rows) {
+      const name = String(r.name || '').trim(), sku = String(r.sku || '').trim(), qty = Number(r.qty);
+      if (!name || !Number.isFinite(qty)) continue;
+      const key = sku ? 'a:' + normName(sku) : 'n:' + normName(name);
+      const cur = agg.get(key) || { name, sku, unit: String(r.unit || '').trim(), qty: 0 };
+      cur.qty = Math.round((cur.qty + qty) * 1000) / 1000; agg.set(key, cur);
+    }
+    const items = Object.entries(db.stock);
+    const bySku = new Map(items.filter(([, it]) => it.sku).map(([id, it]) => [normName(it.sku), id]));
+    const byName = new Map(items.map(([id, it]) => [normName(it.name), id]));
+    const seen = new Set(); let matched = 0, created = 0, skipped = 0;
+    const now = new Date().toISOString();
+    for (const r of agg.values()) {
+      const id = (r.sku && bySku.get(normName(r.sku))) || byName.get(normName(r.name));
+      if (id) { if (!seen.has(id)) { db.stock[id].acctQty = r.qty; seen.add(id); matched++; } else db.stock[id].acctQty = Math.round((db.stock[id].acctQty + r.qty) * 1000) / 1000; }
+      else if (b.createMissing) {
+        const nid = newId();
+        db.stock[nid] = { name: r.name, sku: r.sku, unit: r.unit || 'шт', location: '', minQty: 0, note: 'Добавлено из выгрузки 1С', qty: 0, moves: [], acctQty: r.qty, createdAt: now, createdBy: user.id };
+        seen.add(nid); created++;
+      } else skipped++;
+    }
+    for (const [id, it] of items) if (!seen.has(id)) it.acctQty = 0;   // not in the export: nothing on the books
+    db.meta.acct = { at: now, by: user.id, file: String(b.file || '').slice(0, 200), rows: agg.size, matched, created, skipped };
+    saveDb();
+    return send(res, 200, db.meta.acct);
+  }
+
+  /* write-off list for an order: Excel with highlighting */
+  if (p[1] === 'orders' && p[3] === 'writeoff.xlsx' && m === 'GET') {
+    const o = db.orders[p[2]];
+    if (!o) return fail(res, 404, 'Заказ не найден');
+    const buf = writeoffXlsx(o);
+    const name = `Списание ${o.number || ''} ${o.title || ''}`.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 90) + '.xlsx';
+    res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="writeoff.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`, 'Content-Length': buf.length, 'Cache-Control': 'no-store' });
+    return res.end(buf);
   }
 
   if (p[1] === 'invoices-zip' && m === 'GET') {
@@ -379,7 +425,7 @@ async function api(req, res, url) {
     }
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
     if (col === 'orders' || col === 'counterparties') data.comments = [];
-    if (col === 'stock') { data.qty = 0; data.moves = []; }
+    if (col === 'stock') { data.qty = 0; data.moves = []; data.acctQty = 0; }
     if (col === 'invoices') {
       if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
       data.projectId = db.orders[data.orderId].projectId || null;
@@ -394,7 +440,7 @@ async function api(req, res, url) {
     const patch = clean(await readJsonBody(req));
     delete patch.createdBy; delete patch.createdAt;
     if (col === 'orders' || col === 'counterparties') delete patch.comments;   // comments go through their own endpoint
-    if (col === 'stock') { delete patch.qty; delete patch.moves; }          // balance changes only through receipts and issues
+    if (col === 'stock') { delete patch.qty; delete patch.moves; delete patch.acctQty; }   // balances change only through moves and the 1C import
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     const keys = Object.keys(patch);
     /* tasks: everyone except «Просмотр» may tick «Выполнено»; other changes need a manager or admin */
@@ -484,6 +530,117 @@ function markSeen(user, fileIds) {
     changed = true;
   }
   if (changed) saveDb();
+}
+
+/* ---------- names, write-off lines and a tiny XLSX writer ---------- */
+const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/["«»'“”„]/g, '').replace(/(\d)\s*[x×х*]\s*(?=\d)/g, '$1х').replace(/\s+/g, ' ').trim();
+function writeoffLines(o) {
+  const byName = new Map(Object.entries(db.stock).map(([id, it]) => [normName(it.name), id]));
+  const lines = new Map();
+  for (const p of o.products || []) {
+    const k = Number(p.qty) || 0;
+    for (const c of p.components || []) {
+      const sid = (c.stockId && db.stock[c.stockId]) ? c.stockId : byName.get(normName(c.name));
+      if (!sid && !String(c.name || '').trim()) continue;
+      const it = sid ? db.stock[sid] : null;
+      const key = sid ? 'id:' + sid : 'n:' + normName(c.name);
+      const L = lines.get(key) || { name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, products: [] };
+      L.need = Math.round((L.need + (Number(c.qty) || 0) * k) * 1000) / 1000;
+      if (p.name && !L.products.includes(p.name)) L.products.push(p.name);
+      lines.set(key, L);
+    }
+  }
+  return [...lines.values()].map(L => {
+    const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : L.real >= L.need - 1e-9 ? 'real' : 'short';
+    const shortage = source === 'acct' || source === 'real' ? 0 : Math.round((L.need - (L.inStock ? Math.max(L.acct, L.real) : 0)) * 1000) / 1000;
+    return { ...L, source, shortage };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+const SOURCE_LABEL = { acct: 'Из бухгалтерских остатков', real: 'Из фактических остатков', short: 'Не хватает', none: 'Нет на складе' };
+function zipStore(entries) {
+  const now = new Date();
+  const t = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const d = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+  const parts = [], central = []; let offset = 0;
+  for (const e of entries) {
+    const name = Buffer.from(e.name, 'utf8'), data = Buffer.isBuffer(e.data) ? e.data : Buffer.from(e.data, 'utf8'), crc = crc32(data);
+    const h = Buffer.alloc(30);
+    h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6); h.writeUInt16LE(0, 8); h.writeUInt16LE(t, 10); h.writeUInt16LE(d, 12);
+    h.writeUInt32LE(crc, 14); h.writeUInt32LE(data.length, 18); h.writeUInt32LE(data.length, 22); h.writeUInt16LE(name.length, 26); h.writeUInt16LE(0, 28);
+    const c = Buffer.alloc(46);
+    c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0x0800, 8); c.writeUInt16LE(0, 10); c.writeUInt16LE(t, 12); c.writeUInt16LE(d, 14);
+    c.writeUInt32LE(crc, 16); c.writeUInt32LE(data.length, 20); c.writeUInt32LE(data.length, 24); c.writeUInt16LE(name.length, 28); c.writeUInt32LE(offset, 42);
+    parts.push(h, name, data); central.push(c, name); offset += 30 + name.length + data.length;
+  }
+  const cd = Buffer.concat(central), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10); end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, cd, end]);
+}
+const xmlEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+const colName = i => { let s = ''; i++; while (i) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; };
+/* rows: arrays of { v, s } (s = style index); numbers become numeric cells */
+function xlsxBuffer(sheetName, rows, widths) {
+  const sheetRows = rows.map((r, ri) => `<row r="${ri + 1}">` + r.map((c, ci) => {
+    if (c == null) return '';
+    const ref = colName(ci) + (ri + 1), cell = typeof c === 'object' ? c : { v: c };
+    const st = cell.s ? ` s="${cell.s}"` : '';
+    if (typeof cell.v === 'number') return `<c r="${ref}"${st}><v>${cell.v}</v></c>`;
+    return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(cell.v)}</t></is></c>`;
+  }).join('') + '</row>').join('');
+  const cols = widths ? '<cols>' + widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols>' : '';
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${cols}<sheetData>${sheetRows}</sheetData></worksheet>`;
+  const fill = rgb => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.###"/></numFmts>
+<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts>
+<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fill('E3E8E5')}${fill('DFF2E4')}${fill('DDEBF8')}${fill('FBE1E1')}${fill('EDEFF2')}</fills>
+<borders count="2"><border/><border><left style="thin"><color rgb="FFC8CFCB"/></left><right style="thin"><color rgb="FFC8CFCB"/></right><top style="thin"><color rgb="FFC8CFCB"/></top><bottom style="thin"><color rgb="FFC8CFCB"/></bottom></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="13"><xf/>
+<xf fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1"><alignment wrapText="1" vertical="center"/></xf>
+<xf borderId="1" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf>
+<xf numFmtId="164" borderId="1" applyNumberFormat="1" applyBorder="1"/>
+<xf fillId="3" borderId="1" applyFill="1" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf>
+<xf numFmtId="164" fillId="3" borderId="1" applyNumberFormat="1" applyFill="1" applyBorder="1"/>
+<xf fillId="4" borderId="1" applyFill="1" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf>
+<xf numFmtId="164" fillId="4" borderId="1" applyNumberFormat="1" applyFill="1" applyBorder="1"/>
+<xf fillId="5" borderId="1" applyFill="1" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf>
+<xf numFmtId="164" fillId="5" borderId="1" applyNumberFormat="1" applyFill="1" applyBorder="1"/>
+<xf fontId="2" applyFont="1"/>
+<xf fillId="6" borderId="1" applyFill="1" applyBorder="1"><alignment wrapText="1" vertical="top"/></xf>
+<xf numFmtId="164" fillId="6" borderId="1" applyNumberFormat="1" applyFill="1" applyBorder="1"/>
+</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const files = [
+    { name: '[Content_Types].xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+    { name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+    { name: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(sheetName).slice(0, 31)}" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+    { name: 'xl/_rels/workbook.xml.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+    { name: 'xl/styles.xml', data: styles },
+    { name: 'xl/worksheets/sheet1.xml', data: sheet },
+  ];
+  return zipStore(files);
+}
+function writeoffXlsx(o) {
+  const lines = writeoffLines(o);
+  const st = { acct: [4, 5], real: [6, 7], short: [8, 9], none: [11, 12] };
+  const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : 'не загружались';
+  const rows = [
+    [{ v: `Список для списания — заказ ${o.number || ''} · ${o.title || ''}`, s: 10 }],
+    [`Сформирован: ${fmt(new Date().toISOString())}. Бухгалтерские остатки: ${db.meta.acct ? fmt(db.meta.acct.at) + (db.meta.acct.file ? ' (' + db.meta.acct.file + ')' : '') : 'не загружались'}.`],
+    [],
+    ['№', 'Наименование', 'Артикул', 'Ед.', 'Нужно', 'Бух. остаток', 'Факт. остаток', 'Списать из', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
+    ...lines.map((L, i) => { const [ts, ns] = st[L.source]; return [
+      { v: i + 1, s: ns }, { v: L.name, s: ts }, { v: L.sku, s: ts }, { v: L.unit, s: ts }, { v: L.need, s: ns },
+      L.inStock ? { v: L.acct, s: ns } : { v: '—', s: ts }, L.inStock ? { v: L.real, s: ns } : { v: '—', s: ts },
+      { v: SOURCE_LABEL[L.source], s: ts }, L.shortage ? { v: L.shortage, s: ns } : { v: '', s: ts }, { v: L.products.join(', '), s: ts }]; }),
+    [],
+    [{ v: 'Обозначения:', s: 0 }],
+    [{ v: 'Хватает бухгалтерского остатка', s: 4 }],
+    [{ v: 'Бухгалтерского не хватает, хватает фактического', s: 6 }],
+    [{ v: 'Не хватает ни бухгалтерского, ни фактического', s: 8 }],
+    [{ v: 'Позиции нет на складе', s: 11 }],
+  ];
+  return xlsxBuffer('Списание', rows, [5, 42, 16, 7, 11, 13, 13, 30, 12, 30]);
 }
 
 /* ---------- ZIP of invoices to pay (stored, no compression; no dependencies) ---------- */

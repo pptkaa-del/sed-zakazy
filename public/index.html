@@ -223,7 +223,7 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .prod .sub-h{margin:14px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);font-weight:600}
 .prod .ch{margin-bottom:4px}
 .ok-t{color:var(--ok);font-weight:600}.warn-t{color:var(--warn);font-weight:600}
-.stk{display:grid;grid-template-columns:minmax(0,1fr) 120px 140px 120px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px}
+.stk{display:grid;grid-template-columns:minmax(0,1fr) 110px 120px 110px 120px 172px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px}
 .stk:first-child{border-top:0}
 .stk.head{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px}
 .stk.click{cursor:pointer}.stk.click:hover{background:var(--paper)}
@@ -231,7 +231,29 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .bal{font:600 15px var(--f-mono);text-align:right}
 .stk .bal.low{color:var(--warn)}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
-@media (max-width:820px){.stk{grid-template-columns:1fr auto}.stk.head{display:none}.stk>:nth-child(2),.stk>:nth-child(3){grid-column:1}.stk .bal{grid-row:1;grid-column:2}.stk .acts{grid-column:1/-1;justify-content:flex-start}}
+@media (max-width:820px){.stk{grid-template-columns:1fr auto auto}.stk.head{display:none}.stk>:nth-child(1){grid-column:1/-1}.stk>:nth-child(2),.stk>:nth-child(3){grid-column:1}.stk .bal{grid-row:2}.stk .bal.acct{grid-row:2}.stk .acts{grid-column:1/-1;justify-content:flex-start}}
+.stk .bal small{font:500 11px var(--f-body);color:var(--ink-2);display:block}
+.stk .bal.acct{color:var(--info)}
+.diff{color:var(--warn);font-size:12px}
+.acctbar{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin:0 0 14px;padding:10px 14px;border-radius:10px;background:var(--info-soft);color:var(--info);font-size:14px}
+.acctbar b{color:var(--ink)}
+aside.drawer.wide{width:min(1000px,100%)}
+.wo{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
+.wo th{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:7px 8px;white-space:nowrap}
+.wo th.r,.wo td.r{text-align:right}
+.wo td{padding:7px 8px;border-top:1px solid var(--rule-2);vertical-align:top}
+.wo td.mono{font-family:var(--f-mono)}
+.wo tr.acct td{background:var(--ok-soft)}.wo tr.real td{background:var(--info-soft)}.wo tr.short td{background:var(--bad-soft)}.wo tr.none td{background:var(--mute-soft)}
+.legend2{display:flex;gap:8px 16px;flex-wrap:wrap;font-size:13px}
+.legend2 span{display:flex;gap:6px;align-items:center}
+.legend2 i{width:14px;height:14px;border-radius:3px;display:inline-block;border:1px solid var(--rule)}
+.prev{width:100%;border-collapse:collapse;font-size:13px}
+.prev th,.prev td{padding:5px 6px;border-top:1px solid var(--rule-2);text-align:left}
+.prev th{background:var(--mute-soft);color:var(--ink-2);font-weight:600}
+.pick{list-style:none;margin:0;padding:0;max-height:52vh;overflow-y:auto;border:1px solid var(--rule-2);border-radius:8px}
+.pick li{display:grid;grid-template-columns:auto minmax(0,1fr) 90px;gap:10px;align-items:center;padding:8px 10px;border-top:1px solid var(--rule-2);font-size:14px}
+.pick li:first-child{border-top:0}
+.pick small{display:block;color:var(--ink-2);font-size:12px}
 .mvs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .mvs li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:8px 0;border-top:1px solid var(--rule-2);font-size:14px;align-items:baseline}
 .mvs li:first-child{border-top:0}
@@ -519,7 +541,7 @@ nav.views{order:3;width:100%}
 .pw-eye[aria-pressed="false"] .pw-slash{display:none}
 .login p{margin:0;font-size:14px;color:var(--ink-2)}
 body.no-edit [data-act=newProduct],body.no-edit [data-act=editProduct],body.no-edit [data-act=delProduct],body.no-edit [data-act=addPComp],body.no-edit [data-act=delPComp],body.no-edit [data-act=pastePComp],body.no-edit [data-act=delPFile],body.no-edit label:has(> [data-up=pfile]),body.no-edit .comp .pci{pointer-events:none}
-body.no-edit [data-act=newProduct],body.no-edit [data-act=editProduct],body.no-edit [data-act=delProduct],body.no-edit [data-act=addPComp],body.no-edit [data-act=delPComp],body.no-edit [data-act=pastePComp],body.no-edit [data-act=delPFile],body.no-edit label:has(> [data-up=pfile]){display:none!important}
+body.no-edit [data-act=newProduct],body.no-edit [data-act=editProduct],body.no-edit [data-act=delProduct],body.no-edit [data-act=addPComp],body.no-edit [data-act=delPComp],body.no-edit [data-act=pastePComp],body.no-edit [data-act=pickStock],body.no-edit [data-act=delPFile],body.no-edit label:has(> [data-up=pfile]){display:none!important}
 body.no-edit [data-act=newContact],body.no-edit [data-act=editContact],body.no-edit [data-act=delContact],body.no-edit [data-act=newCp],body.no-edit [data-act=editCp],body.no-edit [data-act=newContract],body.no-edit [data-act=delContract],body.no-edit [data-act=newProject],body.no-edit [data-act=editProject],body.no-edit [data-act=newOrder],body.no-edit [data-act=editOrder],
 body.no-edit [data-act=addComp],body.no-edit [data-act=delComp],body.no-edit [data-act=paste],body.no-edit [data-act=newInvoice],
 body.no-edit [data-act=editInvoice],body.no-edit [data-act=delInvoice],body.no-edit [data-act=newTask],body.no-edit [data-act=delSpec],
@@ -632,6 +654,7 @@ const ROLE_INFO = {
 };
 
 const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[], stock:[] };
+let META = {};
 let me = null, rev = -1, mode = 'loading';
 const canEdit = () => me && (me.role === 'admin' || me.role === 'manager');
 const canPay = () => me && (me.role === 'admin' || me.role === 'accountant');
@@ -696,7 +719,7 @@ async function api(method, url, body, headers = {}){
 }
 async function refresh(){
   const d = await api('GET', '/api/data');
-  rev = d.rev; names = d.users || {};
+  rev = d.rev; names = d.users || {}; META = d.meta || {};
   ['projects','orders','invoices','tasks','counterparties','points','stock'].forEach(c => S[c] = d[c] || []);
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
@@ -825,6 +848,67 @@ async function parseInvoiceFile(file){
   show('✓ Из файла подставлены: ' + got.join(', ') + '. Проверьте перед сохранением.');
 }
 
+/* ===== 1C export of balances ===== */
+let sheetLib = null;
+function loadSheetJS(){
+  if (sheetLib) return sheetLib;
+  sheetLib = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '/vendor/sheetjs/xlsx.full.min.js'; sc.onload = () => res(window.XLSX); sc.onerror = () => { sheetLib = null; rej(new Error('Не удалось загрузить модуль чтения Excel')); }; document.head.appendChild(sc); });
+  return sheetLib;
+}
+async function readTable(file){
+  const X = await loadSheetJS();
+  const buf = new Uint8Array(await file.arrayBuffer());
+  let wb;
+  if (/\.(csv|txt)$/i.test(file.name)) {
+    let text; try { text = new TextDecoder('utf-8', { fatal:true }).decode(buf); } catch(e) { text = new TextDecoder('windows-1251').decode(buf); }
+    wb = X.read(text.replace(/^﻿/, ''), { type:'string', raw:false });
+  } else wb = X.read(buf, { type:'array' });
+  // the sheet with the most filled rows
+  let best = null;
+  for (const n of wb.SheetNames) { const aoa = X.utils.sheet_to_json(wb.Sheets[n], { header:1, raw:true, defval:'' }); if (!best || aoa.length > best.length) best = aoa; }
+  return (best || []).map(r => r.map(v => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : v));
+}
+const cellNum = v => typeof v === 'number' ? v : (String(v).trim() && /^-?[\d\s ]+([.,]\d+)?$/.test(String(v).trim()) ? num(v) : null);
+function guessAcct(aoa){
+  const low = v => String(v || '').toLowerCase();
+  const NAME = /номенклатур|наименован|товар|материал/, QTY = /количеств|кол-во|кол\.|остат/;
+  // header: a row with short cells naming both the item and the quantity (a report title like «Остатки товаров» is one long cell)
+  const isHdr = (r, needQty) => { const c = r.map(low).filter(v => v.trim() && v.length < 60); return c.some(v => NAME.test(v)) && (!needQty || c.some(v => QTY.test(v) && !NAME.test(v)) || c.filter(v => QTY.test(v)).length > 1); };
+  let hdr = aoa.findIndex((r, i) => i < 60 && isHdr(r, true));
+  if (hdr < 0) hdr = aoa.findIndex((r, i) => i < 60 && isHdr(r, false));
+  if (hdr < 0) hdr = 0;
+  // sub-header rows (no numbers in them) add to the column labels
+  const sub = r => r && !r.some(v => cellNum(v) !== null) ? r : [];
+  const H = aoa[hdr] || [], H2 = sub(aoa[hdr + 1]), H3 = H2.length ? sub(aoa[hdr + 2]) : [];
+  const width = Math.max(...aoa.slice(hdr, hdr + 30).map(r => r.length), 0);
+  const label = i => [H[i], H2[i], H3[i]].filter(v => String(v).trim()).join(' / ');
+  const find = (re, prefer) => { const idx = []; for (let i = 0; i < width; i++) if (re.test(low(label(i)))) idx.push(i); return idx.length ? (prefer === 'last' ? idx[idx.length - 1] : idx[0]) : -1; };
+  const cols = {
+    name: find(NAME),
+    qty: find(QTY, 'last'),
+    sku: find(/артикул/),
+    unit: find(/ед\.|единиц/),
+  };
+  if (cols.qty < 0) { // the rightmost column that holds numbers
+    for (let i = width - 1; i >= 0 && cols.qty < 0; i--) if (aoa.slice(hdr + 1, hdr + 30).filter(r => cellNum(r[i]) !== null).length >= 2) cols.qty = i;
+  }
+  return { hdr, cols, width, label };
+}
+function acctRows(aoa, hdr, cols){
+  const out = [];
+  for (const r of aoa.slice(hdr + 1)) {
+    const name = String(r[cols.name] ?? '').trim(), q = cellNum(r[cols.qty]);
+    if (!name || q === null || /^(итого|всего)/i.test(name)) continue;
+    out.push({ name, qty: q, sku: cols.sku >= 0 ? String(r[cols.sku] ?? '').trim() : '', unit: cols.unit >= 0 ? String(r[cols.unit] ?? '').trim() : '' });
+  }
+  return out;
+}
+// every word of the query occurs in the (normalized) text
+const pickHit = (text, q) => normName(q).split(' ').filter(Boolean).every(w => text.includes(w));
+function acctMatch(row){
+  return (row.sku && S.stock.find(x => x.sku && normName(x.sku) === normName(row.sku))) || stockByName(row.name);
+}
+
 /* ===== Warehouse ===== */
 const canMoveStock = () => me && (canEdit() || me.role === 'user');
 const isLow = it => (Number(it.minQty) || 0) > 0 && (Number(it.qty) || 0) <= Number(it.minQty);
@@ -833,20 +917,23 @@ function vStock(){
   const hay = it => [it.name, it.sku, it.location, it.note].join(' ').toLowerCase();
   const low = S.stock.filter(isLow);
   const list = S.stock.filter(it => (ui.sF !== 'low' || isLow(it)) && (!q || hay(it).includes(q))).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
-  const head = `<div class="toolbar">
+  const A = META.acct;
+  const acctBar = `<div class="acctbar"><span>Бухгалтерские остатки (1С): ${A ? `обновлены <b>${esc(fmtDT(A.at))}</b>${A.file ? ` из файла «${esc(A.file)}»` : ''}${A.by ? ', ' + esc(who(A.by)) : ''}` : '<b>ещё не загружались</b>'}</span>${canAcct() ? '<button class="btn sm" data-act="acctImport">Загрузить выгрузку 1С</button>' : ''}</div>`;
+  const head = acctBar + `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="sq" type="search" placeholder="Поиск: наименование, артикул, место" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
     <div class="seg"><button data-act="sF" data-id="all" class="${ui.sF!=='low'?'on':''}">Все</button><button data-act="sF" data-id="low" class="${ui.sF==='low'?'on':''}">Мало на складе${low.length ? ` (${low.length})` : ''}</button></div>
     ${canEdit() ? '<button class="btn primary" data-act="newStock">+ Позиция</button>' : ''}
   </div>`;
-  if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canEdit() ? 'Добавьте позиции: наименование, артикул, единицу, место хранения и минимальный запас. Затем отмечайте приход и расход.' : 'Позиции склада добавляют менеджер или администратор.'}</div>`;
+  if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canAcct() ? 'Загрузите выгрузку остатков из 1С — позиции создадутся сами — или ' : ''}${canEdit() ? 'добавьте позиции вручную: наименование, артикул, единицу, место хранения и минимальный запас. Затем отмечайте приход и расход.' : 'Позиции склада добавляют менеджер или администратор.'}</div>`;
   if (!list.length) return head + `<div class="empty"><h3>Ничего не найдено</h3>Измените поиск или фильтр.</div>`;
   return head + `<section class="card" style="padding:0;overflow:hidden">
-    <div class="stk head"><span>Наименование</span><span>Артикул</span><span>Место</span><span style="text-align:right">Остаток</span><span></span></div>
+    <div class="stk head"><span>Наименование</span><span>Артикул</span><span>Место</span><span style="text-align:right">Фактический</span><span style="text-align:right">Бухгалтерский</span><span></span></div>
     ${list.map(it => `<div class="stk click" data-act="viewStock" data-id="${it.id}" role="button" tabindex="0">
       <div><b>${esc(it.name)}</b>${it.note ? `<small>${esc(it.note)}</small>` : ''}${isLow(it) ? '<small style="color:var(--warn)">меньше минимального запаса (' + fmtQty(it.minQty) + ')</small>' : ''}</div>
       <div class="mono dim">${esc(it.sku || '—')}</div>
       <div class="dim">${esc(it.location || '—')}</div>
-      <div class="bal ${isLow(it) ? 'low' : ''}">${fmtQty(it.qty)} <small style="display:inline">${esc(it.unit || 'шт')}</small></div>
+      <div class="bal ${isLow(it) ? 'low' : ''}">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}<small>фактический</small></div>
+      <div class="bal acct">${A ? fmtQty(it.acctQty) + ' ' + esc(it.unit || 'шт') : '—'}<small>бухгалтерский${A && Math.abs((Number(it.acctQty)||0) - (Number(it.qty)||0)) > 1e-9 ? ` · <span class="diff">разница ${((Number(it.qty)||0) - (Number(it.acctQty)||0) > 0 ? '+' : '')}${fmtQty((Number(it.qty)||0) - (Number(it.acctQty)||0))}</span>` : ''}</small></div>
       <div class="acts">${canMoveStock() ? `<button class="btn sm ok" data-act="stockIn" data-id="${it.id}">+ Приход</button><button class="btn sm" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}</div>
     </div>`).join('')}
   </section>
@@ -978,20 +1065,44 @@ function orderDetail(o){
   </section>`}`;
 }
 /* ===== Products of an order: components per unit, totals, stock, files ===== */
-const stockByName = n => { const k = String(n||'').trim().toLowerCase(); return k ? S.stock.find(x => (x.name||'').trim().toLowerCase() === k) : null; };
+const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/["«»'“”„]/g, '').replace(/(\d)\s*[x×х*]\s*(?=\d)/g, '$1х').replace(/\s+/g, ' ').trim();
+const stockFor = c => (c.stockId && S.stock.find(x => x.id === c.stockId)) || stockByName(c.name);
+const canAcct = () => me && (canEdit() || me.role === 'accountant');
+const SOURCE_LABEL = { acct: 'Из бухгалтерских остатков', real: 'Из фактических остатков', short: 'Не хватает', none: 'Нет на складе' };
+function writeoffLines(o){
+  const lines = new Map();
+  for (const p of o.products || []) {
+    const k = Number(p.qty) || 0;
+    for (const c of p.components || []) {
+      const it = stockFor(c);
+      if (!it && !String(c.name || '').trim()) continue;
+      const key = it ? 'id:' + it.id : 'n:' + normName(c.name);
+      const L = lines.get(key) || { name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, products: [] };
+      L.need = Math.round((L.need + (Number(c.qty) || 0) * k) * 1000) / 1000;
+      if (p.name && !L.products.includes(p.name)) L.products.push(p.name);
+      lines.set(key, L);
+    }
+  }
+  return [...lines.values()].map(L => {
+    const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : L.real >= L.need - 1e-9 ? 'real' : 'short';
+    const shortage = source === 'acct' || source === 'real' ? 0 : Math.round((L.need - (L.inStock ? Math.max(L.acct, L.real) : 0)) * 1000) / 1000;
+    return { ...L, source, shortage };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+const stockByName = n => { const k = normName(n); return k ? S.stock.find(x => normName(x.name) === k) : null; };
 const fmtQty = n => (Math.round((Number(n) || 0) * 1000) / 1000).toLocaleString('ru-RU');
 function productsPane(o){
   const ps = o.products || [];
   const add = `<button class="btn primary" data-act="newProduct" data-id="${o.id}">+ Изделие</button>`;
   if (!ps.length) return `<div class="empty"><h3>Продукции пока нет</h3>Добавьте изделия, которые нужно произвести по заказу: количество, компоненты на одно изделие и файлы (чертежи, схемы, фото).<div class="row-g">${add}</div></div>`;
-  return `<datalist id="stock-names">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist><div class="row-g" style="justify-content:space-between"><span class="dim">Изделий: ${ps.length} · всего штук: ${fmtQty(sum(ps, p => p.qty))}</span>${add}</div>` + ps.map(p => productCard(o, p)).join('');
+  return `<datalist id="stock-names">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist><div class="row-g" style="justify-content:space-between"><span class="dim">Изделий: ${ps.length} · всего штук: ${fmtQty(sum(ps, p => p.qty))}</span><div class="row-g"><button class="btn" data-act="writeoff" data-id="${o.id}">Сформировать список для списания</button>${add}</div></div>` + ps.map(p => productCard(o, p)).join('');
 }
 function productCard(o, p){
   const comps = p.components || [], files = p.files || [];
   const k = Number(p.qty) || 0;
   const rows = comps.map((c, i) => {
-    const st = stockByName(c.name), need = (Number(c.qty) || 0) * k;
-    const stockCell = st ? `<span class="${(Number(st.qty)||0) >= need ? 'ok-t' : 'warn-t'}">${fmtQty(st.qty)} ${esc(st.unit || '')}</span>` : '<span class="dim">нет</span>';
+    const st = stockFor(c), need = (Number(c.qty) || 0) * k;
+    const stockCell = st ? `<span class="${(Number(st.qty)||0) >= need ? 'ok-t' : 'warn-t'}" title="фактический">${fmtQty(st.qty)}</span> <span class="dim">/</span> <span class="${(Number(st.acctQty)||0) >= need ? 'ok-t' : 'warn-t'}" title="бухгалтерский">${fmtQty(st.acctQty)}</span> <span class="dim">${esc(st.unit || '')}</span>` : '<span class="chip c-warn" title="Выберите позицию из склада">не со склада</span>';
     return `<tr data-cid="${esc(c.id)}">
       <td class="n">${i+1}</td>
       <td><input class="pci" data-f="name" value="${esc(c.name)}" list="stock-names" aria-label="Компонент" style="min-width:220px"></td>
@@ -1006,10 +1117,10 @@ function productCard(o, p){
       <div class="row-g"><button class="btn sm" data-act="editProduct" data-id="${o.id}|${p.id}">Изменить</button>${armBtn('pr:'+p.id, 'Удалить', 'delProduct', o.id+'|'+p.id)}</div></div>
     <h4 class="sub-h">Компоненты</h4>
     <div class="tscroll" data-keep><table class="comp" data-oid="${o.id}" data-pid="${p.id}">
-      <thead><tr><th>№</th><th>Компонент</th><th class="r">На 1 ${esc(p.unit || 'шт')}</th><th>Ед.</th><th class="r">Всего на ${fmtQty(k)}</th><th class="r">На складе</th><th></th></tr></thead>
+      <thead><tr><th>№</th><th>Компонент</th><th class="r">На 1 ${esc(p.unit || 'шт')}</th><th>Ед.</th><th class="r">Всего на ${fmtQty(k)}</th><th class="r">Склад: факт / бух</th><th></th></tr></thead>
       <tbody>${rows || '<tr><td colspan="7" class="emptyrow">Компонентов нет. Добавьте строку или вставьте список из Excel.</td></tr>'}</tbody>
     </table></div>
-    <div class="row-g" style="margin-top:10px"><button class="btn sm primary" data-act="addPComp" data-id="${o.id}|${p.id}">+ Компонент</button><button class="btn sm" data-act="pastePComp" data-id="${o.id}|${p.id}">Вставить из Excel</button></div>
+    <div class="row-g" style="margin-top:10px"><button class="btn sm primary" data-act="pickStock" data-id="${o.id}|${p.id}">+ Со склада</button><button class="btn sm" data-act="addPComp" data-id="${o.id}|${p.id}">+ Строка вручную</button><button class="btn sm" data-act="pastePComp" data-id="${o.id}|${p.id}">Вставить из Excel</button></div>
     <h4 class="sub-h">Файлы изделия <span class="dim">${files.length || ''}</span></h4>
     ${files.length ? `<ul class="files">${files.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at||'').slice(0,10))}</small>${armBtn('pf:'+f.id,'✕','delPFile',o.id+'|'+p.id+'|'+f.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0 0 8px">Файлы не загружены.</p>'}
     <label class="btn sm" style="margin-top:8px">Загрузить файлы<input type="file" data-up="pfile" data-id="${o.id}|${p.id}" accept="${ACCEPT}" multiple hidden></label>
@@ -1375,7 +1486,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
+function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport'); ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){ ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
@@ -1421,6 +1532,53 @@ function renderDrawer(){
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${c?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button>
       ${c ? (used ? '<span class="dim" style="font-size:13px">Контрагент указан в заказах, удалить нельзя</span>' : armBtn('cp','Удалить','delCp',c.id)) : ''}</div></form>`;
+  }
+  if (d.kind === 'acctImport') {
+    const A = ui.acct;
+    let body = `<label class="wide">Файл выгрузки из 1С<input class="in" type="file" id="acct-file" accept=".xlsx,.xls,.ods,.csv,.txt">
+      <small class="dim" style="font-size:12px">Отчёт «Остатки товаров», ОСВ по счёту 10/41 или другой, сохранённый из 1С в Excel (xlsx, xls) или CSV.</small></label>
+      <div id="acct-status" class="wide"></div>`;
+    if (A && A.aoa) {
+      const g = A.g, rows = acctRows(A.aoa, A.hdr, A.cols);
+      const matched = rows.filter(acctMatch).length;
+      const opts = sel => `<option value="-1">— нет —</option>` + Array.from({ length:g.width }, (_, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${String.fromCharCode(65 + (i % 26))}${i >= 26 ? Math.floor(i / 26) : ''}: ${esc(g.label(i).slice(0, 40) || '(без заголовка)')}</option>`).join('');
+      body += `<div class="form">
+        <label>Наименование<select class="in" id="acct-c-name">${opts(A.cols.name)}</select></label>
+        <label>Количество (остаток)<select class="in" id="acct-c-qty">${opts(A.cols.qty)}</select></label>
+        <label>Артикул<select class="in" id="acct-c-sku">${opts(A.cols.sku)}</select></label>
+        <label>Единица<select class="in" id="acct-c-unit">${opts(A.cols.unit)}</select></label></div>
+        <p class="parsed ${rows.length ? '' : 'warn'}" style="margin:0">${rows.length ? `Найдено строк с остатками: <b>${rows.length}</b>. Есть на складе: <b>${matched}</b>, новых: <b>${rows.length - matched}</b>. Позиции склада, которых нет в файле, получат бухгалтерский остаток 0.` : 'Не нашлось строк, где есть и наименование, и количество. Проверьте выбор колонок.'}</p>
+        ${rows.length ? `<div class="tscroll"><table class="prev"><thead><tr><th>Наименование</th><th>Артикул</th><th>Ед.</th><th style="text-align:right">Количество</th><th>Склад</th></tr></thead><tbody>${rows.slice(0, 12).map(r => `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.sku)}</td><td>${esc(r.unit)}</td><td style="text-align:right" class="mono">${fmtQty(r.qty)}</td><td>${acctMatch(r) ? '<span class="ok-t">есть</span>' : '<span class="dim">новая</span>'}</td></tr>`).join('')}</tbody></table></div>${rows.length > 12 ? `<small class="dim">…и ещё ${rows.length - 12}</small>` : ''}` : ''}
+        <label class="chk" style="flex-direction:row;display:flex;gap:8px;font-size:14px"><input type="checkbox" id="acct-create" ${A.create !== false ? 'checked' : ''}> Добавить на склад позиции, которых там нет</label>`;
+    }
+    D.innerHTML = dh('Бухгалтерские остатки из 1С') + `<form class="d-body" data-form="acctImport">${body}
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit" ${A && A.aoa ? '' : 'disabled'}>Загрузить остатки</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
+  }
+  if (d.kind === 'pickStock') {
+    const [poid, ppid] = String(d.id || '').split('|'), pp = prodOf(poid, ppid);
+    const had = it => pp && (pp.components || []).find(c => c.stockId === it.id || (!c.stockId && normName(c.name) === normName(it.name)));
+    D.innerHTML = dh('Компоненты со склада') + `<form class="d-body" data-form="pickStock">
+      <span data-keep style="display:contents"><input class="in" id="pick-q" type="search" placeholder="Поиск по складу" value="${esc(ui.pickQ || '')}"></span>
+      ${S.stock.length ? `<ul class="pick">${S.stock.slice().sort((a,b) => a.name.localeCompare(b.name,'ru')).map(it => `<li data-q="${esc(normName(it.name + ' ' + (it.sku || '')))}" ${pickHit(normName(it.name + ' ' + (it.sku || '')), ui.pickQ) ? '' : 'hidden'}>
+        <input type="checkbox" name="pick" value="${it.id}" aria-label="${esc(it.name)}" ${had(it) ? 'checked' : ''}><span><b style="font-weight:500">${esc(it.name)}</b><small>${esc([it.sku, 'факт ' + fmtQty(it.qty), 'бух ' + fmtQty(it.acctQty), it.unit, had(it) ? 'уже в изделии' : ''].filter(Boolean).join(' · '))}</small></span>
+        <input class="in mono" data-pq="${it.id}" value="${esc(had(it) ? had(it).qty : 1)}" inputmode="decimal" aria-label="Количество на одно изделие" title="на одно изделие"></li>`).join('')}</ul>` : '<p class="dim">Склад пуст. Загрузите выгрузку 1С или добавьте позиции на вкладке «Склад».</p>'}
+      <small class="dim">Отметьте позиции и укажите количество на одно изделие.</small>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" type="submit">Добавить отмеченные</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
+  }
+  if (d.kind === 'writeoff') {
+    const o = ord(d.id); if (!o) return closeDrawer();
+    const L = writeoffLines(o), A = META.acct;
+    const cnt = k => L.filter(x => x.source === k).length;
+    D.innerHTML = dh('Список для списания · ' + esc(ordName(o))) + `<div class="d-body">
+      <p class="dim" style="margin:0">Бухгалтерские остатки: ${A ? esc(fmtDT(A.at)) + (A.file ? ' («' + esc(A.file) + '»)' : '') : 'ещё не загружались'}. Количество — сумма по всем изделиям заказа.</p>
+      <div class="legend2"><span><i style="background:var(--ok-soft)"></i>Из бухгалтерских остатков (${cnt('acct')})</span><span><i style="background:var(--info-soft)"></i>Из фактических (${cnt('real')})</span><span><i style="background:var(--bad-soft)"></i>Не хватает (${cnt('short')})</span><span><i style="background:var(--mute-soft)"></i>Нет на складе (${cnt('none')})</span></div>
+      ${L.length ? `<div class="tscroll"><table class="wo"><thead><tr><th>№</th><th>Наименование</th><th>Артикул</th><th>Ед.</th><th class="r">Нужно</th><th class="r">Бух.</th><th class="r">Факт.</th><th>Списать из</th><th class="r">Не хватает</th></tr></thead><tbody>
+        ${L.map((x, i) => `<tr class="${x.source}"><td>${i + 1}</td><td>${esc(x.name)}<br><small class="dim">${esc(x.products.join(', '))}</small></td><td class="mono">${esc(x.sku)}</td><td>${esc(x.unit)}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${x.inStock ? fmtQty(x.acct) : '—'}</td><td class="r mono">${x.inStock ? fmtQty(x.real) : '—'}</td><td>${SOURCE_LABEL[x.source]}</td><td class="r mono">${x.shortage ? fmtQty(x.shortage) : ''}</td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="dim">В изделиях заказа нет компонентов.</p>'}
+      <div class="row-g">${L.length ? `<a class="btn primary" href="/api/orders/${o.id}/writeoff.xlsx" data-dl>Скачать Excel</a>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
+    </div>`;
   }
   if (d.kind === 'product') {
     const [oid, pid] = String(d.id || '').split('|'); const p = pid ? prodOf(oid, pid) : null;
@@ -1643,6 +1801,26 @@ async function onSubmit(e){
         const id = await add('counterparties', { ...data, contacts: first.name || first.phone || first.email ? [first] : [], contracts:[], createdAt:now }); ui.cp = id;
       }
       closeDrawer(); render(); toast(d.id ? 'Сохранено' : 'Контрагент добавлен');
+    }
+    if (kind === 'acctImport') {
+      const A = ui.acct; if (!A || !A.aoa) return fail('Выберите файл.');
+      const rows = acctRows(A.aoa, A.hdr, A.cols);
+      if (!rows.length) return fail('Не нашлось строк с наименованием и количеством. Проверьте выбор колонок.');
+      fail('Загружаем…');
+      const r = await api('POST', '/api/stock-acct', { file: A.file, rows, createMissing: $('acct-create')?.checked });
+      ui.acct = null; await refresh(); closeDrawer();
+      toast(`Бухгалтерские остатки обновлены: сопоставлено ${r.matched}${r.created ? ', добавлено ' + r.created : ''}${r.skipped ? ', пропущено ' + r.skipped : ''}`);
+    }
+    if (kind === 'pickStock') {
+      const [oid, pid] = String(d.id).split('|');
+      const picked = [...f.querySelectorAll('[name=pick]:checked')].map(x => { const it = S.stock.find(s => s.id === x.value); return { id: uid(), stockId: it.id, name: it.name, unit: it.unit || 'шт', qty: num(f.querySelector(`[data-pq="${it.id}"]`).value) || 1 }; });
+      if (!picked.length) return fail('Отметьте хотя бы одну позицию.');
+      await updProduct(oid, pid, p => {
+        const comps = (p.components || []).map(c => ({ ...c }));
+        for (const n of picked) { const ex = comps.find(c => c.stockId === n.stockId || normName(c.name) === normName(n.name)); if (ex) { ex.stockId = n.stockId; ex.name = n.name; ex.qty = n.qty; ex.unit = n.unit; } else comps.push(n); }
+        return { ...p, components: comps };
+      });
+      ui.pickQ = ''; closeDrawer(); render(); toast(`Добавлено со склада: ${picked.length}`);
     }
     if (kind === 'product') {
       const name = val('pr-name'), qty = num(val('pr-qty'));
@@ -1900,6 +2078,9 @@ async function act(el){
     case 'pastePComp': return openDrawer('pastePComp', id);
     case 'delPFile': { const [oid, pid, fid] = id.split('|'); await guard(updProduct(oid, pid, p => ({ ...p, files: (p.files || []).filter(f => f.id !== fid) }))); return render(); }
     case 'sF': ui.sF = id; return render();
+    case 'acctImport': ui.acct = null; return openDrawer('acctImport');
+    case 'pickStock': ui.pickQ = ''; return openDrawer('pickStock', id);
+    case 'writeoff': return openDrawer('writeoff', id);
     case 'newStock': return openDrawer('stockItem');
     case 'editStock': return openDrawer('stockItem', id);
     case 'viewStock': return openDrawer('stockView', id);
@@ -1976,6 +2157,7 @@ $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wq') { ui.wq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorks(); const n = $('wq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'c-text') { ui.drafts[t.dataset.key] = t.value; return; }
@@ -2000,6 +2182,19 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; return; }
   if (t.id === 'f-file') { parseInvoiceFile(t.files[0]); return; }
+  if (t.id === 'acct-file') {
+    const file = t.files[0]; if (!file) return;
+    $('acct-status').innerHTML = '<p class="parsed" style="margin:0">Читаем файл…</p>';
+    try {
+      const aoa = await readTable(file);
+      const g = guessAcct(aoa);
+      ui.acct = { file: file.name, aoa, g, hdr: g.hdr, cols: g.cols, create: true };
+      renderDrawer();
+    } catch(e) { $('acct-status').innerHTML = `<p class="parsed warn" style="margin:0">Не удалось прочитать файл: ${esc(e.message || 'ошибка')}. Сохраните отчёт из 1С в Excel (xlsx) и попробуйте снова.</p>`; }
+    return;
+  }
+  if (/^acct-c-/.test(t.id) && ui.acct) { ui.acct.cols[t.id.slice(7)] = Number(t.value); ui.acct.create = $('acct-create')?.checked !== false; return renderDrawer(); }
+  if (t.id === 'acct-create' && ui.acct) { ui.acct.create = t.checked; return; }
   if (t.id === 'wOrd') { ui.wOrd = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
@@ -2007,7 +2202,9 @@ document.addEventListener('change', async e => {
     const tr = t.closest('tr'), table = t.closest('table'), oid = table.dataset.oid, pid = table.dataset.pid;
     const f = t.dataset.f, value = f === 'qty' ? num(t.value) : t.value.trim();
     if (f === 'qty') { t.value = value; const p = prodOf(oid, pid); tr.querySelector('.ptotal').textContent = fmtQty(value * (Number(p?.qty) || 0)); }
-    return guard(updProduct(oid, pid, p => ({ ...p, components: (p.components || []).map(c => c.id === tr.dataset.cid ? { ...c, [f]: value } : c) })));
+    const st = f === 'name' ? stockByName(value) : null;
+    return guard(updProduct(oid, pid, p => ({ ...p, components: (p.components || []).map(c => c.id !== tr.dataset.cid ? c
+      : f === 'name' ? { ...c, name: st ? st.name : value, stockId: st ? st.id : null, unit: st && st.unit ? st.unit : c.unit } : { ...c, [f]: value }) })));
   }
   if (t.classList.contains('ci')) {
     const tr = t.closest('tr'), table = t.closest('table'), o = ord(table.dataset.oid); if (!o) return;
