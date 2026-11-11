@@ -504,6 +504,7 @@ table.pers{border-collapse:collapse;font-size:14px}table.pers td{padding:3px 14p
 .meter{display:block;height:8px;border-radius:4px;background:var(--mute-soft);overflow:hidden}.meter i{display:block;height:100%}.meter.ok i{background:var(--ok)}.meter.warn i{background:var(--warn)}.meter.bad i{background:var(--bad)}
 .spark{color:var(--stamp);display:block}
 .admedit{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}.admedit label{display:flex;flex-direction:column;font-size:13px;color:var(--ink-2)}
+.pwrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.pwrow .in{flex:1 1 180px;min-width:0}.pwgen{display:flex;gap:4px}
 .slots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .slots li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:8px 10px;border:1px dashed var(--rule);border-radius:10px}
 .slots li.ok{border-style:solid;border-color:var(--ok);background:color-mix(in srgb,var(--ok-soft) 60%,transparent)}
@@ -2793,12 +2794,12 @@ function renderDrawer(){
       ${o ? '' : `<div class="wide" style="font-size:13px;color:var(--ink-2);margin-top:6px">Администратор организации — он добавит остальных пользователей</div>
       <label class="wide">Имя<input class="in" id="oa-name" required></label>
       <label>Логин (латиницей)<input class="in" id="oa-login" autocomplete="off" required></label>
-      <label>Пароль, не короче 8 символов<input class="in" id="oa-pass" autocomplete="new-password" required></label>`}
+      <label>Пароль, не короче 8 символов<span class="pwrow"><input class="in mono" id="oa-pass" autocomplete="new-password" required><span class="pwgen"><button type="button" class="btn sm" data-act="genPass" data-id="#oa-pass" title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm ghost" data-act="copyPass" data-id="#oa-pass" title="Скопировать пароль">Копировать</button></span></span></label>`}
       </div>
       ${o ? `<div class="box adm"><h4>Администраторы организации</h4>
         ${o.admins.length ? `<ul>${o.admins.map(a => ui.admEdit === a.id ? `<li class="admedit"><label>Имя<input class="in" id="ae-name" value="${esc(a.name)}"></label><label>Логин<input class="in" id="ae-login" value="${esc(a.login)}" autocomplete="off"></label><span class="row-g"><button type="button" class="btn sm primary" data-act="orgAdmSave" data-id="${o.id}|${a.id}">Сохранить</button><button type="button" class="btn sm" data-act="orgAdmEdit" data-id="">Отмена</button></span></li>` : `<li><span><b style="font-weight:500">${esc(a.name)}</b> <span class="mono dim">${esc(a.login)}</span>${a.sys ? ' <span class="chip c-info">администратор системы</span>' : ''}${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}<br><small class="dim">${a.lastLoginAt ? 'вход ' + esc(fmtDT(a.lastLoginAt)) : 'ещё не входил'}</small></span>
-          ${a.id === me.id ? '' : `<span class="row-g"><input class="in" type="text" data-apw="${a.id}" autocomplete="new-password" aria-label="Новый пароль для ${esc(a.login)}"><button type="button" class="btn sm" data-act="orgAdmPw" data-id="${o.id}|${a.id}">Сменить пароль</button><button type="button" class="btn sm" data-act="orgAdmEdit" data-id="${a.id}">Имя и логин</button><button type="button" class="btn sm" data-act="orgAdmBlock" data-id="${o.id}|${a.id}|${a.blocked ? 0 : 1}">${a.blocked ? 'Разблокировать' : 'Заблокировать'}</button></span>`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Администраторов нет.</p>'}
-        <div class="form" style="margin-top:4px"><label>Имя<input class="in" id="na-name"></label><label>Логин<input class="in" id="na-login" autocomplete="off"></label><label>Пароль<input class="in" id="na-pass" autocomplete="new-password"></label>
+          ${a.id === me.id ? '' : `<span class="row-g"><input class="in mono" type="text" data-apw="${a.id}" autocomplete="new-password" aria-label="Новый пароль для ${esc(a.login)}"><button type="button" class="btn sm" data-act="genPass" data-id='[data-apw="${a.id}"]' title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm" data-act="orgAdmPw" data-id="${o.id}|${a.id}">Сменить пароль</button><button type="button" class="btn sm" data-act="orgAdmEdit" data-id="${a.id}">Имя и логин</button><button type="button" class="btn sm" data-act="orgAdmBlock" data-id="${o.id}|${a.id}|${a.blocked ? 0 : 1}">${a.blocked ? 'Разблокировать' : 'Заблокировать'}</button></span>`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Администраторов нет.</p>'}
+        <div class="form" style="margin-top:4px"><label>Имя<input class="in" id="na-name"></label><label>Логин<input class="in" id="na-login" autocomplete="off"></label><label class="wide">Пароль<span class="pwrow"><input class="in mono" id="na-pass" autocomplete="new-password"><span class="pwgen"><button type="button" class="btn sm" data-act="genPass" data-id="#na-pass" title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm ghost" data-act="copyPass" data-id="#na-pass" title="Скопировать пароль">Копировать</button></span></span></label>
           <div style="display:flex;align-items:flex-end"><button type="button" class="btn sm" data-act="orgAdmAdd" data-id="${o.id}">+ Добавить администратора</button></div></div></div>` : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${o ? 'Сохранить' : 'Создать организацию'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -2973,7 +2974,7 @@ function renderDrawer(){
       <label>Логин (латиницей)<input class="in" id="uf-login" value="${v(u,'login')}" autocomplete="off" required></label>
       <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(ROLE_NAMES, u?.role || 'worker')}</select></label>
       <label class="wide" id="uf-until-w" ${(u?.role || 'worker') === 'contractor' ? '' : 'hidden'}>Доступ подрядчика до (включительно)<input class="in" type="date" id="uf-until" value="${esc(u?.accessUntil || '')}"><small class="dim" style="font-size:12px">На следующий день вход для подрядчика закроется.</small></label>
-      <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<input class="in" id="uf-pass" autocomplete="new-password" ${u?'':'required'}></label></div>
+      <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<span class="pwrow"><input class="in mono" id="uf-pass" autocomplete="new-password" ${u?'':'required'}><span class="pwgen"><button type="button" class="btn sm" data-act="genPass" data-id="#uf-pass" title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm ghost" data-act="copyPass" data-id="#uf-pass" title="Скопировать пароль">Копировать</button></span></span></label></div>
       <p class="hint dim" id="uf-info" style="margin:0">${esc(ROLE_INFO[u?.role || 'worker'])}</p>
       ${u ? '<p class="hint" style="margin:0">После смены пароля сотрудник выйдет со всех устройств.</p>' : ''}
       <div class="err" id="ferr"></div>
@@ -3333,12 +3334,22 @@ function comboMove(step){
 }
 function disarm(){ ui.armed = null; document.querySelectorAll('[data-arm].armed').forEach(b => { b.classList.remove('armed'); b.textContent = b.dataset.label; }); }
 function drawerBusy(){ const a = document.activeElement; return $('drawer').contains(a) && a.matches('input,textarea,select'); }
+/* a strong password that is easy to read out: no look-alike letters and digits */
+function makePassword(n = 12){
+  const sets = ['ABCDEFGHJKMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789', '-_!@#%+='], all = sets.join('');
+  const pick = str => { const r = new Uint32Array(1); crypto.getRandomValues(r); return str[r[0] % str.length]; };
+  const out = sets.map(pick); while (out.length < n) out.push(pick(all));
+  for (let i = out.length - 1; i > 0; i--) { const r = new Uint32Array(1); crypto.getRandomValues(r); const k = r[0] % (i + 1); [out[i], out[k]] = [out[k], out[i]]; }
+  return out.join('');
+}
 async function act(el){
   const a = el.dataset.act, id = el.dataset.id;
   if (el.dataset.arm && !el.classList.contains('armed')) { disarm(); el.classList.add('armed'); el.textContent = 'Точно удалить?'; ui.armed = el.dataset.arm; return; }
   disarm();
   switch (a) {
     case 'close': return closeDrawer();
+    case 'genPass': { const inp = document.querySelector(id); if (!inp) return; inp.type = 'text'; inp.value = makePassword(); inp.dispatchEvent(new Event('input', { bubbles:true })); inp.focus(); inp.select(); toast('Пароль создан — передайте его пользователю. После сохранения посмотреть его будет нельзя.'); return; }
+    case 'copyPass': { const inp = document.querySelector(id); if (!inp || !inp.value) return toast('Сначала введите или сгенерируйте пароль'); try { await navigator.clipboard.writeText(inp.value); toast('Пароль скопирован'); } catch(e) { inp.select(); document.execCommand?.('copy'); toast('Пароль выделен — скопируйте его'); } return; }
     case 'dtFly': {
       const p = DT.points[Number(id)]; if (!p || !dtMap) return;
       if (ui.dtLasso && canCheckDt()) return dtToggleSel(p.no, Number(id));
