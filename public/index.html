@@ -435,6 +435,10 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .dtrad{position:relative}.dtrad summary{list-style:none;cursor:pointer}.dtrad summary::-webkit-details-marker{display:none}
 .dtrad-pop{position:absolute;z-index:20;top:calc(100% + 6px);left:0;width:260px;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.15);display:flex;flex-direction:column;gap:8px}
 .dtrad-pop label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.dtrad-pop label.btn{display:inline-flex;flex-direction:row;color:inherit;font-size:14px}.dtrad-pop label.dtt{display:inline-flex;flex-direction:row;color:inherit;font-size:14px}.dtrad-pop.wide{width:min(560px,calc(100vw - 32px))}.dtm-h{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);font-weight:600;margin-top:4px}
+.pthemes{flex-wrap:wrap}.pthemes .sw{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid var(--rule);margin-right:6px;vertical-align:-1px}
+.pcols{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:6px 0 10px}.pcol{display:flex;gap:10px;align-items:center;font-size:14px;cursor:pointer}.pcol input{width:38px;height:30px;border:1px solid var(--rule);border-radius:6px;padding:0;background:none;cursor:pointer}
+.dtneed{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-2)}.dtneed select{font-size:14px;padding:6px 8px}
 .dtshow{display:flex;flex-wrap:wrap;gap:6px}
 .dtselbar{margin-top:-4px}.dtsep{width:1px;align-self:stretch;background:var(--rule)}
 .dtselcount{font-size:14px;min-width:96px}
@@ -492,7 +496,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 #wmap{height:calc(100vh - 200px);min-height:420px;border-radius:12px;border:1px solid var(--rule);background:var(--mute-soft);z-index:0}
 .wlistbtn{display:none}
 /* the page is scaled up on a phone in «Версия для ПК»: viewport units have to be scaled back */
-html.forcephone aside.drawer{height:calc(100dvh / var(--pz,1))!important}html.forcephone .wlist{max-height:calc(72vh / var(--pz,1))}
+html.zoomed aside.drawer{height:calc(100dvh / var(--pz,1))!important}html.zoomed .wlist{max-height:calc(72vh / var(--pz,1))}
 @media (max-width:820px), (pointer:coarse) and (max-height:540px){
   .wgrid{display:block;position:relative}
   .wlistbtn{display:flex;width:100%;justify-content:space-between;align-items:center;margin:0 0 8px;min-height:48px;font-size:17px;font-weight:600}
@@ -506,7 +510,7 @@ html.forcephone aside.drawer{height:calc(100dvh / var(--pz,1))!important}html.fo
   .witem{padding:12px 14px}
   aside.drawer.full{inset:0;width:100%;max-width:none;height:100%;height:100dvh;border-radius:0;z-index:3000}
   aside.drawer.full .d-body{padding-bottom:max(24px,env(safe-area-inset-bottom))}
-  body.field .scrim{z-index:2999}
+  .scrim.full{z-index:2999}
   .upl2{display:flex;gap:8px;flex-wrap:wrap}.upl2 .btn{flex:1;min-height:46px;justify-content:center}
 }
 .nwchk{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;cursor:pointer;font-size:15px}
@@ -804,14 +808,8 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     <div class="umenu" id="umenu">
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="upop" id="upop" role="menu" hidden>
-        <div class="uinfo"><b id="uname2"></b><small id="urole"></small><small class="dim" id="uver"></small></div>
-        <div class="tlabel">Тема оформления</div>
-        <div class="themes" id="themes" role="group" aria-label="Тема оформления">
-          <button type="button" data-act="theme" data-id="system"><span class="sw" style="background:linear-gradient(90deg,#fff 50%,#181E26 50%)"></span>Система</button>
-          <button type="button" data-act="theme" data-id="light"><span class="sw" style="background:#fff"></span>Светлая</button>
-          <button type="button" data-act="theme" data-id="dark"><span class="sw" style="background:#181E26"></span>Тёмная</button>
-          <button type="button" data-act="theme" data-id="telecom"><span class="sw" style="background:#1F4D40"></span>Телеком</button>
-        </div>
+        <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
+        <button type="button" role="menuitem" data-act="prefs">⚙ Настройки</button>
         <button type="button" role="menuitem" data-act="password">Сменить пароль</button>
         <button type="button" role="menuitem" class="danger" data-act="logout">Выйти</button>
       </div>
@@ -819,7 +817,6 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
   </div>
 </header>
 <main class="wrap">
-  <div class="updbar" id="updbar" hidden><span>Сервер обновлён до новой версии.</span><button class="btn sm primary" type="button" data-act="reload">Обновить страницу</button></div>
   <div class="banner" id="banner" hidden></div>
   <div class="orgwarn" id="orgwarn" hidden></div>
   <div id="view"></div>
@@ -863,11 +860,12 @@ const PAGE_ZOOM = (() => { try {
   const touch = navigator.maxTouchPoints > 0 || matchMedia('(pointer:coarse)').matches, sw = screen.width;
   if (!touch || !sw || sw > 820 || innerWidth < sw * 1.25) return 1;
   const z = innerWidth / sw, root = document.documentElement;
-  root.style.zoom = z; root.style.setProperty('--pz', z); root.classList.add('forcephone');
+  root.style.zoom = z; root.style.setProperty('--pz', z); root.classList.add('forcephone', 'zoomed');
   const open = r => { if (r.cssRules) [...r.cssRules].forEach(x => { if (x.media && /max-width\s*:\s*(\d+)px/.test(x.media.mediaText) && !/min-width/.test(x.media.mediaText) && Number(RegExp.$1) >= sw) x.media.mediaText = 'all'; else if (x.cssRules) open(x); }); };
   [...document.styleSheets].forEach(sh => { try { open(sh); } catch(e) {} });
   return z;
 } catch(e) { return 1; } })();
+const curZoom = () => parseFloat(document.documentElement.style.zoom) || 1;
 const phoneLayout = () => PAGE_ZOOM > 1 || matchMedia('(max-width:820px), (pointer:coarse) and (max-height:540px)').matches;
 (() => {
 const $ = id => document.getElementById(id);
@@ -1873,8 +1871,15 @@ function mountMini(){
 const DT = { loaded:false, points:[], meta:{}, geom:null };
 const DT_CAT = { road:'Дороги', mkad:'МКАД', ttk:'ТТК', bridge:'Эстакады', other:'Другое', check:'Проверить' };
 const DT_COLOR = { road:'#2E9E4F', mkad:'#E02424', ttk:'#7B2CBF', bridge:'#8B1E3F', other:'#1F6FEB', check:'#E0A800' };
+// marks: what the work at a point needs — special vehicles (lift, fencing, both), own fencing, own fencing + lift
+const DT_NEED = { lift:'Спецтранспорт: вышка', fence:'Спецтранспорт: выгородка', lift_fence:'Спецтранспорт: вышка и выгородка', own_fence:'Своя выгородка', own_fence_lift:'Своя выгородка + вышка' };
+const DT_NEED_SHORT = { lift:'Вышка', fence:'Выгородка', lift_fence:'Вышка + выгородка', own_fence:'Своя выгородка', own_fence_lift:'Своя выгородка + вышка' };
+const NEED_COLOR = { lift:'#F57C00', fence:'#D81B60', lift_fence:'#37474F', own_fence:'#8D6E63', own_fence_lift:'#00838F' };
+const COLOR_DEFAULTS = { ...DT_COLOR, ...Object.fromEntries(Object.entries(NEED_COLOR).map(([k, v]) => ['n_' + k, v])) };
+const needColor = n => NEED_COLOR[n] || '#9AA3AD';
 // which groups are shown on the map (remembered in this browser)
-const DT_SHOW = (() => { try { return { road:true, mkad:true, ttk:true, bridge:true, other:true, ...JSON.parse(localStorage.getItem('sed-dt-show') || '{}') }; } catch(e) { return { road:true, mkad:true, ttk:true, bridge:true, other:true }; } })();
+const DT_SHOW = (() => { const d = { road:true, mkad:true, ttk:true, bridge:true, other:true, n_none:true, ...Object.fromEntries(Object.keys(DT_NEED).map(k => ['n_' + k, true])) }; try { return { ...d, ...JSON.parse(localStorage.getItem('sed-dt-show') || '{}') }; } catch(e) { return d; } })();
+const dtNeedOk = p => DT_SHOW['n_' + (DT_NEED[p.need] ? p.need : 'none')] !== false;
 // public Overpass servers (OpenStreetMap); the Russian mirror goes second
 const OVERPASS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
 let dtMap = null, dtLayer = null, dtMarks = new Map();
@@ -1896,7 +1901,7 @@ const dtAsgOk = p => { const f = ui.dtAsg || 'all'; return f === 'all' || (f ===
 // «Работа»: only the points written into the chosen montage work
 let dtJobSetCache = null;
 const dtJobSet = () => { const j = ui.dtJob && jobOf(ui.dtJob); if (!j) return null; if (dtJobSetCache?.id === j.id && dtJobSetCache.n === (j.places || []).length) return dtJobSetCache.set; dtJobSetCache = { id: j.id, n: (j.places || []).length, set: new Set((j.places || []).map(x => x.dtNo).filter(Boolean)) }; return dtJobSetCache.set; };
-const dtMatch = p => (!ui.dtJob || (dtJobSet() || new Set()).has(p.no)) && dtGroups(p).some(c => DT_SHOW[c]) && (!ui.dtOnlyCheck || (p.cats || []).includes('check') || dtJust.has(p.no)) && dtAsgOk(p) && (!ui.dtOnlySel || dtSel.has(p.no)) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
+const dtMatch = p => (!ui.dtJob || (dtJobSet() || new Set()).has(p.no)) && dtGroups(p).some(c => DT_SHOW[c]) && dtNeedOk(p) && (!ui.dtOnlyCheck || (p.cats || []).includes('check') || dtJust.has(p.no)) && dtAsgOk(p) && (!ui.dtOnlySel || dtSel.has(p.no)) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
 let dtFitted = false;
 function ensureDtMap(){
   if (dtMap || typeof L === 'undefined') return;
@@ -1962,6 +1967,8 @@ function dtPopup(p, i){
   return `<div class="pp"><h4>Объект ${esc(p.no)}</h4>${mo > 1 ? `<div class="modems">Замена ${mo} ${modemsGen(mo)}</div>` : ''}
     <div class="row-g">${(p.cats || []).map(c => `<span class="chip" style="background:${DT_COLOR[c]};color:${c === 'check' ? '#3a2c00' : '#fff'}">${c === 'bridge' ? 'Эстакада' : DT_CAT[c]}</span>`).join('')}${dtCatOf(p) === 'road' ? `<span class="chip" style="background:${DT_COLOR.road};color:#fff">Дорога</span>` : ''}</div>
     ${(p.cats || []).includes('other') && p.other ? `<small><b style="color:${DT_COLOR.other}">Другое:</b> ${esc(p.other)}</small>` : ''}
+    ${DT_NEED[p.need] ? `<div><span class="chip" style="background:${needColor(p.need)};color:#fff">${esc(DT_NEED[p.need])}</span></div>` : ''}
+    ${canCheckDt() ? `<label class="dtneed">Пометка<select class="in" data-dtneed="${esc(p.no)}"><option value="">— нет —</option>${Object.entries(DT_NEED).map(([k, l]) => `<option value="${k}" ${p.need === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
     ${p.road ? `<small>Дорога: ${esc(p.road)}</small>` : ''}${p.bridge && p.bridge !== p.road ? `<small>Эстакада: ${esc(p.bridge)}</small>` : ''}${p.dist != null ? `<small>До оси дороги: ~${p.dist} м</small>` : ''}
     <small class="mono">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</small>
     <small>${p.assignee ? `Исполнитель: <b style="color:${dtPersonColor(p.assignee)}">${esc(who(p.assignee))}</b>${p.assignedAt ? ` · назначил ${esc(who(p.assignedBy))}, ${esc(fmtDT(p.assignedAt))}` : ''}` : '<span class="dim">Исполнитель не назначен</span>'}</small>
@@ -1983,19 +1990,29 @@ function renderDt(){
   $('dtTools').innerHTML = `
     <span data-keep style="display:contents"><input class="in" id="dtq" type="search" aria-label="Поиск по номеру объекта" value="${esc(ui.dtQ || '')}" style="flex:0 1 200px;min-width:0"></span>
     ${(() => { const MJ = S.jobs.filter(isMount); if (ui.dtJob && !MJ.some(j => j.id === ui.dtJob)) ui.dtJob = null; return `<select class="f dtjob" id="dtJob" aria-label="Показать точки работы"><option value="">Все точки</option>${MJ.map(j => `<option value="${j.id}" ${ui.dtJob === j.id ? 'selected' : ''}>Работа № ${jobNo(j)} · ${esc(j.title)} — ${(j.places || []).length} т.${j.status === 'done' ? ' (выполнена)' : ''}</option>`).join('')}</select>`; })()}
-    <div class="dtshow" role="group" aria-label="Что показывать на карте">${['road', 'mkad', 'ttk', 'bridge', ...(cnt('other') ? ['other'] : [])].map(k => `<label class="dtt ${DT_SHOW[k] ? 'on' : ''}" style="--c:${DT_COLOR[k]}"><input type="checkbox" data-dtshow="${k}" ${DT_SHOW[k] ? 'checked' : ''}><i></i>${DT_CAT[k]} <b>${cnt(k)}</b></label>`).join('')}
-      ${cnt('check') ? `<label class="dtt chk ${ui.dtOnlyCheck ? 'on' : ''}" style="--c:${DT_COLOR.check}"><input type="checkbox" data-dtshow="check" ${ui.dtOnlyCheck ? 'checked' : ''}><i></i>Только «проверить» <b>${cnt('check')}</b></label>` : ''}</div>
+    ${P.length ? (() => { const types = ['road', 'mkad', 'ttk', 'bridge', ...(cnt('other') ? ['other'] : [])], on = types.filter(k => DT_SHOW[k]).length, nOn = ['none', ...Object.keys(DT_NEED)].filter(k => DT_SHOW['n_' + k] !== false).length;
+      const nc = k => PB.filter(p => (DT_NEED[p.need] ? p.need : 'none') === k).length;
+      return `<details class="dtrad" data-menu="show" ${ui.dtMenu === 'show' ? 'open' : ''}><summary class="btn">Показать: ${on === types.length ? 'все типы' : on + ' из ' + types.length}${nOn < 6 ? ' · пометки: ' + nOn + ' из 6' : ''}${ui.dtOnlyCheck ? ' · только «проверить»' : ''} ▾</summary><div class="dtrad-pop wide">
+        <b class="dtm-h">Типы точек</b>
+        <div class="dtshow" role="group" aria-label="Что показывать на карте">${types.map(k => `<label class="dtt ${DT_SHOW[k] ? 'on' : ''}" style="--c:${DT_COLOR[k]}"><input type="checkbox" data-dtshow="${k}" ${DT_SHOW[k] ? 'checked' : ''}><i></i>${DT_CAT[k]} <b>${cnt(k)}</b></label>`).join('')}
+          ${cnt('check') ? `<label class="dtt chk ${ui.dtOnlyCheck ? 'on' : ''}" style="--c:${DT_COLOR.check}"><input type="checkbox" data-dtshow="check" ${ui.dtOnlyCheck ? 'checked' : ''}><i></i>Только «проверить» <b>${cnt('check')}</b></label>` : ''}</div>
+        <b class="dtm-h">Пометки</b>
+        <div class="dtshow" role="group" aria-label="Пометки">${Object.entries(DT_NEED_SHORT).map(([k, l]) => `<label class="dtt ${DT_SHOW['n_' + k] !== false ? 'on' : ''}" style="--c:${needColor(k)}"><input type="checkbox" data-dtshow="n_${k}" ${DT_SHOW['n_' + k] !== false ? 'checked' : ''}><i></i>${k.startsWith('own') ? '' : 'Спецтранспорт: '}${l} <b>${nc(k)}</b></label>`).join('')}
+          <label class="dtt ${DT_SHOW.n_none !== false ? 'on' : ''}" style="--c:#9AA3AD"><input type="checkbox" data-dtshow="n_none" ${DT_SHOW.n_none !== false ? 'checked' : ''}><i></i>Без пометки <b>${nc('none')}</b></label></div>
+        <div class="row-g"><button class="btn sm" data-act="dtShowAll">Показать все</button></div></div></details>`; })() : ''}
     ${P.length ? '<button class="btn" data-act="dtExport">Скачать Excel</button>' : ''}
     ${P.length && canLead() ? '<button class="btn primary" data-act="dtSave">Добавить точки к работе</button>' : ''}
     ${canCheckDt() ? `<button class="btn ${ui.dtAdding ? 'primary' : ''}" data-act="dtAdd">${ui.dtAdding ? 'Отменить добавление' : '+ Точка'}</button><button class="btn" data-act="dtAddCoords">+ По координатам</button>` : ''}
     ${ui.dtAdding ? '<span class="maphint" style="color:var(--stamp);font-weight:500">Нажмите на карту там, где стоит объект</span>' : ''}
-    ${ed ? `<label class="btn primary">Вставить размеченный файл<input type="file" data-up="dtmarked" accept=".xlsx,.xls,.csv" hidden></label>
-      <label class="btn">Загрузить точки без отметок<input type="file" data-up="dtfile" accept=".xlsx,.xls,.csv" hidden></label>
-      ${P.length ? `<details class="dtrad"><summary class="btn">Определить по карте…</summary><div class="dtrad-pop">
-        <label>Дорога МКАД/ТТК, м<input class="in mono" id="dt-rr" value="${R.road}" inputmode="numeric"></label>
-        <label>Эстакада, м<input class="in mono" id="dt-rb" value="${R.bridge}" inputmode="numeric"></label>
+    ${ed ? `<details class="dtrad" data-menu="find" ${ui.dtMenu === 'find' ? 'open' : ''}><summary class="btn">Определение МКАД, ТТК, эстакад и дорог ▾</summary><div class="dtrad-pop wide">
+        <label class="btn primary">Вставить размеченный файл<input type="file" data-up="dtmarked" accept=".xlsx,.xls,.csv" hidden></label>
+        <small class="dim">Таблица со столбцами «МКАД», «ТТК», «Эстакада» (да/нет) — точки сразу появятся с отметками.</small>
+        <label class="btn">Загрузить точки без отметок<input type="file" data-up="dtfile" accept=".xlsx,.xls,.csv" hidden></label>
+        ${P.length ? `<b class="dtm-h">Определить по карте OpenStreetMap</b>
+        <label>Дорога МКАД/ТТК, м<span data-keep style="display:contents"><input class="in mono" id="dt-rr" value="${R.road}" inputmode="numeric"></span></label>
+        <label>Эстакада, м<span data-keep style="display:contents"><input class="in mono" id="dt-rb" value="${R.bridge}" inputmode="numeric"></span></label>
         <button class="btn primary sm" data-act="dtClassify">Определить</button>
-        <small class="dim">Наибольшее расстояние от точки до оси дороги или эстакады по данным OpenStreetMap.</small></div></details>` : ''}` : ''}
+        <small class="dim">Наибольшее расстояние от точки до оси дороги или эстакады.</small>` : ''}</div></details>` : ''}
     <span class="dim" id="dtStatus"></span>`;
   const nAsg = P.filter(p => p.assignee).length, A = dtAssignees(), lead = canCheckDt();
   if (ui.dtAsg && !['all', 'any', 'none'].includes(ui.dtAsg) && !A.includes(ui.dtAsg)) ui.dtAsg = 'all';
@@ -2008,11 +2025,12 @@ function renderDt(){
     <span class="dtselcount">Выделено: <b>${dtSel.size}</b></span>
     <button class="btn primary" data-act="dtAssign" ${dtSel.size ? '' : 'disabled'}>Назначить исполнителя…</button>
     <label class="chk" style="flex-direction:row;display:flex;gap:6px;font-size:14px;${dtSel.size ? '' : 'opacity:.5'}"><input type="checkbox" id="dtOnlySel" ${ui.dtOnlySel ? 'checked' : ''} ${dtSel.size ? '' : 'disabled'}> только выделенные</label>
+    <select class="f" id="dtNeedSel" ${dtSel.size ? '' : 'disabled'} aria-label="Пометка для выделенных"><option value="">Пометка для выделенных…</option>${Object.entries(DT_NEED).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}<option value="-">Снять пометку</option></select>
     <button class="btn" data-act="dtSelClear" ${dtSel.size ? '' : 'disabled'}>Снять выделение</button>` : ''}`;
   // the hint lives on the map itself, so the panel above never changes height while points are being picked
   let hint = $('dtLassoHint'); if (!hint) { hint = document.createElement('div'); hint.id = 'dtLassoHint'; hint.className = 'dthint'; $('dtmap').appendChild(hint); }
   hint.hidden = !ui.dtLasso; hint.textContent = 'Режим выделения: обведите область или щёлкайте по точкам — щелчок выделяет точку, повторный снимает выделение.';
-  $('dtLegend').innerHTML = ui.dtColor === 'person' && P.length ? [...A.map(id => `<span><i style="background:${dtPersonColor(id)};border-radius:50%"></i>${esc(who(id))} ${P.filter(p => p.assignee === id).length}</span>`), `<span><i style="background:#9AA3AD;border-radius:50%"></i>Не назначены ${P.length - nAsg}</span>`].join('') : P.length ? `<span class="dim">Обводка: бордовая — точка на МКАД или ТТК стоит и на эстакаде${cnt('check') ? ', жёлтая — точку нужно проверить' : ''}. Щелчок по группе вверху скрывает или показывает её на карте.</span>` : '';
+  $('dtLegend').innerHTML = ui.dtColor === 'person' && P.length ? [...A.map(id => `<span><i style="background:${dtPersonColor(id)};border-radius:50%"></i>${esc(who(id))} ${P.filter(p => p.assignee === id).length}</span>`), `<span><i style="background:#9AA3AD;border-radius:50%"></i>Не назначены ${P.length - nAsg}</span>`].join('') : P.length ? `<span class="dim">Обводка: бордовая — точка на МКАД или ТТК стоит и на эстакаде${cnt('check') ? ', жёлтая — точку нужно проверить' : ''}. Что показывать — кнопка «Показать».</span>${DT.points.some(p => DT_NEED[p.need]) ? Object.keys(DT_NEED).filter(k => DT.points.some(p => p.need === k)).map(k => `<span><i style="background:${needColor(k)};border-radius:50%"></i>${esc(DT_NEED[k])} ${DT.points.filter(p => p.need === k).length}</span>`).join('') : ''}` : '';
   ensureDtMap(); if (!dtMap) return;
   $('dtmap').classList.toggle('adding', !!ui.dtAdding); $('dtmap').classList.toggle('lasso', !!ui.dtLasso);
   // selection mode: no panning and no double-click zoom (two quick taps select and deselect a point)
@@ -2024,8 +2042,11 @@ function renderDt(){
     const key = p.no + '|' + i; seen.add(key);
     const c = dtCatOf(p), cs = p.cats || [], ring = cs.includes('check') ? DT_COLOR.check : (c === 'mkad' || c === 'ttk') && cs.includes('bridge') ? DT_COLOR.bridge : null;
     const byPerson = ui.dtColor === 'person', sel = dtSel.has(p.no);
-    const fill = byPerson ? dtPersonColor(p.assignee) : DT_COLOR[c];
-    const style = { radius: (c === 'road' && !byPerson ? 4.5 : 7) + (sel ? 2 : 0), color: sel ? '#111' : byPerson ? '#fff' : ring || '#fff', weight: sel ? 3 : !byPerson && ring ? 3 : 1, fillColor: fill, fillOpacity: c === 'road' && !byPerson ? .75 : .95 };
+    // a mark (special vehicles / own fencing) colours the point; the type stays as the ring
+    const nd = !byPerson && DT_NEED[p.need], small = c === 'road' && !byPerson && !nd;
+    const fill = byPerson ? dtPersonColor(p.assignee) : nd ? needColor(p.need) : DT_COLOR[c];
+    const tring = nd && c !== 'road' ? DT_COLOR[c] : null;
+    const style = { radius: (small ? 4.5 : 7) + (sel ? 2 : 0), color: sel ? '#111' : byPerson ? '#fff' : ring || tring || '#fff', weight: sel ? 3 : !byPerson && (ring || tring) ? 3 : 1, fillColor: fill, fillOpacity: small ? .75 : .95 };
     let m = dtMarks.get(key);
     if (!m) {
       m = L.circleMarker([p.lat, p.lng], style); m.bindPopup(() => dtPopup(DT.points[i], i), { minWidth:250, maxWidth:300, autoPanPadding:[24, 24], keepInView:true }); m.bindTooltip(String(p.no), { direction:'top', offset:[0,-6] });
@@ -2036,13 +2057,13 @@ function renderDt(){
     else { m.setLatLng([p.lat, p.lng]); m.setStyle(style); if (m.isPopupOpen()) m.setPopupContent(dtPopup(DT.points[i], i)); else m.setPopupContent(() => dtPopup(DT.points[i], i)); }
     const show = dtMatch(p);
     if (show && !dtLayer.hasLayer(m)) dtLayer.addLayer(m); else if (!show && dtLayer.hasLayer(m)) dtLayer.removeLayer(m);
-    if (show && (c !== 'road' || dtSel.has(p.no))) m.bringToFront();
+    if (show && (c !== 'road' || nd || dtSel.has(p.no))) m.bringToFront();
   });
   [...dtMarks.keys()].forEach(k => { if (!seen.has(k)) { dtLayer.removeLayer(dtMarks.get(k)); dtMarks.delete(k); } });
   if (ui.dtJobFit) { ui.dtJobFit = false; const V = P.filter(dtMatch); if (V.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(V.map(p => [p.lat, p.lng])).pad(0.1), { maxZoom: 16 }); } }
   if (!dtFitted && P.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(P.map(p => [p.lat, p.lng])).pad(0.05)); }
   const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => (dtSel.has(b.no) - dtSel.has(a.no)) || (dtFlagged(b) ? 2 : (b.cats || []).length ? 1 : 0) - (dtFlagged(a) ? 2 : (a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
-  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem ${dtSel.has(p.no) ? 'sel' : ''}" data-act="dtFly" data-id="${i}" aria-pressed="${dtSel.has(p.no)}"><span class="dot" style="background:${ui.dtColor === 'person' ? dtPersonColor(p.assignee) : DT_COLOR[dtCatOf(p)]}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${dtSel.has(p.no) ? '☑ ' : ''}${esc(p.no)}${dtModems(p) > 1 ? ` <span class="mchip">${dtModems(p)} ${modemWord(dtModems(p))}</span>` : ''}</b><small>${esc([...dtGroups(p).map(c => dtGroupLabel(c, p)), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · '))}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}${p.assignee ? ` · <span style="color:${dtPersonColor(p.assignee)};font-weight:600">${esc(who(p.assignee))}</span>` : ''}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
+  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem ${dtSel.has(p.no) ? 'sel' : ''}" data-act="dtFly" data-id="${i}" aria-pressed="${dtSel.has(p.no)}"><span class="dot" style="background:${ui.dtColor === 'person' ? dtPersonColor(p.assignee) : DT_NEED[p.need] ? needColor(p.need) : DT_COLOR[dtCatOf(p)]}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${dtSel.has(p.no) ? '☑ ' : ''}${esc(p.no)}${dtModems(p) > 1 ? ` <span class="mchip">${dtModems(p)} ${modemWord(dtModems(p))}</span>` : ''}</b><small>${esc([...dtGroups(p).map(c => dtGroupLabel(c, p)), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · '))}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}${p.assignee ? ` · <span style="color:${dtPersonColor(p.assignee)};font-weight:600">${esc(who(p.assignee))}</span>` : ''}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
     : `<div class="empty" style="border:0">${P.length ? 'Нет точек по этому фильтру.' : 'Точек пока нет.'}</div>`;
 }
 /* the spreadsheet: a column with the object number and one with «lat, lng» (or two columns: latitude and longitude) */
@@ -2189,9 +2210,18 @@ async function dtClassifyAndSave(file){
   if (err) { toast(`Точки сохранены, но отметки не определены: ${err}.`); setTimeout(() => { const e = $('dtStatus'); if (e) { e.textContent = 'Не удалось определить: ' + err; e.className = 'warn-t'; } }, 50); }
   else { const n = DT.points.filter(dtFlagged).length; toast(`Готово: на МКАД ${DT.points.filter(p => p.cats.includes('mkad')).length}, на ТТК ${DT.points.filter(p => p.cats.includes('ttk')).length}, на эстакадах ${DT.points.filter(p => p.cats.includes('bridge')).length} — всего отмечено ${n} из ${DT.points.length}`); }
 }
+async function dtSetNeed(nos, need){
+  if (!nos.length) return toast('Не выделено ни одной точки');
+  try {
+    const r = await api('PATCH', '/api/dt/need', { nos, need });
+    const set = new Set(nos); DT.points.forEach(p => { if (set.has(p.no)) { if (need) p.need = need; else delete p.need; } });
+    renderDt(); refresh().catch(() => {});
+    toast(need ? `Пометка «${DT_NEED[need]}» — точек: ${r.count}` : `Пометка снята — точек: ${r.count}`);
+  } catch(e) { toast(errText(e)); }
+}
 async function dtExport(){
   const X = await loadSheetJS();
-  const rows = DT.points.filter(dtMatch).map(p => ({ 'Номер объекта': p.no, 'Модемов': dtModems(p), 'Широта': p.lat, 'Долгота': p.lng, 'МКАД': (p.cats || []).includes('mkad') ? 'да' : '', 'ТТК': (p.cats || []).includes('ttk') ? 'да' : '', 'Эстакада': (p.cats || []).includes('bridge') ? 'да' : '', 'Проверить': (p.cats || []).includes('check') ? 'да' : '', 'Проверено': p.checkedAt ? `${fmtDT(p.checkedAt)}, ${who(p.checkedBy)}` : '', 'Исполнитель': p.assignee ? who(p.assignee) : '', 'Другое': (p.cats || []).includes('other') ? (p.other || 'да') : '', 'Дорога': p.road || '', 'Эстакада (название)': p.bridge || '', 'До оси, м': p.dist ?? '' }));
+  const rows = DT.points.filter(dtMatch).map(p => ({ 'Номер объекта': p.no, 'Модемов': dtModems(p), 'Широта': p.lat, 'Долгота': p.lng, 'МКАД': (p.cats || []).includes('mkad') ? 'да' : '', 'ТТК': (p.cats || []).includes('ttk') ? 'да' : '', 'Эстакада': (p.cats || []).includes('bridge') ? 'да' : '', 'Пометка': DT_NEED[p.need] || '', 'Проверить': (p.cats || []).includes('check') ? 'да' : '', 'Проверено': p.checkedAt ? `${fmtDT(p.checkedAt)}, ${who(p.checkedBy)}` : '', 'Исполнитель': p.assignee ? who(p.assignee) : '', 'Другое': (p.cats || []).includes('other') ? (p.other || 'да') : '', 'Дорога': p.road || '', 'Эстакада (название)': p.bridge || '', 'До оси, м': p.dist ?? '' }));
   const ws = X.utils.json_to_sheet(rows); ws['!cols'] = [12, 9, 11, 11, 7, 7, 9, 10, 24, 22, 26, 28, 32, 9].map(w => ({ wch: w }));
   const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Карта объектов');
   X.writeFile(wb, `Карта объектов — ${['road', 'mkad', 'ttk', 'bridge'].filter(k => DT_SHOW[k]).map(k => DT_CAT[k]).join(', ')}${ui.dtOnlyCheck ? ', только проверить' : ''} — ${today()}.xlsx`);
@@ -2217,6 +2247,7 @@ function wPopup(j, pl){
   const mo = pl.dtNo ? Math.max(1, String(pl.dtNo).split('/').filter(Boolean).length) : 1, r = placeDone(j, pl), done = !!pl.doneAt, ed = wEditable(pl);
   return `<div class="pp"><h4>${esc(pl.label || 'Точка')}</h4>
     ${mo > 1 ? `<div class="modems">Замена ${mo} модемов</div>` : ''}
+    ${DT_NEED[pl.need] ? `<div><span class="chip" style="background:${needColor(pl.need)};color:#fff">${esc(DT_NEED[pl.need])}</span></div>` : ''}
     <small>Работа: <b>${esc(j.title)}</b>${j.due ? ' · срок ' + fmtD(j.due) : ''}</small>
     ${j.description ? `<small class="dim">${esc(j.description.slice(0, 160))}</small>` : ''}
     ${(j.photoSpec || []).length ? `<small>Фото: ${r.got} из ${r.need}</small>` : ''}
@@ -2227,7 +2258,7 @@ function wPopup(j, pl){
 }
 /* two ways to add a photo: the camera, or a picture already on the phone (gallery, files) */
 const photoBtns = (id, slot, label, multi) => `<span class="upl2"><label class="btn sm ${multi ? '' : 'primary'}">📷 ${label}<input type="file" accept="image/*" capture="environment" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label><label class="btn sm">🖼 Загрузить фото<input type="file" accept="image/*" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label></span>`;
-function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if (phoneLayout()) { const Z = PAGE_ZOOM, top = m.getBoundingClientRect().top + scrollY; document.documentElement.style.setProperty('--wmap-h', Math.max(300, (innerHeight - top) / Z - 8) + 'px'); } wMap && wMap.invalidateSize(); }
+function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if (phoneLayout()) { const Z = curZoom(), top = m.getBoundingClientRect().top + scrollY; document.documentElement.style.setProperty('--wmap-h', Math.max(300, (innerHeight - top) / Z - 8) + 'px'); } wMap && wMap.invalidateSize(); }
 addEventListener('resize', () => { if (!$('wView').hidden) wFitMap(); });
 function renderW(){
   const done = ui.view === 'wdone', all = wPoints(done);
@@ -2652,7 +2683,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('full', kind === 'wdo'); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
@@ -2985,6 +3016,23 @@ function renderDrawer(){
       ${pl.doneAt && !can && HEADish() ? '<p class="box dim" style="margin:0">Выполненную точку изменяет или удаляет администратор.</p>' : ''}
       <div class="err" id="ferr"></div>
       ${r.full ? '<p class="ok-t" style="margin:0">✓ По этой точке всё сделано.</p>' : ''}
+    </div>`;
+  }
+  if (d.kind === 'prefs') {
+    const th = PREFS.theme || themeGet(), sc = PREFS.scale || 1, field = isWorker() || me.sys;
+    const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком' };
+    const col = (k, l) => { const v = k.startsWith('n_') ? NEED_COLOR[k.slice(2)] : DT_COLOR[k]; return `<label class="pcol"><input type="color" data-pcolor="${k}" value="${v}"><span>${esc(l)}</span></label>`; };
+    D.innerHTML = dh('Настройки') + `<div class="d-body">
+      <p class="dim" style="margin:0">Настройки ваши личные: они сохраняются в вашей учётной записи и действуют на любом устройстве.</p>
+      <div class="box"><h4>Тема оформления</h4><div class="seg pthemes" role="group" aria-label="Тема оформления">${THEMES.map(t => `<button type="button" data-act="prefTheme" data-id="${t}" class="${th === t ? 'on' : ''}" aria-pressed="${th === t}"><span class="sw" style="background:${sw[t]}"></span>${tn[t]}</button>`).join('')}</div></div>
+      <div class="box"><h4>Размер текста</h4><div class="seg">${TEXT_SIZES.map(([v, l]) => `<button type="button" data-act="prefScale" data-id="${v}" class="${sc === v ? 'on' : ''}">${l}</button>`).join('')}</div><small class="dim">Увеличивает всю страницу — удобно на телефоне.</small></div>
+      ${field ? '' : `<div class="box"><h4>Открывать после входа</h4><select class="in" id="pref-start">${startViews().map(([k, l]) => `<option value="${k}" ${(PREFS.start || 'works') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="box"><h4>Цвета точек на карте объектов</h4>
+        <div class="pcols">${['road', 'mkad', 'ttk', 'bridge', 'other', 'check'].map(k => col(k, k === 'check' ? 'Проверить (обводка)' : DT_CAT[k])).join('')}</div>
+        <b class="dtm-h">Пометки</b>
+        <div class="pcols">${Object.entries(DT_NEED).map(([k, l]) => col('n_' + k, l)).join('')}</div>
+        <div class="row-g"><button class="btn sm" data-act="prefColorsReset" ${Object.keys(PREFS.colors || {}).length ? '' : 'disabled'}>Вернуть цвета по умолчанию</button></div></div>`}
+      <div class="row-g"><button class="btn" data-act="password">Сменить пароль</button><button class="btn primary" data-act="close">Готово</button></div>
     </div>`;
   }
   if (d.kind === 'jobDone') {
@@ -3484,6 +3532,25 @@ function themeSet(t){
 }
 themeSet(themeGet());
 
+/* ---------- personal settings (kept on the server for each user: the same on the phone and the computer) ---------- */
+let PREFS = {}, prefsT = null;
+const BASE_DT_COLOR = { ...DT_COLOR }, BASE_NEED_COLOR = { ...NEED_COLOR };
+const TEXT_SIZES = [[1, 'Обычный'], [1.1, 'Крупнее'], [1.2, 'Крупный'], [1.35, 'Очень крупный']];
+function applyPrefs(){
+  if (PREFS.theme) themeSet(PREFS.theme);
+  const z = (PAGE_ZOOM || 1) * (PREFS.scale || 1), root = document.documentElement;
+  if (Math.abs(z - 1) > 0.001) { root.style.zoom = z; root.style.setProperty('--pz', z); root.classList.add('zoomed'); } else { root.style.zoom = ''; root.style.removeProperty('--pz'); root.classList.remove('zoomed'); }
+  Object.assign(DT_COLOR, BASE_DT_COLOR); Object.assign(NEED_COLOR, BASE_NEED_COLOR);
+  Object.entries(PREFS.colors || {}).forEach(([k, v]) => { if (k.startsWith('n_')) { if (k.slice(2) in NEED_COLOR) NEED_COLOR[k.slice(2)] = v; } else if (k in DT_COLOR) DT_COLOR[k] = v; });
+  if (PREFS.dtShow) Object.assign(DT_SHOW, PREFS.dtShow);
+}
+function prefsSave(patch){
+  PREFS = { ...PREFS, ...patch };
+  clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
+}
+const startViews = () => [['works', 'Работы'], ['orders', 'Заказы на производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Бухгалтерия'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Заметки']] : [])];
+function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
+
 /* ---------- actions ---------- */
 const val2 = id => ($(id)?.value || '').trim();
 function custHint(){
@@ -3634,6 +3701,11 @@ async function act(el){
     case 'wlKind': ui.wlKind = id; return render();
     case 'jobReport': ui.repDay = today(); return openDrawer('jobReport', id);
     case 'repDay': ui.repDay = id; return renderDrawer();
+    case 'prefs': $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded', 'false'); return openDrawer('prefs');
+    case 'prefTheme': themeSet(THEMES.includes(id) ? id : 'system'); prefsSave({ theme: THEMES.includes(id) ? id : 'system' }); return renderDrawer();
+    case 'prefScale': prefsSave({ scale: Number(id) || 1 }); prefsChanged(); return renderDrawer();
+    case 'prefColorsReset': prefsSave({ colors: {} }); prefsChanged(); return renderDrawer();
+    case 'dtShowAll': Object.keys(DT_SHOW).forEach(k => DT_SHOW[k] = true); ui.dtOnlyCheck = false; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} prefsSave({ dtShow: { ...DT_SHOW } }); return renderDt();
     case 'jdDayClear': ui.jdDay = ''; return renderDrawer();
     case 'noteAdd': return noteAdd();
     case 'noteDel': { const n = NOTES.find(x => x.id === id); if (!n) return; if (!n.done && !confirm('Удалить заметку «' + n.text.slice(0, 60) + '»?')) return;
@@ -3907,6 +3979,8 @@ document.addEventListener('focusout', e => { if (e.target.id === 'f-cust') setTi
 document.addEventListener('toggle', e => { if (e.target.matches?.('.wgroup[data-g=done]')) ui.worksDoneOpen = e.target.open; }, true);
 document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-st=closed]')) ui.openClosed = e.target.open; }, true);
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t' && ui.drawer?.kind === 'paste') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; else if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + e.target.value.split(/\r?\n/).filter(l => l.trim() && !/наимен|компон/i.test(l)).length; });
+document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-menu]')) { if (d.open) ui.dtMenu = d.dataset.menu; else if (ui.dtMenu === d.dataset.menu) ui.dtMenu = null; } }, true);
+document.addEventListener('click', e => { if (ui.dtMenu && !e.target.closest('details[data-menu]')) { ui.dtMenu = null; document.querySelectorAll('details[data-menu][open]').forEach(d => d.open = false); } });
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.note) { const n = NOTES.find(x => x.id === t.dataset.note); if (n) { n.done = t.checked; n.doneAt = t.checked ? new Date().toISOString() : null; n.doneBy = t.checked ? me.id : null; render(); }
@@ -3914,6 +3988,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'jd-who') { ui.jdWho = t.value; return renderDrawer(); }
   if (t.id === 'jd-day') { ui.jdDay = t.value; return renderDrawer(); }
   if (t.id === 'pl-nw') { t.closest('.nwchk').classList.toggle('on', t.checked); return; }
+  if (t.dataset.pcolor) { prefsSave({ colors: { ...(PREFS.colors || {}), [t.dataset.pcolor]: t.value } }); prefsChanged(); const b = document.querySelector('[data-act=prefColorsReset]'); if (b) b.disabled = false; return; }
+  if (t.id === 'pref-start') { prefsSave({ start: t.value }); toast('Сохранено'); return; }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
@@ -3923,9 +3999,11 @@ document.addEventListener('change', async e => {
   if (t.name === 'dtj') { ui.dtJobs = [...document.querySelectorAll('[name=dtj]:checked')].map(x => x.value); return; }
   if (t.name === 'dtw') { ui.dtWhich = t.value; return; }
   if (t.dataset.dtshow) {
-    if (t.dataset.dtshow === 'check') ui.dtOnlyCheck = t.checked; else { DT_SHOW[t.dataset.dtshow] = t.checked; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} }
+    if (t.dataset.dtshow === 'check') ui.dtOnlyCheck = t.checked; else { DT_SHOW[t.dataset.dtshow] = t.checked; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} prefsSave({ dtShow: { ...DT_SHOW } }); }
     return renderDt();
   }
+  if (t.dataset.dtneed !== undefined) return dtSetNeed([t.dataset.dtneed], t.value);
+  if (t.id === 'dtNeedSel') { const v = t.value; t.value = ''; if (!v) return; return dtSetNeed([...dtSel], v === '-' ? '' : v); }
   if (t.dataset.feat) {
     const [oid, fid] = t.dataset.feat.split('|'), text = t.value.trim(), o = ord(oid);
     const F = (o.features || []).map(f => f.id === fid ? { ...f, text, editedBy:me.id, editedAt:new Date().toISOString() } : f).filter(f => f.text);
@@ -4037,7 +4115,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) ? h : 'works';
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -4048,7 +4126,7 @@ window.addEventListener('hashchange', route);
 
 /* ---------- boot ---------- */
 let poll = null, setupMode = false, appVersion = /^[0-9a-f]{12}$/.test('__APP_VERSION__') ? '__APP_VERSION__' : null;
-// a new version on the server: reload by itself when nothing is being edited, otherwise offer the button
+// a new version on the server: reload by itself when nothing is being edited
 const safeToReload = () => !ui.drawer && !document.activeElement?.matches('input,textarea,select') && !document.querySelector('#note-new')?.value;
 async function loadOrgs(){
   try { [ui.orgsList, ui.backups] = await Promise.all([api('GET', '/api/orgs'), api('GET', '/api/backups')]); } catch(e) { toast(errText(e)); ui.orgsList = ui.orgsList || []; ui.backups = ui.backups || []; }
@@ -4079,7 +4157,7 @@ function showLogin(){
   setTimeout(() => (setupMode ? $('l-name') : $('l-login')).focus(), 30);
 }
 async function start(u){
-  me = u; if ($('uver')) $('uver').textContent = appVersion ? 'Версия ' + appVersion.slice(0, 7) : '';
+  me = u; PREFS = u.prefs || {}; applyPrefs();
   $('uname').textContent = u.name; $('uname2').textContent = u.name; $('urole').textContent = u.roleName + ' · ' + u.login;
   $('uav').textContent = (u.name || u.login).split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0]).join('').toUpperCase();
   $('ubtn').title = u.name + ' — ' + u.roleName;
@@ -4106,7 +4184,8 @@ async function start(u){
     try {
       const r = await api('GET', '/api/rev');
       $('banner').hidden = true;
-      if (r.version) { if (!appVersion) appVersion = r.version; else if (r.version !== appVersion) { if (safeToReload()) return location.reload(); $('updbar').hidden = false; } }
+      // a new version: reload quietly as soon as nothing is being edited (checked again on every poll)
+      if (r.version) { if (!appVersion) appVersion = r.version; else if (r.version !== appVersion && safeToReload()) return location.reload(); }
       if (me.sys) { if (ui.view === 'server') loadStats(); }
       else if (r.rev !== rev) await refresh();
     } catch(e) { $('banner').hidden = false; $('banner').textContent = 'Нет связи с сервером. Изменения не сохраняются, пока связь не восстановится.'; }

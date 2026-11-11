@@ -104,6 +104,7 @@ function cleanJob(d){
     .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
     .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200),
       ...(x.assignee && users.some(u => u.id === x.assignee) ? { assignee: String(x.assignee) } : {}),
+      ...(DT_NEEDS.includes(x.need) ? { need: x.need } : {}),
       ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
   // which photos a worker must take at every point, e.g. «Общий вид», «До замены», «После замены»
@@ -139,6 +140,8 @@ function ensureJobOrder(j, jid, user, changed = {}){
   j.orderId = oid;
   return true;
 }
+// marks on map points: special vehicles needed (lift, fencing, both), own fencing, own fencing + lift
+const DT_NEEDS = ['lift', 'fence', 'lift_fence', 'own_fence', 'own_fence_lift'];
 /* Warehouse: managers and admins keep the item list; they and «Сотрудник» record receipts and issues */
 const canMoveStock = u => canEdit(u);
 const qtyOk = v => Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) < 1e9;
@@ -430,6 +433,7 @@ async function api(req, res, url) {
   if (p[1] === 'orgs') return orgsApi(req, res, p, m, user);
   if (p[1] === 'backups') return backupsApi(req, res, p, m, user);
   if (p[1] === 'stats') return statsApi(req, res, m, user);
+  if (p[1] === 'prefs' && m === 'PUT') { user.prefs = cleanPrefs(await readJsonBody(req) || {}); saveUsers(); return send(res, 200, { ok: true, prefs: user.prefs }); }
   // the system administrator manages organizations, backups and the server, not the work of an organization
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
@@ -601,6 +605,21 @@ async function api(req, res, url) {
       }
       saveDb();
       return send(res, 200, { ok: true, count: n, inJobs, rev: db.rev });
+    }
+    /* a mark about what the work at a point needs: special vehicles or own fencing; goes to the same points in works */
+    if (m === 'PATCH' && p[2] === 'need') {
+      if (!canEdit(user)) return fail(res, 403, 'Ставить пометки может администратор или руководитель');
+      const b = await readJsonBody(req), P = db.dt && db.dt.points;
+      if (!P) return fail(res, 409, 'Точек нет');
+      const need = String(b.need || '');
+      if (need && !DT_NEEDS.includes(need)) return fail(res, 400, 'Неизвестная пометка');
+      const nos = new Set((Array.isArray(b.nos) ? b.nos : []).map(String));
+      if (!nos.size) return fail(res, 400, 'Не выбрано ни одной точки');
+      const at = new Date().toISOString(); let n = 0;
+      for (const x of P) if (nos.has(x.no)) { if (need) Object.assign(x, { need, needAt: at, needBy: user.id }); else { delete x.need; delete x.needAt; delete x.needBy; } n++; }
+      for (const j of Object.values(db.jobs)) for (const pl of j.places || []) if (pl.dtNo && nos.has(pl.dtNo)) { if (need) pl.need = need; else delete pl.need; }
+      saveDb();
+      return send(res, 200, { ok: true, count: n, rev: db.rev });
     }
     /* a point added by hand on the map, and removing a point */
     if (m === 'POST' && p[2] === 'point') {
@@ -1293,6 +1312,17 @@ async function statsApi(req, res, m, user) {
   });
 }
 const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role, roleName: ROLES[u.role] });
+/* personal settings of a user: theme, text size, start page, what the map shows and in which colours */
+const HEX = v => /^#[0-9a-f]{6}$/i.test(String(v || '')) ? String(v).toLowerCase() : null;
+function cleanPrefs(b){
+  const o = {};
+  if (['system', 'light', 'dark', 'telecom'].includes(b.theme)) o.theme = b.theme;
+  if ([1, 1.1, 1.2, 1.35].includes(Number(b.scale))) o.scale = Number(b.scale);
+  if (/^[a-z]{2,10}$/.test(String(b.start || ''))) o.start = String(b.start);
+  if (b.dtShow && typeof b.dtShow === 'object') o.dtShow = Object.fromEntries(Object.entries(b.dtShow).filter(([k]) => /^[a-z_]{2,20}$/.test(k)).slice(0, 30).map(([k, v]) => [k, !!v]));
+  if (b.colors && typeof b.colors === 'object') o.colors = Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => /^[a-z_]{2,20}$/.test(k) && HEX(v)).slice(0, 30).map(([k, v]) => [k, HEX(v)]));
+  return o;
+}
 /* Map background: OpenStreetMap by default, another tile source can be set in sed.env */
 const MAP = {
   tiles: process.env.MAP_TILES || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -1300,7 +1330,7 @@ const MAP = {
   subdomains: process.env.MAP_SUBDOMAINS || 'abc',
   maxZoom: Number(process.env.MAP_MAX_ZOOM || 19),
 };
-const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), map: MAP, sys: !!u.sys, org: o ? { id: o.id, name: o.name, until: o.until || '' } : null, orgWarn: st.warn || '' }; };
+const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), prefs: u.prefs || {}, map: MAP, sys: !!u.sys, org: o ? { id: o.id, name: o.name, until: o.until || '' } : null, orgWarn: st.warn || '' }; };
 const adminUser = u => ({ ...publicUser(u), sys: !!u.sys, accessUntil: u.accessUntil || '', expired: !!contractorExpired(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
 /* Remember that the accountant has opened the invoice file(s) */
