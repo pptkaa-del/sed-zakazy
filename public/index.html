@@ -2015,8 +2015,8 @@ const dtAsgOk = p => { const f = ui.dtAsg || 'all'; return f === 'all' || (f ===
 // «Работа»: only the points written into the chosen montage work
 let dtJobSetCache = null;
 const dtJobSet = () => { const j = ui.dtJob && jobOf(ui.dtJob); if (!j) return null; if (dtJobSetCache?.id === j.id && dtJobSetCache.n === (j.places || []).length) return dtJobSetCache.set; dtJobSetCache = { id: j.id, n: (j.places || []).length, set: new Set((j.places || []).map(x => x.dtNo).filter(Boolean)) }; return dtJobSetCache.set; };
-// «Эстакады на МКАД» / «на ТТК»: points with both marks (an overpass and the МКАД or the ТТК)
-const dtTypeOk = (p, t) => t === 'all' ? true : t === 'bridge_mkad' ? (p.cats || []).includes('bridge') && (p.cats || []).includes('mkad') : t === 'bridge_ttk' ? (p.cats || []).includes('bridge') && (p.cats || []).includes('ttk') : dtCatOf(p) === t;
+// «Эстакады на МКАД и ТТК»: points with both marks — an overpass and the МКАД or the ТТК
+const dtTypeOk = (p, t) => t === 'all' ? true : t === 'bridge_ring' ? (p.cats || []).includes('bridge') && ((p.cats || []).includes('mkad') || (p.cats || []).includes('ttk')) : dtCatOf(p) === t;
 const dtMarkOk = p => !ui.dtMarkType || dtTypeOk(p, ui.dtMarkType);
 const dtMatch = p => (!ui.dtJob || (dtJobSet() || new Set()).has(p.no)) && (ui.dtMarking ? dtMarkOk(p) : dtNeedOk(p)) && dtAsgOk(p) && (!ui.dtOnlySel || dtSel.has(p.no)) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
 let dtFitted = false;
@@ -2134,7 +2134,7 @@ function renderDt(){
   const mk = ui.dtMarking, mt = ui.dtMarkType || 'all';
   const tc = k => PB.filter(p => dtTypeOk(p, k)).length;
   $('dtSel').innerHTML = !P.length ? '' : mk ? `<div class="dtmark">
-    <div class="dtmark-row"><b>1. Какие точки размечать:</b><div class="seg">${[['all', 'Все'], ['road', 'Дороги'], ['mkad', 'МКАД'], ['ttk', 'ТТК'], ['bridge', 'Эстакады'], ['bridge_mkad', 'Эстакады на МКАД'], ['bridge_ttk', 'Эстакады на ТТК'], ...(tc('other') ? [['other', 'Другое']] : [])].map(([k, l]) => `<button data-act="dtMarkType" data-id="${k}" class="${mt === k ? 'on' : ''}">${l} <span class="dim">${tc(k)}</span></button>`).join('')}</div></div>
+    <div class="dtmark-row"><b>1. Какие точки размечать:</b><div class="seg">${[['all', 'Все'], ['road', 'Дороги'], ['mkad', 'МКАД'], ['ttk', 'ТТК'], ['bridge', 'Эстакады'], ['bridge_ring', 'Эстакады на МКАД и ТТК'], ...(tc('other') ? [['other', 'Другое']] : [])].map(([k, l]) => `<button data-act="dtMarkType" data-id="${k}" class="${mt === k ? 'on' : ''}">${l} <span class="dim">${tc(k)}</span></button>`).join('')}</div></div>
     <div class="dtmark-row"><b>2. Выделите точки:</b> обведите область или щёлкайте по точкам <button class="btn sm" data-act="dtSelVisible">Выделить все показанные</button><button class="btn sm" data-act="dtSelClear" ${dtSel.size ? '' : 'disabled'}>Снять выделение</button><span class="dtselcount">Выделено: <b>${dtSel.size}</b></span></div>
     <div class="dtmark-row"><b>3. Поставьте пометку:</b><div class="dtneeds">${Object.entries(DT_NEED).map(([k, l]) => `<button class="needbtn" style="--c:${needColor(k)}" data-act="dtMarkSet" data-id="${k}" ${dtSel.size ? '' : 'disabled'}><i></i>${esc(l)} <span class="dim">${PB.filter(p => p.need === k).length}</span></button>`).join('')}<button class="needbtn none" data-act="dtMarkSet" data-id="" ${dtSel.size ? '' : 'disabled'}>Снять пометку</button><button class="btn sm" data-act="dtNeedNew">+ Своя пометка</button></div></div>
     <div class="dtmark-row dim">Размечено: ${PB.filter(p => DT_NEED[p.need]).length} из ${PB.length}. Когда закончите — «✓ Закончить разметку»: на карте будут все точки, раскрашенные по пометкам.</div></div>` : `
