@@ -386,6 +386,10 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .jdlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.jd{border:1px solid var(--rule);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--sheet)}.jd-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.jd-h small{display:block}.jd .tw{display:inline-flex;flex-direction:column;gap:2px;align-items:center}.jd .tw small{font-size:11px}
 .seg-l{align-self:center;padding:0 6px 0 8px;font-size:13px;color:var(--ink-2)}
 .wneed{align-self:flex-start;font-size:12px;font-weight:600;color:#fff;background:var(--c);border-radius:999px;padding:1px 8px}
+.catlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.catlist li{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--sheet)}.catlist small{display:block}
+.cpres{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto;margin-top:6px}.cphit{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;padding:8px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);cursor:pointer;font:inherit;color:inherit}.cphit:hover{border-color:var(--stamp)}.cphit small{display:block}.cphit.new{border-style:dashed}
+.pqty-l{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-2)}.pqty{width:90px}
+table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acct td{background:var(--ok-soft)}table.wo .wo-name{font-size:14px;padding:6px 8px}
 .jplan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}.jplan li{display:flex;gap:10px;align-items:flex-start;padding:6px;border-radius:8px}.jplan li.click{cursor:pointer}.jplan li.click:hover{background:var(--paper)}.jplan .dot{margin-top:6px;flex:none}.jplan small{display:block}
 .bar.prod{background:#7B5BD6}.bar.mount{background:#E07B00}
 .bar.done{opacity:.45}
@@ -798,10 +802,10 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wdone" data-v="wdone" id="wdoneTab" hidden>Выполненные</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
-      <a href="#orders" data-v="orders">Заказы на производство</a>
+      <a href="#orders" data-v="orders">Производство</a>
       <a href="#stock" data-v="stock">Склад</a>
       <a href="#cps" data-v="cps">Контрагенты</a>
-      <a href="#pay" data-v="pay">Бухгалтерия <span class="badge" id="payBadge" hidden></span></a>
+      <a href="#pay" data-v="pay">Счета в оплату <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
       <a href="#dt" data-v="dt">Карта объектов</a>
@@ -906,7 +910,7 @@ const ROLE_INFO = {
   contractor:'То же, что сотрудник, но доступ к системе ограничен датой — после неё вход закрывается.'
 };
 
-const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[], stock:[], jobs:[] };
+const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[], stock:[], jobs:[], products:[] };
 let STAFF = [];
 let META = {};
 let me = null, rev = -1, mode = 'loading';
@@ -977,7 +981,7 @@ async function api(method, url, body, headers = {}){
 async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {};
-  ['projects','orders','invoices','tasks','counterparties','points','stock','jobs'].forEach(c => S[c] = d[c] || []);
+  ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products'].forEach(c => S[c] = d[c] || []);
   STAFF = d.staff || []; NOTES = d.notes || [];
   { const n = NOTES.filter(x => !x.done).length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
   if (mode !== 'live') { mode = 'live'; }
@@ -1308,12 +1312,15 @@ function vStock(){
   const q = ui.sq.trim().toLowerCase();
   const hay = it => [it.name, it.sku, it.location, it.note].join(' ').toLowerCase();
   const low = S.stock.filter(isLow), incWait = S.invoices.filter(i => incState(i) === 'wait').length;
-  const list = S.stock.filter(it => (ui.sF !== 'low' || isLow(it)) && (!q || hay(it).includes(q))).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
+  // «Наличие»: everything, only what is on the accounting balance, only what is actually in the warehouse
+  const av = it => ui.sAv === 'acct' ? (Number(it.acctQty) || 0) > 0 : ui.sAv === 'real' ? (Number(it.qty) || 0) > 0 : true;
+  const list = S.stock.filter(it => (ui.sF !== 'low' || isLow(it)) && av(it) && (!q || hay(it).includes(q))).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
   const A = META.acct;
   const acctBar = `<div class="acctbar"><span>Бухгалтерские остатки (1С): ${A ? `обновлены <b>${esc(fmtDT(A.at))}</b>${A.file ? ` из файла «${esc(A.file)}»` : ''}${A.by ? ', ' + esc(who(A.by)) : ''}` : '<b>ещё не загружались</b>'}</span>${canAcct() ? '<button class="btn sm" data-act="acctImport">Загрузить выгрузку 1С</button>' : ''}</div>`;
   const head = acctBar + `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="sq" type="search" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
     <div class="seg"><button data-act="sF" data-id="all" class="${ui.sF!=='low'&&ui.sF!=='inc'?'on':''}">Все</button><button data-act="sF" data-id="low" class="${ui.sF==='low'?'on':''}">Мало на складе${low.length ? ` (${low.length})` : ''}</button><button data-act="sF" data-id="inc" class="${ui.sF==='inc'?'on':''}">Приходы по счетам${incWait ? ` (${incWait})` : ''}</button></div>
+    ${ui.sF === 'inc' ? '' : `<div class="seg" role="group" aria-label="Наличие">${[['', 'Показывать все'], ['acct', 'Есть на бухгалтерском'], ['real', 'Есть фактически']].map(([k, l]) => `<button data-act="sAv" data-id="${k}" class="${(ui.sAv || '') === k ? 'on' : ''}">${l} <span class="dim">${k === 'acct' ? S.stock.filter(it => (Number(it.acctQty) || 0) > 0).length : k === 'real' ? S.stock.filter(it => (Number(it.qty) || 0) > 0).length : S.stock.length}</span></button>`).join('')}</div>`}
     ${canEdit() ? '<button class="btn primary" data-act="newStock">+ Позиция</button>' : ''}
   </div>`;
   if (ui.sF === 'inc') return head + vIncomes(q);
@@ -1380,7 +1387,7 @@ function workRow(t, tn){
 
 /* ===== Orders view ===== */
 function vOrders(){
-  if (!S.orders.length) return `<div class="empty"><h3>Пока нет ни одного заказа на производство</h3>Создайте заказ: в нём хранятся документы, строки для закупки, счета и задачи план-графика.<div class="row-g"><button class="btn primary" data-act="newOrder">+ Заказ</button></div></div>`;
+  if (!S.orders.length) return `<div class="empty"><h3>Пока нет ни одного заказа на производство</h3>Создайте заказ: в нём хранятся документы, строки для закупки, счета и задачи план-графика.<div class="row-g"><button class="btn primary" data-act="newOrder">+ Заказ</button> <button class="btn" data-act="catalog">Изделия</button></div></div>`;
   const o = ord(ui.order);
   const q = ui.oq.trim().toLowerCase();
   const items = Object.entries(ORDER_ST).map(([st, label]) => {
@@ -1391,7 +1398,7 @@ function vOrders(){
   }).join('');
   return `<div class="split ${o?'has-sel':''}">
     <nav class="olist" aria-label="Заказы">
-      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button></div>
+      <div class="olist-top"><span data-keep style="display:contents"><input class="in" id="oq" type="search" value="${esc(ui.oq)}" aria-label="Поиск заказа"></span><button class="btn primary" data-act="newOrder">+ Заказ</button> <button class="btn" data-act="catalog">Изделия</button></div>
       <div class="pgroup" id="olist">${items}<p class="pad dim" id="onone" ${ordersSorted().some(x => matchOrder(x, q)) ? 'hidden' : ''}>Ничего не найдено</p></div>
     </nav>
     <section class="odetail">${o ? orderDetail(o) : `<div class="empty"><h3>Выберите заказ</h3>Откройте заказ слева, чтобы загрузить документы, заполнить строки для закупки и добавить счета.</div>`}</section>
@@ -1437,13 +1444,13 @@ function orderDetail(o){
   const is = invOf(o.id).sort((a,b) => (a.date||'').localeCompare(b.date||''));
   const ts = tasksOf(o.id);
   const specs = o.specs || [];
-  return `<button class="btn ghost back" data-act="back">← Все заказы на производство</button>
+  return `<button class="btn ghost back" data-act="back">← Все заказы</button>
   <div class="ohead">
     <div style="min-width:0">
       <h2>${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
-    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button></div>
+    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
   </div>
   <div class="seg otabs" role="tablist" aria-label="Разделы заказа">
     <button role="tab" data-act="orderTab" data-id="main" class="${ui.orderTab !== 'products' ? 'on' : ''}" aria-selected="${ui.orderTab !== 'products'}">Заказ</button>
@@ -1476,64 +1483,114 @@ function orderDetail(o){
 const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/["«»'“”„]/g, '').replace(/(\d)\s*[x×х*]\s*(?=\d)/g, '$1х').replace(/\s+/g, ' ').trim();
 const stockFor = c => (c.stockId && S.stock.find(x => x.id === c.stockId)) || stockByName(c.name);
 const canAcct = () => me && (canEdit() || me.role === 'accountant');
-const SOURCE_LABEL = { acct: 'Из бухгалтерских остатков', real: 'Из фактических остатков', short: 'Не хватает', none: 'Нет на складе' };
-function writeoffLines(o){
+const SOURCE_LABEL = { acct: 'Хватает', short: 'Не хватает', none: 'Нет в бухгалтерских остатках' };
+/* the write-off list: from the accounting balances; map = replaced nomenclature (original line key → stock id) */
+function writeoffLines(o, map){
+  map = map || o.woMap || {};
   const lines = new Map();
   for (const p of o.products || []) {
     const k = Number(p.qty) || 0;
     for (const c of p.components || []) {
-      const it = stockFor(c);
-      if (!it && !String(c.name || '').trim()) continue;
-      const key = it ? 'id:' + it.id : 'n:' + normName(c.name);
-      const L = lines.get(key) || { name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, products: [] };
+      const it0 = stockFor(c);
+      if (!it0 && !String(c.name || '').trim()) continue;
+      const key0 = it0 ? 'id:' + it0.id : 'n:' + normName(c.name);
+      const it = (map[key0] && S.stock.find(x => x.id === map[key0])) || it0;
+      const key = it ? 'id:' + it.id : key0;
+      const L = lines.get(key) || { key, keys: [], name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, stockId: it ? it.id : null, replaced: false, products: [] };
+      if (!L.keys.includes(key0)) L.keys.push(key0);
+      if (it !== it0) L.replaced = true;
       L.need = Math.round((L.need + (Number(c.qty) || 0) * k) * 1000) / 1000;
       if (p.name && !L.products.includes(p.name)) L.products.push(p.name);
       lines.set(key, L);
     }
   }
   return [...lines.values()].map(L => {
-    const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : L.real >= L.need - 1e-9 ? 'real' : 'short';
-    const shortage = source === 'acct' || source === 'real' ? 0 : Math.round((L.need - (L.inStock ? Math.max(L.acct, L.real) : 0)) * 1000) / 1000;
-    return { ...L, source, shortage };
+    const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : 'short';
+    return { ...L, source, shortage: source === 'acct' ? 0 : Math.round((L.need - (L.inStock ? L.acct : 0)) * 1000) / 1000 };
   }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
 const stockByName = n => { const k = normName(n); return k ? S.stock.find(x => normName(x.name) === k) : null; };
 const fmtQty = n => (Math.round((Number(n) || 0) * 1000) / 1000).toLocaleString('ru-RU');
 function productsPane(o){
   const ps = o.products || [];
-  const add = `<button class="btn primary" data-act="newProduct" data-id="${o.id}">+ Изделие</button>`;
+  const add = `<button class="btn primary" data-act="addOrderProduct" data-id="${o.id}">+ Изделие</button>`;
   if (!ps.length) return `<div class="empty"><h3>Продукции пока нет</h3>Добавьте изделия, которые нужно произвести по заказу: количество, компоненты на одно изделие и файлы (чертежи, схемы, фото).<div class="row-g">${add}</div></div>`;
-  return `<datalist id="stock-names">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist><div class="row-g" style="justify-content:space-between"><span class="dim">Изделий: ${ps.length} · всего штук: ${fmtQty(sum(ps, p => p.qty))}</span><div class="row-g"><button class="btn" data-act="writeoff" data-id="${o.id}">Сформировать список для списания</button>${add}</div></div>` + ps.map(p => productCard(o, p)).join('');
+  return `<datalist id="stock-names">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist><div class="row-g" style="justify-content:space-between"><span class="dim">Изделий: ${ps.length} · всего штук: ${fmtQty(sum(ps, p => p.qty))}</span><div class="row-g"><button class="btn" data-act="catalog">Изделия</button><button class="btn" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button>${add}</div></div>` + ps.map(p => productCard(o, p)).join('');
 }
 function productCard(o, p){
   const comps = p.components || [], files = p.files || [];
-  const k = Number(p.qty) || 0;
+  const k = Number(p.qty) || 0, cat = p.productId && S.products.find(x => x.id === p.productId);
+  const changed = cat ? !sameComps(p.components, cat.components) : false;
   const rows = comps.map((c, i) => {
     const st = stockFor(c), need = (Number(c.qty) || 0) * k;
-    const stockCell = st ? `<span class="${(Number(st.qty)||0) >= need ? 'ok-t' : 'warn-t'}" title="фактический">${fmtQty(st.qty)}</span> <span class="dim">/</span> <span class="${(Number(st.acctQty)||0) >= need ? 'ok-t' : 'warn-t'}" title="бухгалтерский">${fmtQty(st.acctQty)}</span> <span class="dim">${esc(st.unit || '')}</span>` : '<span class="chip c-warn" title="Выберите позицию из склада">не со склада</span>';
-    return `<tr data-cid="${esc(c.id)}">
-      <td class="n">${i+1}</td>
-      <td><input class="pci" data-f="name" value="${esc(c.name)}" list="stock-names" aria-label="Компонент" style="min-width:220px"></td>
-      <td><input class="pci num" data-f="qty" value="${esc(c.qty)}" inputmode="decimal" aria-label="На одно изделие" style="width:80px"></td>
-      <td><input class="pci" data-f="unit" value="${esc(c.unit)}" aria-label="Единица" style="width:56px"></td>
-      <td class="r mono ptotal">${fmtQty(need)}</td>
-      <td class="r">${stockCell}</td>
-      <td><button class="icon" data-act="delPComp" data-id="${o.id}|${p.id}|${esc(c.id)}" aria-label="Удалить строку" title="Удалить строку">✕</button></td>
-    </tr>`; }).join('');
+    const stockCell = st ? `<span class="${(Number(st.qty)||0) >= need ? 'ok-t' : 'warn-t'}" title="фактический">${fmtQty(st.qty)}</span> <span class="dim">/</span> <span class="${(Number(st.acctQty)||0) >= need ? 'ok-t' : 'warn-t'}" title="бухгалтерский">${fmtQty(st.acctQty)}</span> <span class="dim">${esc(st.unit || '')}</span>` : '<span class="warn-t">нет на складе</span>';
+    return `<tr><td class="n">${i+1}</td><td>${esc(c.name)}</td><td class="r mono">${fmtQty(c.qty)}</td><td>${esc(c.unit || 'шт')}</td><td class="r mono ptotal">${fmtQty(need)}</td><td class="r">${stockCell}</td></tr>`; }).join('');
   return `<section class="card prod">
-    <div class="ch"><div style="min-width:0"><h3>${esc(p.name || 'Без названия')} <span class="chip c-info" style="vertical-align:2px">${fmtQty(p.qty)} ${esc(p.unit || 'шт')}</span></h3>${p.note ? `<small class="dim">${esc(p.note)}</small>` : ''}</div>
-      <div class="row-g"><button class="btn sm" data-act="editProduct" data-id="${o.id}|${p.id}">Изменить</button>${armBtn('pr:'+p.id, 'Удалить', 'delProduct', o.id+'|'+p.id)}</div></div>
-    <h4 class="sub-h">Компоненты</h4>
-    <div class="tscroll" data-keep><table class="comp" data-oid="${o.id}" data-pid="${p.id}">
-      <thead><tr><th>№</th><th>Компонент</th><th class="r">На 1 ${esc(p.unit || 'шт')}</th><th>Ед.</th><th class="r">Всего на ${fmtQty(k)}</th><th class="r">Склад: факт / бух</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="emptyrow">Компонентов нет. Добавьте строку или вставьте список из Excel.</td></tr>'}</tbody>
+    <div class="ch"><div style="min-width:0"><h3>${esc(p.name || 'Без названия')}${cat ? (changed ? ' <span class="chip c-warn" style="vertical-align:2px">модифицировано</span>' : '') : ' <span class="chip c-mute" style="vertical-align:2px">не из справочника</span>'}</h3>${p.note ? `<small class="dim">${esc(p.note)}</small>` : ''}</div>
+      <div class="row-g"><label class="pqty-l">Количество<span data-keep style="display:contents"><input class="in mono pqty" data-id="${o.id}|${p.id}" value="${esc(p.qty)}" inputmode="decimal" aria-label="Количество изделий" ${canEdit() ? '' : 'disabled'}></span><span class="dim">${esc(p.unit || 'шт')}</span></label>
+        ${canEdit() ? `<button class="btn sm primary" data-act="prodMod" data-id="${o.id}|${p.id}">${cat ? 'Модифицировать' : 'Изменить состав'}</button><button class="btn sm" data-act="editProduct" data-id="${o.id}|${p.id}">Примечание</button>${armBtn('pr:'+p.id, 'Удалить', 'delProduct', o.id+'|'+p.id)}` : ''}</div></div>
+    <h4 class="sub-h">Компоненты${cat ? ` <span class="dim" style="text-transform:none;letter-spacing:0;font-weight:400">· изделие «${esc(cat.name)}»</span>` : ''}</h4>
+    <div class="tscroll"><table class="comp">
+      <thead><tr><th>№</th><th>Компонент</th><th class="r">На 1 ${esc(p.unit || 'шт')}</th><th>Ед.</th><th class="r">Всего на ${fmtQty(k)}</th><th class="r">Склад: факт / бух</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="emptyrow">Компонентов нет — нажмите «' + (cat ? 'Модифицировать' : 'Изменить состав') + '».</td></tr>'}</tbody>
     </table></div>
-    <div class="row-g" style="margin-top:10px"><button class="btn sm primary" data-act="pickStock" data-id="${o.id}|${p.id}">+ Со склада</button><button class="btn sm" data-act="addPComp" data-id="${o.id}|${p.id}">+ Строка вручную</button><button class="btn sm" data-act="pastePComp" data-id="${o.id}|${p.id}">Вставить из Excel</button></div>
     <h4 class="sub-h">Файлы изделия <span class="dim">${files.length || ''}</span></h4>
-    ${files.length ? `<ul class="files">${files.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at||'').slice(0,10))}</small>${armBtn('pf:'+f.id,'✕','delPFile',o.id+'|'+p.id+'|'+f.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0 0 8px">Файлы не загружены.</p>'}
+    ${files.length ? `<ul class="files">${files.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at||'').slice(0,10))}</small>${armBtn('pf:'+f.id,'✕','delPFile',o.id+'|'+p.id+'|'+f.id,'icon')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Файлов нет.</p>'}
     <label class="btn sm" style="margin-top:8px">Загрузить файлы<input type="file" data-up="pfile" data-id="${o.id}|${p.id}" accept="${ACCEPT}" multiple hidden></label>
   </section>`;
 }
+/* ---------- the product editor (catalogue product, a new one on the basis of another, or a product of an order) ---------- */
+function cpResults(){
+  const box = $('cp-res'); if (!box || !ui.cp) return;
+  const q = normName($('cp-q')?.value || '');
+  if (!q) { box.innerHTML = '<small class="dim">Начните вводить — появятся позиции склада. Если позиции нет, её можно добавить: она появится на складе при сохранении изделия.</small>'; return; }
+  const hits = S.stock.filter(it => normName(it.name + ' ' + (it.sku || '')).includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 30);
+  const exact = S.stock.some(it => normName(it.name) === q);
+  box.innerHTML = hits.map(it => `<button type="button" class="cphit" data-act="cpAdd" data-id="${it.id}"><span><b style="font-weight:500">${esc(it.name)}</b><small class="dim">${esc([it.sku, 'факт ' + fmtQty(it.qty), 'бух ' + fmtQty(it.acctQty), it.unit].filter(Boolean).join(' · '))}</small></span><span>+</span></button>`).join('')
+    + (exact ? '' : `<button type="button" class="cphit new" data-act="cpNew"><span><b style="font-weight:500">+ Новая позиция склада «${esc($('cp-q').value.trim())}»</b><small class="dim">будет добавлена на склад при сохранении</small></span></button>`);
+}
+const cpRead = () => { const c = ui.cp; if (!c) return; ['name', 'unit', 'note'].forEach(k => { const el = $('cp-' + k); if (el) c[k] = el.value; }); };
+function cpOpen(mode, src, extra = {}){
+  ui.cp = { mode, id: mode === 'cat' && src ? src.id : null, name: src ? (mode === 'base' ? src.name + ' (копия)' : src.name) : '', unit: src?.unit || 'шт', note: src?.note || '',
+    components: (src?.components || []).map(c => ({ id: uid(), stockId: c.stockId || stockByName(c.name)?.id || null, name: c.name, qty: c.qty, unit: c.unit || 'шт' })), baseName: mode === 'base' ? src.name : '', basedOn: mode === 'base' ? src.id : null, ...extra };
+  openDrawer('catEdit');
+}
+async function cpSave(how){
+  cpRead(); const c = ui.cp, fail = m => { const e = $('ferr'); if (e) e.textContent = m; };
+  const name = String(c.name || '').trim();
+  if (!name) return fail('Укажите наименование изделия.');
+  if (!c.components.length) return fail('Добавьте хотя бы один компонент.');
+  if (c.components.some(x => !(num(x.qty) > 0))) return fail('У каждого компонента количество должно быть больше нуля.');
+  if ((how === 'cat' || how === 'new') && S.products.some(p => p.id !== (how === 'cat' ? c.id : null) && normName(p.name) === normName(name))) return fail('Изделие с таким наименованием уже есть — задайте другое.');
+  try {
+    // positions that are not in the warehouse yet become new stock items
+    let added = 0;
+    for (const x of c.components) if (!x.stockId) {
+      const ex = stockByName(x.name);
+      if (ex) { x.stockId = ex.id; x.name = ex.name; continue; }
+      const r = await api('POST', '/api/stock', { name: x.name.trim(), sku: '', unit: x.unit || 'шт', location: '', minQty: 0, note: `Добавлено из изделия «${name}»`, createdAt: new Date().toISOString() });
+      x.stockId = r.id; added++;
+    }
+    if (added) await refresh();
+    const comps = c.components.map(x => ({ id: x.id, stockId: x.stockId, name: x.name, qty: num(x.qty), unit: x.unit || 'шт' }));
+    const data = { name, unit: String(c.unit || 'шт').trim() || 'шт', note: String(c.note || '').trim(), components: comps };
+    let msg = '';
+    if (how === 'order') {
+      await updProduct(c.oid, c.pid, p => ({ ...p, name: p.name, components: comps, modified: true }));
+      msg = 'Состав изделия в заказе изменён';
+    } else if (how === 'new') {
+      const id = await add('products', { ...data, basedOn: c.productId || null, createdAt: new Date().toISOString() });
+      await updProduct(c.oid, c.pid, p => ({ ...p, productId: id, name, unit: data.unit, components: comps, modified: false }));
+      msg = `Сохранено как новое изделие «${name}»`;
+    } else if (c.id) { await upd('products', c.id, data); msg = 'Изделие сохранено'; }
+    else { await add('products', { ...data, basedOn: c.basedOn || null, createdAt: new Date().toISOString() }); msg = 'Изделие создано'; }
+    const back = c.mode === 'order' ? null : 'catalog';
+    ui.cp = null; if (back) openDrawer('catalog'); else closeDrawer(); render();
+    toast(msg + (added ? ` · на склад добавлено новых позиций: ${added}` : ''));
+  } catch(e) { fail(errText(e)); }
+}
+// a product of an order differs from its catalogue product
+const sameComps = (a, b) => JSON.stringify((a || []).map(c => [c.stockId || normName(c.name), Number(c.qty) || 0]).sort()) === JSON.stringify((b || []).map(c => [c.stockId || normName(c.name), Number(c.qty) || 0]).sort());
 const prodOf = (oid, pid) => (ord(oid)?.products || []).find(p => p.id === pid);
 function updProduct(oid, pid, fn){
   const o = ord(oid); if (!o) return Promise.resolve();
@@ -2726,7 +2783,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
@@ -2817,21 +2874,79 @@ function renderDrawer(){
   }
   if (d.kind === 'writeoff') {
     const o = ord(d.id); if (!o) return closeDrawer();
-    const L = writeoffLines(o), A = META.acct;
-    const cnt = k => L.filter(x => x.source === k).length;
+    ui.woMap = ui.woMap || { ...(o.woMap || {}) };
+    const L = writeoffLines(o, ui.woMap), A = META.acct, bad = L.filter(x => x.source !== 'acct'), ed = canEdit();
+    const dirty = JSON.stringify(ui.woMap) !== JSON.stringify(o.woMap || {});
     D.innerHTML = dh('Список для списания · ' + esc(ordName(o))) + `<div class="d-body">
-      <p class="dim" style="margin:0">Бухгалтерские остатки: ${A ? esc(fmtDT(A.at)) + (A.file ? ' («' + esc(A.file) + '»)' : '') : 'ещё не загружались'}. Количество — сумма по всем изделиям заказа.</p>
-      <div class="legend2"><span><i style="background:var(--ok-soft)"></i>Из бухгалтерских остатков (${cnt('acct')})</span><span><i style="background:var(--info-soft)"></i>Из фактических (${cnt('real')})</span><span><i style="background:var(--bad-soft)"></i>Не хватает (${cnt('short')})</span><span><i style="background:var(--mute-soft)"></i>Нет на складе (${cnt('none')})</span></div>
-      ${L.length ? `<div class="tscroll"><table class="wo"><thead><tr><th>№</th><th>Наименование</th><th>Артикул</th><th>Ед.</th><th class="r">Нужно</th><th class="r">Бух.</th><th class="r">Факт.</th><th>Списать из</th><th class="r">Не хватает</th></tr></thead><tbody>
-        ${L.map((x, i) => `<tr class="${x.source}"><td>${i + 1}</td><td>${esc(x.name)}<br><small class="dim">${esc(x.products.join(', '))}</small></td><td class="mono">${esc(x.sku)}</td><td>${esc(x.unit)}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${x.inStock ? fmtQty(x.acct) : '—'}</td><td class="r mono">${x.inStock ? fmtQty(x.real) : '—'}</td><td>${SOURCE_LABEL[x.source]}</td><td class="r mono">${x.shortage ? fmtQty(x.shortage) : ''}</td></tr>`).join('')}
+      <p class="dim" style="margin:0">Строки берутся из <b>бухгалтерских остатков</b> (${A ? 'загружены ' + esc(fmtDT(A.at)) + (A.file ? ', «' + esc(A.file) + '»' : '') : 'ещё не загружались'}). Количество — сумма по всем изделиям заказа.</p>
+      ${o.writeoff ? `<p class="box" style="margin:0;border-color:var(--ok);background:var(--ok-soft)">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}</p>` : ''}
+      ${bad.length ? `<p class="box" style="margin:0;border-color:var(--bad);background:var(--bad-soft);color:var(--bad)"><b>Не хватает в бухгалтерских остатках: ${bad.length}.</b> Такие строки выделены красным — сохранить список нельзя. Замените номенклатуру позиции (введите другую позицию склада) или обновите остатки из 1С.</p>` : L.length ? '<p class="ok-t" style="margin:0">✓ Все позиции есть в бухгалтерских остатках.</p>' : ''}
+      ${L.length ? `<datalist id="wo-names">${S.stock.filter(it => (Number(it.acctQty) || 0) > 0).map(it => `<option value="${esc(it.name)}">${esc([it.sku, 'бух ' + fmtQty(it.acctQty) + ' ' + (it.unit || 'шт')].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>
+      <div class="tscroll"><table class="wo"><thead><tr><th>№</th><th>Номенклатура</th><th>Артикул</th><th>Ед.</th><th class="r">Списать</th><th class="r">Бух. остаток</th><th>Состояние</th></tr></thead><tbody>
+        ${L.map((x, i) => `<tr class="${x.source === 'acct' ? 'acct' : 'short'}"><td>${i + 1}</td>
+          <td>${ed ? `<span data-keep style="display:contents"><input class="in wo-name" data-keys="${esc(x.keys.join('\n'))}" value="${esc(x.name)}" list="wo-names" aria-label="Номенклатура" style="min-width:240px"></span>` : esc(x.name)}
+            <small class="dim">${esc(x.products.join(', '))}${x.replaced ? ` · <b>номенклатура заменена</b>${ed ? ` <button class="linkish" data-act="woReset" data-id="${esc(x.keys.join('\n'))}">вернуть</button>` : ''}` : ''}</small></td>
+          <td class="mono">${esc(x.sku)}</td><td>${esc(x.unit)}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${x.inStock ? fmtQty(x.acct) : '—'}</td>
+          <td>${x.source === 'acct' ? 'Хватает' : x.source === 'none' ? '<b>Нет в бухгалтерских остатках</b>' : `<b>Не хватает ${fmtQty(x.shortage)}</b>`}</td></tr>`).join('')}
       </tbody></table></div>` : '<p class="dim">В изделиях заказа нет компонентов.</p>'}
-      <div class="row-g">${L.length ? `<a class="btn primary" href="/api/orders/${o.id}/writeoff.xlsx" data-dl>Скачать Excel</a>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
+      <div class="err" id="ferr"></div>
+      <div class="row-g">${ed && L.length ? `<button class="btn primary" data-act="woSave" data-id="${o.id}" ${bad.length ? 'disabled title="Есть позиции, которых не хватает в бухгалтерских остатках"' : ''}>Сохранить список</button>` : ''}${L.length ? `<a class="btn" href="/api/orders/${o.id}/writeoff.xlsx" data-dl>Скачать Excel${dirty ? ' (сохранённый)' : ''}</a>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
     </div>`;
+  }
+  if (d.kind === 'catalog') {
+    const q = normName(ui.catQ || ''), used = id => S.orders.filter(o => (o.products || []).some(p => p.productId === id)).length;
+    const list = S.products.filter(p => !q || normName(p.name + ' ' + (p.note || '')).includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    D.innerHTML = dh('Изделия') + `<div class="d-body">
+      <div class="row-g"><span data-keep style="display:contents"><input class="in" id="cat-q" type="search" value="${esc(ui.catQ || '')}" aria-label="Поиск изделия" style="flex:1 1 220px"></span>${canEdit() ? '<button class="btn primary" data-act="catNew">+ Новое изделие</button>' : ''}</div>
+      ${list.length ? `<ul class="catlist">${list.map(p => `<li><div><b>${esc(p.name)}</b><small class="dim">${(p.components || []).length} компонент. · ед. ${esc(p.unit || 'шт')}${used(p.id) ? ' · в заказах: ' + used(p.id) : ''}${p.basedOn && S.products.find(x => x.id === p.basedOn) ? ' · на основании «' + esc(S.products.find(x => x.id === p.basedOn).name) + '»' : ''}${p.note ? ' · ' + esc(p.note) : ''}</small></div>
+        <div class="row-g">${canEdit() ? `<button class="btn sm" data-act="catEdit" data-id="${p.id}">Изменить</button><button class="btn sm" data-act="catBase" data-id="${p.id}">Создать на основании</button>${armBtn('cat:' + p.id, 'Удалить', 'catDel', p.id, 'btn sm')}` : `<button class="btn sm" data-act="catEdit" data-id="${p.id}">Открыть</button>`}</div></li>`).join('')}</ul>`
+        : `<div class="empty" style="padding:18px">${S.products.length ? 'Ничего не найдено.' : 'Изделий пока нет. Создайте изделие: наименование и компоненты со склада.'}</div>`}
+      <div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>`;
+  }
+  if (d.kind === 'catEdit') {
+    const c = ui.cp; if (!c) return closeDrawer();
+    const mode = c.mode, ed = canEdit();
+    const title = mode === 'order' ? 'Модификация изделия в заказе' : mode === 'base' ? 'Новое изделие на основании' : c.id ? 'Изделие' : 'Новое изделие';
+    D.innerHTML = dh(title) + `<div class="d-body">
+      ${mode === 'order' ? `<p class="dim" style="margin:0">Изменения состава сохраняются только в этом заказе («Сохранить в заказе»). Чтобы получилось отдельное изделие в справочнике, задайте новое наименование и нажмите «Сохранить как новое изделие».</p>` : ''}
+      ${mode === 'base' ? `<p class="dim" style="margin:0">Копия изделия «${esc(c.baseName || '')}» — измените наименование и состав.</p>` : ''}
+      <div class="form"><label class="wide">Наименование изделия<span data-keep style="display:contents"><input class="in" id="cp-name" value="${esc(c.name || '')}" ${ed ? '' : 'disabled'}></span></label>
+        <label>Единица<span data-keep style="display:contents"><input class="in" id="cp-unit" value="${esc(c.unit || 'шт')}" ${ed ? '' : 'disabled'}></span></label>
+        <label>Примечание<span data-keep style="display:contents"><input class="in" id="cp-note" value="${esc(c.note || '')}" ${ed ? '' : 'disabled'}></span></label></div>
+      <div class="box"><h4>Компоненты на одно изделие · ${c.components.length}</h4>
+        ${c.components.length ? `<div class="tscroll"><table class="comp"><thead><tr><th>№</th><th>Позиция склада</th><th class="r">Кол-во</th><th>Ед.</th><th class="r">Склад: факт / бух</th><th></th></tr></thead><tbody>
+          ${c.components.map((x, i) => { const st = x.stockId && S.stock.find(y => y.id === x.stockId); return `<tr><td class="n">${i + 1}</td><td><b style="font-weight:500">${esc(x.name)}</b>${st ? (st.sku ? `<small class="dim mono">${esc(st.sku)}</small>` : '') : '<small style="color:var(--warn)">нет на складе — при сохранении будет добавлена новая позиция</small>'}</td>
+            <td><span data-keep style="display:contents"><input class="in mono cpq" data-i="${i}" value="${esc(x.qty)}" inputmode="decimal" style="width:80px" ${ed ? '' : 'disabled'}></span></td>
+            <td><span data-keep style="display:contents"><input class="in cpu" data-i="${i}" value="${esc(x.unit || 'шт')}" style="width:60px" ${ed && !st ? '' : 'disabled'}></span></td>
+            <td class="r mono">${st ? fmtQty(st.qty) + ' / ' + fmtQty(st.acctQty) : '—'}</td><td>${ed ? `<button class="icon" data-act="cpDel" data-id="${i}" aria-label="Удалить строку">✕</button>` : ''}</td></tr>`; }).join('')}
+        </tbody></table></div>` : '<p class="dim" style="margin:0">Компонентов пока нет.</p>'}
+        ${ed ? `<b class="dtm-h">Добавить со склада</b>
+        <span data-keep style="display:contents"><input class="in" id="cp-q" type="search" placeholder="Название или артикул позиции склада" autocomplete="off"></span>
+        <div id="cp-res" class="cpres"></div>` : ''}</div>
+      <div class="err" id="ferr"></div>
+      <div class="row-g">${!ed ? '' : mode === 'order'
+        ? `<button class="btn primary" data-act="cpSave" data-id="order">Сохранить в заказе</button><button class="btn" data-act="cpSave" data-id="new">Сохранить как новое изделие</button>`
+        : `<button class="btn primary" data-act="cpSave" data-id="cat">${c.id ? 'Сохранить' : 'Создать изделие'}</button>`}
+        <button class="btn" data-act="${mode === 'order' ? 'close' : 'catalog'}">${mode === 'order' ? 'Отмена' : '← К списку изделий'}</button></div>
+    </div>`;
+    cpResults();
+  }
+  if (d.kind === 'orderProduct') {
+    const o = ord(d.id); if (!o) return closeDrawer();
+    const P = S.products.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    D.innerHTML = dh('Изделие в заказ') + `<form class="d-body" data-form="orderProduct">
+      ${P.length ? `<div class="form"><label class="wide">Изделие<select class="in" id="op-prod" required><option value="">— выберите изделие —</option>${P.map(p => `<option value="${p.id}">${esc(p.name)} · ${(p.components || []).length} компонент.</option>`).join('')}</select></label>
+        <label>Количество<input class="in mono" id="op-qty" value="1" inputmode="decimal" required></label>
+        <label>Примечание<input class="in" id="op-note"></label></div>
+        <small class="dim">Состав изделия копируется в заказ; изменить его для этого заказа можно кнопкой «Модифицировать».</small>`
+        : '<p class="dim" style="margin:0">В справочнике пока нет изделий.</p>'}
+      <div class="err" id="ferr"></div>
+      <div class="row-g">${P.length ? '<button class="btn primary" type="submit">Добавить в заказ</button>' : ''}<button class="btn" type="button" data-act="catNew">+ Новое изделие</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'product') {
     const [oid, pid] = String(d.id || '').split('|'); const p = pid ? prodOf(oid, pid) : null;
     D.innerHTML = dh(p ? 'Изделие' : 'Новое изделие') + `<form class="d-body" data-form="product"><div class="form">
-      <label class="wide">Наименование изделия<input class="in" id="pr-name" value="${v(p,'name')}" required></label>
+      <label class="wide">Наименование изделия<input class="in" id="pr-name" value="${v(p,'name')}" required ${p && p.productId ? 'readonly' : ''}></label>
       <label>Количество<input class="in mono" id="pr-qty" value="${esc(p ? p.qty : 1)}" inputmode="decimal" required></label>
       <label>Единица<input class="in" id="pr-unit" value="${esc(p?.unit || 'шт')}"></label>
       <label class="wide">Примечание<input class="in" id="pr-note" value="${v(p,'note')}"></label></div>
@@ -3337,6 +3452,15 @@ async function onSubmit(e){
       });
       ui.pickQ = ''; closeDrawer(); render(); toast(`Добавлено со склада: ${picked.length}`);
     }
+    if (kind === 'orderProduct') {
+      const prod = S.products.find(p => p.id === val('op-prod')), qty = num(val('op-qty'));
+      if (!prod) return fail('Выберите изделие.');
+      if (!(qty > 0)) return fail('Количество должно быть больше нуля.');
+      const o = ord(d.id);
+      if ((o.products || []).some(p => p.productId === prod.id)) return fail('Это изделие уже есть в заказе — измените количество в его карточке.');
+      await upd('orders', o.id, { products: [...(o.products || []), { id: uid(), productId: prod.id, name: prod.name, unit: prod.unit || 'шт', qty, note: val('op-note'), components: (prod.components || []).map(c => ({ ...c, id: uid() })), files: [] }] });
+      ui.orderTab = 'products'; closeDrawer(); render(); toast(`«${prod.name}» добавлено в заказ`);
+    }
     if (kind === 'product') {
       const name = val('pr-name'), qty = num(val('pr-qty'));
       if (!name) return fail('Укажите наименование изделия.');
@@ -3605,7 +3729,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['orders', 'Заказы на производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Бухгалтерия'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
+const startViews = () => [['works', 'Работы'], ['orders', 'Производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -3919,6 +4043,22 @@ async function act(el){
     case 'wKind': ui.wKind = id; return render();
     case 'orderTab': ui.orderTab = id; ui.animNext = true; return render();
     case 'newProduct': return openDrawer('product', id + '|');
+    case 'addOrderProduct': return openDrawer('orderProduct', id);
+    case 'catalog': ui.cp = null; return openDrawer('catalog');
+    case 'catNew': ui.catBack = ui.drawer?.kind === 'orderProduct' ? ui.drawer.id : null; return cpOpen('cat', null);
+    case 'catEdit': { const p = S.products.find(x => x.id === id); return p && cpOpen('cat', p); }
+    case 'catBase': { const p = S.products.find(x => x.id === id); return p && cpOpen('base', p); }
+    case 'catDel': { const n = S.orders.filter(o => (o.products || []).some(p => p.productId === id)).length;
+      try { await api('DELETE', '/api/products/' + id); await refresh(); renderDrawer(); toast('Изделие удалено' + (n ? ` — в ${n} заказах оно остаётся с прежним составом` : '')); } catch(e) { toast(errText(e)); } return; }
+    case 'prodMod': { const [oid, pid] = id.split('|'), p = prodOf(oid, pid); if (!p) return; return cpOpen('order', p, { oid, pid, productId: p.productId || null }); }
+    case 'cpAdd': { cpRead(); const it = S.stock.find(x => x.id === id); if (!it) return; const ex = ui.cp.components.find(c => c.stockId === it.id);
+      if (ex) toast('Эта позиция уже в составе — измените количество'); else ui.cp.components.push({ id: uid(), stockId: it.id, name: it.name, qty: 1, unit: it.unit || 'шт' });
+      renderDrawer(); $('cp-q')?.focus(); return; }
+    case 'cpNew': { cpRead(); const nm = ($('cp-q')?.value || '').trim(); if (!nm) return; ui.cp.components.push({ id: uid(), stockId: null, name: nm, qty: 1, unit: 'шт' }); renderDrawer(); $('cp-q')?.focus(); return; }
+    case 'cpDel': cpRead(); ui.cp.components.splice(Number(id), 1); return renderDrawer();
+    case 'cpSave': return cpSave(id);
+    case 'woSave': { el.disabled = true; try { const r = await api('POST', `/api/orders/${id}/writeoff`, { map: ui.woMap || {} }); const o = ord(id); if (o) { o.writeoff = r.writeoff; o.woMap = { ...(ui.woMap || {}) }; } await refresh(); renderDrawer(); toast('Список для списания сохранён'); } catch(e) { const f = $('ferr'); if (f) f.textContent = errText(e); el.disabled = false; } return; }
+    case 'woReset': { String(id).split('\n').forEach(k => delete ui.woMap[k]); return renderDrawer(); }
     case 'editProduct': return openDrawer('product', id);
     case 'delProduct': { const [oid, pid] = id.split('|'); await guard(updProduct(oid, pid, () => null)); render(); return toast('Изделие удалено'); }
     case 'addPComp': { const [oid, pid] = id.split('|'); await guard(updProduct(oid, pid, p => ({ ...p, components: [...(p.components || []), { id: uid(), name: '', qty: 1, unit: 'шт' }] }))); render(); const t = document.querySelector(`table[data-pid="${pid}"] tbody tr:last-child input`); t && t.focus(); return; }
@@ -3926,9 +4066,10 @@ async function act(el){
     case 'pastePComp': return openDrawer('pastePComp', id);
     case 'delPFile': { const [oid, pid, fid] = id.split('|'); await guard(updProduct(oid, pid, p => ({ ...p, files: (p.files || []).filter(f => f.id !== fid) }))); return render(); }
     case 'sF': ui.sF = id; return render();
+    case 'sAv': ui.sAv = id; return render();
     case 'acctImport': ui.acct = null; return openDrawer('acctImport');
     case 'pickStock': ui.pickQ = ''; return openDrawer('pickStock', id);
-    case 'writeoff': return openDrawer('writeoff', id);
+    case 'writeoff': ui.woMap = null; return openDrawer('writeoff', id);
     case 'newStock': return openDrawer('stockItem');
     case 'editStock': return openDrawer('stockItem', id);
     case 'viewStock': return openDrawer('stockView', id);
@@ -4012,6 +4153,10 @@ $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'cp-q') return cpResults();
+  if (t.classList.contains('cpq') && ui.cp) { ui.cp.components[Number(t.dataset.i)].qty = t.value; return; }
+  if (t.classList.contains('cpu') && ui.cp) { ui.cp.components[Number(t.dataset.i)].unit = t.value; return; }
+  if (t.id === 'cat-q') { ui.catQ = t.value; const pos = t.selectionStart; renderDrawer(); const n = $('cat-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } return; }
   if (t.id === 'note-new') { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; return; }
   if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L); } return; }
   if (t.id === 'feat-new') ui.drafts['feat:' + t.dataset.o] = t.value;
@@ -4058,6 +4203,10 @@ document.addEventListener('change', async e => {
   if (t.id === 'pl-nw') { t.closest('.nwchk').classList.toggle('on', t.checked); return; }
   if (t.dataset.pcolor) { prefsSave({ colors: { ...(PREFS.colors || {}), [t.dataset.pcolor]: t.value } }); prefsChanged(); const b = document.querySelector('[data-act=prefColorsReset]'); if (b) b.disabled = false; return; }
   if (t.id === 'pref-start') { prefsSave({ start: t.value }); toast('Сохранено'); return; }
+  if (t.classList.contains('pqty')) { const [oid, pid] = t.dataset.id.split('|'), q = num(t.value); if (!(q > 0)) { toast('Количество должно быть больше нуля'); t.value = prodOf(oid, pid)?.qty ?? 1; return; }
+    await guard(updProduct(oid, pid, p => ({ ...p, qty: q }))); render(); return toast('Количество изменено'); }
+  if (t.classList.contains('wo-name')) { const it = stockByName(t.value); if (!it) { toast('Нет такой позиции на складе — выберите из списка'); return renderDrawer(); }
+    t.dataset.keys.split('\n').forEach(k => { if (k === 'id:' + it.id) delete ui.woMap[k]; else ui.woMap[k] = it.id; }); return renderDrawer(); }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }

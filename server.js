@@ -55,7 +55,8 @@ const SESSION_DAYS = Number(process.env.SESSION_DAYS || 14);
 const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 
-const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points', 'stock', 'jobs'];
+// «products»: the catalogue of products (изделия) with their components from the warehouse
+const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points', 'stock', 'jobs', 'products'];
 const ROLES = {
   admin:      'Администратор',
   head:       'Руководитель',
@@ -705,6 +706,21 @@ async function api(req, res, url) {
     return send(res, 200, db.meta.acct);
   }
 
+  /* saving the write-off list: only when every line is covered by the accounting balances */
+  if (p[1] === 'orders' && p[3] === 'writeoff' && m === 'POST') {
+    if (!canEdit(user)) return fail(res, 403, 'Сохранить список для списания может администратор или руководитель');
+    const o = db.orders[p[2]]; if (!o) return fail(res, 404, 'Заказ не найден');
+    const b = await readJsonBody(req), map = {};
+    for (const [k, v] of Object.entries(b.map || {})) if (/^(id|n):/.test(k) && db.stock[v]) map[k] = v;
+    const lines = writeoffLines(o, map);
+    if (!lines.length) return fail(res, 400, 'В изделиях заказа нет компонентов');
+    const bad = lines.filter(L => L.source !== 'acct');
+    if (bad.length) return fail(res, 409, 'Не хватает в бухгалтерских остатках: ' + bad.slice(0, 5).map(L => L.name).join(', ') + (bad.length > 5 ? ` и ещё ${bad.length - 5}` : '') + '. Замените номенклатуру или обновите остатки');
+    o.woMap = map;
+    o.writeoff = { at: new Date().toISOString(), by: user.id, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.need })) };
+    saveDb();
+    return send(res, 200, { ok: true, writeoff: o.writeoff, rev: db.rev });
+  }
   /* write-off list for an order: Excel with highlighting */
   if (p[1] === 'orders' && p[3] === 'writeoff.xlsx' && m === 'GET') {
     const o = db.orders[p[2]];
@@ -1362,29 +1378,36 @@ function markSeen(user, fileIds) {
 
 /* ---------- names, write-off lines and a tiny XLSX writer ---------- */
 const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/["«»'“”„]/g, '').replace(/(\d)\s*[x×х*]\s*(?=\d)/g, '$1х').replace(/\s+/g, ' ').trim();
-function writeoffLines(o) {
+/* The write-off list of an order is taken from the accounting balances (1С). A line whose position is not in the balances
+   or whose balance is short is «red»; the nomenclature of a line can be replaced (o.woMap: original line key → stock id). */
+function writeoffLines(o, mapOverride) {
   const byName = new Map(Object.entries(db.stock).map(([id, it]) => [normName(it.name), id]));
+  const map = mapOverride || o.woMap || {};
   const lines = new Map();
   for (const p of o.products || []) {
     const k = Number(p.qty) || 0;
     for (const c of p.components || []) {
-      const sid = (c.stockId && db.stock[c.stockId]) ? c.stockId : byName.get(normName(c.name));
-      if (!sid && !String(c.name || '').trim()) continue;
+      const sid0 = (c.stockId && db.stock[c.stockId]) ? c.stockId : byName.get(normName(c.name));
+      if (!sid0 && !String(c.name || '').trim()) continue;
+      const key0 = sid0 ? 'id:' + sid0 : 'n:' + normName(c.name);
+      const sid = map[key0] && db.stock[map[key0]] ? map[key0] : sid0;
       const it = sid ? db.stock[sid] : null;
-      const key = sid ? 'id:' + sid : 'n:' + normName(c.name);
-      const L = lines.get(key) || { name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, products: [] };
+      const key = sid ? 'id:' + sid : key0;
+      const L = lines.get(key) || { key, keys: [], name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, stockId: sid || null, replaced: false, products: [] };
+      if (!L.keys.includes(key0)) L.keys.push(key0);
+      if (sid !== sid0) L.replaced = true;
       L.need = Math.round((L.need + (Number(c.qty) || 0) * k) * 1000) / 1000;
       if (p.name && !L.products.includes(p.name)) L.products.push(p.name);
       lines.set(key, L);
     }
   }
   return [...lines.values()].map(L => {
-    const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : L.real >= L.need - 1e-9 ? 'real' : 'short';
-    const shortage = source === 'acct' || source === 'real' ? 0 : Math.round((L.need - (L.inStock ? Math.max(L.acct, L.real) : 0)) * 1000) / 1000;
+    const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : 'short';
+    const shortage = source === 'acct' ? 0 : Math.round((L.need - (L.inStock ? L.acct : 0)) * 1000) / 1000;
     return { ...L, source, shortage };
   }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
-const SOURCE_LABEL = { acct: 'Из бухгалтерских остатков', real: 'Из фактических остатков', short: 'Не хватает', none: 'Нет на складе' };
+const SOURCE_LABEL = { acct: 'Хватает', short: 'Не хватает', none: 'Нет в бухгалтерских остатках' };
 function zipStore(entries) {
   const now = new Date();
   const t = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
@@ -1450,13 +1473,14 @@ function xlsxBuffer(sheetName, rows, widths) {
 }
 function writeoffXlsx(o) {
   const lines = writeoffLines(o);
-  const st = { acct: [4, 5], real: [6, 7], short: [8, 9], none: [11, 12] };
+  const st = { acct: [4, 5], short: [8, 9], none: [8, 9] };
   const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : 'не загружались';
   const rows = [
     [{ v: `Список для списания — заказ ${o.number || ''} · ${o.title || ''}`, s: 10 }],
     [`Сформирован: ${fmt(new Date().toISOString())}. Бухгалтерские остатки: ${db.meta.acct ? fmt(db.meta.acct.at) + (db.meta.acct.file ? ' (' + db.meta.acct.file + ')' : '') : 'не загружались'}.`],
     [],
-    ['№', 'Наименование', 'Артикул', 'Ед.', 'Нужно', 'Бух. остаток', 'Факт. остаток', 'Списать из', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
+    [`Список ${o.writeoff ? 'сохранён ' + fmt(o.writeoff.at) : 'ещё не сохранён'}.`],
+    ['№', 'Наименование', 'Артикул', 'Ед.', 'Списать', 'Бух. остаток', 'Факт. остаток', 'Состояние', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
     ...lines.map((L, i) => { const [ts, ns] = st[L.source]; return [
       { v: i + 1, s: ns }, { v: L.name, s: ts }, { v: L.sku, s: ts }, { v: L.unit, s: ts }, { v: L.need, s: ns },
       L.inStock ? { v: L.acct, s: ns } : { v: '—', s: ts }, L.inStock ? { v: L.real, s: ns } : { v: '—', s: ts },
@@ -1464,9 +1488,7 @@ function writeoffXlsx(o) {
     [],
     [{ v: 'Обозначения:', s: 0 }],
     [{ v: 'Хватает бухгалтерского остатка', s: 4 }],
-    [{ v: 'Бухгалтерского не хватает, хватает фактического', s: 6 }],
-    [{ v: 'Не хватает ни бухгалтерского, ни фактического', s: 8 }],
-    [{ v: 'Позиции нет на складе', s: 11 }],
+    [{ v: 'Позиции нет в бухгалтерских остатках или её не хватает', s: 8 }],
   ];
   return xlsxBuffer('Списание', rows, [5, 42, 16, 7, 11, 13, 13, 30, 12, 30]);
 }
