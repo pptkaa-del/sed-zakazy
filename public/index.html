@@ -487,7 +487,23 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .witem b{font-weight:600}.witem small{color:var(--ink-2);font-size:12px}.witem.late small{color:var(--bad)}.witem.pt b{font-weight:500}
 .wbar{display:block;height:5px;border-radius:3px;background:var(--mute-soft);overflow:hidden;margin-top:3px}.wbar i{display:block;height:100%;background:var(--ok)}
 #wmap{height:calc(100vh - 200px);min-height:420px;border-radius:12px;border:1px solid var(--rule);background:var(--mute-soft);z-index:0}
-@media (max-width:820px){.wgrid{grid-template-columns:1fr}.wlist{max-height:34vh}#wmap{height:58vh;min-height:300px}}
+.wlistbtn{display:none}
+@media (max-width:820px){
+  .wgrid{display:block;position:relative}
+  .wlistbtn{display:flex;width:100%;justify-content:space-between;align-items:center;margin:0 0 8px;min-height:48px;font-size:17px;font-weight:600}
+  .wlistbtn .arr{transition:transform .15s}.wlistbtn[aria-expanded=true] .arr{transform:rotate(180deg)}
+  .wlist{display:none;position:absolute;top:0;left:0;right:0;z-index:30;max-height:72vh;box-shadow:var(--shadow)}
+  .wgrid.open .wlist{display:flex}
+  #wmap{height:var(--wmap-h,70vh);min-height:300px}
+  body.field main{padding-block:8px 8px}
+  body.field header.top .wrap{padding-block:8px;gap:8px 12px}
+  body.field #hsub{display:none}
+  .witem{padding:12px 14px}
+  aside.drawer.full{inset:0;width:100%;max-width:none;height:100%;height:100dvh;border-radius:0;z-index:3000}
+  aside.drawer.full .d-body{padding-bottom:max(24px,env(safe-area-inset-bottom))}
+  body.field .scrim{z-index:2999}
+  .upl2{display:flex;gap:8px;flex-wrap:wrap}.upl2 .btn{flex:1;min-height:46px;justify-content:center}
+}
 .nwchk{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;cursor:pointer;font-size:15px}
 .nwchk.on{border-color:var(--bad);background:var(--bad-soft)}.nwchk input{width:20px;height:20px}
 .phlist{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:3px}
@@ -719,24 +735,25 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 
 /* ===== телефон: крупнее шрифт ===== */
 @media (max-width:640px){
-  body{font-size:16.5px;line-height:1.5}
-  .in,select.f,textarea,input[type=search].in{font-size:16px}
-  .btn{font-size:16px}.btn.sm{font-size:15px;padding-block:7px}
-  .views a{font-size:16px}
-  .chip{font-size:13.5px}
-  #app small,.drawer small,.leaflet-popup small{font-size:14px}
+  body{font-size:17.5px;line-height:1.5}
+  .in,select.f,textarea,input[type=search].in{font-size:17px}
+  .btn{font-size:17px;padding-block:10px}.btn.sm{font-size:16px;padding-block:9px}
+  .views a{font-size:17px}
+  .chip{font-size:14.5px}
+  #app small,.drawer small,.leaflet-popup small{font-size:15px}
   #app [style*="font-size:11px"],.drawer [style*="font-size:11px"]{font-size:13px!important}
   #app [style*="font-size:12px"],.drawer [style*="font-size:12px"]{font-size:14px!important}
   #app [style*="font-size:13px"],.drawer [style*="font-size:13px"]{font-size:14.5px!important}
   #app [style*="font-size:14px"],.drawer [style*="font-size:14px"]{font-size:15.5px!important}
   .box h4,.orow.head,.urow.head,.stk.head,table.jt th,table.jg thead th,table.lines th{font-size:13px}
-  .leaflet-popup-content{font-size:15.5px}.pp h4{font-size:17px}
-  .witem b,.pitem b,.oitem b{font-size:16px}.witem small,.pitem small,.oitem small,.jt-t small{font-size:14px}
+  .leaflet-popup-content{font-size:17px}.pp h4{font-size:19px}
+  .witem b,.pitem b,.oitem b{font-size:17.5px}.witem small,.pitem small,.oitem small,.jt-t small{font-size:15px}
+  .wlist h3{font-size:17px}.slots b{font-size:17px}.nwchk{font-size:17px}.box h4{font-size:14px}
   .toast{font-size:15.5px}
   .jbar b{font-size:14px}.jbar small{font-size:12.5px}
   .dtt{font-size:15px}.dtt b{font-size:14px}
   .mchip,.modems{font-size:13px}
-  .d-head h2{font-size:20px}
+  .d-head h2{font-size:22px}
 }
 </style>
 </head>
@@ -812,7 +829,8 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     <div class="mapgrid"><div id="map" role="application" aria-label="Карта объектов"></div><div class="plist" id="plist"></div></div>
   </section>
   <section id="wView" hidden>
-    <div class="wgrid"><aside class="wlist" id="wlist"></aside><div id="wmap" role="application" aria-label="Мои точки"></div></div>
+    <button class="btn wlistbtn" id="wListBtn" type="button" data-act="wList" aria-expanded="false" aria-controls="wlist"></button>
+    <div class="wgrid" id="wgrid"><aside class="wlist" id="wlist"></aside><div id="wmap" role="application" aria-label="Мои точки"></div></div>
   </section>
   <section id="dtView" hidden>
     <div class="dtbar" id="dtInfo"></div>
@@ -855,9 +873,10 @@ const MAX_MB = 50;
 const ORDER_ST = { new:'Планируется', work:'В работе', closed:'Закрыт' };
 const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', contractor:'Подрядчик' };
 const KIND = { buy:'Закупка', work:'Работа' };
-const ROLE_NAMES = { admin:'Администратор', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
+const ROLE_NAMES = { admin:'Администратор', head:'Руководитель', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
 const ROLE_INFO = {
   admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, редактор карты, назначение точек, пользователи.',
+  head:'Всё, что может администратор, кроме отметки оплаты счетов и управления пользователями.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
   worker:'Видит только назначенные ему точки: «В работе» и «Выполненные», фото и отметки по каждой точке.',
   contractor:'То же, что сотрудник, но доступ к системе ограничен датой — после неё вход закрывается.'
@@ -867,7 +886,8 @@ const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], po
 let STAFF = [];
 let META = {};
 let me = null, rev = -1, mode = 'loading';
-const canEdit = () => me && me.role === 'admin';
+const isHead = () => me && (me.role === 'admin' || me.role === 'head');
+const canEdit = () => isHead();
 const canPay = () => me && (me.role === 'admin' || me.role === 'accountant');
 const canAddInvoice = () => canEdit();
 const ownInv = i => false;
@@ -1369,7 +1389,7 @@ function commentsCard(col, doc){
   const canComment = me && !isWorker();
   return `<section class="card">
     <div class="ch"><h3>Комментарии <span class="dim">${cm.length||''}</span></h3></div>
-    ${cm.length ? `<div class="comments">${cm.map(c => `<div class="cmt"><span class="avatar">${esc(initials(who(c.by)))}</span><div class="body"><div class="meta"><b style="color:var(--ink)">${esc(who(c.by))}</b><span>${esc(fmtDT(c.at))}</span>${me && (c.by === me.id || me.role === 'admin') ? armBtn('c:'+c.id,'✕','delComment',col+'|'+doc.id+'|'+c.id,'icon') : ''}</div><p>${esc(c.text)}</p></div></div>`).join('')}</div>` : '<p class="dim" style="margin:0">Комментариев пока нет.</p>'}
+    ${cm.length ? `<div class="comments">${cm.map(c => `<div class="cmt"><span class="avatar">${esc(initials(who(c.by)))}</span><div class="body"><div class="meta"><b style="color:var(--ink)">${esc(who(c.by))}</b><span>${esc(fmtDT(c.at))}</span>${me && (c.by === me.id || isHead()) ? armBtn('c:'+c.id,'✕','delComment',col+'|'+doc.id+'|'+c.id,'icon') : ''}</div><p>${esc(c.text)}</p></div></div>`).join('')}</div>` : '<p class="dim" style="margin:0">Комментариев пока нет.</p>'}
     ${canComment ? `<div class="cform" data-keep><textarea class="in" id="c-text" data-key="${key}" rows="2" aria-label="Комментарий">${esc(ui.drafts[key]||'')}</textarea><button class="btn primary" data-act="addComment" data-id="${col}|${doc.id}">Отправить</button></div>` : ''}
   </section>`;
 }
@@ -1636,7 +1656,7 @@ const jobOf = id => S.jobs.find(j => j.id === id);
 const mayEditJob = j => canEdit();
 const onJob = j => me && (j.leaderId === me.id || (j.workers || []).includes(me.id));
 const jobNo = j => j.no || '—';
-const leaders = () => STAFF.filter(u => u.role === 'admin');
+const leaders = () => STAFF.filter(u => u.role === 'admin' || u.role === 'head');
 const workersList = () => STAFF.filter(u => u.role === 'worker' || u.role === 'contractor');
 const overdue = j => j.status !== 'done' && j.due && j.due < today();
 const routeUrl = pl => `https://yandex.ru/maps/?rtext=~${pl.lat},${pl.lng}&rtt=auto`;
@@ -2173,6 +2193,10 @@ function wPopup(j, pl){
     <div class="row-g">${done ? `<button class="btn sm ${ed ? 'primary' : ''}" data-act="wDo" data-id="${j.id}|${pl.id}">${ed ? 'Изменить' : 'Посмотреть'}</button>` : `<button class="btn sm ok" data-act="wDo" data-id="${j.id}|${pl.id}">Выполнить</button>`}
       <a class="btn sm" href="${routeUrl(pl)}" target="_blank" rel="noopener">Маршрут</a></div></div>`;
 }
+/* two ways to add a photo: the camera, or a picture already on the phone (gallery, files) */
+const photoBtns = (id, slot, label, multi) => `<span class="upl2"><label class="btn sm ${multi ? '' : 'primary'}">📷 ${label}<input type="file" accept="image/*" capture="environment" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label><label class="btn sm">🖼 Загрузить фото<input type="file" accept="image/*" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label></span>`;
+function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if (matchMedia('(max-width:820px)').matches) { const top = m.getBoundingClientRect().top + scrollY; document.documentElement.style.setProperty('--wmap-h', Math.max(300, innerHeight - top - 8) + 'px'); } wMap && wMap.invalidateSize(); }
+addEventListener('resize', () => { if (!$('wView').hidden) wFitMap(); });
 function renderW(){
   const done = ui.view === 'wdone', all = wPoints(done);
   const jobs = S.jobs.filter(j => done ? (j.places || []).some(x => x.doneAt) : j.status !== 'done')
@@ -2188,8 +2212,11 @@ function renderW(){
     : `<div class="empty" style="border:0;padding:16px">${done ? 'Закрытых точек пока нет.' : 'Вам пока не назначено задач.'}</div>`}
     ${done && shown.length ? `<h3 style="margin-top:14px">Точки</h3>${shown.sort((a, b) => (b.pl.doneAt || '').localeCompare(a.pl.doneAt || '')).slice(0, 200).map(({ j, pl }) => `<button class="witem pt" data-act="wFly" data-id="${j.id}|${pl.id}"><b>${esc(pl.label || 'Точка')}</b><small>${esc(fmtDT(pl.doneAt))}${pl.notWorking ? ' · не работает' : ''} · ${wEditable(pl) ? 'можно изменить до ' + esc(wUntil(pl)) : 'только просмотр'}</small></button>`).join('')}` : ''}
     ${!done && shown.length ? `<h3 style="margin-top:14px">Точки · ${shown.length}</h3><p class="dim" style="font-size:12px;margin:0 4px 4px">Нажмите на точку на карте или здесь → «Выполнить».</p>${shown.slice(0, 200).map(({ j, pl }) => { const r = placeDone(j, pl); return `<button class="witem pt" data-act="wFly" data-id="${j.id}|${pl.id}"><b>${esc(pl.label || 'Точка')}</b><small>${ui.wJob ? '' : esc(j.title) + ' · '}${r.need ? `фото ${r.got} из ${r.need}` : 'фото не требуются'}</small></button>`; }).join('')}` : ''}`;
+  { const btn = $('wListBtn'), open = !!ui.wListOpen; $('wgrid').classList.toggle('open', open); btn.setAttribute('aria-expanded', open);
+    const j = ui.wJob && jobOf(ui.wJob);
+    btn.innerHTML = `<span>☰ ${j ? esc(j.title) + ' · ' : ''}${done ? 'выполнено' : 'точек'}: ${shown.length}</span><span class="arr" aria-hidden="true">▾</span>`; }
   ensureWMap(); if (!wMap) return;
-  setTimeout(() => wMap.invalidateSize(), 0);
+  setTimeout(wFitMap, 0);
   wLayer.clearLayers();
   shown.forEach(({ j, pl }) => {
     const c = done ? (pl.notWorking ? '#C0392B' : '#1E9E4F') : placeColor(j, pl) ? '#E08A00' : '#3B47B8';
@@ -2374,7 +2401,7 @@ function vPay(){
   const head = `<div class="toolbar">
     <div class="seg" role="tablist">${seg.map(([k,l]) => `<button data-act="payF" data-id="${k}" class="${ui.payF===k?'on':''}">${l}</button>`).join('')}</div>
     <select class="f" id="payOrd" aria-label="Заказ"><option value="">Все заказы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.payOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
-    ${canPay() ? (topay.length ? `<a class="btn" href="${zipHref}" data-dl title="ZIP-архив: файлы счетов по папкам заказов и реестр в CSV">Скачать ${ui.payOrd ? 'счета заказа' : 'все счета'} к оплате${withFiles ? ` · файлов: ${withFiles}` : ''}</a>` : '<button class="btn" disabled>Скачать все счета к оплате</button>') : ''}
+    ${canPay() || canEdit() ? (topay.length ? `<a class="btn" href="${zipHref}" data-dl title="ZIP-архив: файлы счетов по папкам заказов и реестр в CSV">Скачать ${ui.payOrd ? 'счета заказа' : 'все счета'} к оплате${withFiles ? ` · файлов: ${withFiles}` : ''}</a>` : '<button class="btn" disabled>Скачать все счета к оплате</button>') : ''}
     ${canAddInvoice() && S.orders.length ? '<button class="btn primary" data-act="newInvoice" data-id="">+ Счёт</button>' : ''}
   </div>
   <div class="tiles"><div class="tile"><span>К оплате</span><b>${money(sum(topay,i=>i.amount))}</b><small>${topay.length} сч.</small></div></div>`;
@@ -2505,7 +2532,7 @@ function vUsers(){
     const self = u.id === me.id;
     return `<div class="urow ${u.blocked?'blocked':''}">
       <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}${u.sys ? ' · администратор системы' : ''}</small></div>
-      <div><span class="chip ${u.role==='admin'?'c-work':u.role==='accountant'?'c-ok':u.role==='contractor'?'c-warn':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
+      <div><span class="chip ${u.role==='admin'||u.role==='head'?'c-work':u.role==='accountant'?'c-ok':u.role==='contractor'?'c-warn':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
       <div>${u.blocked ? '<span class="chip c-bad">Заблокирован</span>' : u.expired ? '<span class="chip c-bad">Доступ истёк</span>' : '<span class="chip c-ok">Активен</span>'}${u.accessUntil ? `<small>доступ до ${fmtD(u.accessUntil)}</small>` : ''}</div>
       <div><small>Последний вход</small>${u.lastLoginAt ? esc(fmtDT(u.lastLoginAt)) : '<span class="dim">не входил</span>'}</div>
       <div class="acts"><button class="btn sm" data-act="userEdit" data-id="${u.id}">Изменить</button>
@@ -2581,7 +2608,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport');
+function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('full', kind === 'wdo'); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
@@ -2800,7 +2827,7 @@ function renderDrawer(){
   }
   if (d.kind === 'dtAssign') {
     const sel = DT.points.filter(p => dtSel.has(p.no)), had = sel.filter(p => p.assignee);
-    const W = STAFF.filter(u => u.role === 'worker' || u.role === 'contractor'), O = STAFF.filter(u => u.role === 'admin');
+    const W = STAFF.filter(u => u.role === 'worker' || u.role === 'contractor'), O = STAFF.filter(u => u.role === 'admin' || u.role === 'head');
     const opt = u => `<label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dta-who" value="${u.id}"> <span>${esc(u.name)} <small class="dim">— ${esc(ROLE_NAMES[u.role])}, точек: ${DT.points.filter(p => p.assignee === u.id).length}</small></span></label>`;
     D.innerHTML = dh('Назначить исполнителя') + `<form class="d-body" data-form="dtAssign">
       <p style="margin:0">Выделено точек: <b>${sel.length}</b>, модемов: <b>${sel.reduce((a, p) => a + dtModems(p), 0)}</b>${had.length ? ` · уже назначено: ${had.length} (${[...new Set(had.map(p => who(p.assignee)))].map(esc).join(', ')}) — назначение заменится` : ''}.</p>
@@ -2870,7 +2897,7 @@ function renderDrawer(){
     if (!pl) return closeDrawer();
     const ph = pl.photos || {}, r = placeDone(j, pl), done = !!pl.doneAt, ed = wEditable(pl), nw = ui.wNotWorking ?? !!pl.notWorking;
     const thumb = f => `<a href="/files/${f.id}" target="_blank" rel="noopener" class="thumb"><img src="/files/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`;
-    const upl = (slot, label, multi) => ed ? `<label class="btn sm ${multi ? '' : 'primary'}">${label}<input type="file" accept="image/*" capture="environment" data-up="placePhoto" data-id="${jid}|${pid}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label>` : '';
+    const upl = (slot, label, multi) => ed ? photoBtns(jid + '|' + pid, slot, label, multi) : '';
     D.innerHTML = dh(esc(pl.label || 'Точка')) + `<div class="d-body">
       <p class="dim" style="margin:0">${esc(j.title)}${done ? ` · закрыта ${esc(fmtDT(pl.doneAt))}` : ''}</p>
       ${done ? (ed ? `<p class="box" style="margin:0;border-color:var(--warn);background:var(--warn-soft)">Изменить данные можно до <b>${esc(wUntil(pl))}</b>.</p>` : '<p class="box dim" style="margin:0">Прошло больше суток после закрытия — данные только для просмотра. Исправить их может руководитель.</p>') : ''}
@@ -2879,7 +2906,7 @@ function renderDrawer(){
           ${ph[n] ? thumb(ph[n]) : ''}<div class="row-g">${upl(n, ph[n] ? 'Переснять' : 'Сфотографировать')}${ph[n] && ed ? `<button class="btn sm ghost" data-act="placePhotoDel" data-id="${jid}|${pid}|${esc(n)}" aria-label="Удалить фото">✕</button>` : ''}</div></li>`).join('')}</ul></div>` : ''}
       <div class="box"><h4>Дополнительные фото${(ph._extra || []).length ? ' · ' + ph._extra.length : ''}</h4>
         ${(ph._extra || []).length ? `<div class="thumbs">${ph._extra.map(f => `<span class="tw">${thumb(f)}${ed ? `<button class="btn sm ghost" data-act="placePhotoDel" data-id="${jid}|${pid}|_extra|${f.id}" aria-label="Удалить фото">✕</button>` : ''}</span>`).join('')}</div>` : ''}
-        <div class="row-g">${upl('', '+ Добавить фото', true)}</div></div>
+        <div class="row-g">${upl('', 'Сфотографировать', true)}</div></div>
       <label class="nwchk ${nw ? 'on' : ''}"><input type="checkbox" id="w-nw" ${nw ? 'checked' : ''} ${ed ? '' : 'disabled'}> <b>Не работает</b></label>
       ${nw ? `<div class="box"><h4>Комментарий (необязательно)</h4><span data-keep style="display:contents"><textarea class="in" id="w-comment" rows="3" ${ed ? '' : 'disabled'}>${esc(ui.wComment ?? pl.comment ?? '')}</textarea></span></div>` : ''}
       <div class="err" id="ferr"></div>
@@ -2892,7 +2919,7 @@ function renderDrawer(){
     if (!pl) return closeDrawer();
     const can = canReport(j, pl), ph = pl.photos || {}, r = placeDone(j, pl), mo = pl.dtNo ? Math.max(1, String(pl.dtNo).split('/').filter(Boolean).length) : 1;
     const thumb = f => `<a href="/files/${f.id}" target="_blank" rel="noopener" class="thumb"><img src="/files/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`;
-    const upl = (slot, label, multi) => can ? `<label class="btn sm ${multi ? '' : 'primary'}">${label}<input type="file" accept="image/*" capture="environment" data-up="placePhoto" data-id="${jid}|${pid}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label>` : '';
+    const upl = (slot, label, multi) => can ? photoBtns(jid + '|' + pid, slot, label, multi) : '';
     D.innerHTML = dh(esc(pl.label || 'Точка')) + `<div class="d-body">
       <div class="row-g"><button class="btn sm ghost" data-act="openJob" data-id="${jid}">← ${esc(j.title)}</button></div>
       ${mo > 1 ? `<div class="modems">Замена ${mo} модемов</div>` : ''}
@@ -2905,7 +2932,7 @@ function renderDrawer(){
           ${ph[n] ? thumb(ph[n]) : ''}<div class="row-g">${upl(n, ph[n] ? 'Переснять' : 'Сфотографировать')}${ph[n] && can ? `<button class="btn sm ghost" data-act="placePhotoDel" data-id="${jid}|${pid}|${esc(n)}" aria-label="Удалить фото">✕</button>` : ''}</div></li>`).join('')}</ul></div>` : ''}
       <div class="box"><h4>Дополнительные фото${(ph._extra || []).length ? ' · ' + ph._extra.length : ''}</h4>
         ${(ph._extra || []).length ? `<div class="thumbs">${ph._extra.map(f => `<span class="tw">${thumb(f)}${can ? `<button class="btn sm ghost" data-act="placePhotoDel" data-id="${jid}|${pid}|_extra|${f.id}" aria-label="Удалить фото">✕</button>` : ''}</span>`).join('')}</div>` : '<p class="dim" style="margin:0">Нет.</p>'}
-        <div class="row-g">${upl('', '+ Добавить фото', true)}</div></div>
+        <div class="row-g">${upl('', 'Сфотографировать', true)}</div></div>
       <div class="box"><h4>Комментарий (по желанию)</h4>
         ${can ? `<span data-keep style="display:contents"><textarea class="in" id="pl-comment" rows="3">${esc(pl.comment || '')}</textarea></span><div class="row-g"><button class="btn sm primary" data-act="placeComment" data-id="${jid}|${pid}">Сохранить комментарий</button></div>` : `<p class="jdesc" style="margin:0">${esc(pl.comment || '—')}</p>`}</div>
       <div class="err" id="ferr"></div>
@@ -3557,9 +3584,10 @@ async function act(el){
       try { await api('PATCH', `/api/jobs/${id}`, { places }); await refresh(); renderDrawer(); toast(`Точки назначены: ${who(to)}`); } catch(e) { toast(errText(e)); }
       return;
     }
+    case 'wList': ui.wListOpen = !ui.wListOpen; return renderW();
     case 'wJob': ui.wJob = id || null; wFitted = false; return renderW();
     case 'wDo': ui.wNotWorking = null; ui.wComment = null; wMap?.closePopup(); return openDrawer('wdo', id);
-    case 'wFly': { const [jid, pid] = id.split('|'), pl = (jobOf(jid)?.places || []).find(x => x.id === pid); if (pl && wMap) { wMap.setView([pl.lat, pl.lng], Math.max(wMap.getZoom(), 16)); setTimeout(() => { wLayer.eachLayer(m => { const ll = m.getLatLng(); if (Math.abs(ll.lat - pl.lat) < 1e-7 && Math.abs(ll.lng - pl.lng) < 1e-7) m.openPopup(); }); }, 60); } return; }
+    case 'wFly': { if (ui.wListOpen) { ui.wListOpen = false; renderW(); } const [jid, pid] = id.split('|'), pl = (jobOf(jid)?.places || []).find(x => x.id === pid); if (pl && wMap) { wMap.setView([pl.lat, pl.lng], Math.max(wMap.getZoom(), 16)); setTimeout(() => { wLayer.eachLayer(m => { const ll = m.getLatLng(); if (Math.abs(ll.lat - pl.lat) < 1e-7 && Math.abs(ll.lng - pl.lng) < 1e-7) m.openPopup(); }); }, 60); } return; }
     case 'wClose': {
       const [jid, pid] = id.split('|'), j = jobOf(jid), pl = j && (j.places || []).find(x => x.id === pid); if (!pl) return;
       const nw = $('w-nw').checked, comment = $('w-comment') ? $('w-comment').value : (nw ? '' : pl.comment || '');
@@ -3918,7 +3946,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (['users', 'notes'].includes(h) && me?.role === 'admin') ? h : 'works';
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) ? h : 'works';
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -3962,9 +3990,9 @@ async function start(u){
   $('uname').textContent = u.name; $('uname2').textContent = u.name; $('urole').textContent = u.roleName + ' · ' + u.login;
   $('uav').textContent = (u.name || u.login).split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0]).join('').toUpperCase();
   $('ubtn').title = u.name + ' — ' + u.roleName;
-  document.body.classList.toggle('no-edit', !canEdit());
+  document.body.classList.toggle('no-edit', !canEdit()); document.body.classList.toggle('field', isWorker());
   document.body.classList.toggle('can-invoice', canAddInvoice());
-  $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = u.role !== 'admin' || !!u.sys;
+  $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = !isHead() || !!u.sys;
   $('orgsTab').hidden = !u.sys; ui.orgsList = null;
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
   $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
@@ -3972,7 +4000,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (['users', 'notes'].includes(v) && u.role !== 'admin'); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;

@@ -58,6 +58,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY !== '0';
 const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties', 'points', 'stock', 'jobs'];
 const ROLES = {
   admin:      'Администратор',
+  head:       'Руководитель',
   accountant: 'Бухгалтер',
   worker:     'Сотрудник',
   contractor: 'Подрядчик',
@@ -67,7 +68,9 @@ const FIELD = u => u && (u.role === 'worker' || u.role === 'contractor');
 const contractorExpired = u => u && u.role === 'contractor' && u.accessUntil && localDateNow() > u.accessUntil;
 function localDateNow() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 const PAY_FIELDS = ['status', 'paidAt', 'payNo', 'paidAmount', 'paidBy', 'receipt'];
-const canEdit = u => u.role === 'admin' || u.role === 'manager';
+// «Руководитель» works like the administrator but neither marks invoices paid nor manages users
+const HEAD = u => u && (u.role === 'admin' || u.role === 'head');
+const canEdit = u => HEAD(u);
 const canPay = u => u.role === 'admin' || u.role === 'accountant';
 /* «Сотрудник» загружает счета и правит/удаляет только свои неоплаченные */
 const canAddInvoice = u => canEdit(u);
@@ -89,7 +92,7 @@ function cleanJob(d){
   if ('due' in d) out.due = /^\d{4}-\d{2}-\d{2}$/.test(d.due || '') ? d.due : '';
   if ('start' in d) out.start = /^\d{4}-\d{2}-\d{2}$/.test(d.start || '') ? d.start : '';
   if ('orderId' in d) out.orderId = d.orderId && db.orders[d.orderId] ? d.orderId : null;
-  if ('leaderId' in d) { const l = orgUsers().find(u => u.id === d.leaderId); out.leaderId = l && l.role === 'admin' ? l.id : null; }
+  if ('leaderId' in d) { const l = orgUsers().find(u => u.id === d.leaderId); out.leaderId = l && HEAD(l) ? l.id : null; }
   // a work: «Производство», «Монтаж» or both; the customer; documents
   if ('kind' in d) out.kind = ['prod', 'mount', 'both'].includes(d.kind) ? d.kind : 'mount';
   if ('customerId' in d) out.customerId = d.customerId && db.counterparties[d.customerId] ? d.customerId : null;
@@ -467,12 +470,12 @@ async function api(req, res, url) {
     const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = FIELD(user) ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
-    if (user.role === 'admin') out.notes = (db.notes || []).filter(n => n.by === user.id);
+    if (HEAD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id);
     return send(res, 200, out);
   }
   /* «Заметки»: a personal to-do list — each administrator sees and changes only his own notes */
   if (p[1] === 'notes') {
-    if (user.role !== 'admin') return fail(res, 403, 'Заметки доступны только администраторам');
+    if (!HEAD(user)) return fail(res, 403, 'Заметки доступны администраторам и руководителям');
     if (!Array.isArray(db.notes)) db.notes = [];
     const N = db.notes;
     if (m === 'GET' && !p[2]) return send(res, 200, N.filter(n => n.by === user.id));
@@ -655,7 +658,7 @@ async function api(req, res, url) {
   }
 
   if (p[1] === 'invoices-zip' && m === 'GET') {
-    if (!canPay(user)) return fail(res, 403, 'Скачивать архив счетов может бухгалтер или администратор');
+    if (!canPay(user) && !canEdit(user)) return fail(res, 403, 'Скачивать архив счетов может бухгалтер, руководитель или администратор');
     return sendInvoicesZip(res, user, url.searchParams.get('order') || '');
   }
 
@@ -831,7 +834,7 @@ async function api(req, res, url) {
     if (m === 'DELETE' && p.length === 5) {
       const c = o.comments.find(x => x.id === p[4]);
       if (!c) return fail(res, 404, 'Комментарий не найден');
-      if (c.by !== user.id && user.role !== 'admin') return fail(res, 403, 'Удалить можно только свой комментарий');
+      if (c.by !== user.id && !HEAD(user)) return fail(res, 403, 'Удалить можно только свой комментарий');
       o.comments = o.comments.filter(x => x.id !== c.id); saveDb();
       return send(res, 200, { ok: true });
     }
