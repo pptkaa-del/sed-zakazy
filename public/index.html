@@ -488,7 +488,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .wbar{display:block;height:5px;border-radius:3px;background:var(--mute-soft);overflow:hidden;margin-top:3px}.wbar i{display:block;height:100%;background:var(--ok)}
 #wmap{height:calc(100vh - 200px);min-height:420px;border-radius:12px;border:1px solid var(--rule);background:var(--mute-soft);z-index:0}
 .wlistbtn{display:none}
-@media (max-width:820px){
+@media (max-width:820px), (pointer:coarse) and (max-height:540px){
   .wgrid{display:block;position:relative}
   .wlistbtn{display:flex;width:100%;justify-content:space-between;align-items:center;margin:0 0 8px;min-height:48px;font-size:17px;font-weight:600}
   .wlistbtn .arr{transition:transform .15s}.wlistbtn[aria-expanded=true] .arr{transform:rotate(180deg)}
@@ -734,7 +734,7 @@ body.no-edit .comp input,body.no-edit .comp select{pointer-events:none}
 body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-events:none}
 
 /* ===== телефон: крупнее шрифт ===== */
-@media (max-width:640px){
+@media (max-width:640px), (pointer:coarse) and (max-height:540px){
   body{font-size:17.5px;line-height:1.5}
   .in,select.f,textarea,input[type=search].in{font-size:17px}
   .btn{font-size:17px;padding-block:10px}.btn.sm{font-size:16px;padding-block:9px}
@@ -799,7 +799,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     <div class="umenu" id="umenu">
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="upop" id="upop" role="menu" hidden>
-        <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
+        <div class="uinfo"><b id="uname2"></b><small id="urole"></small><small class="dim" id="uver"></small></div>
         <div class="tlabel">Тема оформления</div>
         <div class="themes" id="themes" role="group" aria-label="Тема оформления">
           <button type="button" data-act="theme" data-id="system"><span class="sw" style="background:linear-gradient(90deg,#fff 50%,#181E26 50%)"></span>Система</button>
@@ -2195,7 +2195,7 @@ function wPopup(j, pl){
 }
 /* two ways to add a photo: the camera, or a picture already on the phone (gallery, files) */
 const photoBtns = (id, slot, label, multi) => `<span class="upl2"><label class="btn sm ${multi ? '' : 'primary'}">📷 ${label}<input type="file" accept="image/*" capture="environment" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label><label class="btn sm">🖼 Загрузить фото<input type="file" accept="image/*" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label></span>`;
-function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if (matchMedia('(max-width:820px)').matches) { const top = m.getBoundingClientRect().top + scrollY; document.documentElement.style.setProperty('--wmap-h', Math.max(300, innerHeight - top - 8) + 'px'); } wMap && wMap.invalidateSize(); }
+function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if (matchMedia('(max-width:820px), (pointer:coarse) and (max-height:540px)').matches) { const top = m.getBoundingClientRect().top + scrollY; document.documentElement.style.setProperty('--wmap-h', Math.max(300, innerHeight - top - 8) + 'px'); } wMap && wMap.invalidateSize(); }
 addEventListener('resize', () => { if (!$('wView').hidden) wFitMap(); });
 function renderW(){
   const done = ui.view === 'wdone', all = wPoints(done);
@@ -3956,7 +3956,9 @@ function route(){
 window.addEventListener('hashchange', route);
 
 /* ---------- boot ---------- */
-let poll = null, setupMode = false, appVersion = null;
+let poll = null, setupMode = false, appVersion = /^[0-9a-f]{12}$/.test('__APP_VERSION__') ? '__APP_VERSION__' : null;
+// a new version on the server: reload by itself when nothing is being edited, otherwise offer the button
+const safeToReload = () => !ui.drawer && !document.activeElement?.matches('input,textarea,select') && !document.querySelector('#note-new')?.value;
 async function loadOrgs(){
   try { [ui.orgsList, ui.backups] = await Promise.all([api('GET', '/api/orgs'), api('GET', '/api/backups')]); } catch(e) { toast(errText(e)); ui.orgsList = ui.orgsList || []; ui.backups = ui.backups || []; }
   if (ui.view === 'orgs') render();
@@ -3986,7 +3988,7 @@ function showLogin(){
   setTimeout(() => (setupMode ? $('l-name') : $('l-login')).focus(), 30);
 }
 async function start(u){
-  me = u;
+  me = u; if ($('uver')) $('uver').textContent = appVersion ? 'Версия ' + appVersion.slice(0, 7) : '';
   $('uname').textContent = u.name; $('uname2').textContent = u.name; $('urole').textContent = u.roleName + ' · ' + u.login;
   $('uav').textContent = (u.name || u.login).split(/\s+/).filter(Boolean).slice(0,2).map(w => w[0]).join('').toUpperCase();
   $('ubtn').title = u.name + ' — ' + u.roleName;
@@ -4013,7 +4015,7 @@ async function start(u){
     try {
       const r = await api('GET', '/api/rev');
       $('banner').hidden = true;
-      if (r.version) { if (!appVersion) appVersion = r.version; else if (r.version !== appVersion) $('updbar').hidden = false; }
+      if (r.version) { if (!appVersion) appVersion = r.version; else if (r.version !== appVersion) { if (safeToReload()) return location.reload(); $('updbar').hidden = false; } }
       if (me.sys) { if (ui.view === 'server') loadStats(); }
       else if (r.rev !== rev) await refresh();
     } catch(e) { $('banner').hidden = false; $('banner').textContent = 'Нет связи с сервером. Изменения не сохраняются, пока связь не восстановится.'; }

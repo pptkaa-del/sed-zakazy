@@ -1506,10 +1506,12 @@ function serveStatic(req, res, pathname) {
   if (!fp.startsWith(PUBLIC_DIR + path.sep)) return fail(res, 404, 'Не найдено');
   fs.readFile(fp, (err, buf) => {
     if (err) return fail(res, 404, 'Не найдено');
+    // the page carries the version it was served with, so an old page left open on a phone knows to reload itself
+    if (rel === '/index.html') buf = Buffer.from(buf.toString('utf8').split('__APP_VERSION__').join(APP_VERSION));
     res.writeHead(200, {
       ...SEC_HEADERS,
       'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': rel === '/index.html' ? 'no-store' : 'no-cache',
     });
     res.end(buf);
   });
