@@ -493,6 +493,17 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .phlist{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:3px}
 .phedit{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.phedit li{display:flex;gap:6px;align-items:center}.phedit .in{flex:1;min-width:0;padding:6px 8px}
 .warnbox{border-color:var(--warn);background:var(--warn-soft)}
+.wrk{display:grid;grid-template-columns:150px minmax(0,1fr) 100px 120px minmax(0,170px) 110px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2);cursor:pointer}
+.wrk:first-child{border-top:0}.wrk:hover{background:var(--paper)}.wrk-t b{font-weight:600;display:block}.wrk-t small,.wrk small{display:block;color:var(--ink-2);font-size:12px}.wrk small.lbl{display:none}
+@media (max-width:900px){.wrk{grid-template-columns:1fr auto}.wrk>:nth-child(2){grid-column:1/-1;grid-row:1}.wrk small.lbl{display:inline;margin-right:4px}.wrk-p{grid-column:1/-1}}
+.kindseg{display:flex;flex-wrap:wrap}.kindseg label{display:flex;gap:6px;align-items:center;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:14px}.kindseg label.on{background:var(--sheet);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}.kindseg input{margin:0}
+table.pers{border-collapse:collapse;font-size:14px}table.pers td{padding:3px 14px 3px 0}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.stat{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.stat>small{color:var(--ink-2);font-size:12px}.stat>b{font-size:24px;font-weight:600;font-family:var(--f-mono)}
+.meter{display:block;height:8px;border-radius:4px;background:var(--mute-soft);overflow:hidden}.meter i{display:block;height:100%}.meter.ok i{background:var(--ok)}.meter.warn i{background:var(--warn)}.meter.bad i{background:var(--bad)}
+.spark{color:var(--stamp);display:block}
+.admedit{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}.admedit label{display:flex;flex-direction:column;font-size:13px;color:var(--ink-2)}
 .slots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .slots li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:8px 10px;border:1px dashed var(--rule);border-radius:10px}
 .slots li.ok{border-style:solid;border-color:var(--ok);background:color-mix(in srgb,var(--ok-soft) 60%,transparent)}
@@ -754,6 +765,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#dt" data-v="dt">Редактор карты</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
+      <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
     </nav>
     <div class="umenu" id="umenu">
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -831,24 +843,22 @@ const MAX_MB = 50;
 const ORDER_ST = { new:'Планируется', work:'В работе', closed:'Закрыт' };
 const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', contractor:'Подрядчик' };
 const KIND = { buy:'Закупка', work:'Работа' };
-const ROLE_NAMES = { admin:'Администратор', manager:'Менеджер', accountant:'Бухгалтер', user:'Руководитель', worker:'Работник', viewer:'Просмотр' };
+const ROLE_NAMES = { admin:'Администратор', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
 const ROLE_INFO = {
-  admin:'Всё, включая управление пользователями.',
-  manager:'Заказы, контрагенты и договоры, документы, строки для закупки, счета, план-график. Оплату не отмечает.',
+  admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, редактор карты, назначение точек, пользователи.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
-  user:'Видит всё, загружает счета в заказы, правит и удаляет свои неоплаченные счета, отмечает приход и расход на складе, назначает задачи работникам.',
-  worker:'Видит только назначенные ему задачи: что сделать, места на карте, руководителя. Отмечает «В работе» и «Выполнено».',
-  viewer:'Только просмотр.'
+  worker:'Видит только назначенные ему точки: «В работе» и «Выполненные», фото и отметки по каждой точке.',
+  contractor:'То же, что сотрудник, но доступ к системе ограничен датой — после неё вход закрывается.'
 };
 
 const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[], stock:[], jobs:[] };
 let STAFF = [];
 let META = {};
 let me = null, rev = -1, mode = 'loading';
-const canEdit = () => me && (me.role === 'admin' || me.role === 'manager');
+const canEdit = () => me && me.role === 'admin';
 const canPay = () => me && (me.role === 'admin' || me.role === 'accountant');
-const canAddInvoice = () => canEdit() || (me && me.role === 'user');
-const ownInv = i => me && me.role === 'user' && i.createdBy === me.id && i.status !== 'paid';
+const canAddInvoice = () => canEdit();
+const ownInv = i => false;
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
@@ -956,7 +966,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorks() : ui.view === 'stock' ? vStock() : ui.view === 'jobs' ? vJobs() : ui.view === 'orgs' ? vOrgs() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : vOrders();
   if (changed) animateView(V);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
@@ -1234,7 +1244,7 @@ function acctMatch(row){
 }
 
 /* ===== Warehouse ===== */
-const canMoveStock = () => me && (canEdit() || me.role === 'user');
+const canMoveStock = () => canEdit();
 const isLow = it => (Number(it.minQty) || 0) > 0 && (Number(it.qty) || 0) <= Number(it.minQty);
 function vStock(){
   const q = ui.sq.trim().toLowerCase();
@@ -1343,7 +1353,7 @@ function orderItem(x, q){
 function commentsCard(col, doc){
   const cm = Array.isArray(doc.comments) ? doc.comments : [];
   const key = col + ':' + doc.id;
-  const canComment = me && me.role !== 'viewer';
+  const canComment = me && !isWorker();
   return `<section class="card">
     <div class="ch"><h3>Комментарии <span class="dim">${cm.length||''}</span></h3></div>
     ${cm.length ? `<div class="comments">${cm.map(c => `<div class="cmt"><span class="avatar">${esc(initials(who(c.by)))}</span><div class="body"><div class="meta"><b style="color:var(--ink)">${esc(who(c.by))}</b><span>${esc(fmtDT(c.at))}</span>${me && (c.by === me.id || me.role === 'admin') ? armBtn('c:'+c.id,'✕','delComment',col+'|'+doc.id+'|'+c.id,'icon') : ''}</div><p>${esc(c.text)}</p></div></div>`).join('')}</div>` : '<p class="dim" style="margin:0">Комментариев пока нет.</p>'}
@@ -1555,16 +1565,41 @@ function cpDetail(c){
 }
 
 /* ===== Задачи сотрудникам ===== */
-const isWorker = () => me && me.role === 'worker';
-const canLead = () => me && (canEdit() || me.role === 'user');
-const JOB_ST = { new:'Назначена', work:'В работе', done:'Выполнена' };
+const WORK_KIND = { prod:'Производство', mount:'Монтаж', both:'Производство и монтаж' };
+const WORK_CHIP = { prod:'c-mute', mount:'c-info', both:'c-work' };
+const isMount = j => (j.kind || 'mount') !== 'prod';
+function vWorkList(){
+  const q = (ui.wlq || '').trim().toLowerCase(), K = ui.wlKind || 'all', St = ui.wlSt || 'active';
+  const hay = j => [j.title, cpOf(j.customerId)?.name, j.description, '№' + j.no].join(' ').toLowerCase();
+  const base = S.jobs.filter(j => St === 'all' || (St === 'done' ? j.status === 'done' : j.status !== 'done'));
+  const L = base.filter(j => (K === 'all' || (j.kind || 'mount') === K) && (!q || hay(j).includes(q)))
+    .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9999').localeCompare(b.due || '9999') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const head = `<div class="toolbar">
+    <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
+    <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
+    <div class="seg">${[['active', 'Текущие'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
+  if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Редактор карты».' : 'Работы создаёт администратор.'}</div>`;
+  if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
+  return head + `<section class="card" style="padding:0;overflow:hidden">${L.map(j => { const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), ppl = [...new Set(P.map(x => x.assignee).filter(Boolean))];
+    return `<div class="wrk click" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">
+      <div><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span></div>
+      <div class="wrk-t"><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}${(j.docs || []).length ? ` · документов: ${j.docs.length}` : ''}</small></div>
+      <div class="${overdue(j) ? 'bad-t' : ''}"><small class="lbl">Срок</small>${j.due ? fmtD(j.due) : '<span class="dim">—</span>'}</div>
+      <div>${isMount(j) ? (P.length ? `<small class="lbl">Точки</small>${c} / ${P.length}<span class="wbar"><i style="width:${Math.round(c / P.length * 100)}%"></i></span>` : '<span class="dim">точек нет</span>') : ''}</div>
+      <div class="wrk-p">${ppl.slice(0, 3).map(id => `<span class="wchip">${esc(who(id))}</span>`).join(' ')}${ppl.length > 3 ? ` <span class="dim">+${ppl.length - 3}</span>` : ''}</div>
+      <div><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span></div></div>`; }).join('')}</section>`;
+}
+const isWorker = () => me && (me.role === 'worker' || me.role === 'contractor');   // «Сотрудник» и «Подрядчик»
+const canLead = () => canEdit();
+const JOB_ST = { new:'Новая', work:'В работе', done:'Выполнена' };
 const JOB_CHIP = { new:'c-info', work:'c-warn', done:'c-ok' };
 const jobOf = id => S.jobs.find(j => j.id === id);
-const mayEditJob = j => me && (canEdit() || (me.role === 'user' && (j.createdBy === me.id || j.leaderId === me.id)));
+const mayEditJob = j => canEdit();
 const onJob = j => me && (j.leaderId === me.id || (j.workers || []).includes(me.id));
 const jobNo = j => j.no || '—';
-const leaders = () => STAFF.filter(u => ['admin', 'manager', 'user'].includes(u.role));
-const workersList = () => STAFF.filter(u => u.role === 'worker');
+const leaders = () => STAFF.filter(u => u.role === 'admin');
+const workersList = () => STAFF.filter(u => u.role === 'worker' || u.role === 'contractor');
 const overdue = j => j.status !== 'done' && j.due && j.due < today();
 const routeUrl = pl => `https://yandex.ru/maps/?rtext=~${pl.lat},${pl.lng}&rtt=auto`;
 function vJobs(){
@@ -1768,7 +1803,10 @@ const dtAssignees = () => [...new Set(DT.points.map(p => p.assignee).filter(Bool
 const dtPersonColor = id => { const L = dtAssignees(), k = L.indexOf(id); return k < 0 ? '#9AA3AD' : DT_PAL[k % DT_PAL.length]; };
 const dtJust = new Set();   // answered in this visit: they stay on the «только проверить» map
 const dtAsgOk = p => { const f = ui.dtAsg || 'all'; return f === 'all' || (f === 'none' ? !p.assignee : f === 'any' ? !!p.assignee : p.assignee === f); };
-const dtMatch = p => dtGroups(p).some(c => DT_SHOW[c]) && (!ui.dtOnlyCheck || (p.cats || []).includes('check') || dtJust.has(p.no)) && dtAsgOk(p) && (!ui.dtOnlySel || dtSel.has(p.no)) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
+// «Работа»: only the points written into the chosen montage work
+let dtJobSetCache = null;
+const dtJobSet = () => { const j = ui.dtJob && jobOf(ui.dtJob); if (!j) return null; if (dtJobSetCache?.id === j.id && dtJobSetCache.n === (j.places || []).length) return dtJobSetCache.set; dtJobSetCache = { id: j.id, n: (j.places || []).length, set: new Set((j.places || []).map(x => x.dtNo).filter(Boolean)) }; return dtJobSetCache.set; };
+const dtMatch = p => (!ui.dtJob || (dtJobSet() || new Set()).has(p.no)) && dtGroups(p).some(c => DT_SHOW[c]) && (!ui.dtOnlyCheck || (p.cats || []).includes('check') || dtJust.has(p.no)) && dtAsgOk(p) && (!ui.dtOnlySel || dtSel.has(p.no)) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
 let dtFitted = false;
 function ensureDtMap(){
   if (dtMap || typeof L === 'undefined') return;
@@ -1801,7 +1839,7 @@ function ensureDtMap(){
   box.addEventListener('pointerup', finish, true); box.addEventListener('pointercancel', finish, true);
   dtMap.on('click', e => { if (!ui.dtAdding) return; ui.dtAdding = false; renderDt(); openDrawer('dtAdd', null, { lat: e.latlng.lat, lng: e.latlng.lng }); });
 }
-const canCheckDt = () => me && (canEdit() || me.role === 'user');
+const canCheckDt = () => canEdit();
 // «8357/8393»: two objects at one place — two modems to replace
 const dtModems = p => Math.max(1, String(p.no || '').split('/').filter(x => x.trim()).length);
 const modemsGen = n => n % 10 === 1 && n % 100 !== 11 ? 'модема' : 'модемов';   // «замена 2 модемов»
@@ -1844,7 +1882,8 @@ function dtPopup(p, i){
 }
 function renderDt(){
   const P = DT.points, M = DT.meta || {}, ed = canEdit();
-  const cnt = k => k === 'all' ? P.length : k === 'road' ? P.filter(p => dtCatOf(p) === 'road').length : P.filter(p => (p.cats || []).includes(k)).length;
+  const PB = ui.dtJob ? P.filter(p => (dtJobSet() || new Set()).has(p.no)) : P;   // counts follow the chosen work
+  const cnt = k => k === 'all' ? PB.length : k === 'road' ? PB.filter(p => dtCatOf(p) === 'road').length : PB.filter(p => (p.cats || []).includes(k)).length;
   const flagged = P.filter(dtFlagged).length;
   $('dtInfo').innerHTML = !DT.loaded ? 'Загружаем…' : P.length
     ? `<span>Точек: <b>${P.length}</b>, модемов к замене: <b>${P.reduce((a, p) => a + dtModems(p), 0)}</b> (в ${P.filter(p => dtModems(p) > 1).length} точках по 2 и больше)${M.file ? ` · файл «${esc(M.file)}»` : ''}${M.at ? `, загружено ${esc(fmtDT(M.at))}` : ''}${M.by ? ' · ' + esc(who(M.by)) : ''}.</span>
@@ -1853,10 +1892,11 @@ function renderDt(){
   const R = ui.dtR || M.radius || { road:35, bridge:20 };
   $('dtTools').innerHTML = `
     <span data-keep style="display:contents"><input class="in" id="dtq" type="search" aria-label="Поиск по номеру объекта" value="${esc(ui.dtQ || '')}" style="flex:0 1 200px;min-width:0"></span>
+    ${(() => { const MJ = S.jobs.filter(isMount); if (ui.dtJob && !MJ.some(j => j.id === ui.dtJob)) ui.dtJob = null; return `<select class="f dtjob" id="dtJob" aria-label="Показать точки работы"><option value="">Все точки</option>${MJ.map(j => `<option value="${j.id}" ${ui.dtJob === j.id ? 'selected' : ''}>Работа № ${jobNo(j)} · ${esc(j.title)} — ${(j.places || []).length} т.${j.status === 'done' ? ' (выполнена)' : ''}</option>`).join('')}</select>`; })()}
     <div class="dtshow" role="group" aria-label="Что показывать на карте">${['road', 'mkad', 'ttk', 'bridge', ...(cnt('other') ? ['other'] : [])].map(k => `<label class="dtt ${DT_SHOW[k] ? 'on' : ''}" style="--c:${DT_COLOR[k]}"><input type="checkbox" data-dtshow="${k}" ${DT_SHOW[k] ? 'checked' : ''}><i></i>${DT_CAT[k]} <b>${cnt(k)}</b></label>`).join('')}
       ${cnt('check') ? `<label class="dtt chk ${ui.dtOnlyCheck ? 'on' : ''}" style="--c:${DT_COLOR.check}"><input type="checkbox" data-dtshow="check" ${ui.dtOnlyCheck ? 'checked' : ''}><i></i>Только «проверить» <b>${cnt('check')}</b></label>` : ''}</div>
     ${P.length ? '<button class="btn" data-act="dtExport">Скачать Excel</button>' : ''}
-    ${P.length && canLead() ? '<button class="btn primary" data-act="dtSave">Сохранить точки в БД</button>' : ''}
+    ${P.length && canLead() ? '<button class="btn primary" data-act="dtSave">Добавить точки к работе</button>' : ''}
     ${canCheckDt() ? `<button class="btn ${ui.dtAdding ? 'primary' : ''}" data-act="dtAdd">${ui.dtAdding ? 'Отменить добавление' : '+ Точка'}</button><button class="btn" data-act="dtAddCoords">+ По координатам</button>` : ''}
     ${ui.dtAdding ? '<span class="maphint" style="color:var(--stamp);font-weight:500">Нажмите на карту там, где стоит объект</span>' : ''}
     ${ed ? `<label class="btn primary">Вставить размеченный файл<input type="file" data-up="dtmarked" accept=".xlsx,.xls,.csv" hidden></label>
@@ -1909,6 +1949,7 @@ function renderDt(){
     if (show && (c !== 'road' || dtSel.has(p.no))) m.bringToFront();
   });
   [...dtMarks.keys()].forEach(k => { if (!seen.has(k)) { dtLayer.removeLayer(dtMarks.get(k)); dtMarks.delete(k); } });
+  if (ui.dtJobFit) { ui.dtJobFit = false; const V = P.filter(dtMatch); if (V.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(V.map(p => [p.lat, p.lng])).pad(0.1), { maxZoom: 16 }); } }
   if (!dtFitted && P.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(P.map(p => [p.lat, p.lng])).pad(0.05)); }
   const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => (dtSel.has(b.no) - dtSel.has(a.no)) || (dtFlagged(b) ? 2 : (b.cats || []).length ? 1 : 0) - (dtFlagged(a) ? 2 : (a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
   $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem ${dtSel.has(p.no) ? 'sel' : ''}" data-act="dtFly" data-id="${i}" aria-pressed="${dtSel.has(p.no)}"><span class="dot" style="background:${ui.dtColor === 'person' ? dtPersonColor(p.assignee) : DT_COLOR[dtCatOf(p)]}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${dtSel.has(p.no) ? '☑ ' : ''}${esc(p.no)}${dtModems(p) > 1 ? ` <span class="mchip">${dtModems(p)} ${modemWord(dtModems(p))}</span>` : ''}</b><small>${esc([...dtGroups(p).map(c => dtGroupLabel(c, p)), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · '))}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}${p.assignee ? ` · <span style="color:${dtPersonColor(p.assignee)};font-weight:600">${esc(who(p.assignee))}</span>` : ''}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
@@ -2086,7 +2127,7 @@ function wPopup(j, pl){
   const mo = pl.dtNo ? Math.max(1, String(pl.dtNo).split('/').filter(Boolean).length) : 1, r = placeDone(j, pl), done = !!pl.doneAt, ed = wEditable(pl);
   return `<div class="pp"><h4>${esc(pl.label || 'Точка')}</h4>
     ${mo > 1 ? `<div class="modems">Замена ${mo} модемов</div>` : ''}
-    <small>Задача: <b>${esc(j.title)}</b>${j.due ? ' · срок ' + fmtD(j.due) : ''}</small>
+    <small>Работа: <b>${esc(j.title)}</b>${j.due ? ' · срок ' + fmtD(j.due) : ''}</small>
     ${j.description ? `<small class="dim">${esc(j.description.slice(0, 160))}</small>` : ''}
     ${(j.photoSpec || []).length ? `<small>Фото: ${r.got} из ${r.need}</small>` : ''}
     ${done ? `<small class="ok-t">✓ Закрыта ${esc(fmtDT(pl.doneAt))}${pl.notWorking ? ' · <span class="bad-t">не работает</span>' : ''}</small>${ed ? `<small class="dim">Изменить можно до ${esc(wUntil(pl))}</small>` : '<small class="dim">Срок изменения прошёл</small>'}` : ''}
@@ -2101,8 +2142,8 @@ function renderW(){
   if (ui.wJob && !jobs.some(j => j.id === ui.wJob)) ui.wJob = null;
   const shown = all.filter(x => !ui.wJob || x.j.id === ui.wJob);
   const cnt = j => (j.places || []).filter(x => !!x.doneAt === done).length;
-  $('wlist').innerHTML = `<h3>${done ? 'Выполненные точки' : 'Задачи в работе'}</h3>
-    ${jobs.length ? `<button class="witem ${!ui.wJob ? 'on' : ''}" data-act="wJob" data-id=""><b>Все задачи</b><small>${all.length} ${done ? 'закрыто' : 'точек осталось'}</small></button>
+  $('wlist').innerHTML = `<h3>${done ? 'Выполненные точки' : 'Работы'}</h3>
+    ${jobs.length ? `<button class="witem ${!ui.wJob ? 'on' : ''}" data-act="wJob" data-id=""><b>Все работы</b><small>${all.length} ${done ? 'закрыто' : 'точек осталось'}</small></button>
     ${jobs.map(j => { const n = cnt(j), tot = (j.places || []).length; return `<button class="witem ${ui.wJob === j.id ? 'on' : ''} ${overdue(j) && !done ? 'late' : ''}" data-act="wJob" data-id="${j.id}">
       <b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${done ? `закрыто ${n} из ${tot}` : `осталось ${n} из ${tot}`}${j.due ? ` · срок ${fmtD(j.due)}${overdue(j) && !done ? ' — просрочено' : ''}` : ''}</small>
       ${tot ? `<span class="wbar"><i style="width:${Math.round(((j.places || []).filter(x => x.doneAt).length / tot) * 100)}%"></i></span>` : ''}</button>`; }).join('')}`
@@ -2122,7 +2163,7 @@ function renderW(){
 }
 
 /* ===== Map of objects ===== */
-const canWork = () => me && me.role !== 'viewer';
+const canWork = () => me && !isWorker();
 const mayEditPoint = pt => me && (canEdit() || pt.createdBy === me.id);
 const ptOf = id => S.points.find(p => p.id === id);
 let map = null, markers = new Map(), ghost = null, fitted = false;
@@ -2314,6 +2355,45 @@ function vPay(){
   }).join('');
 }
 
+/* ===== Сервер: нагрузка и память (администратор системы) ===== */
+let statsBusy = false;
+async function loadStats(){
+  if (statsBusy) return; statsBusy = true;
+  try { ui.stats = await api('GET', '/api/stats'); ui.statsHist = [...(ui.statsHist || []), { t: Date.now(), rss: ui.stats.memory.rss, cpu: ui.stats.cpu.process, rpm: ui.stats.requests.perMin }].slice(-60); } catch(e) { ui.statsErr = errText(e); }
+  statsBusy = false;
+  if (ui.view === 'server') render();
+}
+const mb = n => n == null ? '—' : n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' ГБ' : (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' МБ';
+const dur = sec => { const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60); return (d ? d + ' д ' : '') + (d || h ? h + ' ч ' : '') + m + ' мин'; };
+function meter(label, used, total, extra){
+  const pct = total ? Math.min(100, Math.round(used / total * 100)) : 0, cls = pct >= 90 ? 'bad' : pct >= 75 ? 'warn' : 'ok';
+  return `<div class="stat"><small>${label}</small><b>${pct}%</b><span class="meter ${cls}"><i style="width:${pct}%"></i></span><small>${extra || `${mb(used)} из ${mb(total)}`}</small></div>`;
+}
+function spark(key, fmt){
+  const H = ui.statsHist || []; if (H.length < 2) return '';
+  const v = H.map(x => x[key]), mx = Math.max(...v, 1), w = 160, h = 34, pts = v.map((y, i) => `${Math.round(i / (v.length - 1) * w)},${Math.round(h - y / mx * (h - 2) - 1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-label="за последние минуты: от ${fmt(Math.min(...v))} до ${fmt(mx)}"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
+}
+function vServer(){
+  const S2 = ui.stats;
+  if (!S2) return `<div class="empty"><h3>${ui.statsErr ? esc(ui.statsErr) : 'Загружаем данные сервера…'}</h3></div>`;
+  const M = S2.memory, sysUsed = M.total - M.free, L = S2.cpu.load;
+  return `<div class="toolbar"><h3 style="margin:0">Сервер</h3><span class="dim">обновлено ${esc(fmtDT(S2.at))}, данные обновляются каждые 5 секунд · версия ${esc(S2.version)} · Node.js ${esc(S2.node)} · ${esc(S2.platform)}</span></div>
+    <div class="stats">
+      ${meter('Память сервера', sysUsed, M.total)}
+      <div class="stat"><small>Память приложения (RSS)</small><b>${mb(M.rss)}</b>${spark('rss', mb)}<small>куча ${mb(M.heapUsed)} из ${mb(M.heapTotal)}</small></div>
+      <div class="stat"><small>Процессор приложения</small><b>${S2.cpu.process}%</b>${spark('cpu', x => x + '%')}<small>нагрузка системы ${L.map(x => x.toFixed(2)).join(' / ')} (1/5/15 мин), ядер ${S2.cpu.cores}</small></div>
+      ${S2.disk ? meter('Диск', S2.disk.total - S2.disk.free, S2.disk.total, `свободно ${mb(S2.disk.free)} из ${mb(S2.disk.total)}`) : ''}
+      <div class="stat"><small>Данные организаций</small><b>${mb(S2.data.orgs)}</b><small>резервные копии: ${mb(S2.data.backups)}, файлов ${S2.data.backupFiles}</small></div>
+      <div class="stat"><small>Запросы</small><b>${S2.requests.perMin} / мин</b>${spark('rpm', x => x + '/мин')}<small>за 10 мин ${S2.requests.per10Min}, всего ${S2.requests.total}</small></div>
+      <div class="stat"><small>Пользователи</small><b>${S2.users.online} онлайн</b><small>всего ${S2.users.total}; онлайн — был запрос за 5 минут</small></div>
+      <div class="stat"><small>Работает</small><b>${dur(S2.uptime.process)}</b><small>сервер без перезагрузки ${dur(S2.uptime.system)}</small></div>
+    </div>
+    <section class="card" style="padding:0;overflow:auto;margin-top:16px"><table class="jt"><thead><tr><th>Организация</th><th>Польз.</th><th>Онлайн</th><th>Заказов</th><th>Работ</th><th>Точек в работах</th><th>Точек в редакторе</th><th>Файлов</th><th>Объём</th></tr></thead><tbody>
+      ${S2.orgs.map(o => `<tr><td><b style="font-weight:500">${esc(o.name)}</b>${o.state === 'blocked' ? ' <span class="chip c-bad">заблокирована</span>' : ''}<small class="mono dim">${esc(o.id)}</small></td><td>${o.users}</td><td>${o.online}</td><td>${o.orders}</td><td>${o.jobs}</td><td>${o.places}</td><td>${o.points}</td><td>${o.files}</td><td>${mb(o.dbBytes + o.filesBytes)}<small class="dim">файлы ${mb(o.filesBytes)}, база ${mb(o.dbBytes)}</small></td></tr>`).join('')}
+    </tbody></table></section>`;
+}
+
 /* ===== Организации (администратор системы) ===== */
 const orgOf = id => (ui.orgsList || []).find(o => o.id === id);
 const ORG_STATE = o => o.state === 'manual' ? ['c-bad', 'Заблокирована'] : o.state === 'expired' ? ['c-bad', 'Срок истёк'] : o.left !== null && o.left <= 7 ? ['c-warn', o.left === 0 ? 'Последний день' : `Осталось ${o.left} дн.`] : ['c-ok', 'Работает'];
@@ -2328,7 +2408,7 @@ function vOrgs(){
     return `<div class="orow ${o.state !== 'active' ? 'off' : ''}">
       <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
       <div><small class="lbl">Пользователей</small>${o.users}</div>
-      <div><small class="lbl">Администраторы</small>${o.admins.length ? o.admins.map(a => `${esc(a.name)} <span class="mono dim">${esc(a.login)}</span>${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}`).join('<br>') : '<span class="dim">нет</span>'}</div>
+      <div><small class="lbl">Администраторы</small>${!o.admins.some(a => !a.sys) ? '<span class="chip c-warn">нет администратора организации</span><br>' : ''}${o.admins.length ? o.admins.map(a => `${esc(a.name)} <span class="mono dim">${esc(a.login)}</span>${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}`).join('<br>') : '<span class="dim">нет</span>'}</div>
       <div><span class="chip ${cc}">${cl}</span><small>${o.until ? 'до ' + fmtD(o.until) + ' включительно' : 'без срока'}</small></div>
       <div class="acts"><button class="btn sm" data-act="orgEdit" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="mkBackup" data-id="${o.id}" title="Резервная копия этой организации">Копия</button>
         ${mine ? '' : o.blocked ? `<button class="btn sm ok" data-act="orgBlock" data-id="${o.id}|0">Разблокировать</button>` : armBtn('org:' + o.id, 'Заблокировать', 'orgBlock', o.id + '|1')}</div></div>`;
@@ -2363,8 +2443,8 @@ function vUsers(){
     const self = u.id === me.id;
     return `<div class="urow ${u.blocked?'blocked':''}">
       <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}${u.sys ? ' · администратор системы' : ''}</small></div>
-      <div><span class="chip ${u.role==='admin'?'c-work':u.role==='accountant'?'c-ok':u.role==='viewer'?'c-mute':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
-      <div>${u.blocked ? '<span class="chip c-bad">Заблокирован</span>' : '<span class="chip c-ok">Активен</span>'}</div>
+      <div><span class="chip ${u.role==='admin'?'c-work':u.role==='accountant'?'c-ok':u.role==='contractor'?'c-warn':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
+      <div>${u.blocked ? '<span class="chip c-bad">Заблокирован</span>' : u.expired ? '<span class="chip c-bad">Доступ истёк</span>' : '<span class="chip c-ok">Активен</span>'}${u.accessUntil ? `<small>доступ до ${fmtD(u.accessUntil)}</small>` : ''}</div>
       <div><small>Последний вход</small>${u.lastLoginAt ? esc(fmtDT(u.lastLoginAt)) : '<span class="dim">не входил</span>'}</div>
       <div class="acts"><button class="btn sm" data-act="userEdit" data-id="${u.id}">Изменить</button>
         ${self || (u.sys && !me.sys) ? '' : `<button class="btn sm" data-act="userBlock" data-id="${u.id}">${u.blocked ? 'Разблокировать' : 'Заблокировать'}</button>${armBtn('u:'+u.id, 'Удалить', 'userDel', u.id)}`}</div>
@@ -2658,7 +2738,7 @@ function renderDrawer(){
   }
   if (d.kind === 'dtAssign') {
     const sel = DT.points.filter(p => dtSel.has(p.no)), had = sel.filter(p => p.assignee);
-    const W = STAFF.filter(u => u.role === 'worker'), O = STAFF.filter(u => ['user', 'manager', 'admin'].includes(u.role));
+    const W = STAFF.filter(u => u.role === 'worker' || u.role === 'contractor'), O = STAFF.filter(u => u.role === 'admin');
     const opt = u => `<label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dta-who" value="${u.id}"> <span>${esc(u.name)} <small class="dim">— ${esc(ROLE_NAMES[u.role])}, точек: ${DT.points.filter(p => p.assignee === u.id).length}</small></span></label>`;
     D.innerHTML = dh('Назначить исполнителя') + `<form class="d-body" data-form="dtAssign">
       <p style="margin:0">Выделено точек: <b>${sel.length}</b>, модемов: <b>${sel.reduce((a, p) => a + dtModems(p), 0)}</b>${had.length ? ` · уже назначено: ${had.length} (${[...new Set(had.map(p => who(p.assignee)))].map(esc).join(', ')}) — назначение заменится` : ''}.</p>
@@ -2683,24 +2763,21 @@ function renderDrawer(){
   if (d.kind === 'dtSave') {
     const P = DT.points, vis = P.filter(dtMatch), flag = P.filter(dtFlagged), chk = P.filter(p => (p.cats || []).includes('check'));
     const which = ui.dtWhich || 'visible', q = (ui.dtJq || '').toLowerCase();
-    const J = S.jobs.filter(j => mayEditJob(j) && (!q || (j.title + ' ' + (j.workers || []).map(who).join(' ')).toLowerCase().includes(q)))
+    const J = S.jobs.filter(j => isMount(j) && mayEditJob(j) && (!q || (j.title + ' ' + (j.workers || []).map(who).join(' ')).toLowerCase().includes(q)))
       .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.createdAt || '').localeCompare(a.createdAt || ''));
     const W = workersList();
-    D.innerHTML = dh('Сохранить точки в БД') + `<form class="d-body" data-form="dtSave">
+    D.innerHTML = dh('Добавить точки к работе') + `<form class="d-body" data-form="dtSave">
       <div class="box"><h4>Какие точки</h4>
         ${[...(dtSel.size ? [['selected', 'Выделенные', dtSel.size]] : []), ['visible', `Видимые на карте сейчас`, vis.length], ['flagged', 'Только МКАД, ТТК и эстакады', flag.length], ...(chk.length ? [['check', 'Только «проверить»', chk.length]] : []), ['all', 'Все точки', P.length]].map(([k, l, n]) =>
           `<label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dtw" value="${k}" ${which === k ? 'checked' : ''}> ${l} <b class="mono">${n}</b></label>`).join('')}</div>
       <div class="box"><h4>В какие работы</h4>
         <span data-keep style="display:contents"><input class="in" id="dt-jq" type="search" aria-label="Поиск работы" value="${esc(ui.dtJq || '')}"></span>
-        ${J.length ? `<ul class="dtjobs">${J.map(j => `<li><label class="chk" style="flex-direction:row;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" name="dtj" value="${j.id}" ${(ui.dtJobs || []).includes(j.id) ? 'checked' : ''}><span><b style="font-weight:500">№ ${jobNo(j)} · ${esc(j.title)}</b><small class="dim">${esc(JOB_ST[j.status])} · ${esc((j.workers || []).map(who).join(', ') || 'без работников')} · мест: ${(j.places || []).length}</small></span></label></li>`).join('')}</ul>` : `<p class="dim" style="margin:0">${q ? 'Не найдено.' : 'Работ, которые вы можете менять, пока нет.'}</p>`}
-        <details class="dtnew" ${ui.dtNewOpen ? 'open' : ''}><summary>+ Новая работа</summary>
-          <div class="form" style="margin-top:8px"><label class="wide">Что нужно сделать<input class="in" id="dtn-title" value="${esc(ui.dtNewTitle ?? 'Замена ДТ')}"></label>
-          <label>Начало<input class="in" type="date" id="dtn-start" value="${today()}"></label><label>Срок<input class="in" type="date" id="dtn-due"></label>
-          <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Работники</span>${W.length ? `<div class="wpick">${W.map(u => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="dtn-w" value="${u.id}"> ${esc(u.name)}</label>`).join('')}</div>` : '<p class="dim" style="margin:4px 0 0">Нет пользователей с ролью «Работник».</p>'}</div></div></details></div>
+        ${J.length ? `<ul class="dtjobs">${J.map(j => `<li><label class="chk" style="flex-direction:row;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" name="dtj" value="${j.id}" ${(ui.dtJobs || []).includes(j.id) ? 'checked' : ''}><span><b style="font-weight:500">№ ${jobNo(j)} · ${esc(j.title)}</b><small class="dim">${esc(WORK_KIND[j.kind || 'mount'])} · ${esc(cpOf(j.customerId)?.name || 'контрагент не указан')} · ${esc(JOB_ST[j.status])} · точек: ${(j.places || []).length}</small></span></label></li>`).join('')}</ul>` : `<p class="dim" style="margin:0">${q ? 'Не найдено.' : 'Работ с монтажом пока нет — создайте работу типа «Монтаж» или «Производство и монтаж» на вкладке «Работы».'}</p>`}
+</div>
       <div class="box"><h4>Как записать</h4>
         <label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dtm" value="add" checked> Добавить к местам работы (точки, которые уже есть, не повторяются)</label>
         <label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dtm" value="replace"> Заменить все места работы этими точками</label></div>
-      <p class="hint" style="margin:0">Каждая точка станет местом работы: номер объекта, отметка (МКАД, ТТК, эстакада или дорога) и дорога. Работники увидят точки в своих задачах и на карте.</p>
+      <p class="hint" style="margin:0">Каждая точка станет точкой работы со всеми данными: номер объекта (и замена 2 модемов), отметка, дорога, исполнитель. Сотрудник увидит назначенные ему точки у себя.</p>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Сохранить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
@@ -2719,8 +2796,8 @@ function renderDrawer(){
       <label>Пароль, не короче 8 символов<input class="in" id="oa-pass" autocomplete="new-password" required></label>`}
       </div>
       ${o ? `<div class="box adm"><h4>Администраторы организации</h4>
-        ${o.admins.length ? `<ul>${o.admins.map(a => `<li><span><b style="font-weight:500">${esc(a.name)}</b> <span class="mono dim">${esc(a.login)}</span>${a.sys ? ' <span class="chip c-info">администратор системы</span>' : ''}${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}<br><small class="dim">${a.lastLoginAt ? 'вход ' + esc(fmtDT(a.lastLoginAt)) : 'ещё не входил'}</small></span>
-          ${a.id === me.id ? '' : `<span class="row-g"><input class="in" type="text" data-apw="${a.id}" autocomplete="new-password" aria-label="Новый пароль для ${esc(a.login)}"><button type="button" class="btn sm" data-act="orgAdmPw" data-id="${o.id}|${a.id}">Сменить пароль</button><button type="button" class="btn sm" data-act="orgAdmBlock" data-id="${o.id}|${a.id}|${a.blocked ? 0 : 1}">${a.blocked ? 'Разблокировать' : 'Заблокировать'}</button></span>`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Администраторов нет.</p>'}
+        ${o.admins.length ? `<ul>${o.admins.map(a => ui.admEdit === a.id ? `<li class="admedit"><label>Имя<input class="in" id="ae-name" value="${esc(a.name)}"></label><label>Логин<input class="in" id="ae-login" value="${esc(a.login)}" autocomplete="off"></label><span class="row-g"><button type="button" class="btn sm primary" data-act="orgAdmSave" data-id="${o.id}|${a.id}">Сохранить</button><button type="button" class="btn sm" data-act="orgAdmEdit" data-id="">Отмена</button></span></li>` : `<li><span><b style="font-weight:500">${esc(a.name)}</b> <span class="mono dim">${esc(a.login)}</span>${a.sys ? ' <span class="chip c-info">администратор системы</span>' : ''}${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}<br><small class="dim">${a.lastLoginAt ? 'вход ' + esc(fmtDT(a.lastLoginAt)) : 'ещё не входил'}</small></span>
+          ${a.id === me.id ? '' : `<span class="row-g"><input class="in" type="text" data-apw="${a.id}" autocomplete="new-password" aria-label="Новый пароль для ${esc(a.login)}"><button type="button" class="btn sm" data-act="orgAdmPw" data-id="${o.id}|${a.id}">Сменить пароль</button><button type="button" class="btn sm" data-act="orgAdmEdit" data-id="${a.id}">Имя и логин</button><button type="button" class="btn sm" data-act="orgAdmBlock" data-id="${o.id}|${a.id}|${a.blocked ? 0 : 1}">${a.blocked ? 'Разблокировать' : 'Заблокировать'}</button></span>`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Администраторов нет.</p>'}
         <div class="form" style="margin-top:4px"><label>Имя<input class="in" id="na-name"></label><label>Логин<input class="in" id="na-login" autocomplete="off"></label><label>Пароль<input class="in" id="na-pass" autocomplete="new-password"></label>
           <div style="display:flex;align-items:flex-end"><button type="button" class="btn sm" data-act="orgAdmAdd" data-id="${o.id}">+ Добавить администратора</button></div></div></div>` : ''}
       <div class="err" id="ferr"></div>
@@ -2775,56 +2852,51 @@ function renderDrawer(){
   }
   if (d.kind === 'job') {
     const j = jobOf(d.id); if (!j) return closeDrawer();
-    const o = ord(j.orderId), mine = (j.workers || []).includes(me.id), act = mine || mayEditJob(j) || j.leaderId === me.id;
-    D.innerHTML = dh(`Задача № ${jobNo(j)}`) + `<div class="d-body">
-      <div class="row-g"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${overdue(j) ? '<span class="chip c-bad">Просрочена</span>' : ''}</div>
+    const ed = mayEditJob(j), cp = cpOf(j.customerId), P = j.places || [], mount = isMount(j);
+    const closed = P.filter(x => x.doneAt).length, nw = P.filter(x => x.notWorking).length;
+    const byPerson = {}; P.forEach(x => { const k = x.assignee || ''; (byPerson[k] = byPerson[k] || { t:0, c:0 }).t++; if (x.doneAt) byPerson[k].c++; });
+    D.innerHTML = dh(`${esc(WORK_KIND[j.kind || 'mount'])} · № ${jobNo(j)}`) + `<div class="d-body">
+      <div class="row-g"><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${overdue(j) ? '<span class="chip c-bad">Срок прошёл</span>' : ''}</div>
       <h3 style="margin:0;font-size:20px">${esc(j.title)}</h3>
-      ${j.description ? `<p class="jdesc">${esc(j.description)}</p>` : ''}
       <dl class="kv">
-        <dt>Руководитель</dt><dd>${esc(who(j.leaderId))}</dd>
-        <dt>Работники</dt><dd>${(j.workers || []).map(id => `<span class="wchip ${id === me.id ? 'me' : ''}">${esc(who(id))}</span>`).join(' ')}</dd>
-        <dt>Даты</dt><dd>${j.start ? fmtD(j.start) + ' – ' : ''}${j.due ? 'срок ' + fmtD(j.due) : j.start ? '' : '—'}</dd>
-        ${o && !isWorker() ? `<dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${o.id}">${esc(ordName(o))}</a></dd>` : ''}
-        <dt>Поставил</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
-        ${j.startedAt ? `<dt>Начата</dt><dd>${esc(fmtDT(j.startedAt))} · ${esc(who(j.startedBy))}</dd>` : ''}
-        ${j.status === 'done' ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))} · ${esc(who(j.doneBy))}</dd>` : ''}
+        <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
+        <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
+        <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
+        ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
+      ${j.description ? `<p class="jdesc">${esc(j.description)}</p>` : ''}
+      <div class="box"><h4>Документы${(j.docs || []).length ? ' · ' + j.docs.length : ''}</h4>
+        ${(j.docs || []).length ? `<ul class="files">${j.docs.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at || '').slice(0, 10))}</small>${ed ? armBtn('jdoc:' + f.id, '✕', 'jobDocDel', j.id + '|' + f.id, 'icon') : ''}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документов нет.</p>'}
+        ${ed ? `<div class="row-g"><label class="btn sm">Загрузить документы<input type="file" data-up="jobDoc" data-id="${j.id}" accept="${ACCEPT}" multiple hidden></label></div>` : ''}</div>
+      ${mount ? `<div class="box"><h4>Точки · ${P.length}</h4>
+        ${P.length ? `<p style="margin:0">Закрыто <b>${closed}</b> из <b>${P.length}</b>${nw ? ` · не работает: <b class="bad-t">${nw}</b>` : ''}</p>
+          <span class="wbar"><i style="width:${Math.round(closed / P.length * 100)}%"></i></span>
+          <table class="pers"><tbody>${Object.entries(byPerson).sort((x, y) => (x[0] ? 0 : 1) - (y[0] ? 0 : 1) || who(x[0]).localeCompare(who(y[0]), 'ru')).map(([id, r]) => `<tr><td>${id ? esc(who(id)) : '<span class="warn-t">без исполнителя</span>'}</td><td class="mono">${r.c} / ${r.t}</td></tr>`).join('')}</tbody></table>`
+          : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Редактор карты»: выделите точки → «Добавить точки к работе».</p>'}
+        ${canEdit() ? `<div class="row-g"><button class="btn sm primary" data-act="gotoDtJob" data-id="${j.id}">Открыть в редакторе карты</button></div>` : ''}</div>
       ${jobPhotoBox(j)}
       ${jobAssignBox(j)}
-      <div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>
-      ${j.status === 'done' ? (j.report ? `<div class="box paid"><h4>Отчёт</h4><p class="jdesc" style="margin:0">${esc(j.report)}</p></div>` : '')
-        : act ? `<div class="box"><h4>${j.status === 'new' ? 'Начать работу' : 'Отметить выполнение'}</h4>
-          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-2)">Комментарий о выполнении (необязательно)<span data-keep style="display:contents"><textarea class="in" id="j-report" rows="3">${esc(j.report || '')}</textarea></span></label>
-          <div class="row-g">${j.status === 'new' ? `<button class="btn" data-act="jobStatus" data-id="${j.id}|work">Начать работу</button>` : ''}<button class="btn ok" data-act="jobStatus" data-id="${j.id}|done">✓ Выполнено</button></div></div>` : ''}
+      ${P.length ? `<div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>` : ''}` : ''}
       <div class="err" id="ferr"></div>
-      <div class="row-g">${j.status === 'done' && act ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Вернуть в работу</button>` : ''}
-        ${mayEditJob(j) ? `<button class="btn sm" data-act="editJob" data-id="${j.id}">Изменить</button>${armBtn('job', 'Удалить задачу', 'delJob', j.id)}` : ''}
+      <div class="row-g">${ed ? (j.status === 'done' ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Вернуть в работу</button>` : `<button class="btn sm ok" data-act="jobStatus" data-id="${j.id}|done">✓ Работа выполнена</button>`) : ''}
+        ${ed ? `<button class="btn sm" data-act="editJob" data-id="${j.id}">Изменить</button>${armBtn('job', 'Удалить работу', 'delJob', j.id)}` : ''}
         <button class="btn sm" data-act="close">Закрыть</button></div>
     </div>`;
   }
   if (d.kind === 'jobForm') {
-    const j = d.id && jobOf(d.id), W = workersList(), LD = leaders();
-    const chosen = new Set(j ? j.workers || [] : d.ctx?.worker ? [d.ctx.worker] : []);
-    const extra = j ? (j.workers || []).filter(id => !W.some(u => u.id === id)).map(id => ({ id, name: who(id) })) : [];
-    const leaderSel = j ? j.leaderId : (me.role === 'user' || me.role === 'manager' || me.role === 'admin' ? me.id : '');
-    D.innerHTML = dh(j ? 'Изменить задачу' : 'Новая задача') + `<form class="d-body" data-form="job"><div class="form">
-      <label class="wide">Что нужно сделать<input class="in" id="j-title" value="${v(j,'title')}" required></label>
-      <label class="wide">Какие фото нужны на каждой точке — по одному в строке<textarea class="in" id="j-photos" rows="3">${esc(j ? (j.photoSpec || []).join('\n') : 'Общий вид\nДо замены\nПосле замены')}</textarea><small class="dim" style="font-size:12px">Работник увидит эти пункты в окне точки и сфотографирует каждый. Пусто — фото не обязательны.</small></label>
-      <label class="wide">Описание<textarea class="in" id="j-desc" rows="3">${esc(j?.description || '')}</textarea></label>
-      <label class="wide">Ответственный руководитель<select class="in" id="j-leader" required>${LD.map(u => `<option value="${u.id}" ${u.id === leaderSel ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role])}</option>`).join('')}</select></label>
-      <label>Начало<input class="in" type="date" id="j-start" value="${esc(j ? (j.start || '') : d.ctx?.date || today())}"></label>
-      <label>Срок (окончание)<input class="in" type="date" id="j-due" value="${esc(j ? (j.due || '') : d.ctx?.date || '')}"></label>
-      <label class="wide">Заказ (необязательно)<select class="in" id="j-order"><option value="">— без заказа —</option>${ordersSorted().map(o => `<option value="${o.id}" ${j?.orderId === o.id ? 'selected' : ''}>${esc(ordName(o))}</option>`).join('')}</select></label>
-      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Работники</span>
-        ${W.length || extra.length ? `<div class="wpick">${[...W, ...extra].map(u => `<label class="chk" style="flex-direction:row"><input type="checkbox" name="j-w" value="${u.id}" ${chosen.has(u.id) ? 'checked' : ''}> ${esc(u.name)}</label>`).join('')}</div>`
-          : `<p class="dim" style="margin:6px 0 0">Нет пользователей с ролью «Работник». ${me.role === 'admin' ? 'Добавьте их на вкладке «Пользователи».' : 'Попросите администратора добавить их.'}</p>`}</div>
-      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Место или места проведения работ — нажмите на карту, метку можно перетащить</span>
-        <div id="jfmap" class="minimap" style="margin-top:6px"></div>
-        <div class="row-g" style="margin-top:8px"><span class="dim" style="font-size:13px">или координаты</span><input class="in mono" id="jf-coords" aria-label="Координаты места" style="flex:1 1 220px;min-width:0"><button type="button" class="btn sm" data-act="addJPlace">Добавить</button></div>
-        <div id="jf-places" style="margin-top:8px">${jobFormPlaces()}</div></div>
+    const j = d.id && jobOf(d.id), kind = ui.jfKind || j?.kind || 'mount', cp = j && cpOf(j.customerId);
+    D.innerHTML = dh(j ? 'Изменить работу' : 'Новая работа') + `<form class="d-body" data-form="job"><div class="form">
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Тип работы</span><div class="seg kindseg" style="margin-top:6px">${Object.entries(WORK_KIND).map(([k, l]) => `<label class="${kind === k ? 'on' : ''}"><input type="radio" name="jf-kind" value="${k}" ${kind === k ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
+      <label class="wide">Название проекта<input class="in" id="j-title" value="${v(j,'title')}" required></label>
+      <label class="wide">Контрагент<input class="in" id="j-cust" list="j-cust-list" autocomplete="off" value="${esc(cp ? cp.name : '')}"><datalist id="j-cust-list">${cpsSorted().map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist><small class="dim" style="font-size:12px">Выберите из списка или впишите нового — он добавится в контрагенты.</small></label>
+      <label>Срок окончания работ<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
+      <label class="wide">Документы<input class="in" type="file" id="j-files" accept="${ACCEPT}" multiple>${j && (j.docs || []).length ? `<small class="dim" style="font-size:12px">Уже загружено: ${j.docs.length}. Новые файлы добавятся к ним.</small>` : ''}</label>
+      <label class="wide" id="j-photos-w" ${kind === 'prod' ? 'hidden' : ''}>Какие фото нужны на каждой точке — по одному в строке<textarea class="in" id="j-photos" rows="3">${esc(j ? (j.photoSpec || []).join('\n') : 'Общий вид\nДо замены\nПосле замены')}</textarea><small class="dim" style="font-size:12px">Сотрудник увидит эти пункты в окне точки. Пусто — фото не обязательны.</small></label>
+      <label class="wide">Описание (необязательно)<textarea class="in" id="j-desc" rows="2">${esc(j?.description || '')}</textarea></label>
       </div>
+      ${kind !== 'prod' ? '<p class="hint" style="margin:0">Точки к работе добавляются на вкладке «Редактор карты», там же их назначают сотрудникам.</p>' : ''}
       <div class="err" id="ferr"></div>
-      <div class="row-g"><button class="btn primary" type="submit">${j ? 'Сохранить' : 'Назначить задачу'}</button><button class="btn" type="button" data-act="${j ? 'openJob' : 'close'}" data-id="${j?.id || ''}">Отмена</button></div></form>`;
+      <div class="row-g"><button class="btn primary" type="submit">${j ? 'Сохранить' : 'Создать работу'}</button><button class="btn" type="button" data-act="${j ? 'openJob' : 'close'}" data-id="${j?.id || ''}">Отмена</button></div></form>`;
   }
   if (d.kind === 'income') {
     const i = inv(d.id); if (!i) return closeDrawer();
@@ -2899,9 +2971,10 @@ function renderDrawer(){
     D.innerHTML = dh(u ? 'Пользователь: ' + esc(u.name) : 'Новый пользователь') + `<form class="d-body" data-form="userForm"><div class="form">
       <label class="wide">Имя<input class="in" id="uf-name" value="${v(u,'name')}" required></label>
       <label>Логин (латиницей)<input class="in" id="uf-login" value="${v(u,'login')}" autocomplete="off" required></label>
-      <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(ROLE_NAMES, u?.role || 'user')}</select></label>
+      <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(ROLE_NAMES, u?.role || 'worker')}</select></label>
+      <label class="wide" id="uf-until-w" ${(u?.role || 'worker') === 'contractor' ? '' : 'hidden'}>Доступ подрядчика до (включительно)<input class="in" type="date" id="uf-until" value="${esc(u?.accessUntil || '')}"><small class="dim" style="font-size:12px">На следующий день вход для подрядчика закроется.</small></label>
       <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<input class="in" id="uf-pass" autocomplete="new-password" ${u?'':'required'}></label></div>
-      <p class="hint dim" id="uf-info" style="margin:0">${esc(ROLE_INFO[u?.role || 'user'])}</p>
+      <p class="hint dim" id="uf-info" style="margin:0">${esc(ROLE_INFO[u?.role || 'worker'])}</p>
       ${u ? '<p class="hint" style="margin:0">После смены пароля сотрудник выйдет со всех устройств.</p>' : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${u?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -3076,7 +3149,7 @@ async function onSubmit(e){
       const ids = [...f.querySelectorAll('[name=dtj]:checked')].map(x => x.value);
       const newOpen = f.querySelector('.dtnew')?.open, newTitle = val('dtn-title'), newW = [...f.querySelectorAll('[name=dtn-w]:checked')].map(x => x.value);
       if (newOpen && newTitle && !newW.length) return fail('Для новой работы отметьте хотя бы одного работника.');
-      if (!ids.length && !(newOpen && newTitle)) return fail('Отметьте работу или создайте новую.');
+      if (!ids.length && !(newOpen && newTitle)) return fail('Отметьте работу.');
       const label = p => [p.no + (dtModems(p) > 1 ? ` (замена ${dtModems(p)} ${modemsGen(dtModems(p))})` : ''), ...dtGroups(p).map(c => dtGroupLabel(c, p).toLowerCase().replace(/^мкад/, 'МКАД').replace(/^ттк/, 'ТТК')), p.road].filter(Boolean).join(' · ');
       const asPlace = p => ({ id:uid(), lat:p.lat, lng:p.lng, label:label(p), dtNo:p.no, cats:(p.cats || []).slice(), road:p.road || '', ...(p.assignee ? { assignee:p.assignee } : {}) });
       fail('Сохраняем…');
@@ -3093,7 +3166,7 @@ async function onSubmit(e){
         await api('PATCH', `/api/jobs/${id}`, { places:[...keep, ...add] }); n += add.length; jobsDone++;
       }
       ui.dtJobs = []; ui.dtNewOpen = false; await refresh(); closeDrawer();
-      toast(`Сохранено: ${n} точек в ${jobsDone} ${jobsDone === 1 ? 'работу' : jobsDone < 5 ? 'работы' : 'работ'}`);
+      toast(`Добавлено точек: ${n} — в ${jobsDone} ${jobsDone === 1 ? 'работу' : jobsDone < 5 ? 'работы' : 'работ'}`);
     }
     if (kind === 'restore') {
       if (!$('rs-ok').checked) return fail('Подтвердите восстановление.');
@@ -3116,13 +3189,19 @@ async function onSubmit(e){
       closeDrawer(); await loadOrgs(); toast(d.id ? 'Сохранено' : `Организация «${body.name}» создана. Передайте администратору логин ${body.admin.login} и пароль.`);
     }
     if (kind === 'job') {
-      const data = { title:val('j-title'), photoSpec:($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean), description:($('j-desc').value || '').trim(), leaderId:$('j-leader').value, start:val('j-start'), due:val('j-due'), orderId:$('j-order').value || null,
-        workers:[...f.querySelectorAll('[name=j-w]:checked')].map(x => x.value), places:(ui.jPlaces || []).map(x => ({ ...x, label:String(x.label || '').trim() })) };
-      if (!data.title) return fail('Укажите, что нужно сделать.');
-      if (!data.workers.length) return fail('Отметьте хотя бы одного работника.');
-      if (data.start && data.due && data.due < data.start) return fail('Срок не может быть раньше начала.');
-      if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Задача сохранена'); }
-      else { const id = await add('jobs', data); openDrawer('job', id); toast('Задача назначена'); }
+      const kindV = f.querySelector('[name=jf-kind]:checked')?.value || 'mount';
+      if (!val('j-title')) return fail('Укажите название проекта.');
+      // the counterparty: chosen from the list or added
+      let customerId = null; const cn = val('j-cust');
+      if (cn) { const c = cpByName(cn); customerId = c ? c.id : await add('counterparties', { name:cn, roles:['customer'], contacts:[], contracts:[], createdAt:now }); }
+      const old = d.id && jobOf(d.id), docs = [...(old?.docs || [])];
+      const files = [...($('j-files').files || [])];
+      for (const fl of files) { fail(`Загружаем «${fl.name}»…`); const u = await upload(fl); docs.push({ id:u.id, name:u.name }); }
+      const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs,
+        photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
+      ui.jfKind = null;
+      if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Работа сохранена'); }
+      else { const id = await add('jobs', data); openDrawer('job', id); toast(kindV === 'prod' ? 'Работа создана' : 'Работа создана — добавьте к ней точки на вкладке «Редактор карты»'); }
     }
     if (kind === 'income') {
       const L = cleanLines(ui.incLines);
@@ -3180,6 +3259,7 @@ async function onSubmit(e){
     }
     if (kind === 'userForm') {
       const body = { name:val('uf-name'), login:val('uf-login'), role:$('uf-role').value };
+      if (body.role === 'contractor') { body.accessUntil = val('uf-until'); if (!body.accessUntil) return fail('Укажите, до какой даты у подрядчика доступ.'); }
       const pw = $('uf-pass').value;
       if (d.id) {
         if (pw) body.password = pw;
@@ -3316,7 +3396,7 @@ async function act(el){
     case 'dtAssign': return openDrawer('dtAssign');
     case 'dtAddCoords': ui.dtAdding = false; return openDrawer('dtAdd', null, null);
     case 'dtReanswer': { ui.dtOtherFor = null; const i = Number(id); const prev = ui.dtEdit; ui.dtEdit = i >= 0 ? i : null; const k = i >= 0 ? i : prev; const p = DT.points[k]; const m = p && dtMarks.get(p.no + '|' + k); if (m) m.setPopupContent(dtPopup(p, k)); return; }
-    case 'dtSave': ui.dtWhich = dtSel.size ? 'selected' : 'visible'; ui.dtJobs = []; ui.dtJq = ''; ui.dtNewOpen = !S.jobs.some(mayEditJob); return openDrawer('dtSave');
+    case 'dtSave': ui.dtWhich = dtSel.size ? 'selected' : 'visible'; ui.dtJobs = ui.dtJob ? [ui.dtJob] : []; ui.dtJq = ''; ui.dtNewOpen = false; return openDrawer('dtSave');
     case 'dtExport': return dtExport().catch(e => toast(errText(e)));
     case 'dtClassify': { el.disabled = true; el.closest('details')?.removeAttribute('open'); try { await dtClassifyAndSave(); } catch(e) { toast(errText(e)); } finally { el.disabled = false; } return; }
     case 'addFeat': {
@@ -3336,12 +3416,15 @@ async function act(el){
     }
     case 'restoreBackup': ui.rsScope = null; return openDrawer('restore', id);
     case 'delBackup': try { await api('DELETE', `/api/backups/${id}`); await loadOrgs(); toast('Копия удалена'); } catch(e) { toast(errText(e)); } return;
-    case 'orgEdit': return openDrawer('orgForm', id);
+    case 'orgEdit': ui.admEdit = null; return openDrawer('orgForm', id);
     case 'orgBlock': { const [oid, on] = id.split('|'); try { await api('PATCH', `/api/orgs/${oid}`, { blocked: on === '1' }); await loadOrgs(); toast(on === '1' ? 'Организация заблокирована' : 'Организация разблокирована'); } catch(e) { toast(errText(e)); } return; }
     case 'orgAdmAdd': {
       try { await api('POST', `/api/orgs/${id}/admins`, { name:$('na-name').value.trim(), login:$('na-login').value.trim(), password:$('na-pass').value }); await loadOrgs(); renderDrawer(); toast('Администратор добавлен'); }
       catch(e) { $('ferr').textContent = errText(e); } return;
     }
+    case 'orgAdmEdit': ui.admEdit = id || null; return renderDrawer();
+    case 'orgAdmSave': { const [oid, uid2] = id.split('|');
+      try { await api('PATCH', `/api/orgs/${oid}/admins/${uid2}`, { name: $('ae-name').value.trim(), login: $('ae-login').value.trim() }); ui.admEdit = null; await loadOrgs(); renderDrawer(); toast('Учётная запись администратора сохранена'); } catch(e) { $('ferr').textContent = errText(e); } return; }
     case 'orgAdmPw': { const [oid, uid2] = id.split('|'); const inp = document.querySelector(`[data-apw="${uid2}"]`);
       try { await api('PATCH', `/api/orgs/${oid}/admins/${uid2}`, { password: inp.value }); inp.value = ''; toast('Пароль изменён, прежние входы завершены'); } catch(e) { $('ferr').textContent = errText(e); } return; }
     case 'orgAdmBlock': { const [oid, uid2, on] = id.split('|');
@@ -3350,9 +3433,13 @@ async function act(el){
     case 'jMode': ui.jMode = id; try { localStorage.setItem('sed-jmode', id); } catch(e){} return render();
     case 'jSpan': ui.jSpan = Number(id); return render();
     case 'jShift': ui.jFrom = Number(id) ? (ui.jFrom ?? monday(dnum(today()))) + Number(id) : monday(dnum(today())); return render();
-    case 'newJob': return openDrawer('jobForm');
+    case 'newJob': ui.jfKind = null; return openDrawer('jobForm');
+    case 'wlKind': ui.wlKind = id; return render();
+    case 'wlSt': ui.wlSt = id; return render();
+    case 'gotoDtJob': closeDrawer(); ui.dtJob = id; ui.dtJobFit = true; if (location.hash !== '#dt') location.hash = 'dt'; else render(); return;
+    case 'jobDocDel': { const [jid, fid] = id.split('|'), j = jobOf(jid); try { await api('PATCH', `/api/jobs/${jid}`, { docs: (j.docs || []).filter(f => f.id !== fid) }); await refresh(); renderDrawer(); toast('Документ удалён'); } catch(e) { toast(errText(e)); } return; }
     case 'newJobAt': { const [wid, day] = id.split('|'); return openDrawer('jobForm', null, { worker: wid, date: day }); }
-    case 'editJob': ui.jPhotoEdit = null; return openDrawer('jobForm', id);
+    case 'editJob': ui.jPhotoEdit = null; ui.jfKind = null; return openDrawer('jobForm', id);
     case 'openJob': ui.jPhotoEdit = null; return openDrawer('job', id);
     case 'openPlace': return openDrawer('place', id);
     case 'phEdit': ui.jPhotoEdit = id; ui.jPhotoRows = [...(jobOf(id)?.photoSpec || [])]; if (!ui.jPhotoRows.length) ui.jPhotoRows = ['']; renderDrawer(); setTimeout(() => document.querySelector('[data-ph]')?.focus(), 30); return;
@@ -3582,6 +3669,7 @@ document.addEventListener('input', e => {
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
+  if (t.id === 'wlq') { ui.wlq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorkList(); const n = $('wlq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.dataset.ph !== undefined && ui.jPhotoRows) { ui.jPhotoRows[Number(t.dataset.ph)] = t.value; return; }
   if (t.id === 'jq') { ui.jq = t.value; const pos = t.selectionStart; $('view').innerHTML = vJobs(); const n = $('jq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.dataset.jpl !== undefined) { const pl = ui.jPlaces?.[Number(t.dataset.jpl)]; if (pl) pl.label = t.value; return; }
@@ -3606,7 +3694,9 @@ document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t' && ui.drawer?.kind === 'paste') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; else if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + e.target.value.split(/\r?\n/).filter(l => l.trim() && !/наимен|компон/i.test(l)).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
+  if (t.id === 'dtJob') { ui.dtJob = t.value || null; ui.dtJobFit = true; return renderDt(); }
   if (t.id === 'dtAsgWho') { ui.dtAsg = t.value || 'any'; return renderDt(); }
   if (t.id === 'dtOnlySel') { ui.dtOnlySel = t.checked; return renderDt(); }
   if (t.name === 'dtj') { ui.dtJobs = [...document.querySelectorAll('[name=dtj]:checked')].map(x => x.value); return; }
@@ -3620,7 +3710,7 @@ document.addEventListener('change', async e => {
     const F = (o.features || []).map(f => f.id === fid ? { ...f, text, editedBy:me.id, editedAt:new Date().toISOString() } : f).filter(f => f.text);
     await saveFeatures(oid, F); return render();
   }
-  if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; return; }
+  if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; $('uf-until-w').hidden = t.value !== 'contractor'; return; }
   if (t.id === 'f-file') { parseInvoiceFile(t.files[0]); return; }
   if (t.id === 'acct-file') {
     const file = t.files[0]; if (!file) return;
@@ -3654,6 +3744,12 @@ document.addEventListener('change', async e => {
     const f = t.dataset.f; c[f] = f === 'qty' ? num(t.value) : t.value.trim();
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
+  }
+  if (t.dataset.up === 'jobDoc') {
+    const files = [...t.files]; if (!files.length) return; const j = jobOf(t.dataset.id); t.value = '';
+    try { const docs = [...(j.docs || [])]; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); docs.push({ id:u.id, name:u.name }); }
+      await api('PATCH', `/api/jobs/${j.id}`, { docs }); await refresh(); renderDrawer(); toast(files.length > 1 ? `Загружено документов: ${files.length}` : 'Документ загружен'); } catch(e) { toast(errText(e)); }
+    return;
   }
   if (t.dataset.up === 'placePhoto') {
     const files = [...t.files]; if (!files.length) return; const [jid, pid] = t.dataset.id.split('|'), slot = t.dataset.slot || '';
@@ -3716,7 +3812,10 @@ document.addEventListener('change', async e => {
 });
 function route(){
   const h = location.hash.slice(1);
-  ui.view = isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork') : ['jobs','works','orders','stock','cps','pay','plan','map','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'orgs' && me?.sys) ? h : 'orders';
+  ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
+    : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'works';
+  if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
   if (ui.view === 'dt' && !DT.loaded) loadDt();
@@ -3767,13 +3866,15 @@ async function start(u){
   $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
   $('orgwarn').hidden = !u.orgWarn; $('orgwarn').textContent = u.orgWarn ? '⚠ ' + u.orgWarn + ' Для продления обратитесь к администратору системы.' : '';
   $('blockscr').hidden = true;
-  document.querySelectorAll('#views a:not(#usersTab):not(#orgsTab)').forEach(a => a.hidden = isWorker() ? !['wwork', 'wdone'].includes(a.dataset.v) : ['wwork', 'wdone'].includes(a.dataset.v));
-  $('jobsTab').firstChild.textContent = isWorker() ? 'Мои задачи ' : 'Задачи сотрудникам ';
+  // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
+  document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin'); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
   route();
-  try { await refresh(); } catch(e) { $('banner').hidden = false; $('banner').textContent = errText(e); }
+  if (u.sys) { mode = 'live'; render(); }
+  else try { await refresh(); } catch(e) { $('banner').hidden = false; $('banner').textContent = errText(e); }
   clearInterval(poll);
   poll = setInterval(async () => {
     if (document.hidden) return;
@@ -3781,7 +3882,8 @@ async function start(u){
       const r = await api('GET', '/api/rev');
       $('banner').hidden = true;
       if (r.version) { if (!appVersion) appVersion = r.version; else if (r.version !== appVersion) $('updbar').hidden = false; }
-      if (r.rev !== rev) await refresh();
+      if (me.sys) { if (ui.view === 'server') loadStats(); }
+      else if (r.rev !== rev) await refresh();
     } catch(e) { $('banner').hidden = false; $('banner').textContent = 'Нет связи с сервером. Изменения не сохраняются, пока связь не восстановится.'; }
   }, 5000);
 }
