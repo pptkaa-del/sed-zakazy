@@ -105,7 +105,7 @@ function cleanJob(d){
     .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
     .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200),
       ...(x.assignee && users.some(u => u.id === x.assignee) ? { assignee: String(x.assignee) } : {}),
-      ...(DT_NEEDS.includes(x.need) ? { need: x.need } : {}),
+      ...(isNeed(x.need) ? { need: x.need } : {}),
       ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
   // which photos a worker must take at every point, e.g. «Общий вид», «До замены», «После замены»
@@ -143,6 +143,8 @@ function ensureJobOrder(j, jid, user, changed = {}){
 }
 // marks on map points: special vehicles needed (lift, fencing, both), own fencing, own fencing + lift
 const DT_NEEDS = ['lift', 'fence', 'lift_fence', 'own_fence', 'own_fence_lift'];
+// the organization's own marks (db.meta.dtNeeds: id, name, colour) are valid too
+const isNeed = n => DT_NEEDS.includes(n) || ((db.meta && db.meta.dtNeeds) || []).some(x => x.id === n);
 /* Warehouse: managers and admins keep the item list; they and «Сотрудник» record receipts and issues */
 const canMoveStock = u => canEdit(u);
 const qtyOk = v => Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) < 1e9;
@@ -617,13 +619,42 @@ async function api(req, res, url) {
       saveDb();
       return send(res, 200, { ok: true, count: n, inJobs, rev: db.rev });
     }
+    /* own marks: a name and a colour; deleting one removes it from the points */
+    if (p[2] === 'needs') {
+      if (!canEdit(user)) return fail(res, 403, 'Создавать пометки может администратор или руководитель');
+      db.meta.dtNeeds = Array.isArray(db.meta.dtNeeds) ? db.meta.dtNeeds : [];
+      if (m === 'POST' && !p[3]) {
+        const b = await readJsonBody(req), name = String(b.name || '').trim().slice(0, 60), color = HEX(b.color);
+        if (!name) return fail(res, 400, 'Укажите название пометки');
+        if (!color) return fail(res, 400, 'Выберите цвет');
+        if (db.meta.dtNeeds.some(x => x.name.toLowerCase() === name.toLowerCase())) return fail(res, 409, 'Такая пометка уже есть');
+        const n = { id: 'c_' + newId().replace(/[^A-Za-z0-9]/g, '').slice(0, 10), name, color, at: new Date().toISOString(), by: user.id };
+        db.meta.dtNeeds.push(n); saveDb();
+        return send(res, 200, { ok: true, need: n, rev: db.rev });
+      }
+      const n = p[3] && db.meta.dtNeeds.find(x => x.id === p[3]);
+      if (!n) return fail(res, 404, 'Пометка не найдена');
+      if (m === 'PATCH') {
+        const b = await readJsonBody(req);
+        if (b.name !== undefined) { const nm = String(b.name).trim().slice(0, 60); if (!nm) return fail(res, 400, 'Укажите название пометки'); n.name = nm; }
+        if (b.color !== undefined) { const c = HEX(b.color); if (!c) return fail(res, 400, 'Выберите цвет'); n.color = c; }
+        saveDb(); return send(res, 200, { ok: true, need: n, rev: db.rev });
+      }
+      if (m === 'DELETE') {
+        db.meta.dtNeeds = db.meta.dtNeeds.filter(x => x.id !== n.id); let k = 0;
+        for (const x of (db.dt && db.dt.points) || []) if (x.need === n.id) { delete x.need; delete x.needAt; delete x.needBy; k++; }
+        for (const j of Object.values(db.jobs)) for (const pl of j.places || []) if (pl.need === n.id) delete pl.need;
+        saveDb(); return send(res, 200, { ok: true, cleared: k, rev: db.rev });
+      }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
     /* a mark about what the work at a point needs: special vehicles or own fencing; goes to the same points in works */
     if (m === 'PATCH' && p[2] === 'need') {
       if (!canEdit(user)) return fail(res, 403, 'Ставить пометки может администратор или руководитель');
       const b = await readJsonBody(req), P = db.dt && db.dt.points;
       if (!P) return fail(res, 409, 'Точек нет');
       const need = String(b.need || '');
-      if (need && !DT_NEEDS.includes(need)) return fail(res, 400, 'Неизвестная пометка');
+      if (need && !isNeed(need)) return fail(res, 400, 'Неизвестная пометка');
       const nos = new Set((Array.isArray(b.nos) ? b.nos : []).map(String));
       if (!nos.size) return fail(res, 400, 'Не выбрано ни одной точки');
       const at = new Date().toISOString(); let n = 0;
