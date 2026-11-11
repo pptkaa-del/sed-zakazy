@@ -111,6 +111,34 @@ function cleanJob(d){
   if ('status' in d) out.status = d.status;
   return out;
 }
+/* A work with production («Производство» or «Производство и монтаж») gets its own order on «Заказы на производство» */
+function nextOrderNumber(){
+  const list = listOf('orders'), num = o => /^(.*?)(\d+)$/.exec(String(o.number || '').trim());
+  const parsed = list.map(num).filter(Boolean);
+  if (!parsed.length) return 'З-1';
+  const last = list.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).map(num).find(Boolean) || parsed[0];
+  const prefix = last[1], width = last[2].length;
+  return prefix + String(Math.max(...parsed.filter(m => m[1] === prefix).map(m => Number(m[2]))) + 1).padStart(width, '0');
+}
+function ensureJobOrder(j, jid, user, changed = {}){
+  if (!['prod', 'both'].includes(j.kind) || (j.noOrder && !j.orderId)) return false;
+  const cp = j.customerId && db.counterparties[j.customerId];
+  const o = j.orderId && db.orders[j.orderId];
+  if (o) {   // the work is the master: what changed in it goes to its order
+    if (o.jobId !== jid) return false;
+    let ch = false;
+    if ('title' in changed && j.title) { o.title = j.title; ch = true; }
+    if ('due' in changed) { o.deadline = j.due || ''; ch = true; }
+    if ('customerId' in changed) { o.customerId = cp ? j.customerId : null; o.customer = cp ? cp.name : ''; ch = true; }
+    return ch;
+  }
+  const oid = newId();
+  db.orders[oid] = { number: nextOrderNumber(), orderNo: '', status: 'new', title: j.title || 'Без названия', customerId: cp ? j.customerId : null, customer: cp ? cp.name : '',
+    deadline: j.due || '', billNo: '', billDate: '', components: [], specs: (j.docs || []).map(f => ({ ...f })), comments: [], jobId: jid,
+    createdBy: user.id, createdAt: new Date().toISOString() };
+  j.orderId = oid;
+  return true;
+}
 /* Warehouse: managers and admins keep the item list; they and «Сотрудник» record receipts and issues */
 const canMoveStock = u => canEdit(u);
 const qtyOk = v => Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) < 1e9;
@@ -464,6 +492,8 @@ async function api(req, res, url) {
   }
   if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION });
   if (p[1] === 'data' && m === 'GET') {
+    // works with production made before orders were created for them
+    if (HEAD(user)) { let ch = false; for (const [jid, j] of Object.entries(db.jobs || {})) if (ensureJobOrder(j, jid, user)) ch = true; if (ch) saveDb(); }
     const out = { rev: db.rev, users: Object.fromEntries(orgUsers().map(u => [u.id, u.name])), meta: db.meta,
       staff: orgUsers().filter(u => !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) };
     // a worker gets only the points assigned to him; points without an executor only when he is the job's only worker
@@ -873,6 +903,7 @@ async function api(req, res, url) {
     let cpCreated = false;
     if (col === 'invoices') { const sup = ensureSupplier(data.supplier, data.supplierInn, user, `Добавлен по счёту № ${data.number || '—'}`); data.supplierId = sup.id; cpCreated = sup.created; }
     const nid = newId(); db[col][nid] = data;
+    if (col === 'jobs') { delete data.orderId; ensureJobOrder(data, nid, user); }
     const linesFilled = col === 'invoices' ? fillOrderSuppliers(data) : 0;
     saveDb();
     return send(res, 200, { id: nid, rev: db.rev, cpCreated, linesFilled });
@@ -910,8 +941,10 @@ async function api(req, res, url) {
         if (c.status === 'work' && !j.startedAt) { c.startedAt = t; c.startedBy = user.id; }
         c.doneAt = c.status === 'done' ? t : null; c.doneBy = c.status === 'done' ? user.id : null;
       }
+      delete c.orderId;   // the order of a work is made and kept by the server
       Object.assign(j, c, { updatedAt: new Date().toISOString(), updatedBy: user.id });
       if (c.places) jobWorkersFromPlaces(j);
+      ensureJobOrder(j, id, user, c);
       saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
     }
@@ -972,6 +1005,9 @@ async function api(req, res, url) {
     if (col === 'counterparties' && listOf('orders').some(o => o.customerId === id)) return fail(res, 409, 'Контрагент указан заказчиком в заказах');
     if (col === 'invoices' && d.status === 'paid') return fail(res, 409, 'Оплаченный счёт удалить нельзя');
     if (col === 'invoices' && d.income) return fail(res, 409, 'По счёту оприходован товар на склад. Сначала отмените приход');
+    // a deleted order of a work is not made again automatically
+    if (col === 'orders') for (const j of Object.values(db.jobs || {})) if (j.orderId === id) { j.orderId = null; j.noOrder = true; }
+    if (col === 'jobs' && d.orderId && db.orders[d.orderId] && db.orders[d.orderId].jobId === id) delete db.orders[d.orderId].jobId;
     delete db[col][id]; saveDb();
     return send(res, 200, { ok: true, rev: db.rev });
   }

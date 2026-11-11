@@ -1437,7 +1437,7 @@ function orderDetail(o){
   <div class="ohead">
     <div style="min-width:0">
       <h2>${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
-      <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline)].filter(Boolean).join(' · ')}</div>
+      <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button></div>
   </div>
@@ -3010,6 +3010,7 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
+        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Заказ на производство</dt><dd>${ord(j.orderId) ? `<a href="#orders" data-act="gotoOrder" data-id="${j.orderId}">${esc(ordName(ord(j.orderId)))}</a> · <span class="dim">${esc(ORDER_ST[ord(j.orderId).status] || '')}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
@@ -3357,7 +3358,7 @@ async function onSubmit(e){
         photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
       if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Работа сохранена'); }
-      else { const id = await add('jobs', data); openDrawer('job', id); toast(kindV === 'prod' ? 'Работа создана' : 'Работа создана — добавьте к ней точки на вкладке «Карта объектов»'); }
+      else { const id = await add('jobs', data); openDrawer('job', id); const o = ord(jobOf(id)?.orderId); toast((o ? `Работа создана, заказ на производство ${o.number} создан` : 'Работа создана') + (kindV === 'prod' ? '' : ' — добавьте к ней точки на вкладке «Карта объектов»')); }
     }
     if (kind === 'income') {
       const L = cleanLines(ui.incLines);
