@@ -796,9 +796,13 @@ async function api(req, res, url) {
     if (!mayReport) return fail(res, 403, 'Это не ваша точка');
     const touch = () => { pl.reportAt = new Date().toISOString(); pl.reportBy = user.id; j.updatedAt = pl.reportAt; j.updatedBy = user.id; };
     pl.photos = pl.photos || {};
-    // a closed point stays editable for the worker for 24 hours; managers and the leader may always correct it
-    const boss = mayEditJob(user, j) || j.leaderId === user.id;
-    if (pl.doneAt && !boss && Date.now() - Date.parse(pl.doneAt) > 864e5 && m !== 'GET') return fail(res, 409, 'Прошло больше суток после закрытия точки — изменить данные может руководитель');
+    // a closed point: the worker may correct it for 24 hours; after that — and always for other people's points — only the administrator.
+    // «Руководитель» sees closed points but does not change them
+    const adm = user.role === 'admin';
+    if (pl.doneAt && m !== 'GET' && !adm) {
+      if (HEAD(user) && pl.doneBy !== user.id) return fail(res, 403, 'Изменять и удалять выполненные точки может администратор');
+      if (Date.now() - Date.parse(pl.doneAt) > 864e5) return fail(res, 409, 'Прошло больше суток после закрытия точки — изменить данные может администратор');
+    }
     if (p[5] === 'done' && m === 'POST') {
       const b = await readJsonBody(req), notWorking = !!b.notWorking;
       const missing = (j.photoSpec || []).filter(n => !pl.photos[n]);
@@ -814,10 +818,17 @@ async function api(req, res, url) {
       saveDb();
       return send(res, 200, { ok: true, place: pl, left, status: j.status, rev: db.rev });
     }
+    /* the administrator deletes what was done at a point: photos, comment and the mark go, the point is again
+       in the list of the employee it is assigned to */
     if (p[5] === 'done' && m === 'DELETE') {
-      if (!boss) return fail(res, 403, 'Открыть точку снова может руководитель');
-      delete pl.doneAt; delete pl.doneBy; if (j.status === 'done') j.status = 'work';
-      touch(); saveDb();
+      if (!adm) return fail(res, 403, 'Удалить выполнение точки может администратор');
+      const ph = pl.photos || {}, files = [...Object.entries(ph).filter(([k]) => k !== '_extra').map(([, f]) => f), ...(ph._extra || [])];
+      for (const f of files) if (f && f.id && db.files[f.id]) { delete db.files[f.id]; try { fs.unlinkSync(path.join(filesDir(), f.id)); } catch {} }
+      ['doneAt', 'doneBy', 'notWorking', 'comment', 'editedAt', 'editedBy', 'reportAt', 'reportBy'].forEach(k => delete pl[k]); pl.photos = {};
+      pl.clearedAt = new Date().toISOString(); pl.clearedBy = user.id;
+      if (j.status === 'done') { j.status = 'work'; j.doneAt = null; j.doneBy = null; }
+      j.updatedAt = pl.clearedAt; j.updatedBy = user.id;
+      saveDb();
       return send(res, 200, { ok: true, place: pl, rev: db.rev });
     }
     if (p[5] === 'photo' && m === 'POST') {

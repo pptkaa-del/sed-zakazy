@@ -383,6 +383,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .bar{position:absolute;top:7px;height:22px;border-radius:5px;border:0;cursor:pointer;color:var(--sheet);font-size:12px;font-weight:500;padding:0 6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar.buy{background:var(--stamp)}
 .bar.work{background:var(--work)}
+.jdlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.jd{border:1px solid var(--rule);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--sheet)}.jd-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.jd-h small{display:block}.jd .tw{display:inline-flex;flex-direction:column;gap:2px;align-items:center}.jd .tw small{font-size:11px}
 .jplan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}.jplan li{display:flex;gap:10px;align-items:flex-start;padding:6px;border-radius:8px}.jplan li.click{cursor:pointer}.jplan li.click:hover{background:var(--paper)}.jplan .dot{margin-top:6px;flex:none}.jplan small{display:block}
 .bar.prod{background:#7B5BD6}.bar.mount{background:#E07B00}
 .bar.done{opacity:.45}
@@ -980,7 +981,7 @@ async function refresh(){
   $('banner').hidden = true;
   render();
   if (ui.drawer?.kind === 'invoice' && !drawerBusy() && !$('drawer').querySelector('form')) renderDrawer();
-  if ((ui.drawer?.kind === 'job' || ui.drawer?.kind === 'place' || ui.drawer?.kind === 'wdo') && !drawerBusy()) renderDrawer();
+  if ((ui.drawer?.kind === 'job' || ui.drawer?.kind === 'place' || ui.drawer?.kind === 'wdo' || ui.drawer?.kind === 'jobDone') && !drawerBusy()) renderDrawer();
   const nNew = S.jobs.filter(j => j.status === 'new' && (j.workers || []).includes(me?.id)).length;
   $('jobBadge').hidden = !nNew; $('jobBadge').textContent = nNew;
   if (isWorker()) { const left = wPoints(false).length; $('wBadge').hidden = !left; $('wBadge').textContent = left; }
@@ -1809,7 +1810,11 @@ function jobPlacesHtml(j){
 /* photo report at a point of a job */
 const placeDone = (j, pl) => { const need = j.photoSpec || []; const ph = pl.photos || {}; const got = need.filter(n => ph[n]).length; return { need: need.length, got, extra: (ph._extra || []).length, full: need.length ? got === need.length : !!((ph._extra || []).length || pl.comment) }; };
 const placeColor = (j, pl) => { if (pl.doneAt) return pl.notWorking ? '#C0392B' : '#1E9E4F'; const r = placeDone(j, pl); return (r.got || r.extra || pl.comment) ? '#E08A00' : null; };
-const canReport = (j, pl) => me && (mayEditJob(j) || j.leaderId === me.id || ((j.workers || []).includes(me.id) && (pl.assignee ? pl.assignee === me.id : (j.workers || []).length === 1)));
+const isAdmin = () => me && me.role === 'admin';
+const HEADish = () => me && (me.role === 'admin' || me.role === 'head');
+// a closed point: the administrator always, the one who closed it — for 24 hours; «Руководитель» only looks
+const canReport = (j, pl) => me && (pl.doneAt ? isAdmin() || (pl.doneBy === me.id && Date.now() - Date.parse(pl.doneAt) < 864e5)
+  : (mayEditJob(j) || j.leaderId === me.id || ((j.workers || []).includes(me.id) && (pl.assignee ? pl.assignee === me.id : (j.workers || []).length === 1))));
 function placeUpdate(jid, place){
   const j = jobOf(jid); if (!j) return; const k = (j.places || []).findIndex(x => x.id === place.id); if (k >= 0) j.places[k] = place;
   if (ui.drawer?.kind === 'place' || ui.drawer?.kind === 'wdo') renderDrawer();
@@ -2647,7 +2652,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('full', kind === 'wdo'); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport');
+function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('full', kind === 'wdo'); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
@@ -2967,7 +2972,7 @@ function renderDrawer(){
       <dl class="kv"><dt>Координаты</dt><dd class="mono">${pl.lat.toFixed(6)}, ${pl.lng.toFixed(6)} · <a href="${routeUrl(pl)}" target="_blank" rel="noopener">Маршрут</a></dd>
         ${pl.assignee ? `<dt>Исполнитель</dt><dd>${esc(who(pl.assignee))}</dd>` : ''}
         ${pl.reportAt ? `<dt>Отчёт</dt><dd>${esc(who(pl.reportBy))}, ${esc(fmtDT(pl.reportAt))}</dd>` : ''}
-        <dt>Статус</dt><dd>${pl.doneAt ? `<span class="chip c-ok">Закрыта</span> ${esc(fmtDT(pl.doneAt))} · ${esc(who(pl.doneBy))}${pl.notWorking ? ' · <span class="chip c-bad">Не работает</span>' : ''}${mayEditJob(j) || j.leaderId === me.id ? ` ${armBtn('reopen:' + pid, 'Открыть снова', 'placeReopen', jid + '|' + pid, 'btn sm')}` : ''}` : '<span class="chip c-info">Не закрыта</span>'}</dd></dl>
+        <dt>Статус</dt><dd>${pl.doneAt ? `<span class="chip c-ok">Закрыта</span> ${esc(fmtDT(pl.doneAt))} · ${esc(who(pl.doneBy))}${pl.notWorking ? ' · <span class="chip c-bad">Не работает</span>' : ''}${isAdmin() ? ` ${armBtn('clear:' + pid, 'Удалить выполнение', 'placeClear', jid + '|' + pid, 'btn sm')}` : ''}` : '<span class="chip c-info">Не закрыта</span>'}</dd></dl>
       ${(j.photoSpec || []).length ? `<div class="box"><h4>Нужные фото · ${r.got} из ${r.need}</h4>
         <ul class="slots">${j.photoSpec.map(n => `<li class="${ph[n] ? 'ok' : ''}"><div><b>${ph[n] ? '✓ ' : ''}${esc(n)}</b>${ph[n] ? `<small class="dim">${esc(who(ph[n].by))}, ${esc(fmtDT(ph[n].at))}</small>` : '<small class="dim">ещё нет фото</small>'}</div>
           ${ph[n] ? thumb(ph[n]) : ''}<div class="row-g">${upl(n, ph[n] ? 'Переснять' : 'Сфотографировать')}${ph[n] && can ? `<button class="btn sm ghost" data-act="placePhotoDel" data-id="${jid}|${pid}|${esc(n)}" aria-label="Удалить фото">✕</button>` : ''}</div></li>`).join('')}</ul></div>` : ''}
@@ -2976,8 +2981,30 @@ function renderDrawer(){
         <div class="row-g">${upl('', 'Сфотографировать', true)}</div></div>
       <div class="box"><h4>Комментарий (по желанию)</h4>
         ${can ? `<span data-keep style="display:contents"><textarea class="in" id="pl-comment" rows="3">${esc(pl.comment || '')}</textarea></span><div class="row-g"><button class="btn sm primary" data-act="placeComment" data-id="${jid}|${pid}">Сохранить комментарий</button></div>` : `<p class="jdesc" style="margin:0">${esc(pl.comment || '—')}</p>`}</div>
+      ${pl.doneAt && can ? `<div class="box"><h4>Отметка при закрытии</h4><label class="nwchk ${pl.notWorking ? 'on' : ''}"><input type="checkbox" id="pl-nw" ${pl.notWorking ? 'checked' : ''}> <b>Не работает</b></label><div class="row-g" style="margin-top:8px"><button class="btn sm primary" data-act="placeNw" data-id="${jid}|${pid}">Сохранить отметку</button></div></div>` : ''}
+      ${pl.doneAt && !can && HEADish() ? '<p class="box dim" style="margin:0">Выполненную точку изменяет или удаляет администратор.</p>' : ''}
       <div class="err" id="ferr"></div>
       ${r.full ? '<p class="ok-t" style="margin:0">✓ По этой точке всё сделано.</p>' : ''}
+    </div>`;
+  }
+  if (d.kind === 'jobDone') {
+    const j = jobOf(d.id); if (!j) return closeDrawer();
+    const done = (j.places || []).filter(x => x.doneAt), ppl = [...new Set(done.map(x => x.doneBy || x.assignee || ''))];
+    const list = done.filter(x => (!ui.jdWho || (x.doneBy || x.assignee || '') === ui.jdWho) && (!ui.jdDay || localDay(x.doneAt) === ui.jdDay)).sort((a, b) => b.doneAt.localeCompare(a.doneAt));
+    const thumb = f => `<a href="/files/${f.id}" target="_blank" rel="noopener" class="thumb"><img src="/files/${f.id}" alt="${esc(f.name)}" loading="lazy"></a>`;
+    const photosOf = pl => { const ph = pl.photos || {}; return [...(j.photoSpec || []).filter(n => ph[n]).map(n => ({ ...ph[n], cap: n })), ...(ph._extra || []).map(f => ({ ...f, cap: 'доп.' }))]; };
+    const card = pl => { const P = photosOf(pl); return `<li class="jd">
+        <div class="jd-h"><div><b>${esc(pl.label || 'Точка')}</b><small class="dim">${esc(who(pl.doneBy))} · ${esc(fmtDT(pl.doneAt))}${pl.editedAt ? ' · изменено ' + esc(fmtDT(pl.editedAt)) : ''}</small></div>${pl.notWorking ? '<span class="chip c-bad">Не работает</span>' : '<span class="chip c-ok">Выполнена</span>'}</div>
+        ${pl.comment ? `<p class="jdesc" style="margin:0">${esc(pl.comment)}</p>` : ''}
+        ${P.length ? `<div class="thumbs">${P.map(f => `<span class="tw" title="${esc(f.cap)}">${thumb(f)}<small class="dim">${esc(f.cap)}</small></span>`).join('')}</div>` : '<small class="dim">Фото нет</small>'}
+        <div class="row-g"><button class="btn sm" data-act="openPlace" data-id="${j.id}|${pl.id}">${isAdmin() ? 'Изменить' : 'Подробнее'}</button>${isAdmin() ? armBtn('jdclear:' + pl.id, 'Удалить выполнение', 'placeClear', j.id + '|' + pl.id, 'btn sm') : ''}</div></li>`; };
+    D.innerHTML = dh(`Выполненные точки · № ${jobNo(j)}`) + `<div class="d-body">
+      <p style="margin:0"><b>${esc(j.title)}</b> · закрыто ${done.length} из ${(j.places || []).length}</p>
+      <div class="row-g"><select class="in" id="jd-who" style="width:auto"><option value="">Все исполнители</option>${ppl.map(id => `<option value="${esc(id)}" ${ui.jdWho === id ? 'selected' : ''}>${esc(id ? who(id) : 'Без исполнителя')} · ${done.filter(x => (x.doneBy || x.assignee || '') === id).length}</option>`).join('')}</select>
+        <input class="in" type="date" id="jd-day" value="${esc(ui.jdDay || '')}" max="${today()}" style="width:auto" aria-label="День">${ui.jdDay ? '<button class="btn sm ghost" data-act="jdDayClear">Все дни</button>' : ''}</div>
+      ${isAdmin() ? '<p class="dim" style="margin:0;font-size:13px">«Удалить выполнение» убирает фото, комментарий и отметку — точка возвращается в список назначенного сотрудника.</p>' : '<p class="dim" style="margin:0;font-size:13px">Изменять и удалять выполненные точки может администратор.</p>'}
+      ${list.length ? `<ul class="jdlist">${list.slice(0, 300).map(card).join('')}</ul>${list.length > 300 ? `<p class="dim">Показаны 300 из ${list.length}.</p>` : ''}` : '<div class="empty" style="padding:18px">Нет выполненных точек по выбранному фильтру.</div>'}
+      <div class="row-g"><button class="btn sm" data-act="openJob" data-id="${j.id}">← К работе</button><button class="btn sm" data-act="close">Закрыть</button></div>
     </div>`;
   }
   if (d.kind === 'jobReport') {
@@ -2991,7 +3018,7 @@ function renderDrawer(){
         <span style="flex:1"></span><button class="btn sm primary" data-act="repExport" data-id="${j.id}">Скачать Excel</button></div>
       ${!(j.places || []).length ? '<p class="dim" style="margin:0">У работы пока нет точек — отчёт появится, когда точки будут добавлены и назначены.</p>' : `
       <div class="tscroll"><table class="rep"><thead><tr><th>Исполнитель</th><th class="r">Назначено</th><th class="r">${isToday ? 'Сегодня' : 'За ' + fmtD(day)}</th><th class="r">За всё время</th><th class="r">Осталось</th><th class="r">Не работает</th><th>Последняя</th></tr></thead><tbody>
-        ${R.rows.map(r => `<tr class="${r.id ? '' : 'free'}"><td><b>${esc(r.name)}</b>${r.role ? `<small>${esc(r.role)}</small>` : ''}</td><td class="r mono">${r.assigned}</td><td class="r mono ${r.day ? 'hi' : ''}">${r.day}</td><td class="r mono">${r.total}${r.assigned ? `<span class="wbar"><i style="width:${Math.round(r.total / r.assigned * 100)}%"></i></span>` : ''}</td><td class="r mono">${r.left}</td><td class="r mono">${r.nw || ''}</td><td><small>${r.last ? esc(fmtDT(r.last)) : '—'}</small></td></tr>`).join('')}
+        ${R.rows.map(r => `<tr class="${r.id ? '' : 'free'}"><td>${r.total && HEADish() ? `<button class="linkish" data-act="jobDone" data-id="${j.id}|${esc(r.id || '')}" title="Выполненные точки"><b>${esc(r.name)}</b></button>` : `<b>${esc(r.name)}</b>`}${r.role ? `<small>${esc(r.role)}</small>` : ''}</td><td class="r mono">${r.assigned}</td><td class="r mono ${r.day ? 'hi' : ''}">${r.day}</td><td class="r mono">${r.total}${r.assigned ? `<span class="wbar"><i style="width:${Math.round(r.total / r.assigned * 100)}%"></i></span>` : ''}</td><td class="r mono">${r.left}</td><td class="r mono">${r.nw || ''}</td><td><small>${r.last ? esc(fmtDT(r.last)) : '—'}</small></td></tr>`).join('')}
         <tr class="sum"><td>Итого</td><td class="r mono">${R.sum.assigned}</td><td class="r mono">${R.sum.day}</td><td class="r mono">${R.sum.total}</td><td class="r mono">${R.sum.assigned - R.sum.total}</td><td class="r mono">${R.sum.nw || ''}</td><td></td></tr>
       </tbody></table></div>
       <div class="box"><h4>По дням</h4>${R.byDay.length ? `<div class="tscroll"><table class="rep days"><thead><tr><th>Дата</th>${R.ids.map(id => `<th class="r">${esc(who(id))}</th>`).join('')}<th class="r">Всего</th></tr></thead><tbody>
@@ -3023,7 +3050,7 @@ function renderDrawer(){
           <span class="wbar"><i style="width:${Math.round(closed / P.length * 100)}%"></i></span>
           <table class="pers"><tbody>${Object.entries(byPerson).sort((x, y) => (x[0] ? 0 : 1) - (y[0] ? 0 : 1) || who(x[0]).localeCompare(who(y[0]), 'ru')).map(([id, r]) => `<tr><td>${id ? esc(who(id)) : '<span class="warn-t">без исполнителя</span>'}</td><td class="mono">${r.c} / ${r.t}</td></tr>`).join('')}</tbody></table>`
           : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Карта объектов»: выделите точки → «Добавить точки к работе».</p>'}
-        <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в карте объектов</button>` : ''}</div></div>
+        <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${HEADish() && closed ? `<button class="btn sm" data-act="jobDone" data-id="${j.id}">Выполненные точки · ${closed}</button>` : ''}${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в карте объектов</button>` : ''}</div></div>
       ${jobPlanBox(j)}
       ${jobPhotoBox(j)}
       ${jobAssignBox(j)}
@@ -3607,6 +3634,7 @@ async function act(el){
     case 'wlKind': ui.wlKind = id; return render();
     case 'jobReport': ui.repDay = today(); return openDrawer('jobReport', id);
     case 'repDay': ui.repDay = id; return renderDrawer();
+    case 'jdDayClear': ui.jdDay = ''; return renderDrawer();
     case 'noteAdd': return noteAdd();
     case 'noteDel': { const n = NOTES.find(x => x.id === id); if (!n) return; if (!n.done && !confirm('Удалить заметку «' + n.text.slice(0, 60) + '»?')) return;
       try { await api('DELETE', '/api/notes/' + id); NOTES = NOTES.filter(x => x.id !== id); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
@@ -3652,6 +3680,10 @@ async function act(el){
       } catch(e) { $('ferr').textContent = errText(e); el.disabled = false; }
       return;
     }
+    case 'placeClear': { const [jid, pid] = id.split('|'); try { const r = await api('DELETE', `/api/jobs/${jid}/places/${pid}/done`); placeUpdate(jid, r.place); await refresh(); renderDrawer(); toast('Выполнение удалено — точка снова у сотрудника' + (r.place.assignee ? ' «' + who(r.place.assignee) + '»' : '')); } catch(e) { toast(errText(e)); } return; }
+    case 'placeNw': { const [jid, pid] = id.split('|'), pl = (jobOf(jid)?.places || []).find(x => x.id === pid); if (!pl) return;
+      try { const r = await api('POST', `/api/jobs/${jid}/places/${pid}/done`, { notWorking: $('pl-nw').checked, comment: $('pl-comment') ? $('pl-comment').value : pl.comment || '' }); placeUpdate(jid, r.place); toast('Сохранено'); } catch(e) { const f = $('ferr'); if (f) f.textContent = errText(e); else toast(errText(e)); } return; }
+    case 'jobDone': { const [jid, who_] = String(id).split('|'); ui.jdWho = who_ ?? ''; ui.jdDay = ''; return openDrawer('jobDone', jid); }
     case 'placeReopen': { const [jid, pid] = id.split('|'); try { const r = await api('DELETE', `/api/jobs/${jid}/places/${pid}/done`); placeUpdate(jid, r.place); toast('Точка снова открыта'); } catch(e) { toast(errText(e)); } return; }
     case 'placeComment': {
       const [jid, pid] = id.split('|');
@@ -3879,6 +3911,9 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.note) { const n = NOTES.find(x => x.id === t.dataset.note); if (n) { n.done = t.checked; n.doneAt = t.checked ? new Date().toISOString() : null; n.doneBy = t.checked ? me.id : null; render(); }
     try { await api('PATCH', '/api/notes/' + t.dataset.note, { done: t.checked }); } catch(e) { toast(errText(e)); } refresh().catch(() => {}); return; }
+  if (t.id === 'jd-who') { ui.jdWho = t.value; return renderDrawer(); }
+  if (t.id === 'jd-day') { ui.jdDay = t.value; return renderDrawer(); }
+  if (t.id === 'pl-nw') { t.closest('.nwchk').classList.toggle('on', t.checked); return; }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
