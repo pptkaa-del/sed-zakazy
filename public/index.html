@@ -537,6 +537,9 @@ table.pers{border-collapse:collapse;font-size:14px}table.pers td{padding:3px 14p
 .note-list{list-style:none;margin:0;padding:0;border:1px solid var(--rule);border-radius:12px;background:var(--paper);overflow:hidden}.note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-top:1px solid var(--rule-2)}.note:first-child{border-top:0}
 .note-cb{padding-top:2px}.note-cb input{width:20px;height:20px;cursor:pointer}.note-t{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}.note-t small{display:block;font-size:12px;color:var(--ink-2);margin-top:2px;white-space:normal}
 .note.done .note-t>div{text-decoration:line-through;color:var(--ink-2)}
+.note.urgent{background:color-mix(in srgb,var(--bad) 9%,var(--sheet));box-shadow:inset 4px 0 0 var(--bad)}.note.urgent .note-t>div{color:var(--bad);font-weight:600}
+.note-acts{display:flex;flex-direction:column;gap:2px;align-items:center}.note-urg{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--ink-2);margin-top:4px;cursor:pointer}.note-urg input{width:16px;height:16px;accent-color:var(--bad)}
+.note.urgent .note-urg{color:var(--bad);font-weight:600}.note-urg-new{margin:6px 2px 0}.note-t{white-space:normal}.note-t>div{white-space:pre-wrap}.note-t small{margin-top:2px}.note-urg{display:flex;width:max-content}.note-ed{width:100%;min-height:70px;font:inherit}
 table.rep{width:100%;border-collapse:collapse;font-size:14px}table.rep th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule);font-weight:500;white-space:nowrap}
 table.rep td{padding:7px 8px;border-bottom:1px solid var(--rule-2);vertical-align:top}table.rep .r{text-align:right}table.rep td small{display:block;font-size:12px;color:var(--ink-2)}
 table.rep td.hi{color:var(--ok);font-weight:700}table.rep tr.sum td{font-weight:700;border-top:2px solid var(--rule)}table.rep tr.free td{color:var(--warn)}
@@ -2595,14 +2598,22 @@ function vBackups(){
 /* ---------- «Заметки»: a personal to-do list ---------- */
 let NOTES = [];
 function vNotes(){
-  const open = NOTES.filter(n => !n.done), done = NOTES.filter(n => n.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
-  const row = n => `<li class="note ${n.done ? 'done' : ''}">
+  // «В первую очередь» goes first (the last marked on top), then the rest, newest first
+  const open = NOTES.filter(n => !n.done).sort((a, b) => (!!b.urgent - !!a.urgent) || String(b.urgent ? b.urgentAt || '' : b.at).localeCompare(String(a.urgent ? a.urgentAt || '' : a.at)));
+  const done = NOTES.filter(n => n.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
+  const row = n => { const ed = ui.noteEdit === n.id; return `<li class="note ${n.done ? 'done' : ''} ${n.urgent && !n.done ? 'urgent' : ''}">
       <label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label>
-      <div class="note-t"><div>${esc(n.text)}</div><small>${esc(fmtDT(n.at))}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}` : ''}</small></div>
-      <button class="btn ghost sm" type="button" data-act="noteDel" data-id="${esc(n.id)}" title="Удалить" aria-label="Удалить">✕</button>
-    </li>`;
+      <div class="note-t">${ed ? `<span data-keep style="display:contents"><textarea class="in note-ed" id="note-ed" rows="3" maxlength="2000">${esc(n.text)}</textarea></span>
+          <div class="row-g" style="margin-top:6px"><button class="btn sm primary" type="button" data-act="noteSave" data-id="${esc(n.id)}">Сохранить</button><button class="btn sm" type="button" data-act="noteEditCancel">Отмена</button></div>`
+        : `<div>${esc(n.text)}</div>`}
+        <small>${esc(fmtDT(n.at))}${n.editedAt ? ' · изменено ' + esc(fmtDT(n.editedAt)) : ''}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}` : ''}</small>
+        ${n.done ? '' : `<label class="note-urg"><input type="checkbox" data-noteurg="${esc(n.id)}" ${n.urgent ? 'checked' : ''}> В первую очередь</label>`}</div>
+      <div class="note-acts"><button class="btn ghost sm" type="button" data-act="noteDel" data-id="${esc(n.id)}" title="Удалить" aria-label="Удалить">✕</button>
+        ${ed ? '' : `<button class="btn ghost sm" type="button" data-act="noteEdit" data-id="${esc(n.id)}" title="Изменить" aria-label="Изменить">✎</button>`}</div>
+    </li>`; };
   return `<div class="notes">
     <div class="note-add" data-keep><textarea id="note-new" rows="1" maxlength="2000" aria-label="Новая заметка"></textarea><button class="btn primary" type="button" data-act="noteAdd">Добавить</button></div>
+    <label class="note-urg note-urg-new"><input type="checkbox" id="note-new-urg" ${ui.noteNewUrg ? 'checked' : ''}> В первую очередь</label>
     <div class="dim note-hint">Enter — добавить, Shift+Enter — новая строка. Заметки видите только вы.</div>
     ${NOTES.length ? '' : '<div class="empty"><h3>Заметок пока нет</h3>Напишите задачу в поле выше.</div>'}
     ${open.length ? `<ul class="note-list">${open.map(row).join('')}</ul>` : NOTES.length ? '<div class="dim note-hint">Все заметки выполнены.</div>' : ''}
@@ -2612,7 +2623,7 @@ function vNotes(){
 async function noteAdd(){
   const t = $('note-new'), text = t.value.trim();
   if (!text) { t.focus(); return toast('Напишите текст заметки'); }
-  try { const r = await api('POST', '/api/notes', { text }); NOTES.unshift(r.note); t.value = ''; t.style.height = ''; t.blur(); render(); $('note-new')?.focus(); refresh().catch(() => {}); }
+  try { const r = await api('POST', '/api/notes', { text, urgent: !!$('note-new-urg')?.checked }); NOTES.unshift(r.note); ui.noteNewUrg = false; t.value = ''; t.style.height = ''; t.blur(); render(); $('note-new')?.focus(); refresh().catch(() => {}); }
   catch(e) { toast(errText(e)); }
 }
 
@@ -3755,6 +3766,10 @@ async function act(el){
     case 'dtShowAll': Object.keys(DT_SHOW).forEach(k => DT_SHOW[k] = true); ui.dtOnlyCheck = false; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} prefsSave({ dtShow: { ...DT_SHOW } }); return renderDt();
     case 'jdDayClear': ui.jdDay = ''; return renderDrawer();
     case 'noteAdd': return noteAdd();
+    case 'noteEdit': ui.noteEdit = id; render(); { const t = $('note-ed'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } } return;
+    case 'noteEditCancel': ui.noteEdit = null; document.activeElement?.blur(); return render();
+    case 'noteSave': { const text = ($('note-ed')?.value || '').trim(); if (!text) return toast('Напишите текст заметки');
+      try { const r = await api('PATCH', '/api/notes/' + id, { text }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); ui.noteEdit = null; document.activeElement?.blur(); render(); toast('Заметка изменена'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'noteDel': { const n = NOTES.find(x => x.id === id); if (!n) return; if (!n.done && !confirm('Удалить заметку «' + n.text.slice(0, 60) + '»?')) return;
       try { await api('DELETE', '/api/notes/' + id); NOTES = NOTES.filter(x => x.id !== id); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'noteClear': { const ids = NOTES.filter(x => x.done).map(x => x.id); if (!confirm(`Удалить выполненные заметки (${ids.length})?`)) return;
@@ -3971,6 +3986,8 @@ document.addEventListener('keydown', e => {
   if (e.target.dataset?.ph !== undefined && e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('[data-act=phAdd]'); if (b) act(b); return; }
   if (e.target.id === 'dt-other' && e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('[data-act=dtOtherSave]'); if (b) act(b); return; }
   if (e.target.id === 'note-new' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); noteAdd(); return; }
+  if (e.target.id === 'note-ed' && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); const b = document.querySelector('[data-act=noteSave]'); if (b) act(b); return; }
+  if (e.target.id === 'note-ed' && e.key === 'Escape') { e.preventDefault(); ui.noteEdit = null; e.target.blur(); render(); return; }
   if (e.target.id === 'feat-new' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); const b = document.querySelector('[data-act=addFeat]'); if (b) act(b); return; }
   if (e.target.dataset?.feat && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.target.blur(); return; }
   if (e.target.id === 'f-cust') {
@@ -4030,6 +4047,9 @@ document.addEventListener('toggle', e => { const d = e.target; if (d.matches && 
 document.addEventListener('click', e => { if (ui.dtMenu && !e.target.closest('details[data-menu]')) { ui.dtMenu = null; document.querySelectorAll('details[data-menu][open]').forEach(d => d.open = false); } });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.id === 'note-new-urg') { ui.noteNewUrg = t.checked; return; }
+  if (t.dataset.noteurg) { const n = NOTES.find(x => x.id === t.dataset.noteurg); if (n) { n.urgent = t.checked; n.urgentAt = t.checked ? new Date().toISOString() : null; render(); }
+    try { await api('PATCH', '/api/notes/' + t.dataset.noteurg, { urgent: t.checked }); } catch(e) { toast(errText(e)); } refresh().catch(() => {}); return; }
   if (t.dataset.note) { const n = NOTES.find(x => x.id === t.dataset.note); if (n) { n.done = t.checked; n.doneAt = t.checked ? new Date().toISOString() : null; n.doneBy = t.checked ? me.id : null; render(); }
     try { await api('PATCH', '/api/notes/' + t.dataset.note, { done: t.checked }); } catch(e) { toast(errText(e)); } refresh().catch(() => {}); return; }
   if (t.id === 'jd-who') { ui.jdWho = t.value; return renderDrawer(); }
