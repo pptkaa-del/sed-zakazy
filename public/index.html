@@ -929,8 +929,9 @@ const contactsOf = c => Array.isArray(c?.contacts) && c.contacts.length ? c.cont
 const siteUrl = s => /^https?:\/\//i.test(s) ? s : 'https://' + s;
 const custName = o => (o && (cpOf(o.customerId)?.name || o.customer)) || '';
 const brigadesOf = t => t.brigades != null ? (Number(t.brigades) || 0) : (t.contractors ? 1 : 0);
-const crew = t => [t.people ? `${t.people} чел.` : '', brigadesOf(t) ? `${brigadesOf(t)} бр. подрядчиков` : ''].filter(Boolean).join(' + ');
-const crewShort = t => [t.people ? `${t.people} чел.` : '', brigadesOf(t) ? `${brigadesOf(t)} бр.` : ''].filter(Boolean).join(' + ');
+const plural = (n, one, few, many) => { const m = n % 100, k = n % 10; return m > 10 && m < 20 ? many : k === 1 ? one : k >= 2 && k <= 4 ? few : many; };
+const crew = t => [t.people ? `${t.people} чел.` : '', brigadesOf(t) ? `${brigadesOf(t)} ${plural(brigadesOf(t), 'подрядчик', 'подрядчика', 'подрядчиков')}` : ''].filter(Boolean).join(' + ');
+const crewShort = t => [t.people ? `${t.people} чел.` : '', brigadesOf(t) ? `${brigadesOf(t)} подр.` : ''].filter(Boolean).join(' + ');
 function nextOrderNumber(){
   const parsed = S.orders.map(o => /^(.*?)(\d+)$/.exec(String(o.number||'').trim())).filter(Boolean);
   if (!parsed.length) return 'З-1';
@@ -1343,7 +1344,7 @@ function vWorks(){
     <select class="f" id="wOrd" aria-label="Заказ"><option value="">Все заказы</option><option value="_" ${ui.wOrd==='_'?'selected':''}>Общие работы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.wOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
     <button class="btn primary" data-act="newTask" data-id="${ui.wOrd && ui.wOrd !== '_' ? ui.wOrd : ''}">+ Работа</button>
   </div>
-  <div class="wsum"><span>Сейчас в работе: <b>${now.length}</b></span><span>своих людей: <b>${people}</b></span><span>бригад подрядчиков: <b>${brig}</b></span></div>`;
+  <div class="wsum"><span>Сейчас в работе: <b>${now.length}</b></span><span>своих людей: <b>${people}</b></span><span>подрядчиков: <b>${brig}</b></span></div>`;
   if (!all.length) return head + `<div class="empty"><h3>Работ пока нет</h3>Добавьте работу или закупку с датами, ответственным и количеством людей. Они появятся и здесь, и в план-графике.</div>`;
   const groups = [
     ['now', 'Сейчас', t => !t.done && dnum(t.start) <= tn],
@@ -2582,7 +2583,7 @@ function vPlan(){
     ${canEdit() ? `<button class="btn primary" data-act="newTask" data-id="${ui.planOrd && ui.planOrd !== '_' ? 'j:' + ui.planOrd : ''}">+ Задача</button>` : ''}
     <div class="legend"><span><i class="dot prod"></i>Изготовление</span><span><i class="dot mount"></i>Монтаж</span><span><i class="dot work" style="background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.45) 0 2px,transparent 2px 4px)"></i>С подрядчиками</span><span><i class="dot" style="background:var(--bad);width:2px;height:14px"></i>Сегодня</span><span><i class="dot" style="border-left:2px dashed var(--warn);border-radius:0;width:2px;height:14px"></i>Срок работы</span></div>
   </div>`;
-  if (!tasks.length) return head + `<div class="empty"><h3>${S.tasks.length ? 'Нет задач по выбранному фильтру' : 'План-график пуст'}</h3>График строится из задач, которые вносятся здесь: «+ Задача» → работа, тип (изготовление или монтаж), даты начала и окончания, сколько своих людей и бригад подрядчиков.${PJ.length ? '' : ' Сначала создайте работу на вкладке «Работы».'}</div>`;
+  if (!tasks.length) return head + `<div class="empty"><h3>${S.tasks.length ? 'Нет задач по выбранному фильтру' : 'План-график пуст'}</h3>График строится из задач, которые вносятся здесь: «+ Задача» → работа, тип (изготовление или монтаж), даты начала и окончания, сколько своих людей и подрядчиков.${PJ.length ? '' : ' Сначала создайте работу на вкладке «Работы».'}</div>`;
   const tn = dnum(today());
   let lo = Math.min(tn, ...tasks.map(t => dnum(t.start))) - 3;
   let hi = Math.max(tn, ...tasks.map(t => dnum(t.end))) + 10;
@@ -2639,7 +2640,7 @@ function vPlan(){
   };
   const hasPeople = per.some(Boolean), hasCon = con.some(Boolean);
   if (hasPeople) rows += `<div class="g-row g-load"><div class="g-lab">Своих людей${ui.scale==='week'?' (макс. в неделю)':' в день'}</div>${track(cells(per,'p'))}</div>`;
-  if (hasCon) rows += `<div class="g-row g-load"><div class="g-lab">Бригад подрядчиков${ui.scale==='week'?' (макс.)':' в день'}</div>${track(cells(con,'c'))}</div>`;
+  if (hasCon) rows += `<div class="g-row g-load"><div class="g-lab">Подрядчиков${ui.scale==='week'?' (макс.)':' в день'}</div>${track(cells(con,'c'))}</div>`;
   return head + `<div class="gantt ${ui.scale}" style="--dw:${DW}px"><div style="width:calc(var(--lw) + ${W}px)">
     <div class="g-row g-head"><div class="g-lab">Задача</div><div class="g-track" style="width:${W}px">${months}${weeks}</div></div>${rows}
   </div></div>`;
@@ -3115,7 +3116,7 @@ function renderDrawer(){
       <label>Начало<input class="in" type="date" id="t-start" value="${esc(st)}" required></label>
       <label>Окончание<input class="in" type="date" id="t-end" value="${esc(t?.end || dstr(dnum(st)+7))}" required></label>
       <label>Своих людей, чел.<input class="in mono" type="number" id="t-people" min="0" max="999" step="1" inputmode="numeric" value="${esc(t?.people || '')}"></label>
-      <label>Бригад подрядчиков<input class="in mono" type="number" id="t-brig" min="0" max="99" step="1" inputmode="numeric" value="${esc(t ? (brigadesOf(t) || '') : '')}"></label>
+      <label>Подрядчиков<input class="in mono" type="number" id="t-brig" min="0" max="99" step="1" inputmode="numeric" value="${esc(t ? (brigadesOf(t) || '') : '')}"></label>
       <label class="wide chk"><input type="checkbox" id="t-done" ${t?.done?'checked':''}> Выполнено</label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${t?'Сохранить':'Добавить в график'}</button><button class="btn" type="button" data-act="close">Отмена</button>${t?armBtn('task','Удалить','delTask',t.id):''}</div></form>`;
@@ -3408,7 +3409,7 @@ async function onSubmit(e){
       if (!s || !en) return fail('Укажите даты начала и окончания.');
       if (en < s) return fail('Окончание не может быть раньше начала.');
       const brigades = val('t-brig') === '' ? 0 : Math.round(num(val('t-brig')));
-      if (brigades < 0 || brigades > 99) return fail('Бригад подрядчиков — от 0 до 99.');
+      if (brigades < 0 || brigades > 99) return fail('Подрядчиков — от 0 до 99.');
       const data = { jobId, kind:tk, resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
         people, brigades, contractors: brigades > 0, contractorsNote: '' };
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
