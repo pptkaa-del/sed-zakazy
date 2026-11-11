@@ -488,6 +488,8 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .wbar{display:block;height:5px;border-radius:3px;background:var(--mute-soft);overflow:hidden;margin-top:3px}.wbar i{display:block;height:100%;background:var(--ok)}
 #wmap{height:calc(100vh - 200px);min-height:420px;border-radius:12px;border:1px solid var(--rule);background:var(--mute-soft);z-index:0}
 .wlistbtn{display:none}
+/* the page is scaled up on a phone in «Версия для ПК»: viewport units have to be scaled back */
+html.forcephone aside.drawer{height:calc(100dvh / var(--pz,1))!important}html.forcephone .wlist{max-height:calc(72vh / var(--pz,1))}
 @media (max-width:820px), (pointer:coarse) and (max-height:540px){
   .wgrid{display:block;position:relative}
   .wlistbtn{display:flex;width:100%;justify-content:space-between;align-items:center;margin:0 0 8px;min-height:48px;font-size:17px;font-weight:600}
@@ -851,6 +853,19 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 
 <script src="/vendor/leaflet/leaflet.js"></script>
 <script>
+/* A phone whose browser ignores the page's viewport setting («Версия для ПК» and some browsers) lays the page out
+   about 980 px wide, so the phone styles never switch on and everything is tiny. Detect it and turn the phone
+   layout on anyway: scale the page to the real screen width and make the phone-width @media rules unconditional. */
+const PAGE_ZOOM = (() => { try {
+  const touch = navigator.maxTouchPoints > 0 || matchMedia('(pointer:coarse)').matches, sw = screen.width;
+  if (!touch || !sw || sw > 820 || innerWidth < sw * 1.25) return 1;
+  const z = innerWidth / sw, root = document.documentElement;
+  root.style.zoom = z; root.style.setProperty('--pz', z); root.classList.add('forcephone');
+  const open = r => { if (r.cssRules) [...r.cssRules].forEach(x => { if (x.media && /max-width\s*:\s*(\d+)px/.test(x.media.mediaText) && !/min-width/.test(x.media.mediaText) && Number(RegExp.$1) >= sw) x.media.mediaText = 'all'; else if (x.cssRules) open(x); }); };
+  [...document.styleSheets].forEach(sh => { try { open(sh); } catch(e) {} });
+  return z;
+} catch(e) { return 1; } })();
+const phoneLayout = () => PAGE_ZOOM > 1 || matchMedia('(max-width:820px), (pointer:coarse) and (max-height:540px)').matches;
 (() => {
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2195,7 +2210,7 @@ function wPopup(j, pl){
 }
 /* two ways to add a photo: the camera, or a picture already on the phone (gallery, files) */
 const photoBtns = (id, slot, label, multi) => `<span class="upl2"><label class="btn sm ${multi ? '' : 'primary'}">📷 ${label}<input type="file" accept="image/*" capture="environment" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label><label class="btn sm">🖼 Загрузить фото<input type="file" accept="image/*" data-up="placePhoto" data-id="${esc(id)}" data-slot="${esc(slot)}" ${multi ? 'multiple' : ''} hidden></label></span>`;
-function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if (matchMedia('(max-width:820px), (pointer:coarse) and (max-height:540px)').matches) { const top = m.getBoundingClientRect().top + scrollY; document.documentElement.style.setProperty('--wmap-h', Math.max(300, innerHeight - top - 8) + 'px'); } wMap && wMap.invalidateSize(); }
+function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if (phoneLayout()) { const Z = PAGE_ZOOM, top = m.getBoundingClientRect().top + scrollY; document.documentElement.style.setProperty('--wmap-h', Math.max(300, (innerHeight - top) / Z - 8) + 'px'); } wMap && wMap.invalidateSize(); }
 addEventListener('resize', () => { if (!$('wView').hidden) wFitMap(); });
 function renderW(){
   const done = ui.view === 'wdone', all = wPoints(done);
@@ -2216,7 +2231,6 @@ function renderW(){
     const j = ui.wJob && jobOf(ui.wJob);
     btn.innerHTML = `<span>☰ ${j ? esc(j.title) + ' · ' : ''}${done ? 'выполнено' : 'точек'}: ${shown.length}</span><span class="arr" aria-hidden="true">▾</span>`; }
   ensureWMap(); if (!wMap) return;
-  setTimeout(wFitMap, 0);
   wLayer.clearLayers();
   shown.forEach(({ j, pl }) => {
     const c = done ? (pl.notWorking ? '#C0392B' : '#1E9E4F') : placeColor(j, pl) ? '#E08A00' : '#3B47B8';
@@ -2224,7 +2238,8 @@ function renderW(){
       .bindPopup(() => wPopup(j, (jobOf(j.id)?.places || []).find(x => x.id === pl.id) || pl), { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20] })
       .bindTooltip(pl.label || '', { direction: 'top', offset: [0, -8] }).addTo(wLayer);
   });
-  if (!wFitted && shown.length) { wFitted = true; wMap.fitBounds(L.latLngBounds(shown.map(x => [x.pl.lat, x.pl.lng])).pad(0.2), { maxZoom: 16 }); }
+  // fit only once the map has its final size (on a phone its height is set from the screen)
+  setTimeout(() => { wFitMap(); if (!wFitted && shown.length) { wFitted = true; wMap.fitBounds(L.latLngBounds(shown.map(x => [x.pl.lat, x.pl.lng])).pad(0.2), { maxZoom: 16 }); } }, 0);
 }
 
 /* ===== Map of objects ===== */
