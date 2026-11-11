@@ -99,7 +99,7 @@ function cleanJob(d){
   if ('docs' in d) out.docs = (Array.isArray(d.docs) ? d.docs : []).filter(f => f && db.files[f.id]).slice(0, 200)
     .map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), size: db.files[f.id].size, type: db.files[f.id].type, at: db.files[f.id].at, by: db.files[f.id].by }));
   if ('workers' in d) out.workers = [...new Set((Array.isArray(d.workers) ? d.workers : []).filter(id => orgUsers().some(u => u.id === id)))].slice(0, 50);
-  // up to 5000 places: points from «Редактор карты» keep the object number and its marks
+  // up to 5000 places: points from «Карта объектов» keep the object number and its marks
   if ('places' in d) out.places = (Array.isArray(d.places) ? d.places : []).slice(0, 5000)
     .filter(x => x && Number.isFinite(Number(x.lat)) && Number.isFinite(Number(x.lng)) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180)
     .map(x => ({ id: String(x.id || newId()).slice(0, 40), lat: Math.round(Number(x.lat) * 1e6) / 1e6, lng: Math.round(Number(x.lng) * 1e6) / 1e6, label: String(x.label || '').trim().slice(0, 200),
@@ -508,7 +508,7 @@ async function api(req, res, url) {
   }
 
   /* accounting balances from a 1C export: rows are matched by article, then by name */
-  /* «Редактор карты»: objects with coordinates from a spreadsheet; which of them stand on the MKAD, the TTK or an overpass
+  /* «Карта объектов»: objects with coordinates from a spreadsheet; which of them stand on the MKAD, the TTK or an overpass
      is worked out in the browser from OpenStreetMap and stored here, so everybody sees the same result */
   if (p[1] === 'dt') {
     if (m === 'GET') return send(res, 200, db.dt || { points: [] });

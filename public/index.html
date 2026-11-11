@@ -794,7 +794,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#pay" data-v="pay">Бухгалтерия <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
-      <a href="#dt" data-v="dt">Редактор карты</a>
+      <a href="#dt" data-v="dt">Карта объектов</a>
       <a href="#notes" data-v="notes" id="notesTab" hidden>Заметки <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
@@ -840,7 +840,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     <div class="dtbar" id="dtInfo"></div>
     <div class="toolbar" id="dtTools"></div>
     <div class="toolbar dtselbar" id="dtSel"></div>
-    <div class="mapgrid"><div id="dtmap" role="application" aria-label="Редактор карты"></div><div class="plist" id="dtlist"></div></div>
+    <div class="mapgrid"><div id="dtmap" role="application" aria-label="Карта объектов"></div><div class="plist" id="dtlist"></div></div>
     <div class="legend2" id="dtLegend" style="margin-top:10px"></div>
   </section>
 </main>
@@ -895,7 +895,7 @@ const PLAN_KIND = { prod:'Изготовление', mount:'Монтаж' };
 const planKinds = j => { const k = j ? j.kind || 'mount' : 'both'; return k === 'prod' ? { prod:PLAN_KIND.prod } : k === 'mount' ? { mount:PLAN_KIND.mount } : PLAN_KIND; };
 const ROLE_NAMES = { admin:'Администратор', head:'Руководитель', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
 const ROLE_INFO = {
-  admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, редактор карты, назначение точек, пользователи.',
+  admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, карта объектов, назначение точек, пользователи.',
   head:'Всё, что может администратор, кроме отметки оплаты счетов и управления пользователями.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
   worker:'Видит только назначенные ему точки: «В работе» и «Выполненные», фото и отметки по каждой точке.',
@@ -1657,7 +1657,7 @@ function vWorkList(){
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
     <div class="seg">${[['active', 'Текущие'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
-  if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Редактор карты».' : 'Работы создаёт администратор.'}</div>`;
+  if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
   return head + `<section class="card" style="padding:0;overflow:hidden">${L.map(j => { const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), ppl = [...new Set(P.map(x => x.assignee).filter(Boolean))];
     return `<div class="wrk click" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">
@@ -1790,7 +1790,7 @@ function jobAssignBox(j){
   const W = j.workers || [], free = (j.places || []).filter(pl => !pl.assignee && !pl.doneAt);
   if (!mayEditJob(j) || W.length < 2 || !free.length) return '';
   return `<div class="box warnbox"><h4>Точки без исполнителя · ${free.length}</h4>
-    <p style="margin:0">В работе несколько работников, и эти точки никто из них не видит. Назначьте их здесь или в «Редакторе карты» (выделение → «Назначить исполнителя»).</p>
+    <p style="margin:0">В работе несколько работников, и эти точки никто из них не видит. Назначьте их здесь или в «Карте объектов» (выделение → «Назначить исполнителя»).</p>
     <div class="row-g"><select class="f" id="ja-who" aria-label="Работник">${W.map(id => `<option value="${id}">${esc(who(id))}</option>`).join('')}</select><button type="button" class="btn sm primary" data-act="jobAssignFree" data-id="${j.id}">Назначить все ${free.length}</button></div></div>`;
 }
 function jobPlacesHtml(j){
@@ -1863,7 +1863,7 @@ function mountMini(){
   setTimeout(() => mini && mini.invalidateSize(), 50); setTimeout(() => mini && mini.invalidateSize(), 400);
 }
 
-/* ===== Редактор карты: objects from a spreadsheet on a map, marked when they stand on the MKAD, the TTK or an overpass ===== */
+/* ===== Карта объектов: objects from a spreadsheet on a map, marked when they stand on the MKAD, the TTK or an overpass ===== */
 const DT = { loaded:false, points:[], meta:{}, geom:null };
 const DT_CAT = { road:'Дороги', mkad:'МКАД', ttk:'ТТК', bridge:'Эстакады', other:'Другое', check:'Проверить' };
 const DT_COLOR = { road:'#2E9E4F', mkad:'#E02424', ttk:'#7B2CBF', bridge:'#8B1E3F', other:'#1F6FEB', check:'#E0A800' };
@@ -2187,8 +2187,8 @@ async function dtExport(){
   const X = await loadSheetJS();
   const rows = DT.points.filter(dtMatch).map(p => ({ 'Номер объекта': p.no, 'Модемов': dtModems(p), 'Широта': p.lat, 'Долгота': p.lng, 'МКАД': (p.cats || []).includes('mkad') ? 'да' : '', 'ТТК': (p.cats || []).includes('ttk') ? 'да' : '', 'Эстакада': (p.cats || []).includes('bridge') ? 'да' : '', 'Проверить': (p.cats || []).includes('check') ? 'да' : '', 'Проверено': p.checkedAt ? `${fmtDT(p.checkedAt)}, ${who(p.checkedBy)}` : '', 'Исполнитель': p.assignee ? who(p.assignee) : '', 'Другое': (p.cats || []).includes('other') ? (p.other || 'да') : '', 'Дорога': p.road || '', 'Эстакада (название)': p.bridge || '', 'До оси, м': p.dist ?? '' }));
   const ws = X.utils.json_to_sheet(rows); ws['!cols'] = [12, 9, 11, 11, 7, 7, 9, 10, 24, 22, 26, 28, 32, 9].map(w => ({ wch: w }));
-  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Редактор карты');
-  X.writeFile(wb, `Редактор карты — ${['road', 'mkad', 'ttk', 'bridge'].filter(k => DT_SHOW[k]).map(k => DT_CAT[k]).join(', ')}${ui.dtOnlyCheck ? ', только проверить' : ''} — ${today()}.xlsx`);
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Карта объектов');
+  X.writeFile(wb, `Карта объектов — ${['road', 'mkad', 'ttk', 'bridge'].filter(k => DT_SHOW[k]).map(k => DT_CAT[k]).join(', ')}${ui.dtOnlyCheck ? ', только проверить' : ''} — ${today()}.xlsx`);
 }
 
 /* ===== Работник: «В работе» и «Выполненные» — список задач слева, карта с его точками справа ===== */
@@ -2650,6 +2650,8 @@ function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('full', kind ==
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
+  // «Выполнить»: start at the top, at the first photo — focusing the first field would scroll down to «Не работает» and «Закрыть точку»
+  if (kind === 'wdo') { $('drawer').scrollTop = 0; $('drawer').querySelector('.d-body')?.scrollTo?.(0, 0); const first = $('drawer').querySelector('.slots li:not(.ok) label, .slots label, .upl2 label'); if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); } return; }
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){ if (mini) { try { mini.remove(); } catch(e){} mini = null; } ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const renderDrawerBase = renderDrawer;
@@ -3018,8 +3020,8 @@ function renderDrawer(){
         ${P.length ? `<p style="margin:0">Закрыто <b>${closed}</b> из <b>${P.length}</b>${nw ? ` · не работает: <b class="bad-t">${nw}</b>` : ''}</p>
           <span class="wbar"><i style="width:${Math.round(closed / P.length * 100)}%"></i></span>
           <table class="pers"><tbody>${Object.entries(byPerson).sort((x, y) => (x[0] ? 0 : 1) - (y[0] ? 0 : 1) || who(x[0]).localeCompare(who(y[0]), 'ru')).map(([id, r]) => `<tr><td>${id ? esc(who(id)) : '<span class="warn-t">без исполнителя</span>'}</td><td class="mono">${r.c} / ${r.t}</td></tr>`).join('')}</tbody></table>`
-          : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Редактор карты»: выделите точки → «Добавить точки к работе».</p>'}
-        <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в редакторе карты</button>` : ''}</div></div>
+          : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Карта объектов»: выделите точки → «Добавить точки к работе».</p>'}
+        <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в карте объектов</button>` : ''}</div></div>
       ${jobPlanBox(j)}
       ${jobPhotoBox(j)}
       ${jobAssignBox(j)}
@@ -3041,7 +3043,7 @@ function renderDrawer(){
       <label class="wide" id="j-photos-w" ${kind === 'prod' ? 'hidden' : ''}>Какие фото нужны на каждой точке — по одному в строке<textarea class="in" id="j-photos" rows="3">${esc(j ? (j.photoSpec || []).join('\n') : 'Общий вид\nДо замены\nПосле замены')}</textarea><small class="dim" style="font-size:12px">Сотрудник увидит эти пункты в окне точки. Пусто — фото не обязательны.</small></label>
       <label class="wide">Описание (необязательно)<textarea class="in" id="j-desc" rows="2">${esc(j?.description || '')}</textarea></label>
       </div>
-      ${kind !== 'prod' ? '<p class="hint" style="margin:0">Точки к работе добавляются на вкладке «Редактор карты», там же их назначают сотрудникам.</p>' : ''}
+      ${kind !== 'prod' ? '<p class="hint" style="margin:0">Точки к работе добавляются на вкладке «Карта объектов», там же их назначают сотрудникам.</p>' : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${j ? 'Сохранить' : 'Создать работу'}</button><button class="btn" type="button" data-act="${j ? 'openJob' : 'close'}" data-id="${j?.id || ''}">Отмена</button></div></form>`;
   }
@@ -3308,7 +3310,7 @@ async function onSubmit(e){
       fail('Сохраняем…');
       let n = 0, jobsDone = 0;
       if (newOpen && newTitle) {
-        await api('POST', '/api/jobs', { title:newTitle, description:'Точки из «Редактора карты»' + (DT.meta.file ? ` (файл «${DT.meta.file}»)` : ''), workers:newW, leaderId:me.id, start:val('dtn-start'), due:val('dtn-due'), places:pts.map(asPlace) });
+        await api('POST', '/api/jobs', { title:newTitle, description:'Точки из «Карты объектов»' + (DT.meta.file ? ` (файл «${DT.meta.file}»)` : ''), workers:newW, leaderId:me.id, start:val('dtn-start'), due:val('dtn-due'), places:pts.map(asPlace) });
         n += pts.length; jobsDone++;
       }
       for (const id of ids) {
@@ -3354,7 +3356,7 @@ async function onSubmit(e){
         photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
       if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Работа сохранена'); }
-      else { const id = await add('jobs', data); openDrawer('job', id); toast(kindV === 'prod' ? 'Работа создана' : 'Работа создана — добавьте к ней точки на вкладке «Редактор карты»'); }
+      else { const id = await add('jobs', data); openDrawer('job', id); toast(kindV === 'prod' ? 'Работа создана' : 'Работа создана — добавьте к ней точки на вкладке «Карта объектов»'); }
     }
     if (kind === 'income') {
       const L = cleanLines(ui.incLines);
