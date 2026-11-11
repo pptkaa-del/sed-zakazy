@@ -317,7 +317,7 @@ aside.drawer.wide{width:min(1000px,100%)}
 .tlist li:hover{background:var(--paper)}
 .tlist .t{flex:1;min-width:140px;overflow-wrap:anywhere}
 .dot{width:10px;height:10px;border-radius:3px;flex:none}
-.dot.buy{background:var(--stamp)}.dot.work{background:var(--work)}
+.dot.buy{background:var(--stamp)}.dot.work{background:var(--work)}.dot.prod{background:#7B5BD6}.dot.mount{background:#E07B00}
 
 @media (max-width:900px){
   .split{grid-template-columns:1fr}
@@ -383,6 +383,8 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .bar{position:absolute;top:7px;height:22px;border-radius:5px;border:0;cursor:pointer;color:var(--sheet);font-size:12px;font-weight:500;padding:0 6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar.buy{background:var(--stamp)}
 .bar.work{background:var(--work)}
+.jplan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}.jplan li{display:flex;gap:10px;align-items:flex-start;padding:6px;border-radius:8px}.jplan li.click{cursor:pointer}.jplan li.click:hover{background:var(--paper)}.jplan .dot{margin-top:6px;flex:none}.jplan small{display:block}
+.bar.prod{background:#7B5BD6}.bar.mount{background:#E07B00}
 .bar.done{opacity:.45}
 .bar.late{box-shadow:0 0 0 2px var(--bad)}
 .g-today{position:absolute;top:0;bottom:0;width:2px;background:var(--bad);opacity:.7;z-index:1;pointer-events:none}
@@ -887,7 +889,10 @@ const MAX_MB = 50;
 
 const ORDER_ST = { new:'Планируется', work:'В работе', closed:'Закрыт' };
 const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', contractor:'Подрядчик' };
-const KIND = { buy:'Закупка', work:'Работа' };
+// plan-schedule task types: «Изготовление» and «Монтаж»; «Закупка» and «Работа» stay only for tasks made before
+const KIND = { prod:'Изготовление', mount:'Монтаж', buy:'Закупка', work:'Работа' };
+const PLAN_KIND = { prod:'Изготовление', mount:'Монтаж' };
+const planKinds = j => { const k = j ? j.kind || 'mount' : 'both'; return k === 'prod' ? { prod:PLAN_KIND.prod } : k === 'mount' ? { mount:PLAN_KIND.mount } : PLAN_KIND; };
 const ROLE_NAMES = { admin:'Администратор', head:'Руководитель', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
 const ROLE_INFO = {
   admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, редактор карты, назначение точек, пользователи.',
@@ -909,7 +914,7 @@ const ownInv = i => false;
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', jq:'', jF:'active', jW:'', jMode:(() => { try { return localStorage.getItem('sed-jmode') || 'grid'; } catch(e) { return 'grid'; } })(), jFrom:null, jSpan:14, mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', oq:'', scale:'day', drawer:null, armed:null };
+const ui = { view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', jq:'', jF:'active', jW:'', jMode:(() => { try { return localStorage.getItem('sed-jmode') || 'grid'; } catch(e) { return 'grid'; } })(), jFrom:null, jSpan:14, mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', planKind:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
@@ -1759,6 +1764,12 @@ function jobGrid(list){
   <div class="legend2" style="margin-top:10px"><span><i class="lg st-new"></i>Назначена</span><span><i class="lg st-work"></i>В работе</span><span><i class="lg st-done"></i>Выполнена</span><span><i class="lg st-late"></i>Просрочена</span>${canLead() ? '<span class="dim">Щелчок по пустой клетке — назначить задачу работнику на этот день</span>' : ''}${outside ? `<span class="dim">Вне выбранных дат: ${outside}</span>` : ''}</div>`;
 }
 // «Фото на каждой точке»: the list the workers see in every point window; editable right in the card
+/* the work's tasks in the plan-schedule */
+function jobPlanBox(j){
+  const T = S.tasks.filter(t => t.jobId === j.id).sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  return `<div class="box"><div class="ch"><h4>План-график${T.length ? ' · ' + T.length : ''}</h4><div class="row-g">${T.length ? `<a class="btn sm" href="#plan" data-act="planOfJob" data-id="${j.id}">Открыть график</a>` : ''}${canEdit() ? `<button class="btn sm" data-act="newTask" data-id="j:${j.id}">+ В план-график</button>` : ''}</div></div>
+    ${T.length ? `<ul class="jplan">${T.map(t => `<li ${canEdit() ? `data-act="editTask" data-id="${t.id}" role="button" tabindex="0" class="click"` : ''}><i class="dot ${esc(t.kind)}"></i><span><b>${t.done ? '✓ ' : ''}${esc(t.title)}</b><small class="dim">${esc(KIND[t.kind] || '')} · ${fmtD(t.start)} – ${fmtD(t.end)}${crew(t) ? ' · ' + esc(crew(t)) : ''}</small></span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Задач в план-графике пока нет.</p>'}</div>`;
+}
 function jobPhotoBox(j){
   const L = j.photoSpec || [], ed = mayEditJob(j);
   if (ui.jPhotoEdit === j.id) {
@@ -2559,15 +2570,19 @@ function vUsers(){
 }
 
 /* ===== Plan view ===== */
+const planJobs = () => S.jobs.slice().sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.no || 0) - (a.no || 0));
 function vPlan(){
-  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planOrd || (ui.planOrd === '_' ? !ord(t.orderId) : t.orderId === ui.planOrd)));
+  if (ui.planOrd && ui.planOrd !== '_' && !jobOf(ui.planOrd)) ui.planOrd = '';
+  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planOrd || (ui.planOrd === '_' ? !jobOf(t.jobId) : t.jobId === ui.planOrd)) && (!ui.planKind || t.kind === ui.planKind));
+  const PJ = planJobs();
   const head = `<div class="toolbar">
-    <select class="f" id="planOrd" aria-label="Заказ"><option value="">Все заказы</option><option value="_" ${ui.planOrd==='_'?'selected':''}>Общие работы</option>${ordersSorted().map(o => `<option value="${o.id}" ${ui.planOrd===o.id?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('')}</select>
+    <select class="f" id="planOrd" aria-label="Работа"><option value="">Все работы</option>${PJ.map(j => `<option value="${j.id}" ${ui.planOrd===j.id?'selected':''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}<option value="_" ${ui.planOrd==='_'?'selected':''}>Без работы</option></select>
+    <div class="seg"><button data-act="planKind" data-id="" class="${!ui.planKind?'on':''}">Все</button><button data-act="planKind" data-id="prod" class="${ui.planKind==='prod'?'on':''}">Изготовление</button><button data-act="planKind" data-id="mount" class="${ui.planKind==='mount'?'on':''}">Монтаж</button></div>
     <div class="seg"><button data-act="scale" data-id="day" class="${ui.scale==='day'?'on':''}">Дни</button><button data-act="scale" data-id="week" class="${ui.scale==='week'?'on':''}">Недели</button></div>
-    <button class="btn primary" data-act="newTask" data-id="${ui.planOrd && ui.planOrd !== '_' ? ui.planOrd : ''}">+ Задача</button>
-    <div class="legend"><span><i class="dot buy"></i>Закупка</span><span><i class="dot work"></i>Работа</span><span><i class="dot work" style="background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.45) 0 2px,transparent 2px 4px)"></i>С подрядчиками</span><span><i class="dot" style="background:var(--bad);width:2px;height:14px"></i>Сегодня</span><span><i class="dot" style="border-left:2px dashed var(--warn);border-radius:0;width:2px;height:14px"></i>Срок заказа</span></div>
+    ${canEdit() ? `<button class="btn primary" data-act="newTask" data-id="${ui.planOrd && ui.planOrd !== '_' ? 'j:' + ui.planOrd : ''}">+ Задача</button>` : ''}
+    <div class="legend"><span><i class="dot prod"></i>Изготовление</span><span><i class="dot mount"></i>Монтаж</span><span><i class="dot work" style="background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.45) 0 2px,transparent 2px 4px)"></i>С подрядчиками</span><span><i class="dot" style="background:var(--bad);width:2px;height:14px"></i>Сегодня</span><span><i class="dot" style="border-left:2px dashed var(--warn);border-radius:0;width:2px;height:14px"></i>Срок работы</span></div>
   </div>`;
-  if (!tasks.length) return head + `<div class="empty"><h3>План-график пуст</h3>Добавьте закупку или работу с датами начала и окончания, количеством своих людей и бригад подрядчиков. Задачу можно привязать к заказу.</div>`;
+  if (!tasks.length) return head + `<div class="empty"><h3>${S.tasks.length ? 'Нет задач по выбранному фильтру' : 'План-график пуст'}</h3>График строится из задач, которые вносятся здесь: «+ Задача» → работа, тип (изготовление или монтаж), даты начала и окончания, сколько своих людей и бригад подрядчиков.${PJ.length ? '' : ' Сначала создайте работу на вкладке «Работы».'}</div>`;
   const tn = dnum(today());
   let lo = Math.min(tn, ...tasks.map(t => dnum(t.start))) - 3;
   let hi = Math.max(tn, ...tasks.map(t => dnum(t.end))) + 10;
@@ -2593,13 +2608,21 @@ function vPlan(){
   const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}<small>${meta(t)}</small></div>${track(bar(t))}</div>`;
   const byStart = (a,b) => a.start.localeCompare(b.start);
   let rows = '';
+  // grouped by work (the work's deadline is the dashed line), then old tasks tied to orders, then tasks without a work
+  PJ.forEach(j => {
+    const jt = tasks.filter(t => t.jobId === j.id).sort(byStart); if (!jt.length) return;
+    const dl = j.due && dnum(j.due) >= lo && dnum(j.due) <= hi ? `<i class="g-dl" style="left:${(dnum(j.due)-lo)*DW + DW - 1}px" title="Срок окончания работ ${fmtD(j.due)}"></i>` : '';
+    const cp = cpOf(j.customerId)?.name;
+    rows += `<div class="g-row g-proj"><div class="g-lab" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">№ ${jobNo(j)} · ${esc(j.title)}<small>${esc(WORK_KIND[j.kind || 'mount'])}${cp ? ' · ' + esc(cp) : ''}${j.due ? ' · срок ' + fmtD(j.due) : ''}</small></div>${track('', dl)}</div>` + jt.map(taskRow).join('');
+  });
+  const rest = tasks.filter(t => !jobOf(t.jobId));
   ordersSorted().slice().reverse().forEach(o => {
-    const ot = tasks.filter(t => t.orderId === o.id).sort(byStart); if (!ot.length) return;
+    const ot = rest.filter(t => t.orderId === o.id).sort(byStart); if (!ot.length) return;
     const dl = o.deadline && dnum(o.deadline) >= lo && dnum(o.deadline) <= hi ? `<i class="g-dl" style="left:${(dnum(o.deadline)-lo)*DW + DW - 1}px" title="Срок сдачи заказа ${fmtD(o.deadline)}"></i>` : '';
     rows += `<div class="g-row g-proj"><div class="g-lab">${esc(o.number)} · ${esc(o.title)}</div>${track('', dl)}</div>` + ot.map(taskRow).join('');
   });
-  const common = tasks.filter(t => !ord(t.orderId)).sort(byStart);
-  if (common.length) rows += `<div class="g-row g-proj"><div class="g-lab">Общие работы</div>${track('')}</div>` + common.map(taskRow).join('');
+  const common = rest.filter(t => !ord(t.orderId)).sort(byStart);
+  if (common.length) rows += `<div class="g-row g-proj"><div class="g-lab">Без работы</div>${track('')}</div>` + common.map(taskRow).join('');
 
   // people and contractors per day (week scale: maximum within the week)
   const per = [], con = [];
@@ -2997,6 +3020,7 @@ function renderDrawer(){
           <table class="pers"><tbody>${Object.entries(byPerson).sort((x, y) => (x[0] ? 0 : 1) - (y[0] ? 0 : 1) || who(x[0]).localeCompare(who(y[0]), 'ru')).map(([id, r]) => `<tr><td>${id ? esc(who(id)) : '<span class="warn-t">без исполнителя</span>'}</td><td class="mono">${r.c} / ${r.t}</td></tr>`).join('')}</tbody></table>`
           : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Редактор карты»: выделите точки → «Добавить точки к работе».</p>'}
         <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в редакторе карты</button>` : ''}</div></div>
+      ${jobPlanBox(j)}
       ${jobPhotoBox(j)}
       ${jobAssignBox(j)}
       ${P.length ? `<div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>` : ''}` : ''}
@@ -3073,11 +3097,17 @@ function renderDrawer(){
   }
   if (d.kind === 'task') {
     const t = S.tasks.find(x => x.id === d.id);
-    const sel = t ? (ord(t.orderId) ? t.orderId : '') : String(d.ctx || '').replace(/^o:/, '');
+    const ctx = String(d.ctx || '');
+    const jsel = ui.tJob !== undefined ? ui.tJob : t ? (jobOf(t.jobId) ? t.jobId : '') : ctx.startsWith('j:') ? ctx.slice(2) : '';
+    const J = jobOf(jsel), kinds = planKinds(J);
+    const ksel = kinds[ui.tKind] ? ui.tKind : kinds[t?.kind] ? t.kind : Object.keys(kinds)[0];
+    const legacy = t && !jobOf(t.jobId) && ord(t.orderId);
     const st = t?.start || today();
     D.innerHTML = dh(t ? 'Задача план-графика' : 'Новая задача') + `<form class="d-body" data-form="task"><div class="form">
-      <label class="wide">Заказ<select class="in" id="t-target">${targetOpts(sel)}</select></label>
-      <label>Тип<select class="in" id="t-kind">${opt(KIND, t?.kind||'buy')}</select></label>
+      <label class="wide">Работа<select class="in" id="t-job"><option value="">— выберите работу —</option>${planJobs().map(j => `<option value="${j.id}" ${j.id === jsel ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title + ' · ' + WORK_KIND[j.kind || 'mount'])}</option>`).join('')}</select>
+        ${legacy ? `<small class="dim" style="font-size:12px">Задача внесена раньше по заказу ${esc(ordName(ord(t.orderId)))} — выберите работу.</small>` : ''}</label>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Тип</span><div class="seg kindseg" role="radiogroup" style="margin-top:6px">${Object.entries(kinds).map(([k, n]) => `<label class="${k === ksel ? 'on' : ''}"><input type="radio" name="t-kind" value="${k}" ${k === ksel ? 'checked' : ''}> ${n}</label>`).join('')}</div>
+        ${J && (J.kind || 'mount') !== 'both' ? `<small class="dim" style="font-size:12px">Работа «${esc(WORK_KIND[J.kind || 'mount'])}» — доступен только этот тип.</small>` : ''}</div>
       <label>Ответственный<input class="in" id="t-resp" value="${v(t,'resp')}"></label>
       <label class="wide">Название<input class="in" id="t-title" value="${v(t,'title')}" required></label>
       <label>Начало<input class="in" type="date" id="t-start" value="${esc(st)}" required></label>
@@ -3366,7 +3396,9 @@ async function onSubmit(e){
       toast(file ? 'Оплата отмечена, чек приложен' : 'Оплата отмечена');
     }
     if (kind === 'task') {
-      const tg = val('t-target');
+      const jobId = val('t-job'), tk = (document.querySelector('input[name=t-kind]:checked') || {}).value;
+      if (!jobOf(jobId)) return fail('Выберите работу.');
+      if (!planKinds(jobOf(jobId))[tk]) return fail('Выберите тип: изготовление или монтаж.');
       if (!val('t-title')) return fail('Укажите название задачи.');
       const people = val('t-people') === '' ? 0 : Math.round(num(val('t-people')));
       if (people < 0 || people > 999) return fail('Количество людей — от 0 до 999.');
@@ -3375,9 +3407,10 @@ async function onSubmit(e){
       if (en < s) return fail('Окончание не может быть раньше начала.');
       const brigades = val('t-brig') === '' ? 0 : Math.round(num(val('t-brig')));
       if (brigades < 0 || brigades > 99) return fail('Бригад подрядчиков — от 0 до 99.');
-      const data = { orderId: tg || null, kind:val('t-kind'), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
+      const data = { jobId, kind:tk, resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
         people, brigades, contractors: brigades > 0, contractorsNote: '' };
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
+      ui.tJob = undefined; ui.tKind = undefined;
       closeDrawer(); render(); toast(d.id ? 'Задача сохранена' : 'Задача добавлена в план-график');
     }
     if (kind === 'userForm') {
@@ -3709,7 +3742,9 @@ async function act(el){
     case 'cancelIncome': try { await api('DELETE', `/api/invoices/${id}/income`); await refresh(); renderDrawer(); render(); toast('Приход отменён'); } catch(e) { const fe = $('ferr'); if (fe) fe.textContent = errText(e); else toast(errText(e)); } return;
     case 'addLn': ui[id] = [...(ui[id] || []), { id:uid(), name:'', qty:'', unit:'шт', price:'' }]; drawLines(id); { const ins = document.querySelectorAll(`[data-ln^="${id}|"][data-ln$="|name"]`); ins[ins.length - 1]?.focus(); } return;
     case 'delLn': { const [k, n] = id.split('|'); ui[k].splice(Number(n), 1); return drawLines(k); }
-    case 'newTask': return openDrawer('task', null, id);
+    case 'newTask': ui.tJob = undefined; ui.tKind = undefined; return openDrawer('task', null, id);
+    case 'planKind': ui.planKind = id; return render();
+    case 'planOfJob': ui.planOrd = id; ui.planKind = ''; closeDrawer(); if (location.hash !== '#plan') location.hash = 'plan'; else render(); return;
     case 'wKind': ui.wKind = id; return render();
     case 'orderTab': ui.orderTab = id; ui.animNext = true; return render();
     case 'newProduct': return openDrawer('product', id + '|');
@@ -3730,7 +3765,7 @@ async function act(el){
     case 'stockOut': return openDrawer('stockMove', id, 'out');
     case 'delStock': await guard(del('stock', id)); closeDrawer(); return toast('Позиция удалена');
     case 'taskDone': { const t = S.tasks.find(x => x.id === id); if (!t) return; try { await upd('tasks', id, { done: !t.done }); ui.justDone = id; setTimeout(() => { if (ui.justDone === id) ui.justDone = null; }, 600); render(); toast(t.done ? 'Отмечено как выполненное' : 'Возвращено в работу'); } catch(e) { toast(errText(e)); } return; }
-    case 'editTask': return openDrawer('task', id);
+    case 'editTask': ui.tJob = undefined; ui.tKind = undefined; return openDrawer('task', id);
     case 'paste': return openDrawer('paste', id);
     case 'payF': ui.payF = id; return render();
     case 'scale': ui.scale = id; remember(); return render();
@@ -3876,6 +3911,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'jW') { ui.jW = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
+  if (t.id === 't-job') { ui.tJob = t.value; ui.tKind = (document.querySelector('input[name=t-kind]:checked') || {}).value; ['t-title','t-resp','t-start','t-end','t-people','t-brig'].forEach(k => { ui.tKeep = ui.tKeep || {}; ui.tKeep[k] = $(k)?.value; }); ui.tKeep.done = $('t-done')?.checked; renderDrawer(); Object.entries(ui.tKeep).forEach(([k, v]) => { if (k === 'done') { if ($('t-done')) $('t-done').checked = v; } else if ($(k) && v !== undefined) $(k).value = v; }); ui.tKeep = null; return; }
+  if (t.name === 't-kind') { ui.tKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); return; }
   if (t.classList.contains('pci')) {
     const tr = t.closest('tr'), table = t.closest('table'), oid = table.dataset.oid, pid = table.dataset.pid;
     const f = t.dataset.f, value = f === 'qty' ? num(t.value) : t.value.trim();
