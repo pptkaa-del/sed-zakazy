@@ -467,7 +467,33 @@ async function api(req, res, url) {
     const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = FIELD(user) ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
+    if (user.role === 'admin') out.notes = db.notes || [];
     return send(res, 200, out);
+  }
+  /* «Заметки»: a shared to-do list of the organization's administrators */
+  if (p[1] === 'notes') {
+    if (user.role !== 'admin') return fail(res, 403, 'Заметки доступны только администраторам');
+    if (!Array.isArray(db.notes)) db.notes = [];
+    const N = db.notes;
+    if (m === 'GET' && !p[2]) return send(res, 200, N);
+    if (m === 'POST' && !p[2]) {
+      const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 2000);
+      if (!text) return fail(res, 400, 'Напишите текст заметки');
+      const n = { id: newId(), text, done: false, at: new Date().toISOString(), by: user.id };
+      N.unshift(n); saveDb();
+      return send(res, 200, { ok: true, note: n, rev: db.rev });
+    }
+    const n = p[2] && N.find(x => x.id === p[2]);
+    if (!n) return fail(res, 404, 'Заметка не найдена — обновите страницу');
+    if (m === 'PATCH') {
+      const b = await readJsonBody(req);
+      if (b.text !== undefined) { const t = String(b.text).trim().slice(0, 2000); if (!t) return fail(res, 400, 'Напишите текст заметки'); n.text = t; }
+      if (b.done !== undefined) { n.done = !!b.done; n.doneAt = n.done ? new Date().toISOString() : null; n.doneBy = n.done ? user.id : null; }
+      saveDb();
+      return send(res, 200, { ok: true, note: n, rev: db.rev });
+    }
+    if (m === 'DELETE') { N.splice(N.indexOf(n), 1); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'password' && m === 'POST') {
     const { current = '', next = '' } = await readJsonBody(req);

@@ -505,6 +505,11 @@ table.pers{border-collapse:collapse;font-size:14px}table.pers td{padding:3px 14p
 .spark{color:var(--stamp);display:block}
 .admedit{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}.admedit label{display:flex;flex-direction:column;font-size:13px;color:var(--ink-2)}
 .pwrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.pwrow .in{flex:1 1 180px;min-width:0}.pwgen{display:flex;gap:4px}
+.notes{max-width:760px}.note-add{display:flex;gap:8px;align-items:flex-start}.note-add textarea{flex:1;min-height:44px;resize:none;font:inherit;font-size:16px;line-height:1.4;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--ink);overflow:hidden}
+.note-add .btn{min-height:44px}.note-hint{font-size:12px;margin:6px 2px 14px}.note-h{margin:22px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);font-weight:500;display:flex;gap:10px;align-items:center}
+.note-list{list-style:none;margin:0;padding:0;border:1px solid var(--rule);border-radius:12px;background:var(--paper);overflow:hidden}.note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-top:1px solid var(--rule-2)}.note:first-child{border-top:0}
+.note-cb{padding-top:2px}.note-cb input{width:20px;height:20px;cursor:pointer}.note-t{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}.note-t small{display:block;font-size:12px;color:var(--ink-2);margin-top:2px;white-space:normal}
+.note.done .note-t>div{text-decoration:line-through;color:var(--ink-2)}
 table.rep{width:100%;border-collapse:collapse;font-size:14px}table.rep th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule);font-weight:500;white-space:nowrap}
 table.rep td{padding:7px 8px;border-bottom:1px solid var(--rule-2);vertical-align:top}table.rep .r{text-align:right}table.rep td small{display:block;font-size:12px;color:var(--ink-2)}
 table.rep td.hi{color:var(--ok);font-weight:700}table.rep tr.sum td{font-weight:700;border-top:2px solid var(--rule)}table.rep tr.free td{color:var(--warn)}
@@ -769,6 +774,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
       <a href="#dt" data-v="dt">Редактор карты</a>
+      <a href="#notes" data-v="notes" id="notesTab" hidden>Заметки <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
@@ -927,7 +933,8 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {};
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || [];
+  STAFF = d.staff || []; NOTES = d.notes || [];
+  { const n = NOTES.filter(x => !x.done).length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
   render();
@@ -972,7 +979,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : vOrders();
   if (changed) animateView(V);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
@@ -2464,6 +2471,30 @@ function vBackups(){
 }
 
 /* ===== Users view (admin) ===== */
+/* ---------- «Заметки»: a shared to-do list of the administrators ---------- */
+let NOTES = [];
+function vNotes(){
+  const open = NOTES.filter(n => !n.done), done = NOTES.filter(n => n.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
+  const row = n => `<li class="note ${n.done ? 'done' : ''}">
+      <label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label>
+      <div class="note-t"><div>${esc(n.text)}</div><small>${esc(names[n.by] || '—')} · ${esc(fmtDT(n.at))}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}${n.doneBy && n.doneBy !== n.by ? ' (' + esc(names[n.doneBy] || '—') + ')' : ''}` : ''}</small></div>
+      <button class="btn ghost sm" type="button" data-act="noteDel" data-id="${esc(n.id)}" title="Удалить" aria-label="Удалить">✕</button>
+    </li>`;
+  return `<div class="notes">
+    <div class="note-add" data-keep><textarea id="note-new" rows="1" maxlength="2000" aria-label="Новая заметка"></textarea><button class="btn primary" type="button" data-act="noteAdd">Добавить</button></div>
+    <div class="dim note-hint">Enter — добавить, Shift+Enter — новая строка. Заметки видят все администраторы организации.</div>
+    ${NOTES.length ? '' : '<div class="empty"><h3>Заметок пока нет</h3>Напишите задачу в поле выше.</div>'}
+    ${open.length ? `<ul class="note-list">${open.map(row).join('')}</ul>` : NOTES.length ? '<div class="dim note-hint">Все заметки выполнены.</div>' : ''}
+    ${done.length ? `<h4 class="note-h">Выполненные · ${done.length}${done.length > 1 ? ' <button class="btn ghost sm" type="button" data-act="noteClear">Удалить выполненные</button>' : ''}</h4><ul class="note-list">${done.map(row).join('')}</ul>` : ''}
+  </div>`;
+}
+async function noteAdd(){
+  const t = $('note-new'), text = t.value.trim();
+  if (!text) { t.focus(); return toast('Напишите текст заметки'); }
+  try { const r = await api('POST', '/api/notes', { text }); NOTES.unshift(r.note); t.value = ''; t.style.height = ''; t.blur(); render(); $('note-new')?.focus(); refresh().catch(() => {}); }
+  catch(e) { toast(errText(e)); }
+}
+
 function vUsers(){
   const L = ui.usersList;
   const head = `<div class="toolbar"><button class="btn primary" data-act="userNew">+ Пользователь</button>
@@ -3497,6 +3528,11 @@ async function act(el){
     case 'wlKind': ui.wlKind = id; return render();
     case 'jobReport': ui.repDay = today(); return openDrawer('jobReport', id);
     case 'repDay': ui.repDay = id; return renderDrawer();
+    case 'noteAdd': return noteAdd();
+    case 'noteDel': { const n = NOTES.find(x => x.id === id); if (!n) return; if (!n.done && !confirm('Удалить заметку «' + n.text.slice(0, 60) + '»?')) return;
+      try { await api('DELETE', '/api/notes/' + id); NOTES = NOTES.filter(x => x.id !== id); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+    case 'noteClear': { const ids = NOTES.filter(x => x.done).map(x => x.id); if (!confirm(`Удалить выполненные заметки (${ids.length})?`)) return;
+      try { for (const i of ids) await api('DELETE', '/api/notes/' + i); NOTES = NOTES.filter(x => !ids.includes(x.id)); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'repExport': return exportJobReport(jobOf(id), ui.repDay || today()).catch(e => toast(errText(e)));
     case 'wlSt': ui.wlSt = id; return render();
     case 'gotoDtJob': closeDrawer(); ui.dtJob = id; ui.dtJobFit = true; if (location.hash !== '#dt') location.hash = 'dt'; else render(); return;
@@ -3701,6 +3737,7 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.target.dataset?.ph !== undefined && e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('[data-act=phAdd]'); if (b) act(b); return; }
   if (e.target.id === 'dt-other' && e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('[data-act=dtOtherSave]'); if (b) act(b); return; }
+  if (e.target.id === 'note-new' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); noteAdd(); return; }
   if (e.target.id === 'feat-new' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); const b = document.querySelector('[data-act=addFeat]'); if (b) act(b); return; }
   if (e.target.dataset?.feat && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.target.blur(); return; }
   if (e.target.id === 'f-cust') {
@@ -3724,6 +3761,7 @@ $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'note-new') { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; return; }
   if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L); } return; }
   if (t.id === 'feat-new') ui.drafts['feat:' + t.dataset.o] = t.value;
   if (t.id === 'feat-new' || t.dataset.feat) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; if (t.id === 'feat-new') return; }
@@ -3757,6 +3795,8 @@ document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t' && ui.drawer?.kind === 'paste') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; else if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + e.target.value.split(/\r?\n/).filter(l => l.trim() && !/наимен|компон/i.test(l)).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.dataset.note) { const n = NOTES.find(x => x.id === t.dataset.note); if (n) { n.done = t.checked; n.doneAt = t.checked ? new Date().toISOString() : null; n.doneBy = t.checked ? me.id : null; render(); }
+    try { await api('PATCH', '/api/notes/' + t.dataset.note, { done: t.checked }); } catch(e) { toast(errText(e)); } refresh().catch(() => {}); return; }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
@@ -3878,7 +3918,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') ? h : 'works';
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (['users', 'notes'].includes(h) && me?.role === 'admin') ? h : 'works';
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -3924,7 +3964,7 @@ async function start(u){
   $('ubtn').title = u.name + ' — ' + u.roleName;
   document.body.classList.toggle('no-edit', !canEdit());
   document.body.classList.toggle('can-invoice', canAddInvoice());
-  $('usersTab').hidden = u.role !== 'admin';
+  $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = u.role !== 'admin' || !!u.sys;
   $('orgsTab').hidden = !u.sys; ui.orgsList = null;
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
   $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
@@ -3932,7 +3972,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin'); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (['users', 'notes'].includes(v) && u.role !== 'admin'); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
