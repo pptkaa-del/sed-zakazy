@@ -467,15 +467,15 @@ async function api(req, res, url) {
     const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = FIELD(user) ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
-    if (user.role === 'admin') out.notes = db.notes || [];
+    if (user.role === 'admin') out.notes = (db.notes || []).filter(n => n.by === user.id);
     return send(res, 200, out);
   }
-  /* «Заметки»: a shared to-do list of the organization's administrators */
+  /* «Заметки»: a personal to-do list — each administrator sees and changes only his own notes */
   if (p[1] === 'notes') {
     if (user.role !== 'admin') return fail(res, 403, 'Заметки доступны только администраторам');
     if (!Array.isArray(db.notes)) db.notes = [];
     const N = db.notes;
-    if (m === 'GET' && !p[2]) return send(res, 200, N);
+    if (m === 'GET' && !p[2]) return send(res, 200, N.filter(n => n.by === user.id));
     if (m === 'POST' && !p[2]) {
       const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 2000);
       if (!text) return fail(res, 400, 'Напишите текст заметки');
@@ -483,7 +483,7 @@ async function api(req, res, url) {
       N.unshift(n); saveDb();
       return send(res, 200, { ok: true, note: n, rev: db.rev });
     }
-    const n = p[2] && N.find(x => x.id === p[2]);
+    const n = p[2] && N.find(x => x.id === p[2] && x.by === user.id);
     if (!n) return fail(res, 404, 'Заметка не найдена — обновите страницу');
     if (m === 'PATCH') {
       const b = await readJsonBody(req);

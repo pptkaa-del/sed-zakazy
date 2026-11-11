@@ -2471,18 +2471,18 @@ function vBackups(){
 }
 
 /* ===== Users view (admin) ===== */
-/* ---------- «Заметки»: a shared to-do list of the administrators ---------- */
+/* ---------- «Заметки»: a personal to-do list ---------- */
 let NOTES = [];
 function vNotes(){
   const open = NOTES.filter(n => !n.done), done = NOTES.filter(n => n.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
   const row = n => `<li class="note ${n.done ? 'done' : ''}">
       <label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label>
-      <div class="note-t"><div>${esc(n.text)}</div><small>${esc(names[n.by] || '—')} · ${esc(fmtDT(n.at))}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}${n.doneBy && n.doneBy !== n.by ? ' (' + esc(names[n.doneBy] || '—') + ')' : ''}` : ''}</small></div>
+      <div class="note-t"><div>${esc(n.text)}</div><small>${esc(fmtDT(n.at))}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}` : ''}</small></div>
       <button class="btn ghost sm" type="button" data-act="noteDel" data-id="${esc(n.id)}" title="Удалить" aria-label="Удалить">✕</button>
     </li>`;
   return `<div class="notes">
     <div class="note-add" data-keep><textarea id="note-new" rows="1" maxlength="2000" aria-label="Новая заметка"></textarea><button class="btn primary" type="button" data-act="noteAdd">Добавить</button></div>
-    <div class="dim note-hint">Enter — добавить, Shift+Enter — новая строка. Заметки видят все администраторы организации.</div>
+    <div class="dim note-hint">Enter — добавить, Shift+Enter — новая строка. Заметки видите только вы.</div>
     ${NOTES.length ? '' : '<div class="empty"><h3>Заметок пока нет</h3>Напишите задачу в поле выше.</div>'}
     ${open.length ? `<ul class="note-list">${open.map(row).join('')}</ul>` : NOTES.length ? '<div class="dim note-hint">Все заметки выполнены.</div>' : ''}
     ${done.length ? `<h4 class="note-h">Выполненные · ${done.length}${done.length > 1 ? ' <button class="btn ghost sm" type="button" data-act="noteClear">Удалить выполненные</button>' : ''}</h4><ul class="note-list">${done.map(row).join('')}</ul>` : ''}
