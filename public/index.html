@@ -384,6 +384,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .bar.buy{background:var(--stamp)}
 .bar.work{background:var(--work)}
 .jdlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.jd{border:1px solid var(--rule);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--sheet)}.jd-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.jd-h small{display:block}.jd .tw{display:inline-flex;flex-direction:column;gap:2px;align-items:center}.jd .tw small{font-size:11px}
+.seg-l{align-self:center;padding:0 6px 0 8px;font-size:13px;color:var(--ink-2)}
 .wneed{align-self:flex-start;font-size:12px;font-weight:600;color:#fff;background:var(--c);border-radius:999px;padding:1px 8px}
 .jplan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}.jplan li{display:flex;gap:10px;align-items:flex-start;padding:6px;border-radius:8px}.jplan li.click{cursor:pointer}.jplan li.click:hover{background:var(--paper)}.jplan .dot{margin-top:6px;flex:none}.jplan small{display:block}
 .bar.prod{background:#7B5BD6}.bar.mount{background:#E07B00}
@@ -1880,6 +1881,8 @@ const COLOR_DEFAULTS = { ...DT_COLOR, ...Object.fromEntries(Object.entries(NEED_
 const needColor = n => NEED_COLOR[n] || '#9AA3AD';
 // which groups are shown on the map (remembered in this browser)
 const DT_SHOW = (() => { const d = { road:true, mkad:true, ttk:true, bridge:true, other:true, n_none:true, ...Object.fromEntries(Object.keys(DT_NEED).map(k => ['n_' + k, true])) }; try { return { ...d, ...JSON.parse(localStorage.getItem('sed-dt-show') || '{}') }; } catch(e) { return d; } })();
+const dtMode = () => ['type', 'need', 'person'].includes(ui.dtColor) ? ui.dtColor : ['type', 'need', 'person'].includes(typeof PREFS !== 'undefined' && PREFS.dtColor) ? PREFS.dtColor : 'type';
+const dtFill = p => { const m = dtMode(); return m === 'person' ? dtPersonColor(p.assignee) : m === 'need' ? (DT_NEED[p.need] ? needColor(p.need) : '#9AA3AD') : DT_COLOR[dtCatOf(p)]; };
 const dtNeedOk = p => DT_SHOW['n_' + (DT_NEED[p.need] ? p.need : 'none')] !== false;
 // public Overpass servers (OpenStreetMap); the Russian mirror goes second
 const OVERPASS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
@@ -2020,7 +2023,7 @@ function renderDt(){
   $('dtSel').innerHTML = !P.length ? '' : `
     <div class="seg" role="group" aria-label="Назначение">${[['all', 'Все'], ['any', `Назначенные ${nAsg}`], ['none', `Неназначенные ${P.length - nAsg}`]].map(([k, l]) => `<button data-act="dtAsg" data-id="${k}" class="${(ui.dtAsg || 'all') === k || (k === 'any' && A.includes(ui.dtAsg)) ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${A.length ? `<select class="f" id="dtAsgWho" aria-label="Исполнитель"><option value="">Любой исполнитель</option>${A.map(id => `<option value="${id}" ${ui.dtAsg === id ? 'selected' : ''}>${esc(who(id))} — ${P.filter(p => p.assignee === id).length}</option>`).join('')}</select>` : ''}
-    <div class="seg" role="group" aria-label="Цвет точек"><button data-act="dtColor" data-id="type" class="${ui.dtColor !== 'person' ? 'on' : ''}">Цвет: тип</button><button data-act="dtColor" data-id="person" class="${ui.dtColor === 'person' ? 'on' : ''}">исполнитель</button></div>
+    <div class="seg" role="group" aria-label="Цвет точек"><span class="seg-l">Цвет:</span>${[['type', 'по типам'], ['need', 'по пометкам'], ['person', 'по исполнителям']].map(([k, l]) => `<button data-act="dtColor" data-id="${k}" class="${dtMode() === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${lead ? `<span class="dtsep"></span>
     <button class="btn ${ui.dtLasso ? 'primary' : ''}" data-act="dtLasso">${ui.dtLasso ? 'Закончить выделение' : '◌ Режим выделения'}</button>
     <span class="dtselcount">Выделено: <b>${dtSel.size}</b></span>
@@ -2031,7 +2034,8 @@ function renderDt(){
   // the hint lives on the map itself, so the panel above never changes height while points are being picked
   let hint = $('dtLassoHint'); if (!hint) { hint = document.createElement('div'); hint.id = 'dtLassoHint'; hint.className = 'dthint'; $('dtmap').appendChild(hint); }
   hint.hidden = !ui.dtLasso; hint.textContent = 'Режим выделения: обведите область или щёлкайте по точкам — щелчок выделяет точку, повторный снимает выделение.';
-  $('dtLegend').innerHTML = ui.dtColor === 'person' && P.length ? [...A.map(id => `<span><i style="background:${dtPersonColor(id)};border-radius:50%"></i>${esc(who(id))} ${P.filter(p => p.assignee === id).length}</span>`), `<span><i style="background:#9AA3AD;border-radius:50%"></i>Не назначены ${P.length - nAsg}</span>`].join('') : P.length ? `<span class="dim">Обводка: бордовая — точка на МКАД или ТТК стоит и на эстакаде${cnt('check') ? ', жёлтая — точку нужно проверить' : ''}. Что показывать — кнопка «Показать».</span>${DT.points.some(p => DT_NEED[p.need]) ? Object.keys(DT_NEED).filter(k => DT.points.some(p => p.need === k)).map(k => `<span><i style="background:${needColor(k)};border-radius:50%"></i>${esc(DT_NEED[k])} ${DT.points.filter(p => p.need === k).length}</span>`).join('') : ''}` : '';
+  $('dtLegend').innerHTML = dtMode() === 'need' && P.length ? [...Object.keys(DT_NEED).map(k => `<span><i style="background:${needColor(k)};border-radius:50%"></i>${esc(DT_NEED[k])} ${P.filter(p => p.need === k).length}</span>`), `<span><i style="background:#9AA3AD;border-radius:50%"></i>Без пометки ${P.filter(p => !DT_NEED[p.need]).length}</span>`].join('')
+    : dtMode() === 'person' && P.length ? [...A.map(id => `<span><i style="background:${dtPersonColor(id)};border-radius:50%"></i>${esc(who(id))} ${P.filter(p => p.assignee === id).length}</span>`), `<span><i style="background:#9AA3AD;border-radius:50%"></i>Не назначены ${P.length - nAsg}</span>`].join('') : P.length ? `<span class="dim">Обводка: бордовая — точка на МКАД или ТТК стоит и на эстакаде${cnt('check') ? ', жёлтая — точку нужно проверить' : ''}. Что показывать — кнопка «Показать».</span>` : '';
   ensureDtMap(); if (!dtMap) return;
   $('dtmap').classList.toggle('adding', !!ui.dtAdding); $('dtmap').classList.toggle('lasso', !!ui.dtLasso);
   // selection mode: no panning and no double-click zoom (two quick taps select and deselect a point)
@@ -2042,12 +2046,12 @@ function renderDt(){
   P.forEach((p, i) => {
     const key = p.no + '|' + i; seen.add(key);
     const c = dtCatOf(p), cs = p.cats || [], ring = cs.includes('check') ? DT_COLOR.check : (c === 'mkad' || c === 'ttk') && cs.includes('bridge') ? DT_COLOR.bridge : null;
-    const byPerson = ui.dtColor === 'person', sel = dtSel.has(p.no);
-    // a mark (special vehicles / own fencing) colours the point; the type stays as the ring
-    const nd = !byPerson && DT_NEED[p.need], small = c === 'road' && !byPerson && !nd;
-    const fill = byPerson ? dtPersonColor(p.assignee) : nd ? needColor(p.need) : DT_COLOR[c];
-    const tring = nd && c !== 'road' ? DT_COLOR[c] : null;
-    const style = { radius: (small ? 4.5 : nd ? 8.5 : 7) + (sel ? 2 : 0), color: sel ? '#111' : byPerson ? '#fff' : ring || tring || '#fff', weight: sel ? 3 : !byPerson && (ring || tring) ? 3 : 1, fillColor: fill, fillOpacity: small ? .75 : .95 };
+    // colour by type (roads, МКАД, ТТК, overpasses), by mark (special vehicles, own fencing) or by executor
+    const mode = dtMode(), byPerson = mode === 'person', byNeed = mode === 'need', sel = dtSel.has(p.no);
+    const nd = byNeed && DT_NEED[p.need], small = byNeed ? !nd : c === 'road' && !byPerson;
+    const fill = dtFill(p);
+    const rg = byNeed ? null : !byPerson ? ring : null;
+    const style = { radius: (small ? 4.5 : nd ? 8 : 7) + (sel ? 2 : 0), color: sel ? '#111' : rg || '#fff', weight: sel ? 3 : rg ? 3 : 1, fillColor: fill, fillOpacity: byNeed && !nd ? .55 : small ? .75 : .95 };
     let m = dtMarks.get(key);
     if (m && m._pin !== pinMode()) { dtLayer.removeLayer(m); dtMarks.delete(key); m = null; }   // the point style was changed in the settings
     if (!m) {
@@ -2059,13 +2063,13 @@ function renderDt(){
     else { m.setLatLng([p.lat, p.lng]); m.setStyle(pinMode() ? { ...style, radius: Math.max(6, style.radius), weight: Math.max(1.5, style.weight) } : style); if (m.isPopupOpen()) m.setPopupContent(dtPopup(DT.points[i], i)); else m.setPopupContent(() => dtPopup(DT.points[i], i)); }
     const show = dtMatch(p);
     if (show && !dtLayer.hasLayer(m)) dtLayer.addLayer(m); else if (!show && dtLayer.hasLayer(m)) dtLayer.removeLayer(m);
-    if (show && (c !== 'road' || nd || dtSel.has(p.no))) m.bringToFront();
+    if (show && ((byNeed ? nd : c !== 'road') || dtSel.has(p.no))) m.bringToFront();
   });
   [...dtMarks.keys()].forEach(k => { if (!seen.has(k)) { dtLayer.removeLayer(dtMarks.get(k)); dtMarks.delete(k); } });
   if (ui.dtJobFit) { ui.dtJobFit = false; const V = P.filter(dtMatch); if (V.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(V.map(p => [p.lat, p.lng])).pad(0.1), { maxZoom: 16 }); } }
   if (!dtFitted && P.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(P.map(p => [p.lat, p.lng])).pad(0.05)); }
-  const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => (dtSel.has(b.no) - dtSel.has(a.no)) || (dtFlagged(b) ? 2 : (b.cats || []).length ? 1 : 0) - (dtFlagged(a) ? 2 : (a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
-  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem ${dtSel.has(p.no) ? 'sel' : ''}" data-act="dtFly" data-id="${i}" aria-pressed="${dtSel.has(p.no)}"><span class="dot" style="background:${ui.dtColor === 'person' ? dtPersonColor(p.assignee) : DT_NEED[p.need] ? needColor(p.need) : DT_COLOR[dtCatOf(p)]}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${dtSel.has(p.no) ? '☑ ' : ''}${esc(p.no)}${dtModems(p) > 1 ? ` <span class="mchip">${dtModems(p)} ${modemWord(dtModems(p))}</span>` : ''}${DT_NEED[p.need] ? ` <span class="wneed" style="--c:${needColor(p.need)}">${esc(DT_NEED_SHORT[p.need])}</span>` : ''}</b><small>${esc([...dtGroups(p).map(c => dtGroupLabel(c, p)), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · '))}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}${p.assignee ? ` · <span style="color:${dtPersonColor(p.assignee)};font-weight:600">${esc(who(p.assignee))}</span>` : ''}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
+  const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => (dtSel.has(b.no) - dtSel.has(a.no)) || (dtMode() === 'need' ? (!!DT_NEED[b.need]) - (!!DT_NEED[a.need]) || String(a.need || '').localeCompare(String(b.need || '')) : 0) || (dtFlagged(b) ? 2 : (b.cats || []).length ? 1 : 0) - (dtFlagged(a) ? 2 : (a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
+  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem ${dtSel.has(p.no) ? 'sel' : ''}" data-act="dtFly" data-id="${i}" aria-pressed="${dtSel.has(p.no)}"><span class="dot" style="background:${dtFill(p)}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${dtSel.has(p.no) ? '☑ ' : ''}${esc(p.no)}${dtModems(p) > 1 ? ` <span class="mchip">${dtModems(p)} ${modemWord(dtModems(p))}</span>` : ''}${DT_NEED[p.need] ? ` <span class="wneed" style="--c:${needColor(p.need)}">${esc(DT_NEED_SHORT[p.need])}</span>` : ''}</b><small>${esc([...dtGroups(p).map(c => dtGroupLabel(c, p)), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · '))}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}${p.assignee ? ` · <span style="color:${dtPersonColor(p.assignee)};font-weight:600">${esc(who(p.assignee))}</span>` : ''}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
     : `<div class="empty" style="border:0">${P.length ? 'Нет точек по этому фильтру.' : 'Точек пока нет.'}</div>`;
 }
 /* the spreadsheet: a column with the object number and one with «lat, lng» (or two columns: latitude and longitude) */
@@ -3698,7 +3702,7 @@ async function act(el){
     case 'dtSelClear': dtSel.clear(); ui.dtOnlySel = false; return renderDt();
     case 'dtSelOne': { if (dtSel.has(id)) dtSel.delete(id); else dtSel.add(id); renderDt(); const k = DT.points.findIndex(p => p.no === id); const m = dtMarks.get(id + '|' + k); if (m && m.isPopupOpen()) m.setPopupContent(dtPopup(DT.points[k], k)); return; }
     case 'dtAsg': ui.dtAsg = id; return renderDt();
-    case 'dtColor': ui.dtColor = id; return renderDt();
+    case 'dtColor': ui.dtColor = id; prefsSave({ dtColor: id }); return renderDt();
     case 'dtAssign': return openDrawer('dtAssign');
     case 'dtAddCoords': ui.dtAdding = false; return openDrawer('dtAdd', null, null);
     case 'dtReanswer': { ui.dtOtherFor = null; const i = Number(id); const prev = ui.dtEdit; ui.dtEdit = i >= 0 ? i : null; const k = i >= 0 ? i : prev; const p = DT.points[k]; const m = p && dtMarks.get(p.no + '|' + k); if (m) m.setPopupContent(dtPopup(p, k)); return; }
