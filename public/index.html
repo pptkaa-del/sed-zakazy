@@ -384,6 +384,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .bar.buy{background:var(--stamp)}
 .bar.work{background:var(--work)}
 .jdlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.jd{border:1px solid var(--rule);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--sheet)}.jd-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.jd-h small{display:block}.jd .tw{display:inline-flex;flex-direction:column;gap:2px;align-items:center}.jd .tw small{font-size:11px}
+.wneed{align-self:flex-start;font-size:12px;font-weight:600;color:#fff;background:var(--c);border-radius:999px;padding:1px 8px}
 .jplan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}.jplan li{display:flex;gap:10px;align-items:flex-start;padding:6px;border-radius:8px}.jplan li.click{cursor:pointer}.jplan li.click:hover{background:var(--paper)}.jplan .dot{margin-top:6px;flex:none}.jplan small{display:block}
 .bar.prod{background:#7B5BD6}.bar.mount{background:#E07B00}
 .bar.done{opacity:.45}
@@ -1854,7 +1855,7 @@ function mountMini(){
     mini._pins.clearLayers();
     const many = P().length > 40;
     const j = !form && jobOf(ui.drawer.id), open = pl => { if (j) openDrawer('place', j.id + '|' + pl.id); };
-    if (many) { P().forEach(pl => { const done = j && placeColor(j, pl); mkPoint([pl.lat, pl.lng], { radius: done ? 6 : 5, weight: done ? 3 : 1, color: done || '#fff', fillColor: pl.dtNo ? DT_COLOR[dtCatOfPlace(pl)] : '#3B47B8', fillOpacity:.95 }).bindTooltip((pl.label || '') + (j ? ' — нажмите, чтобы открыть' : '')).on('click', () => open(pl)).addTo(mini._pins); }); return; }
+    if (many) { P().forEach(pl => { const done = j && placeColor(j, pl); mkPoint([pl.lat, pl.lng], { radius: done ? 6 : 5, weight: done ? 3 : 1, color: done || '#fff', fillColor: DT_NEED[pl.need] ? needColor(pl.need) : pl.dtNo ? DT_COLOR[dtCatOfPlace(pl)] : '#3B47B8', fillOpacity:.95 }).bindTooltip((pl.label || '') + (j ? ' — нажмите, чтобы открыть' : '')).on('click', () => open(pl)).addTo(mini._pins); }); return; }
     P().forEach((pl, i) => { const mk = L.marker([pl.lat, pl.lng], { icon: PIN('job' + (j && placeColor(j, pl) ? (pl.doneAt ? ' done' : ' part') : ''), i + 1), draggable: form, title: pl.label || '' }).addTo(mini._pins);
       if (j) mk.on('click', () => open(pl));
       if (form) mk.on('dragend', () => { const ll = mk.getLatLng(); pl.lat = ll.lat; pl.lng = ll.lng; $('jf-places').innerHTML = jobFormPlaces(); }); });
@@ -2046,7 +2047,7 @@ function renderDt(){
     const nd = !byPerson && DT_NEED[p.need], small = c === 'road' && !byPerson && !nd;
     const fill = byPerson ? dtPersonColor(p.assignee) : nd ? needColor(p.need) : DT_COLOR[c];
     const tring = nd && c !== 'road' ? DT_COLOR[c] : null;
-    const style = { radius: (small ? 4.5 : 7) + (sel ? 2 : 0), color: sel ? '#111' : byPerson ? '#fff' : ring || tring || '#fff', weight: sel ? 3 : !byPerson && (ring || tring) ? 3 : 1, fillColor: fill, fillOpacity: small ? .75 : .95 };
+    const style = { radius: (small ? 4.5 : nd ? 8.5 : 7) + (sel ? 2 : 0), color: sel ? '#111' : byPerson ? '#fff' : ring || tring || '#fff', weight: sel ? 3 : !byPerson && (ring || tring) ? 3 : 1, fillColor: fill, fillOpacity: small ? .75 : .95 };
     let m = dtMarks.get(key);
     if (m && m._pin !== pinMode()) { dtLayer.removeLayer(m); dtMarks.delete(key); m = null; }   // the point style was changed in the settings
     if (!m) {
@@ -2064,7 +2065,7 @@ function renderDt(){
   if (ui.dtJobFit) { ui.dtJobFit = false; const V = P.filter(dtMatch); if (V.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(V.map(p => [p.lat, p.lng])).pad(0.1), { maxZoom: 16 }); } }
   if (!dtFitted && P.length) { dtFitted = true; dtMap.fitBounds(L.latLngBounds(P.map(p => [p.lat, p.lng])).pad(0.05)); }
   const list = P.map((p, i) => [p, i]).filter(([p]) => dtMatch(p)).sort(([a], [b]) => (dtSel.has(b.no) - dtSel.has(a.no)) || (dtFlagged(b) ? 2 : (b.cats || []).length ? 1 : 0) - (dtFlagged(a) ? 2 : (a.cats || []).length ? 1 : 0) || String(a.no).localeCompare(String(b.no), 'ru', { numeric:true }));
-  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem ${dtSel.has(p.no) ? 'sel' : ''}" data-act="dtFly" data-id="${i}" aria-pressed="${dtSel.has(p.no)}"><span class="dot" style="background:${ui.dtColor === 'person' ? dtPersonColor(p.assignee) : DT_NEED[p.need] ? needColor(p.need) : DT_COLOR[dtCatOf(p)]}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${dtSel.has(p.no) ? '☑ ' : ''}${esc(p.no)}${dtModems(p) > 1 ? ` <span class="mchip">${dtModems(p)} ${modemWord(dtModems(p))}</span>` : ''}</b><small>${esc([...dtGroups(p).map(c => dtGroupLabel(c, p)), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · '))}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}${p.assignee ? ` · <span style="color:${dtPersonColor(p.assignee)};font-weight:600">${esc(who(p.assignee))}</span>` : ''}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
+  $('dtlist').innerHTML = list.length ? list.slice(0, 400).map(([p, i]) => `<button class="pitem ${dtSel.has(p.no) ? 'sel' : ''}" data-act="dtFly" data-id="${i}" aria-pressed="${dtSel.has(p.no)}"><span class="dot" style="background:${ui.dtColor === 'person' ? dtPersonColor(p.assignee) : DT_NEED[p.need] ? needColor(p.need) : DT_COLOR[dtCatOf(p)]}${(p.cats || []).includes('check') ? ';box-shadow:0 0 0 2px ' + DT_COLOR.check : ''}"></span><span style="min-width:0"><b>${dtSel.has(p.no) ? '☑ ' : ''}${esc(p.no)}${dtModems(p) > 1 ? ` <span class="mchip">${dtModems(p)} ${modemWord(dtModems(p))}</span>` : ''}${DT_NEED[p.need] ? ` <span class="wneed" style="--c:${needColor(p.need)}">${esc(DT_NEED_SHORT[p.need])}</span>` : ''}</b><small>${esc([...dtGroups(p).map(c => dtGroupLabel(c, p)), ...((p.cats || []).includes('check') ? ['проверить'] : [])].join(' · '))}${[...new Set([p.bridge, p.road].filter(Boolean))].map(x => ' · ' + esc(x)).join('')}${p.assignee ? ` · <span style="color:${dtPersonColor(p.assignee)};font-weight:600">${esc(who(p.assignee))}</span>` : ''}</small></span></button>`).join('') + (list.length > 400 ? `<div class="empty" style="border:0;padding:12px">Показаны первые 400 из ${list.length}. Уточните поиск.</div>` : '')
     : `<div class="empty" style="border:0">${P.length ? 'Нет точек по этому фильтру.' : 'Точек пока нет.'}</div>`;
 }
 /* the spreadsheet: a column with the object number and one with «lat, lng» (or two columns: latitude and longitude) */
@@ -2275,15 +2276,17 @@ function renderW(){
       ${tot ? `<span class="wbar"><i style="width:${Math.round(((j.places || []).filter(x => x.doneAt).length / tot) * 100)}%"></i></span>` : ''}</button>`; }).join('')}`
     : `<div class="empty" style="border:0;padding:16px">${done ? 'Закрытых точек пока нет.' : 'Вам пока не назначено задач.'}</div>`}
     ${done && shown.length ? `<h3 style="margin-top:14px">Точки</h3>${shown.sort((a, b) => (b.pl.doneAt || '').localeCompare(a.pl.doneAt || '')).slice(0, 200).map(({ j, pl }) => `<button class="witem pt" data-act="wFly" data-id="${j.id}|${pl.id}"><b>${esc(pl.label || 'Точка')}</b><small>${esc(fmtDT(pl.doneAt))}${pl.notWorking ? ' · не работает' : ''} · ${wEditable(pl) ? 'можно изменить до ' + esc(wUntil(pl)) : 'только просмотр'}</small></button>`).join('')}` : ''}
-    ${!done && shown.length ? `<h3 style="margin-top:14px">Точки · ${shown.length}</h3><p class="dim" style="font-size:12px;margin:0 4px 4px">Нажмите на точку на карте или здесь → «Выполнить».</p>${shown.slice(0, 200).map(({ j, pl }) => { const r = placeDone(j, pl); return `<button class="witem pt" data-act="wFly" data-id="${j.id}|${pl.id}"><b>${esc(pl.label || 'Точка')}</b><small>${ui.wJob ? '' : esc(j.title) + ' · '}${r.need ? `фото ${r.got} из ${r.need}` : 'фото не требуются'}</small></button>`; }).join('')}` : ''}`;
+    ${!done && shown.length ? `<h3 style="margin-top:14px">Точки · ${shown.length}</h3><p class="dim" style="font-size:12px;margin:0 4px 4px">Нажмите на точку на карте или здесь → «Выполнить».</p>${shown.slice(0, 200).map(({ j, pl }) => { const r = placeDone(j, pl); return `<button class="witem pt" data-act="wFly" data-id="${j.id}|${pl.id}"><b>${esc(pl.label || 'Точка')}</b>${DT_NEED[pl.need] ? `<span class="wneed" style="--c:${needColor(pl.need)}">${esc(DT_NEED[pl.need])}</span>` : ''}<small>${ui.wJob ? '' : esc(j.title) + ' · '}${r.need ? `фото ${r.got} из ${r.need}` : 'фото не требуются'}</small></button>`; }).join('')}` : ''}`;
   { const btn = $('wListBtn'), open = !!ui.wListOpen; $('wgrid').classList.toggle('open', open); btn.setAttribute('aria-expanded', open);
     const j = ui.wJob && jobOf(ui.wJob);
     btn.innerHTML = `<span>☰ ${j ? esc(j.title) + ' · ' : ''}${done ? 'выполнено' : 'точек'}: ${shown.length}</span><span class="arr" aria-hidden="true">▾</span>`; }
   ensureWMap(); if (!wMap) return;
   wLayer.clearLayers();
   shown.forEach(({ j, pl }) => {
-    const c = done ? (pl.notWorking ? '#C0392B' : '#1E9E4F') : placeColor(j, pl) ? '#E08A00' : '#3B47B8';
-    mkPoint([pl.lat, pl.lng], { radius: 9, weight: 2, color: '#fff', fillColor: c, fillOpacity: .95 })
+    // open points with a mark (special vehicles, own fencing) take its colour; started ones keep an orange ring
+    const c = done ? (pl.notWorking ? '#C0392B' : '#1E9E4F') : DT_NEED[pl.need] ? needColor(pl.need) : placeColor(j, pl) ? '#E08A00' : '#3B47B8';
+    const ringW = !done && DT_NEED[pl.need] && placeColor(j, pl) ? '#E08A00' : '#fff';
+    mkPoint([pl.lat, pl.lng], { radius: 9, weight: ringW === '#fff' ? 2 : 3, color: ringW, fillColor: c, fillOpacity: .95 })
       .bindPopup(() => wPopup(j, (jobOf(j.id)?.places || []).find(x => x.id === pl.id) || pl), { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20], ...popOff() })
       .bindTooltip(pl.label || '', { direction: 'top', offset: tipOff(-8) }).addTo(wLayer);
   });
@@ -3414,7 +3417,7 @@ async function onSubmit(e){
       if (newOpen && newTitle && !newW.length) return fail('Для новой работы отметьте хотя бы одного работника.');
       if (!ids.length && !(newOpen && newTitle)) return fail('Отметьте работу.');
       const label = p => [p.no + (dtModems(p) > 1 ? ` (замена ${dtModems(p)} ${modemsGen(dtModems(p))})` : ''), ...dtGroups(p).map(c => dtGroupLabel(c, p).toLowerCase().replace(/^мкад/, 'МКАД').replace(/^ттк/, 'ТТК')), p.road].filter(Boolean).join(' · ');
-      const asPlace = p => ({ id:uid(), lat:p.lat, lng:p.lng, label:label(p), dtNo:p.no, cats:(p.cats || []).slice(), road:p.road || '', ...(p.assignee ? { assignee:p.assignee } : {}) });
+      const asPlace = p => ({ id:uid(), lat:p.lat, lng:p.lng, label:label(p), dtNo:p.no, cats:(p.cats || []).slice(), road:p.road || '', ...(p.assignee ? { assignee:p.assignee } : {}), ...(DT_NEED[p.need] ? { need:p.need } : {}) });
       fail('Сохраняем…');
       let n = 0, jobsDone = 0;
       if (newOpen && newTitle) {
@@ -3423,7 +3426,9 @@ async function onSubmit(e){
       }
       for (const id of ids) {
         const j = jobOf(id); if (!j) continue;
-        const keep = mode === 'replace' ? [] : (j.places || []);
+        const byNo = new Map(DT.points.map(p => [p.no, p]));
+        // points already in the work take the current mark from the map
+        const keep = (mode === 'replace' ? [] : (j.places || [])).map(x => { const p = x.dtNo && byNo.get(x.dtNo); if (!p) return x; const y = { ...x }; if (DT_NEED[p.need]) y.need = p.need; else delete y.need; return y; });
         const has = new Set(keep.map(x => x.dtNo || (x.lat.toFixed(6) + ',' + x.lng.toFixed(6))));
         const add = pts.filter(p => !has.has(p.no) && !has.has(p.lat.toFixed(6) + ',' + p.lng.toFixed(6))).map(asPlace);
         await api('PATCH', `/api/jobs/${id}`, { places:[...keep, ...add] }); n += add.length; jobsDone++;

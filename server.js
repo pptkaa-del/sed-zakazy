@@ -496,6 +496,12 @@ async function api(req, res, url) {
   }
   if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION });
   if (p[1] === 'data' && m === 'GET') {
+    // points written into works before they were marked on the map get the mark
+    if (db.dt && Array.isArray(db.dt.points) && db.dt.points.some(x => x.need)) {
+      const nd = new Map(db.dt.points.filter(x => x.need).map(x => [x.no, x.need])); let ch = false;
+      for (const j of Object.values(db.jobs || {})) for (const pl of j.places || []) if (pl.dtNo && !pl.need && nd.has(pl.dtNo)) { pl.need = nd.get(pl.dtNo); ch = true; }
+      if (ch) saveDb();
+    }
     // works with production made before orders were created for them
     if (HEAD(user)) { let ch = false; for (const [jid, j] of Object.entries(db.jobs || {})) if (ensureJobOrder(j, jid, user)) ch = true; if (ch) saveDb(); }
     const out = { rev: db.rev, users: Object.fromEntries(orgUsers().map(u => [u.id, u.name])), meta: db.meta,
