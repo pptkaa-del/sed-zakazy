@@ -513,26 +513,26 @@ async function api(req, res, url) {
     if (HEAD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id);
     return send(res, 200, out);
   }
-  /* «Заметки»: a personal to-do list — each administrator sees and changes only his own notes */
+  /* «Мои задачи»: a personal to-do list — each administrator sees and changes only his own notes */
   if (p[1] === 'notes') {
-    if (!HEAD(user)) return fail(res, 403, 'Заметки доступны администраторам и руководителям');
+    if (!HEAD(user)) return fail(res, 403, '«Мои задачи» доступны администраторам и руководителям');
     if (!Array.isArray(db.notes)) db.notes = [];
     const N = db.notes;
     if (m === 'GET' && !p[2]) return send(res, 200, N.filter(n => n.by === user.id));
     if (m === 'POST' && !p[2]) {
       const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 2000);
-      if (!text) return fail(res, 400, 'Напишите текст заметки');
+      if (!text) return fail(res, 400, 'Напишите текст задачи');
       const n = { id: newId(), text, done: false, urgent: !!b.urgent, at: new Date().toISOString(), by: user.id };
       if (n.urgent) n.urgentAt = n.at;
       N.unshift(n); saveDb();
       return send(res, 200, { ok: true, note: n, rev: db.rev });
     }
     const n = p[2] && N.find(x => x.id === p[2] && x.by === user.id);
-    if (!n) return fail(res, 404, 'Заметка не найдена — обновите страницу');
+    if (!n) return fail(res, 404, 'Задача не найдена — обновите страницу');
     if (m === 'PATCH') {
       const b = await readJsonBody(req);
-      if (b.text !== undefined) { const t = String(b.text).trim().slice(0, 2000); if (!t) return fail(res, 400, 'Напишите текст заметки'); n.text = t; }
-      // «В первую очередь»: the note goes to the top of the list and is shown in red
+      if (b.text !== undefined) { const t = String(b.text).trim().slice(0, 2000); if (!t) return fail(res, 400, 'Напишите текст задачи'); n.text = t; }
+      // urgent: the task goes to the top of the list and is shown in red
       if (b.urgent !== undefined) { n.urgent = !!b.urgent; n.urgentAt = n.urgent ? new Date().toISOString() : null; }
       if (b.text !== undefined) n.editedAt = new Date().toISOString();
       if (b.done !== undefined) { n.done = !!b.done; n.doneAt = n.done ? new Date().toISOString() : null; n.doneBy = n.done ? user.id : null; }

@@ -539,7 +539,7 @@ table.pers{border-collapse:collapse;font-size:14px}table.pers td{padding:3px 14p
 .note.done .note-t>div{text-decoration:line-through;color:var(--ink-2)}
 .note.urgent{background:color-mix(in srgb,var(--bad) 9%,var(--sheet));box-shadow:inset 4px 0 0 var(--bad)}.note.urgent .note-t>div{color:var(--bad);font-weight:600}
 .note-acts{display:flex;flex-direction:column;gap:2px;align-items:center}.note-urg{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--ink-2);margin-top:4px;cursor:pointer}.note-urg input{width:16px;height:16px;accent-color:var(--bad)}
-.note.urgent .note-urg{color:var(--bad);font-weight:600}.note-urg-new{margin:6px 2px 0}.note-t{white-space:normal}.note-t>div{white-space:pre-wrap}.note-t small{margin-top:2px}.note-urg{display:flex;width:max-content}.note-ed{width:100%;min-height:70px;font:inherit}
+.note.urgent .note-urg{color:var(--bad);font-weight:600}.note-urg-new{margin:6px 2px 0}.note-urgtag{display:inline-block;margin-top:4px;font-size:12px;font-weight:700;color:#fff;background:var(--bad);border-radius:999px;padding:1px 9px}.note-t{white-space:normal}.note-t>div{white-space:pre-wrap}.note-t small{margin-top:2px}.note-urg{display:flex;width:max-content}.note-ed{width:100%;min-height:70px;font:inherit}
 table.rep{width:100%;border-collapse:collapse;font-size:14px}table.rep th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule);font-weight:500;white-space:nowrap}
 table.rep td{padding:7px 8px;border-bottom:1px solid var(--rule-2);vertical-align:top}table.rep .r{text-align:right}table.rep td small{display:block;font-size:12px;color:var(--ink-2)}
 table.rep td.hi{color:var(--ok);font-weight:700}table.rep tr.sum td{font-weight:700;border-top:2px solid var(--rule)}table.rep tr.free td{color:var(--warn)}
@@ -805,7 +805,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
       <a href="#dt" data-v="dt">Карта объектов</a>
-      <a href="#notes" data-v="notes" id="notesTab" hidden>Заметки <span class="badge" id="noteBadge" hidden></span></a>
+      <a href="#notes" data-v="notes" id="notesTab" hidden>Мои задачи <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
@@ -2595,34 +2595,35 @@ function vBackups(){
 }
 
 /* ===== Users view (admin) ===== */
-/* ---------- «Заметки»: a personal to-do list ---------- */
+/* ---------- «Мои задачи»: a personal to-do list ---------- */
 let NOTES = [];
 function vNotes(){
-  // «В первую очередь» goes first (the last marked on top), then the rest, newest first
+  // urgent tasks go first (the last marked on top), then the rest, newest first
   const open = NOTES.filter(n => !n.done).sort((a, b) => (!!b.urgent - !!a.urgent) || String(b.urgent ? b.urgentAt || '' : b.at).localeCompare(String(a.urgent ? a.urgentAt || '' : a.at)));
   const done = NOTES.filter(n => n.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
   const row = n => { const ed = ui.noteEdit === n.id; return `<li class="note ${n.done ? 'done' : ''} ${n.urgent && !n.done ? 'urgent' : ''}">
       <label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label>
       <div class="note-t">${ed ? `<span data-keep style="display:contents"><textarea class="in note-ed" id="note-ed" rows="3" maxlength="2000">${esc(n.text)}</textarea></span>
+          <label class="note-urg"><input type="checkbox" id="note-ed-urg" ${n.urgent ? 'checked' : ''}> Срочная</label>
           <div class="row-g" style="margin-top:6px"><button class="btn sm primary" type="button" data-act="noteSave" data-id="${esc(n.id)}">Сохранить</button><button class="btn sm" type="button" data-act="noteEditCancel">Отмена</button></div>`
         : `<div>${esc(n.text)}</div>`}
         <small>${esc(fmtDT(n.at))}${n.editedAt ? ' · изменено ' + esc(fmtDT(n.editedAt)) : ''}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}` : ''}</small>
-        ${n.done ? '' : `<label class="note-urg"><input type="checkbox" data-noteurg="${esc(n.id)}" ${n.urgent ? 'checked' : ''}> В первую очередь</label>`}</div>
+        ${n.urgent && !n.done && !ed ? '<span class="note-urgtag">Срочная</span>' : ''}</div>
       <div class="note-acts"><button class="btn ghost sm" type="button" data-act="noteDel" data-id="${esc(n.id)}" title="Удалить" aria-label="Удалить">✕</button>
         ${ed ? '' : `<button class="btn ghost sm" type="button" data-act="noteEdit" data-id="${esc(n.id)}" title="Изменить" aria-label="Изменить">✎</button>`}</div>
     </li>`; };
   return `<div class="notes">
-    <div class="note-add" data-keep><textarea id="note-new" rows="1" maxlength="2000" aria-label="Новая заметка"></textarea><button class="btn primary" type="button" data-act="noteAdd">Добавить</button></div>
-    <label class="note-urg note-urg-new"><input type="checkbox" id="note-new-urg" ${ui.noteNewUrg ? 'checked' : ''}> В первую очередь</label>
-    <div class="dim note-hint">Enter — добавить, Shift+Enter — новая строка. Заметки видите только вы.</div>
-    ${NOTES.length ? '' : '<div class="empty"><h3>Заметок пока нет</h3>Напишите задачу в поле выше.</div>'}
-    ${open.length ? `<ul class="note-list">${open.map(row).join('')}</ul>` : NOTES.length ? '<div class="dim note-hint">Все заметки выполнены.</div>' : ''}
+    <div class="note-add" data-keep><textarea id="note-new" rows="1" maxlength="2000" aria-label="Новая задача"></textarea><button class="btn primary" type="button" data-act="noteAdd">Добавить</button></div>
+    <label class="note-urg note-urg-new"><input type="checkbox" id="note-new-urg" ${ui.noteNewUrg ? 'checked' : ''}> Срочная</label>
+    <div class="dim note-hint">Enter — добавить, Shift+Enter — новая строка. Свои задачи видите только вы.</div>
+    ${NOTES.length ? '' : '<div class="empty"><h3>Задач пока нет</h3>Напишите задачу в поле выше.</div>'}
+    ${open.length ? `<ul class="note-list">${open.map(row).join('')}</ul>` : NOTES.length ? '<div class="dim note-hint">Все задачи выполнены.</div>' : ''}
     ${done.length ? `<h4 class="note-h">Выполненные · ${done.length}${done.length > 1 ? ' <button class="btn ghost sm" type="button" data-act="noteClear">Удалить выполненные</button>' : ''}</h4><ul class="note-list">${done.map(row).join('')}</ul>` : ''}
   </div>`;
 }
 async function noteAdd(){
   const t = $('note-new'), text = t.value.trim();
-  if (!text) { t.focus(); return toast('Напишите текст заметки'); }
+  if (!text) { t.focus(); return toast('Напишите текст задачи'); }
   try { const r = await api('POST', '/api/notes', { text, urgent: !!$('note-new-urg')?.checked }); NOTES.unshift(r.note); ui.noteNewUrg = false; t.value = ''; t.style.height = ''; t.blur(); render(); $('note-new')?.focus(); refresh().catch(() => {}); }
   catch(e) { toast(errText(e)); }
 }
@@ -3604,7 +3605,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['orders', 'Заказы на производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Бухгалтерия'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Заметки']] : [])];
+const startViews = () => [['works', 'Работы'], ['orders', 'Заказы на производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Бухгалтерия'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -3768,11 +3769,11 @@ async function act(el){
     case 'noteAdd': return noteAdd();
     case 'noteEdit': ui.noteEdit = id; render(); { const t = $('note-ed'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } } return;
     case 'noteEditCancel': ui.noteEdit = null; document.activeElement?.blur(); return render();
-    case 'noteSave': { const text = ($('note-ed')?.value || '').trim(); if (!text) return toast('Напишите текст заметки');
-      try { const r = await api('PATCH', '/api/notes/' + id, { text }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); ui.noteEdit = null; document.activeElement?.blur(); render(); toast('Заметка изменена'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
-    case 'noteDel': { const n = NOTES.find(x => x.id === id); if (!n) return; if (!n.done && !confirm('Удалить заметку «' + n.text.slice(0, 60) + '»?')) return;
+    case 'noteSave': { const text = ($('note-ed')?.value || '').trim(); if (!text) return toast('Напишите текст задачи');
+      try { const r = await api('PATCH', '/api/notes/' + id, { text, urgent: !!$('note-ed-urg')?.checked }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); ui.noteEdit = null; document.activeElement?.blur(); render(); toast('Задача изменена'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+    case 'noteDel': { const n = NOTES.find(x => x.id === id); if (!n) return; if (!n.done && !confirm('Удалить задачу «' + n.text.slice(0, 60) + '»?')) return;
       try { await api('DELETE', '/api/notes/' + id); NOTES = NOTES.filter(x => x.id !== id); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
-    case 'noteClear': { const ids = NOTES.filter(x => x.done).map(x => x.id); if (!confirm(`Удалить выполненные заметки (${ids.length})?`)) return;
+    case 'noteClear': { const ids = NOTES.filter(x => x.done).map(x => x.id); if (!confirm(`Удалить выполненные задачи (${ids.length})?`)) return;
       try { for (const i of ids) await api('DELETE', '/api/notes/' + i); NOTES = NOTES.filter(x => !ids.includes(x.id)); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'repExport': return exportJobReport(jobOf(id), ui.repDay || today()).catch(e => toast(errText(e)));
     case 'wlSt': ui.wlSt = id; return render();
