@@ -505,6 +505,11 @@ table.pers{border-collapse:collapse;font-size:14px}table.pers td{padding:3px 14p
 .spark{color:var(--stamp);display:block}
 .admedit{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}.admedit label{display:flex;flex-direction:column;font-size:13px;color:var(--ink-2)}
 .pwrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.pwrow .in{flex:1 1 180px;min-width:0}.pwgen{display:flex;gap:4px}
+table.rep{width:100%;border-collapse:collapse;font-size:14px}table.rep th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule);font-weight:500;white-space:nowrap}
+table.rep td{padding:7px 8px;border-bottom:1px solid var(--rule-2);vertical-align:top}table.rep .r{text-align:right}table.rep td small{display:block;font-size:12px;color:var(--ink-2)}
+table.rep td.hi{color:var(--ok);font-weight:700}table.rep tr.sum td{font-weight:700;border-top:2px solid var(--rule)}table.rep tr.free td{color:var(--warn)}
+table.rep tr.cur td{background:color-mix(in srgb,var(--stamp) 8%,transparent)}table.rep .wbar{width:70px;margin-left:auto}
+.wrk-st{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .slots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .slots li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:8px 10px;border:1px dashed var(--rule);border-radius:10px}
 .slots li.ok{border-style:solid;border-color:var(--ok);background:color-mix(in srgb,var(--ok-soft) 60%,transparent)}
@@ -1569,6 +1574,31 @@ function cpDetail(c){
 const WORK_KIND = { prod:'Производство', mount:'Монтаж', both:'Производство и монтаж' };
 const WORK_CHIP = { prod:'c-mute', mount:'c-info', both:'c-work' };
 const isMount = j => (j.kind || 'mount') !== 'prod';
+/* the report of a work: closed points per executor — for a chosen day and for all time, and day by day */
+const localDay = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function jobReport(j, day){
+  const P = j.places || [], ids = [...new Set([...(j.workers || []), ...P.map(x => x.assignee).filter(Boolean)])];
+  const row = id => { const mine = P.filter(x => (x.assignee || '') === id), done = mine.filter(x => x.doneAt);
+    const u = STAFF.find(x => x.id === id);
+    return { id, name: id ? who(id) : 'Без исполнителя', role: u ? ROLE_NAMES[u.role] || '' : '', assigned: mine.length, day: done.filter(x => localDay(x.doneAt) === day).length, total: done.length, left: mine.length - done.length, nw: done.filter(x => x.notWorking).length,
+      last: done.reduce((a, x) => x.doneAt > a ? x.doneAt : a, '') }; };
+  const rows = ids.map(row).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ru'));
+  if (P.some(x => !x.assignee)) rows.push(row(''));
+  const days = [...new Set(P.filter(x => x.doneAt).map(x => localDay(x.doneAt)))].sort().reverse();
+  const byDay = days.map(d => ({ d, per: Object.fromEntries(ids.map(id => [id, P.filter(x => x.assignee === id && x.doneAt && localDay(x.doneAt) === d).length])), all: P.filter(x => x.doneAt && localDay(x.doneAt) === d).length }));
+  return { rows, ids, byDay, sum: { assigned: P.length, day: rows.reduce((a, r) => a + r.day, 0), total: rows.reduce((a, r) => a + r.total, 0), nw: rows.reduce((a, r) => a + r.nw, 0) } };
+}
+async function exportJobReport(j, day){
+  const X = await loadSheetJS(), R = jobReport(j, day), wb = X.utils.book_new();
+  const a = [['Отчёт по работе № ' + jobNo(j) + ' · ' + j.title], ['Контрагент: ' + (cpOf(j.customerId)?.name || '—') + (j.due ? ' · срок ' + fmtD(j.due) : '')], ['Сформирован: ' + fmtDT(new Date().toISOString())], [],
+    ['Исполнитель', 'Роль', 'Назначено точек', 'Выполнено за ' + fmtD(day), 'Выполнено за всё время', 'Осталось', 'Из них «не работает»', 'Последняя закрытая'],
+    ...R.rows.map(r => [r.name, r.role, r.assigned, r.day, r.total, r.left, r.nw, r.last ? fmtDT(r.last) : '']),
+    ['Итого', '', R.sum.assigned, R.sum.day, R.sum.total, R.sum.assigned - R.sum.total, R.sum.nw, '']];
+  const ws = X.utils.aoa_to_sheet(a); ws['!cols'] = [28, 14, 14, 18, 20, 10, 18, 18].map(w => ({ wch: w })); X.utils.book_append_sheet(wb, ws, 'По исполнителям');
+  const b = [['Дата', ...R.ids.map(who), 'Всего'], ...R.byDay.map(x => [fmtD(x.d), ...R.ids.map(id => x.per[id]), x.all])];
+  const ws2 = X.utils.aoa_to_sheet(b); ws2['!cols'] = [12, ...R.ids.map(() => ({ wch: 16 })), 8].map(w => typeof w === 'number' ? { wch: w } : w); X.utils.book_append_sheet(wb, ws2, 'По дням');
+  X.writeFile(wb, `Отчёт — работа № ${jobNo(j)} — ${today()}.xlsx`);
+}
 function vWorkList(){
   const q = (ui.wlq || '').trim().toLowerCase(), K = ui.wlKind || 'all', St = ui.wlSt || 'active';
   const hay = j => [j.title, cpOf(j.customerId)?.name, j.description, '№' + j.no].join(' ').toLowerCase();
@@ -1589,7 +1619,7 @@ function vWorkList(){
       <div class="${overdue(j) ? 'bad-t' : ''}"><small class="lbl">Срок</small>${j.due ? fmtD(j.due) : '<span class="dim">—</span>'}</div>
       <div>${isMount(j) ? (P.length ? `<small class="lbl">Точки</small>${c} / ${P.length}<span class="wbar"><i style="width:${Math.round(c / P.length * 100)}%"></i></span>` : '<span class="dim">точек нет</span>') : ''}</div>
       <div class="wrk-p">${ppl.slice(0, 3).map(id => `<span class="wchip">${esc(who(id))}</span>`).join(' ')}${ppl.length > 3 ? ` <span class="dim">+${ppl.length - 3}</span>` : ''}</div>
-      <div><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span></div></div>`; }).join('')}</section>`;
+      <div class="wrk-st"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${isMount(j) && P.length ? `<button class="btn sm" data-act="jobReport" data-id="${j.id}">Отчёт</button>` : ''}</div></div>`; }).join('')}</section>`;
 }
 const isWorker = () => me && (me.role === 'worker' || me.role === 'contractor');   // «Сотрудник» и «Подрядчик»
 const canLead = () => canEdit();
@@ -2520,7 +2550,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm');
+function openDrawer(kind, id, ctx){ $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'invoiceForm' || kind === 'jobReport');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
@@ -2851,6 +2881,25 @@ function renderDrawer(){
       ${r.full ? '<p class="ok-t" style="margin:0">✓ По этой точке всё сделано.</p>' : ''}
     </div>`;
   }
+  if (d.kind === 'jobReport') {
+    const j = jobOf(d.id); if (!j) return closeDrawer();
+    const day = ui.repDay || today(), R = jobReport(j, day), isToday = day === today();
+    D.innerHTML = dh(`Отчёт · работа № ${jobNo(j)}`) + `<div class="d-body">
+      <p style="margin:0"><b>${esc(j.title)}</b>${cpOf(j.customerId) ? ' · ' + esc(cpOf(j.customerId).name) : ''}${j.due ? ' · срок ' + fmtD(j.due) : ''}</p>
+      <div class="row-g"><label style="display:flex;gap:8px;align-items:center;font-size:14px">День<input class="in" type="date" id="rep-day" value="${day}" max="${today()}" style="width:auto"></label>
+        <button class="btn sm" data-act="repDay" data-id="${today()}" ${isToday ? 'disabled' : ''}>Сегодня</button>
+        <button class="btn sm" data-act="repDay" data-id="${localDay(Date.now() - 864e5)}">Вчера</button>
+        <span style="flex:1"></span><button class="btn sm primary" data-act="repExport" data-id="${j.id}">Скачать Excel</button></div>
+      ${!(j.places || []).length ? '<p class="dim" style="margin:0">У работы пока нет точек — отчёт появится, когда точки будут добавлены и назначены.</p>' : `
+      <div class="tscroll"><table class="rep"><thead><tr><th>Исполнитель</th><th class="r">Назначено</th><th class="r">${isToday ? 'Сегодня' : 'За ' + fmtD(day)}</th><th class="r">За всё время</th><th class="r">Осталось</th><th class="r">Не работает</th><th>Последняя</th></tr></thead><tbody>
+        ${R.rows.map(r => `<tr class="${r.id ? '' : 'free'}"><td><b>${esc(r.name)}</b>${r.role ? `<small>${esc(r.role)}</small>` : ''}</td><td class="r mono">${r.assigned}</td><td class="r mono ${r.day ? 'hi' : ''}">${r.day}</td><td class="r mono">${r.total}${r.assigned ? `<span class="wbar"><i style="width:${Math.round(r.total / r.assigned * 100)}%"></i></span>` : ''}</td><td class="r mono">${r.left}</td><td class="r mono">${r.nw || ''}</td><td><small>${r.last ? esc(fmtDT(r.last)) : '—'}</small></td></tr>`).join('')}
+        <tr class="sum"><td>Итого</td><td class="r mono">${R.sum.assigned}</td><td class="r mono">${R.sum.day}</td><td class="r mono">${R.sum.total}</td><td class="r mono">${R.sum.assigned - R.sum.total}</td><td class="r mono">${R.sum.nw || ''}</td><td></td></tr>
+      </tbody></table></div>
+      <div class="box"><h4>По дням</h4>${R.byDay.length ? `<div class="tscroll"><table class="rep days"><thead><tr><th>Дата</th>${R.ids.map(id => `<th class="r">${esc(who(id))}</th>`).join('')}<th class="r">Всего</th></tr></thead><tbody>
+        ${R.byDay.slice(0, 60).map(x => `<tr class="${x.d === day ? 'cur' : ''}"><td><button class="linkish" data-act="repDay" data-id="${x.d}">${fmtD(x.d)}</button></td>${R.ids.map(id => `<td class="r mono">${x.per[id] || ''}</td>`).join('')}<td class="r mono"><b>${x.all}</b></td></tr>`).join('')}</tbody></table></div>` : '<p class="dim" style="margin:0">Закрытых точек пока нет.</p>'}</div>`}
+      <div class="row-g"><button class="btn sm" data-act="openJob" data-id="${j.id}">← К работе</button><button class="btn sm" data-act="close">Закрыть</button></div>
+    </div>`;
+  }
   if (d.kind === 'job') {
     const j = jobOf(d.id); if (!j) return closeDrawer();
     const ed = mayEditJob(j), cp = cpOf(j.customerId), P = j.places || [], mount = isMount(j);
@@ -2874,7 +2923,7 @@ function renderDrawer(){
           <span class="wbar"><i style="width:${Math.round(closed / P.length * 100)}%"></i></span>
           <table class="pers"><tbody>${Object.entries(byPerson).sort((x, y) => (x[0] ? 0 : 1) - (y[0] ? 0 : 1) || who(x[0]).localeCompare(who(y[0]), 'ru')).map(([id, r]) => `<tr><td>${id ? esc(who(id)) : '<span class="warn-t">без исполнителя</span>'}</td><td class="mono">${r.c} / ${r.t}</td></tr>`).join('')}</tbody></table>`
           : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Редактор карты»: выделите точки → «Добавить точки к работе».</p>'}
-        ${canEdit() ? `<div class="row-g"><button class="btn sm primary" data-act="gotoDtJob" data-id="${j.id}">Открыть в редакторе карты</button></div>` : ''}</div>
+        <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в редакторе карты</button>` : ''}</div></div>
       ${jobPhotoBox(j)}
       ${jobAssignBox(j)}
       ${P.length ? `<div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>` : ''}` : ''}
@@ -3446,6 +3495,9 @@ async function act(el){
     case 'jShift': ui.jFrom = Number(id) ? (ui.jFrom ?? monday(dnum(today()))) + Number(id) : monday(dnum(today())); return render();
     case 'newJob': ui.jfKind = null; return openDrawer('jobForm');
     case 'wlKind': ui.wlKind = id; return render();
+    case 'jobReport': ui.repDay = today(); return openDrawer('jobReport', id);
+    case 'repDay': ui.repDay = id; return renderDrawer();
+    case 'repExport': return exportJobReport(jobOf(id), ui.repDay || today()).catch(e => toast(errText(e)));
     case 'wlSt': ui.wlSt = id; return render();
     case 'gotoDtJob': closeDrawer(); ui.dtJob = id; ui.dtJobFit = true; if (location.hash !== '#dt') location.hash = 'dt'; else render(); return;
     case 'jobDocDel': { const [jid, fid] = id.split('|'), j = jobOf(jid); try { await api('PATCH', `/api/jobs/${jid}`, { docs: (j.docs || []).filter(f => f.id !== fid) }); await refresh(); renderDrawer(); toast('Документ удалён'); } catch(e) { toast(errText(e)); } return; }
@@ -3705,6 +3757,7 @@ document.addEventListener('toggle', e => { if (e.target.matches?.('.ogroup[data-
 $('drawer').addEventListener('input', e => { if (e.target.id === 'paste-t' && ui.drawer?.kind === 'paste') $('paste-info').textContent = 'Строк к добавлению: ' + parsePaste(e.target.value).length; else if (e.target.id === 'paste-t') $('paste-info').textContent = 'Строк к добавлению: ' + e.target.value.split(/\r?\n/).filter(l => l.trim() && !/наимен|компон/i.test(l)).length; });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
   if (t.id === 'dtJob') { ui.dtJob = t.value || null; ui.dtJobFit = true; return renderDt(); }
