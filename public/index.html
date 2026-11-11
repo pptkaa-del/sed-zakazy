@@ -810,7 +810,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <div class="upop" id="upop" role="menu" hidden>
         <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
         <button type="button" role="menuitem" data-act="prefs">⚙ Настройки</button>
-        <button type="button" role="menuitem" data-act="password">Сменить пароль</button>
+
         <button type="button" role="menuitem" class="danger" data-act="logout">Выйти</button>
       </div>
     </div>
@@ -1854,7 +1854,7 @@ function mountMini(){
     mini._pins.clearLayers();
     const many = P().length > 40;
     const j = !form && jobOf(ui.drawer.id), open = pl => { if (j) openDrawer('place', j.id + '|' + pl.id); };
-    if (many) { P().forEach(pl => { const done = j && placeColor(j, pl); L.circleMarker([pl.lat, pl.lng], { radius: done ? 6 : 5, weight: done ? 3 : 1, color: done || '#fff', fillColor: pl.dtNo ? DT_COLOR[dtCatOfPlace(pl)] : '#3B47B8', fillOpacity:.95 }).bindTooltip((pl.label || '') + (j ? ' — нажмите, чтобы открыть' : '')).on('click', () => open(pl)).addTo(mini._pins); }); return; }
+    if (many) { P().forEach(pl => { const done = j && placeColor(j, pl); mkPoint([pl.lat, pl.lng], { radius: done ? 6 : 5, weight: done ? 3 : 1, color: done || '#fff', fillColor: pl.dtNo ? DT_COLOR[dtCatOfPlace(pl)] : '#3B47B8', fillOpacity:.95 }).bindTooltip((pl.label || '') + (j ? ' — нажмите, чтобы открыть' : '')).on('click', () => open(pl)).addTo(mini._pins); }); return; }
     P().forEach((pl, i) => { const mk = L.marker([pl.lat, pl.lng], { icon: PIN('job' + (j && placeColor(j, pl) ? (pl.doneAt ? ' done' : ' part') : ''), i + 1), draggable: form, title: pl.label || '' }).addTo(mini._pins);
       if (j) mk.on('click', () => open(pl));
       if (form) mk.on('dragend', () => { const ll = mk.getLatLng(); pl.lat = ll.lat; pl.lng = ll.lng; $('jf-places').innerHTML = jobFormPlaces(); }); });
@@ -2048,13 +2048,14 @@ function renderDt(){
     const tring = nd && c !== 'road' ? DT_COLOR[c] : null;
     const style = { radius: (small ? 4.5 : 7) + (sel ? 2 : 0), color: sel ? '#111' : byPerson ? '#fff' : ring || tring || '#fff', weight: sel ? 3 : !byPerson && (ring || tring) ? 3 : 1, fillColor: fill, fillOpacity: small ? .75 : .95 };
     let m = dtMarks.get(key);
+    if (m && m._pin !== pinMode()) { dtLayer.removeLayer(m); dtMarks.delete(key); m = null; }   // the point style was changed in the settings
     if (!m) {
-      m = L.circleMarker([p.lat, p.lng], style); m.bindPopup(() => dtPopup(DT.points[i], i), { minWidth:250, maxWidth:300, autoPanPadding:[24, 24], keepInView:true }); m.bindTooltip(String(p.no), { direction:'top', offset:[0,-6] });
+      m = mkPoint([p.lat, p.lng], style); m._pin = pinMode(); m.bindPopup(() => dtPopup(DT.points[i], i), { minWidth:250, maxWidth:300, autoPanPadding:[24, 24], keepInView:true, ...popOff() }); m.bindTooltip(String(p.no), { direction:'top', offset:tipOff(-6) });
       // in the selection mode a click selects / deselects the point instead of opening it
       m.off('click', m._openPopup, m); m.on('click', ev => { if (ui.dtLasso) return; m.openPopup(ev.latlng); });   // in the selection mode the tap is handled by the area drawing (dtToggleSel)
       dtMarks.set(key, m);
     }
-    else { m.setLatLng([p.lat, p.lng]); m.setStyle(style); if (m.isPopupOpen()) m.setPopupContent(dtPopup(DT.points[i], i)); else m.setPopupContent(() => dtPopup(DT.points[i], i)); }
+    else { m.setLatLng([p.lat, p.lng]); m.setStyle(pinMode() ? { ...style, radius: Math.max(6, style.radius), weight: Math.max(1.5, style.weight) } : style); if (m.isPopupOpen()) m.setPopupContent(dtPopup(DT.points[i], i)); else m.setPopupContent(() => dtPopup(DT.points[i], i)); }
     const show = dtMatch(p);
     if (show && !dtLayer.hasLayer(m)) dtLayer.addLayer(m); else if (!show && dtLayer.hasLayer(m)) dtLayer.removeLayer(m);
     if (show && (c !== 'road' || nd || dtSel.has(p.no))) m.bringToFront();
@@ -2282,9 +2283,9 @@ function renderW(){
   wLayer.clearLayers();
   shown.forEach(({ j, pl }) => {
     const c = done ? (pl.notWorking ? '#C0392B' : '#1E9E4F') : placeColor(j, pl) ? '#E08A00' : '#3B47B8';
-    L.circleMarker([pl.lat, pl.lng], { radius: 9, weight: 2, color: '#fff', fillColor: c, fillOpacity: .95 })
-      .bindPopup(() => wPopup(j, (jobOf(j.id)?.places || []).find(x => x.id === pl.id) || pl), { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20] })
-      .bindTooltip(pl.label || '', { direction: 'top', offset: [0, -8] }).addTo(wLayer);
+    mkPoint([pl.lat, pl.lng], { radius: 9, weight: 2, color: '#fff', fillColor: c, fillOpacity: .95 })
+      .bindPopup(() => wPopup(j, (jobOf(j.id)?.places || []).find(x => x.id === pl.id) || pl), { minWidth: 230, maxWidth: 290, autoPanPadding: [20, 20], ...popOff() })
+      .bindTooltip(pl.label || '', { direction: 'top', offset: tipOff(-8) }).addTo(wLayer);
   });
   // fit only once the map has its final size (on a phone its height is set from the screen)
   setTimeout(() => { wFitMap(); if (!wFitted && shown.length) { wFitted = true; wMap.fitBounds(L.latLngBounds(shown.map(x => [x.pl.lat, x.pl.lng])).pad(0.2), { maxZoom: 16 }); } }, 0);
@@ -2292,6 +2293,29 @@ function renderW(){
 
 /* ===== Map of objects ===== */
 const canWork = () => me && !isWorker();
+/* Points on the maps: «Точка» (a circle) or «Капля» (a drop-shaped pin whose tip is the place) — a personal setting.
+   The drop is drawn on the canvas like the circle, so thousands of points stay fast. */
+if (typeof L !== 'undefined') {
+L.PinMarker = L.CircleMarker.extend({
+  _updateBounds(){ const r = this._radius * 1.25, w = this._clickTolerance(), p = this._point; this._pxBounds = new L.Bounds(p.subtract([r + w, r * 2.6 + w]), p.add([r + w, w])); },
+  _updatePath(){ this._renderer._updatePin(this); },
+  _containsPoint(pt){ const r = this._radius * 1.25, c = this._point.subtract([0, r * 1.55]); return pt.distanceTo(c) <= r + this._clickTolerance() || (pt.y <= this._point.y + 2 && pt.y >= c.y && Math.abs(pt.x - this._point.x) <= r * 0.7); }
+});
+L.Canvas.include({ _updatePin(layer){
+  if (!this._drawing || layer._empty()) return;
+  const p = layer._point, ctx = this._ctx, r = Math.max(layer._radius, 1) * 1.25, cy = p.y - r * 1.55;
+  ctx.beginPath(); ctx.moveTo(p.x, p.y);
+  ctx.bezierCurveTo(p.x - r * 0.3, p.y - r * 0.55, p.x - r, cy + r * 0.6, p.x - r, cy);
+  ctx.arc(p.x, cy, r, Math.PI, 0);
+  ctx.bezierCurveTo(p.x + r, cy + r * 0.6, p.x + r * 0.3, p.y - r * 0.55, p.x, p.y);
+  ctx.closePath(); this._fillStroke(ctx, layer);
+} });
+}
+const pinMode = () => (typeof PREFS !== 'undefined' && PREFS.marker) === 'pin';
+// a map point in the chosen style; drops are a little bigger so the head is easy to tap
+const mkPoint = (ll, style) => pinMode() && L.PinMarker ? new L.PinMarker(ll, { ...style, radius: Math.max(6, style.radius || 6), weight: Math.max(1.5, style.weight || 1) }) : L.circleMarker(ll, style);
+const popOff = () => pinMode() ? { offset: [0, -14] } : {};
+const tipOff = y => pinMode() ? [0, -22] : [0, y];
 const mayEditPoint = pt => me && (canEdit() || pt.createdBy === me.id);
 const ptOf = id => S.points.find(p => p.id === id);
 let map = null, markers = new Map(), ghost = null, fitted = false;
@@ -3025,6 +3049,7 @@ function renderDrawer(){
     D.innerHTML = dh('Настройки') + `<div class="d-body">
       <p class="dim" style="margin:0">Настройки ваши личные: они сохраняются в вашей учётной записи и действуют на любом устройстве.</p>
       <div class="box"><h4>Тема оформления</h4><div class="seg pthemes" role="group" aria-label="Тема оформления">${THEMES.map(t => `<button type="button" data-act="prefTheme" data-id="${t}" class="${th === t ? 'on' : ''}" aria-pressed="${th === t}"><span class="sw" style="background:${sw[t]}"></span>${tn[t]}</button>`).join('')}</div></div>
+      <div class="box"><h4>Точки на карте</h4><div class="seg" role="group" aria-label="Вид точек">${[['dot', '● Точка'], ['pin', '📍 Капля']].map(([k, l]) => `<button type="button" data-act="prefMarker" data-id="${k}" class="${(PREFS.marker || 'dot') === k ? 'on' : ''}" aria-pressed="${(PREFS.marker || 'dot') === k}">${l}</button>`).join('')}</div><small class="dim">Как рисовать точки на картах: кружком или каплей, острый конец которой указывает место.</small></div>
       <div class="box"><h4>Размер текста</h4><div class="seg">${TEXT_SIZES.map(([v, l]) => `<button type="button" data-act="prefScale" data-id="${v}" class="${sc === v ? 'on' : ''}">${l}</button>`).join('')}</div><small class="dim">Увеличивает всю страницу — удобно на телефоне.</small></div>
       ${field ? '' : `<div class="box"><h4>Открывать после входа</h4><select class="in" id="pref-start">${startViews().map(([k, l]) => `<option value="${k}" ${(PREFS.start || 'works') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div class="box"><h4>Цвета точек на карте объектов</h4>
@@ -3032,7 +3057,13 @@ function renderDrawer(){
         <b class="dtm-h">Пометки</b>
         <div class="pcols">${Object.entries(DT_NEED).map(([k, l]) => col('n_' + k, l)).join('')}</div>
         <div class="row-g"><button class="btn sm" data-act="prefColorsReset" ${Object.keys(PREFS.colors || {}).length ? '' : 'disabled'}>Вернуть цвета по умолчанию</button></div></div>`}
-      <div class="row-g"><button class="btn" data-act="password">Сменить пароль</button><button class="btn primary" data-act="close">Готово</button></div>
+      <form class="box" data-form="prefsPw" autocomplete="on"><h4>Пароль</h4><div class="form">
+        <label class="wide">Текущий пароль<input class="in" type="password" id="pw-cur" autocomplete="current-password" required></label>
+        <label>Новый пароль (не короче 8 символов)<input class="in" type="password" id="pw-new" autocomplete="new-password" minlength="8" required></label>
+        <label>Повторите новый пароль<input class="in" type="password" id="pw-new2" autocomplete="new-password" minlength="8" required></label></div>
+        <div class="err" id="ferr"></div>
+        <div class="row-g"><button class="btn" type="submit">Сменить пароль</button></div></form>
+      <div class="row-g"><button class="btn primary" data-act="close">Готово</button></div>
     </div>`;
   }
   if (d.kind === 'jobDone') {
@@ -3511,6 +3542,11 @@ async function onSubmit(e){
       await api('POST', '/api/password', { current:$('pw-cur').value, next:$('pw-new').value });
       closeDrawer(); toast('Пароль изменён');
     }
+    if (kind === 'prefsPw') {
+      if ($('pw-new').value !== $('pw-new2').value) return fail('Новый пароль и повтор не совпадают.');
+      await api('POST', '/api/password', { current:$('pw-cur').value, next:$('pw-new').value });
+      ['pw-cur', 'pw-new', 'pw-new2'].forEach(k => $(k).value = ''); fail(''); toast('Пароль изменён');
+    }
     if (kind === 'paste') {
       const rows = parsePaste($('paste-t').value);
       if (!rows.length) return fail('Не нашлось строк с наименованием. Проверьте, что столбцы разделены табуляцией.');
@@ -3549,6 +3585,7 @@ function prefsSave(patch){
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
 const startViews = () => [['works', 'Работы'], ['orders', 'Заказы на производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Бухгалтерия'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Заметки']] : [])];
+const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
 /* ---------- actions ---------- */
@@ -3702,8 +3739,9 @@ async function act(el){
     case 'jobReport': ui.repDay = today(); return openDrawer('jobReport', id);
     case 'repDay': ui.repDay = id; return renderDrawer();
     case 'prefs': $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded', 'false'); return openDrawer('prefs');
-    case 'prefTheme': themeSet(THEMES.includes(id) ? id : 'system'); prefsSave({ theme: THEMES.includes(id) ? id : 'system' }); return renderDrawer();
-    case 'prefScale': prefsSave({ scale: Number(id) || 1 }); prefsChanged(); return renderDrawer();
+    case 'prefTheme': themeSet(THEMES.includes(id) ? id : 'system'); prefsSave({ theme: THEMES.includes(id) ? id : 'system' }); return segOn(el);
+    case 'prefScale': prefsSave({ scale: Number(id) || 1 }); prefsChanged(); return segOn(el);
+    case 'prefMarker': prefsSave({ marker: id === 'pin' ? 'pin' : 'dot' }); prefsChanged(); if (ui.view === 'wwork' || ui.view === 'wdone') renderW(); return segOn(el);
     case 'prefColorsReset': prefsSave({ colors: {} }); prefsChanged(); return renderDrawer();
     case 'dtShowAll': Object.keys(DT_SHOW).forEach(k => DT_SHOW[k] = true); ui.dtOnlyCheck = false; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} prefsSave({ dtShow: { ...DT_SHOW } }); return renderDt();
     case 'jdDayClear': ui.jdDay = ''; return renderDrawer();

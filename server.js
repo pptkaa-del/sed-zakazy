@@ -1318,6 +1318,7 @@ function cleanPrefs(b){
   const o = {};
   if (['system', 'light', 'dark', 'telecom'].includes(b.theme)) o.theme = b.theme;
   if ([1, 1.1, 1.2, 1.35].includes(Number(b.scale))) o.scale = Number(b.scale);
+  if (['pin', 'dot'].includes(b.marker)) o.marker = b.marker;
   if (/^[a-z]{2,10}$/.test(String(b.start || ''))) o.start = String(b.start);
   if (b.dtShow && typeof b.dtShow === 'object') o.dtShow = Object.fromEntries(Object.entries(b.dtShow).filter(([k]) => /^[a-z_]{2,20}$/.test(k)).slice(0, 30).map(([k, v]) => [k, !!v]));
   if (b.colors && typeof b.colors === 'object') o.colors = Object.fromEntries(Object.entries(b.colors).filter(([k, v]) => /^[a-z_]{2,20}$/.test(k) && HEX(v)).slice(0, 30).map(([k, v]) => [k, HEX(v)]));
