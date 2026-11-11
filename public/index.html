@@ -389,6 +389,8 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .dtmark{display:flex;flex-direction:column;gap:8px;width:100%;padding:10px 12px;border:2px solid var(--stamp);border-radius:12px;background:color-mix(in srgb,var(--stamp) 5%,var(--sheet))}.dtmark-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
 .dtneeds{display:flex;flex-wrap:wrap;gap:6px}.needbtn{display:inline-flex;gap:7px;align-items:center;padding:7px 12px;border:2px solid var(--c,#9AA3AD);border-radius:999px;background:var(--sheet);font:inherit;font-size:14px;cursor:pointer;color:inherit}.needbtn i{width:12px;height:12px;border-radius:50%;background:var(--c)}.needbtn:hover:not(:disabled){background:color-mix(in srgb,var(--c) 15%,var(--sheet))}.needbtn:disabled{opacity:.45;cursor:default}.needbtn.none{border-style:dashed}
 .legbtn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--sheet);font:inherit;font-size:13px;cursor:pointer;color:inherit}.legbtn i{width:10px;height:10px;display:inline-block}.legbtn.off{opacity:.4;text-decoration:line-through}
+.worow{display:grid;grid-template-columns:minmax(0,1fr) 90px 220px auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}.worow:first-child{border-top:0}.worow small{display:block}@media (max-width:820px){.worow{grid-template-columns:1fr auto}}
+.shortbox{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:var(--warn-soft)}.shortbox small{display:block}
 .catlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.catlist li{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--sheet)}.catlist small{display:block}
 .cpres{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto;margin-top:6px}.cphit{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;padding:8px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);cursor:pointer;font:inherit;color:inherit}.cphit:hover{border-color:var(--stamp)}.cphit small{display:block}.cphit.new{border-style:dashed}
 .pqty-l{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-2)}.pqty{width:90px}
@@ -808,6 +810,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#orders" data-v="orders">Производство</a>
       <a href="#stock" data-v="stock">Склад</a>
       <a href="#cps" data-v="cps">Контрагенты</a>
+      <a href="#wo" data-v="wo" id="woTab" hidden>Списание материалов</a>
       <a href="#pay" data-v="pay">Счета в оплату <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
@@ -1031,7 +1034,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : vOrders();
   if (changed) animateView(V);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
@@ -1469,8 +1472,9 @@ function orderDetail(o){
     <p class="hint">Спецификации, чертежи, письма и другие файлы: любой формат, до 50 МБ. Строки из Excel можно вставить в таблицу «Строки для закупки».</p>
   </section>
   <section class="card">
-    <div class="ch"><h3>Строки для закупки <span class="dim">${comps.length||''}</span></h3>
+    <div class="ch"><h3>Строки для закупки <span class="dim">${(comps.length + orderShort(o).length)||''}</span></h3>
       <div class="row-g"><button class="btn sm" data-act="paste" data-id="${o.id}">Вставить из Excel</button><button class="btn sm primary" data-act="addComp" data-id="${o.id}">+ Строка</button></div></div>
+    ${orderShortTable(o)}
     ${compTable(o)}
   </section>
   <section class="card">
@@ -1561,8 +1565,8 @@ function cpOpen(mode, src, extra = {}){
 async function cpSave(how){
   cpRead(); const c = ui.cp, fail = m => { const e = $('ferr'); if (e) e.textContent = m; };
   const name = String(c.name || '').trim();
-  if (!name) return fail('Укажите наименование изделия.');
-  if (!c.components.length) return fail('Добавьте хотя бы один компонент.');
+  if (!name && c.mode !== 'job') return fail('Укажите наименование изделия.');
+  if (!c.components.length && c.mode !== 'job') return fail('Добавьте хотя бы один компонент.');
   if (c.components.some(x => !(num(x.qty) > 0))) return fail('У каждого компонента количество должно быть больше нуля.');
   if ((how === 'cat' || how === 'new') && S.products.some(p => p.id !== (how === 'cat' ? c.id : null) && normName(p.name) === normName(name))) return fail('Изделие с таким наименованием уже есть — задайте другое.');
   try {
@@ -1578,6 +1582,10 @@ async function cpSave(how){
     const comps = c.components.map(x => ({ id: x.id, stockId: x.stockId, name: x.name, qty: num(x.qty), unit: x.unit || 'шт' }));
     const data = { name, unit: String(c.unit || 'шт').trim() || 'шт', note: String(c.note || '').trim(), components: comps };
     let msg = '';
+    if (how === 'job') {
+      await api('PATCH', '/api/jobs/' + c.jid, { materials: comps }); await refresh();
+      ui.cp = null; openDrawer('job', c.jid); return toast('Материалы сохранены' + (added ? ` · на склад добавлено новых позиций: ${added}` : ''));
+    }
     if (how === 'order') {
       await updProduct(c.oid, c.pid, p => ({ ...p, name: p.name, components: comps, modified: true }));
       msg = 'Состав изделия в заказе изменён';
@@ -1592,6 +1600,7 @@ async function cpSave(how){
     toast(msg + (added ? ` · на склад добавлено новых позиций: ${added}` : ''));
   } catch(e) { fail(errText(e)); }
 }
+const jobWoDoc = j => ({ ...j, products: [{ name: j.title, qty: 1, components: j.materials || [] }] });
 // a product of an order differs from its catalogue product
 const sameComps = (a, b) => JSON.stringify((a || []).map(c => [c.stockId || normName(c.name), Number(c.qty) || 0]).sort()) === JSON.stringify((b || []).map(c => [c.stockId || normName(c.name), Number(c.qty) || 0]).sort());
 const prodOf = (oid, pid) => (ord(oid)?.products || []).find(p => p.id === pid);
@@ -1601,6 +1610,27 @@ function updProduct(oid, pid, fn){
   return upd('orders', oid, { products });
 }
 
+/* positions the products of an order need but the warehouse does not have (or has not enough of):
+   they show up among the order's purchase lines and disappear once the stock covers them */
+function shortOf(comps, k){
+  const need = new Map();
+  for (const c of comps || []) {
+    const it = stockFor(c), key = it ? 'id:' + it.id : 'n:' + normName(c.name);
+    if (!String(c.name || '').trim()) continue;
+    const L = need.get(key) || { name: it ? it.name : c.name, unit: (it && it.unit) || c.unit || 'шт', need: 0, have: it ? Math.max(Number(it.qty) || 0, Number(it.acctQty) || 0) : 0, inStock: !!it, products: [] };
+    L.need = Math.round((L.need + (Number(c.qty) || 0) * (k(c) || 0)) * 1000) / 1000; need.set(key, L);
+    if (c._p && !L.products.includes(c._p)) L.products.push(c._p);
+  }
+  return [...need.values()].filter(L => L.have < L.need - 1e-9).map(L => ({ ...L, short: Math.round((L.need - L.have) * 1000) / 1000 })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+const orderShort = o => shortOf((o.products || []).flatMap(p => (p.components || []).map(c => ({ ...c, _q: Number(p.qty) || 0, _p: p.name }))), c => c._q);
+function orderShortTable(o){
+  const L = orderShort(o); if (!L.length) return '';
+  return `<div class="shortbox"><b>Нет на складе для изделий заказа · ${L.length}</b><small class="dim">Строки добавлены автоматически и исчезнут, когда позиция поступит на склад в нужном количестве.</small>
+    <div class="tscroll"><table class="comp"><thead><tr><th>Наименование</th><th class="r">Нужно</th><th class="r">На складе</th><th class="r">Не хватает</th><th>Ед.</th><th>Изделия</th></tr></thead><tbody>
+    ${L.map(x => `<tr><td>${esc(x.name)}${x.inStock ? '' : ' <span class="chip c-warn">нет позиции</span>'}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${fmtQty(x.have)}</td><td class="r mono" style="color:var(--bad);font-weight:600">${fmtQty(x.short)}</td><td>${esc(x.unit)}</td><td><small class="dim">${esc(x.products.join(', '))}</small></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
 function compTable(o){
   const comps = o.components || [];
   const invNos = [...new Set(invOf(o.id).map(i => i.number).filter(Boolean))];
@@ -1829,6 +1859,15 @@ function jobGrid(list){
   <div class="legend2" style="margin-top:10px"><span><i class="lg st-new"></i>Назначена</span><span><i class="lg st-work"></i>В работе</span><span><i class="lg st-done"></i>Выполнена</span><span><i class="lg st-late"></i>Просрочена</span>${canLead() ? '<span class="dim">Щелчок по пустой клетке — назначить задачу работнику на этот день</span>' : ''}${outside ? `<span class="dim">Вне выбранных дат: ${outside}</span>` : ''}</div>`;
 }
 // «Фото на каждой точке»: the list the workers see in every point window; editable right in the card
+/* materials of a montage work: what is written off, and what the warehouse does not have */
+function jobMatBox(j){
+  const M = j.materials || [], L = M.length ? writeoffLines(jobWoDoc(j)) : [], bad = L.filter(x => x.source !== 'acct').length, need = shortOf(M, () => 1);
+  return `<div class="box"><div class="ch"><h4>Материалы на списание${M.length ? ' · ' + M.length : ''}</h4><div class="row-g">${canEdit() ? `<button class="btn sm" data-act="jobMat" data-id="${j.id}">${M.length ? 'Изменить материалы' : '+ Материалы'}</button>` : ''}${M.length ? `<button class="btn sm ${j.writeoff ? '' : 'primary'}" data-act="jobWo" data-id="${j.id}">Список для списания${j.writeoff ? ' ✓' : ''}</button>` : ''}</div></div>
+    ${M.length ? `<div class="tscroll"><table class="comp"><thead><tr><th>Материал</th><th class="r">Кол-во</th><th>Ед.</th><th class="r">Бух. остаток</th></tr></thead><tbody>${M.map(x => { const st = stockFor(x); return `<tr><td>${esc(x.name)}</td><td class="r mono">${fmtQty(x.qty)}</td><td>${esc(x.unit || 'шт')}</td><td class="r mono ${st && (Number(st.acctQty) || 0) >= x.qty ? 'ok-t' : 'warn-t'}">${st ? fmtQty(st.acctQty) : '—'}</td></tr>`; }).join('')}</tbody></table></div>
+      ${j.writeoff ? `<small class="ok-t">✓ Список для списания сохранён ${esc(fmtDT(j.writeoff.at))} · ${esc(who(j.writeoff.by))}</small>` : bad ? `<small style="color:var(--bad)">Не хватает в бухгалтерских остатках: ${bad} — список для списания пока не сохранить.</small>` : ''}
+      ${need.length ? `<div class="shortbox" style="margin-top:8px"><b>Необходимо (нет на складе) · ${need.length}</b>${need.map(x => `<small>${esc(x.name)} — не хватает <b style="color:var(--bad)">${fmtQty(x.short)} ${esc(x.unit)}</b>${x.inStock ? '' : ' · нет позиции на складе'}</small>`).join('')}</div>` : ''}`
+      : '<p class="dim" style="margin:0">Материалов пока нет. Добавьте их со склада — по ним формируется список для списания.</p>'}</div>`;
+}
 /* the work's tasks in the plan-schedule */
 function jobPlanBox(j){
   const T = S.tasks.filter(t => t.jobId === j.id).sort((a, b) => String(a.start).localeCompare(String(b.start)));
@@ -1894,7 +1933,7 @@ async function shrinkImage(file){
     return blob && blob.size < file.size ? new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type:'image/jpeg' }) : file;
   } catch(e) { return file; }
 }
-const dtCatOfPlace = pl => ['mkad', 'ttk', 'bridge', 'other'].find(c => (pl.cats || []).includes(c)) || 'road';
+const dtCatOfPlace = pl => ['bridge', 'mkad', 'ttk', 'other'].find(c => (pl.cats || []).includes(c)) || 'road';
 function jobFormPlaces(){
   const P = ui.jPlaces || [];
   if (P.length > 30) return `<p class="dim" style="margin:0">Мест: <b>${P.length}</b> (показаны на карте). Подписи мест при таком количестве не редактируются здесь.</p><button type="button" class="btn sm danger" data-act="clearJPlaces">Убрать все места</button>`;
@@ -1963,7 +2002,8 @@ async function loadDt(){
 }
 // a point's groups: МКАД / ТТК / эстакада from the marks, otherwise «дороги»; «проверить» is an extra mark on top
 const dtGroups = p => { const g = (p.cats || []).filter(c => c !== 'check'); return g.includes('other') ? ['other'] : g.length ? g : ['road']; };
-const dtCatOf = p => ['mkad', 'ttk', 'bridge', 'other', 'road'].find(c => dtGroups(p).includes(c));
+// an overpass is the main type of a point even when it is also on the МКАД or the ТТК
+const dtCatOf = p => ['bridge', 'mkad', 'ttk', 'other', 'road'].find(c => dtGroups(p).includes(c));
 const dtFlagged = p => (p.cats || []).some(c => c === 'mkad' || c === 'ttk' || c === 'bridge');
 const dtGroupLabel = (c, p) => c === 'bridge' ? 'Эстакада' : c === 'road' ? 'Дорога' : c === 'other' ? 'Другое' + (p && p.other ? ': ' + p.other : '') : DT_CAT[c];
 const dtSel = new Set();    // selected object numbers
@@ -1975,8 +2015,8 @@ const dtAsgOk = p => { const f = ui.dtAsg || 'all'; return f === 'all' || (f ===
 // «Работа»: only the points written into the chosen montage work
 let dtJobSetCache = null;
 const dtJobSet = () => { const j = ui.dtJob && jobOf(ui.dtJob); if (!j) return null; if (dtJobSetCache?.id === j.id && dtJobSetCache.n === (j.places || []).length) return dtJobSetCache.set; dtJobSetCache = { id: j.id, n: (j.places || []).length, set: new Set((j.places || []).map(x => x.dtNo).filter(Boolean)) }; return dtJobSetCache.set; };
-const dtMarkOk = p => !ui.dtMarkType || ui.dtMarkType === 'all' || dtGroups(p).includes(ui.dtMarkType);
-const dtMatch = p => (!ui.dtJob || (dtJobSet() || new Set()).has(p.no)) && (ui.dtMarking ? dtMarkOk(p) : dtGroups(p).some(c => DT_SHOW[c]) && dtNeedOk(p)) && (!ui.dtOnlyCheck || (p.cats || []).includes('check') || dtJust.has(p.no)) && dtAsgOk(p) && (!ui.dtOnlySel || dtSel.has(p.no)) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
+const dtMarkOk = p => !ui.dtMarkType || ui.dtMarkType === 'all' || dtCatOf(p) === ui.dtMarkType;
+const dtMatch = p => (!ui.dtJob || (dtJobSet() || new Set()).has(p.no)) && (ui.dtMarking ? dtMarkOk(p) : dtNeedOk(p)) && dtAsgOk(p) && (!ui.dtOnlySel || dtSel.has(p.no)) && (!ui.dtQ || String(p.no).toLowerCase().includes(ui.dtQ.toLowerCase()) || (p.road + ' ' + p.bridge).toLowerCase().includes(ui.dtQ.toLowerCase()));
 let dtFitted = false;
 function ensureDtMap(){
   if (dtMap || typeof L === 'undefined') return;
@@ -2067,12 +2107,9 @@ function renderDt(){
     ${(() => { const MJ = S.jobs.filter(isMount); if (ui.dtJob && !MJ.some(j => j.id === ui.dtJob)) ui.dtJob = null; return `<select class="f dtjob" id="dtJob" aria-label="Показать точки работы"><option value="">Все точки</option>${MJ.map(j => `<option value="${j.id}" ${ui.dtJob === j.id ? 'selected' : ''}>Работа № ${jobNo(j)} · ${esc(j.title)} — ${(j.places || []).length} т.${j.status === 'done' ? ' (выполнена)' : ''}</option>`).join('')}</select>`; })()}
     ${P.length ? (() => { const types = ['road', 'mkad', 'ttk', 'bridge', ...(cnt('other') ? ['other'] : [])], on = types.filter(k => DT_SHOW[k]).length, nOn = ['none', ...Object.keys(DT_NEED)].filter(k => DT_SHOW['n_' + k] !== false).length;
       const nc = k => PB.filter(p => (DT_NEED[p.need] ? p.need : 'none') === k).length;
-      return `<details class="dtrad" data-menu="show" ${ui.dtMenu === 'show' ? 'open' : ''}><summary class="btn">Показать: ${on === types.length ? 'все типы' : on + ' из ' + types.length}${nOn < 6 ? ' · пометки: ' + nOn + ' из 6' : ''}${ui.dtOnlyCheck ? ' · только «проверить»' : ''} ▾</summary><div class="dtrad-pop wide">
-        <b class="dtm-h">Типы точек</b>
-        <div class="dtshow" role="group" aria-label="Что показывать на карте">${types.map(k => `<label class="dtt ${DT_SHOW[k] ? 'on' : ''}" style="--c:${DT_COLOR[k]}"><input type="checkbox" data-dtshow="${k}" ${DT_SHOW[k] ? 'checked' : ''}><i></i>${DT_CAT[k]} <b>${cnt(k)}</b></label>`).join('')}
-          ${cnt('check') ? `<label class="dtt chk ${ui.dtOnlyCheck ? 'on' : ''}" style="--c:${DT_COLOR.check}"><input type="checkbox" data-dtshow="check" ${ui.dtOnlyCheck ? 'checked' : ''}><i></i>Только «проверить» <b>${cnt('check')}</b></label>` : ''}</div>
+      return `<details class="dtrad" data-menu="show" ${ui.dtMenu === 'show' ? 'open' : ''}><summary class="btn">Показать: ${nOn === Object.keys(DT_NEED).length + 1 ? 'все пометки' : 'пометки ' + nOn + ' из ' + (Object.keys(DT_NEED).length + 1)} ▾</summary><div class="dtrad-pop wide">
         <b class="dtm-h">Пометки</b>
-        <div class="dtshow" role="group" aria-label="Пометки">${Object.entries(DT_NEED_SHORT).map(([k, l]) => `<label class="dtt ${DT_SHOW['n_' + k] !== false ? 'on' : ''}" style="--c:${needColor(k)}"><input type="checkbox" data-dtshow="n_${k}" ${DT_SHOW['n_' + k] !== false ? 'checked' : ''}><i></i>${k.startsWith('own') ? '' : 'Спецтранспорт: '}${l} <b>${nc(k)}</b></label>`).join('')}
+        <div class="dtshow" role="group" aria-label="Пометки">${Object.entries(DT_NEED_SHORT).map(([k, l]) => `<label class="dtt ${DT_SHOW['n_' + k] !== false ? 'on' : ''}" style="--c:${needColor(k)}"><input type="checkbox" data-dtshow="n_${k}" ${DT_SHOW['n_' + k] !== false ? 'checked' : ''}><i></i>${esc(DT_NEED[k] || l)} <b>${nc(k)}</b></label>`).join('')}
           <label class="dtt ${DT_SHOW.n_none !== false ? 'on' : ''}" style="--c:#9AA3AD"><input type="checkbox" data-dtshow="n_none" ${DT_SHOW.n_none !== false ? 'checked' : ''}><i></i>Без пометки <b>${nc('none')}</b></label></div>
         <div class="row-g"><button class="btn sm" data-act="dtShowAll">Показать все</button></div></div></details>`; })() : ''}
     ${P.length ? '<button class="btn" data-act="dtExport">Скачать Excel</button>' : ''}
@@ -2093,7 +2130,7 @@ function renderDt(){
   const nAsg = P.filter(p => p.assignee).length, A = dtAssignees(), lead = canCheckDt();
   if (ui.dtAsg && !['all', 'any', 'none'].includes(ui.dtAsg) && !A.includes(ui.dtAsg)) ui.dtAsg = 'all';
   const mk = ui.dtMarking, mt = ui.dtMarkType || 'all';
-  const tc = k => k === 'all' ? PB.length : PB.filter(p => dtGroups(p).includes(k)).length;
+  const tc = k => k === 'all' ? PB.length : PB.filter(p => dtCatOf(p) === k).length;
   $('dtSel').innerHTML = !P.length ? '' : mk ? `<div class="dtmark">
     <div class="dtmark-row"><b>1. Какие точки размечать:</b><div class="seg">${[['all', 'Все'], ['road', 'Дороги'], ['mkad', 'МКАД'], ['ttk', 'ТТК'], ['bridge', 'Эстакады'], ...(tc('other') ? [['other', 'Другое']] : [])].map(([k, l]) => `<button data-act="dtMarkType" data-id="${k}" class="${mt === k ? 'on' : ''}">${l} <span class="dim">${tc(k)}</span></button>`).join('')}</div></div>
     <div class="dtmark-row"><b>2. Выделите точки:</b> обведите область или щёлкайте по точкам <button class="btn sm" data-act="dtSelVisible">Выделить все показанные</button><button class="btn sm" data-act="dtSelClear" ${dtSel.size ? '' : 'disabled'}>Снять выделение</button><span class="dtselcount">Выделено: <b>${dtSel.size}</b></span></div>
@@ -2113,7 +2150,7 @@ function renderDt(){
   let hint = $('dtLassoHint'); if (!hint) { hint = document.createElement('div'); hint.id = 'dtLassoHint'; hint.className = 'dthint'; $('dtmap').appendChild(hint); }
   hint.hidden = !ui.dtLasso; hint.textContent = 'Режим выделения: обведите область или щёлкайте по точкам — щелчок выделяет точку, повторный снимает выделение.';
   $('dtLegend').innerHTML = dtMode() === 'need' && P.length ? '<span class="dim">Фильтр по пометкам:</span>' + [...Object.keys(DT_NEED).map(k => [k, DT_NEED[k], needColor(k), P.filter(p => p.need === k).length]), ['none', 'Без пометки', '#9AA3AD', P.filter(p => !DT_NEED[p.need]).length]].map(([k, l, c, n]) => `<button class="legbtn ${DT_SHOW['n_' + k] === false ? 'off' : ''}" data-act="dtLegNeed" data-id="${k}" aria-pressed="${DT_SHOW['n_' + k] !== false}"><i style="background:${c};border-radius:50%"></i>${esc(l)} ${n}</button>`).join('') + (ui.dtMarking ? '' : ` <button class="linkish" data-act="dtShowAll">показать все</button>`)
-    : dtMode() === 'person' && P.length ? [...A.map(id => `<span><i style="background:${dtPersonColor(id)};border-radius:50%"></i>${esc(who(id))} ${P.filter(p => p.assignee === id).length}</span>`), `<span><i style="background:#9AA3AD;border-radius:50%"></i>Не назначены ${P.length - nAsg}</span>`].join('') : P.length ? `<span class="dim">Обводка: бордовая — точка на МКАД или ТТК стоит и на эстакаде${cnt('check') ? ', жёлтая — точку нужно проверить' : ''}. Что показывать — кнопка «Показать».</span>` : '';
+    : dtMode() === 'person' && P.length ? [...A.map(id => `<span><i style="background:${dtPersonColor(id)};border-radius:50%"></i>${esc(who(id))} ${P.filter(p => p.assignee === id).length}</span>`), `<span><i style="background:#9AA3AD;border-radius:50%"></i>Не назначены ${P.length - nAsg}</span>`].join('') : P.length ? `<span class="dim">Эстакада важнее МКАД и ТТК: эстакада над МКАД — бордовая с красной обводкой, над ТТК — с фиолетовой${cnt('check') ? ', жёлтая — точку нужно проверить' : ''}. Что показывать — кнопка «Показать».</span>` : '';
   ensureDtMap(); if (!dtMap) return;
   $('dtmap').classList.toggle('adding', !!ui.dtAdding); $('dtmap').classList.toggle('lasso', !!ui.dtLasso);
   // selection mode: no panning and no double-click zoom (two quick taps select and deselect a point)
@@ -2123,7 +2160,7 @@ function renderDt(){
   const seen = new Set();
   P.forEach((p, i) => {
     const key = p.no + '|' + i; seen.add(key);
-    const c = dtCatOf(p), cs = p.cats || [], ring = cs.includes('check') ? DT_COLOR.check : (c === 'mkad' || c === 'ttk') && cs.includes('bridge') ? DT_COLOR.bridge : null;
+    const c = dtCatOf(p), cs = p.cats || [], ring = cs.includes('check') ? DT_COLOR.check : c === 'bridge' && cs.includes('mkad') ? DT_COLOR.mkad : c === 'bridge' && cs.includes('ttk') ? DT_COLOR.ttk : null;
     // colour by type (roads, МКАД, ТТК, overpasses), by mark (special vehicles, own fencing) or by executor
     const mode = dtMode(), byPerson = mode === 'person', byNeed = mode === 'need', sel = dtSel.has(p.no);
     const nd = byNeed && DT_NEED[p.need], small = byNeed ? !nd : c === 'road' && !byPerson;
@@ -2672,6 +2709,24 @@ function vBackups(){
 /* ===== Users view (admin) ===== */
 /* ---------- «Мои задачи»: a personal to-do list ---------- */
 let NOTES = [];
+/* ---------- «Списание материалов»: every write-off list — of montage works and of production orders ---------- */
+function vWoList(){
+  const f = ui.woF || 'all';
+  const rows = [
+    ...S.jobs.filter(j => isMount(j) && (j.materials || []).length).map(j => ({ col: 'jobs', id: j.id, src: j, kind: 'Работа', title: `№ ${jobNo(j)} · ${j.title}`, sub: cpOf(j.customerId)?.name || '', doc: jobWoDoc(j) })),
+    ...S.orders.filter(o => (o.products || []).some(p => (p.components || []).length)).map(o => ({ col: 'orders', id: o.id, src: o, kind: 'Производство', title: ordName(o), sub: custName(o) || '', doc: o })),
+  ].map(r => { const L = writeoffLines(r.doc); return { ...r, n: L.length, bad: L.filter(x => x.source !== 'acct').length }; })
+   .filter(r => f === 'all' || (f === 'saved' ? r.src.writeoff : !r.src.writeoff))
+   .sort((a, b) => String(b.src.writeoff?.at || '').localeCompare(String(a.src.writeoff?.at || '')) || a.title.localeCompare(b.title, 'ru'));
+  const head = `<div class="toolbar"><div class="seg">${[['all', 'Все'], ['saved', 'Сохранённые'], ['open', 'Не сохранённые']].map(([k, l]) => `<button data-act="woF" data-id="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <span class="dim">Списки строятся по бухгалтерским остаткам${META.acct ? ' (загружены ' + esc(fmtDT(META.acct.at)) + ')' : ''}.</span></div>`;
+  if (!rows.length) return head + '<div class="empty"><h3>Списков для списания нет</h3>Они появляются у работ с монтажом (материалы) и у заказов на производство (изделия).</div>';
+  return head + `<section class="card" style="padding:0;overflow:hidden">${rows.map(r => `<div class="worow">
+      <div><span class="chip ${r.col === 'jobs' ? 'c-info' : 'c-mute'}">${r.kind}</span> <b>${esc(r.title)}</b>${r.sub ? `<small class="dim">${esc(r.sub)}</small>` : ''}</div>
+      <div><small class="dim">позиций</small>${r.n}</div>
+      <div>${r.src.writeoff ? `<span class="chip c-ok">Сохранён</span><small class="dim">${esc(fmtDT(r.src.writeoff.at))} · ${esc(who(r.src.writeoff.by))}</small>` : r.bad ? `<span class="chip c-bad">Не хватает: ${r.bad}</span>` : '<span class="chip c-warn">Не сохранён</span>'}</div>
+      <div class="row-g"><button class="btn sm" data-act="${r.col === 'jobs' ? 'jobWo' : 'writeoff'}" data-id="${r.id}">Открыть</button><a class="btn sm" href="/api/${r.col}/${r.id}/writeoff.xlsx" data-dl>Excel</a></div></div>`).join('')}</section>`;
+}
 function vNotes(){
   // urgent tasks go first (the last marked on top), then the rest, newest first
   const open = NOTES.filter(n => !n.done).sort((a, b) => (!!b.urgent - !!a.urgent) || String(b.urgent ? b.urgentAt || '' : b.at).localeCompare(String(a.urgent ? a.urgentAt || '' : a.at)));
@@ -2891,12 +2946,13 @@ function renderDrawer(){
       <div class="row-g"><button class="btn primary" type="submit">Добавить отмеченные</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'writeoff') {
-    const o = ord(d.id); if (!o) return closeDrawer();
+    const col = d.ctx === 'jobs' ? 'jobs' : 'orders', src = col === 'jobs' ? jobOf(d.id) : ord(d.id); if (!src) return closeDrawer();
+    const o = col === 'jobs' ? jobWoDoc(src) : src;
     ui.woMap = ui.woMap || { ...(o.woMap || {}) };
     const L = writeoffLines(o, ui.woMap), A = META.acct, bad = L.filter(x => x.source !== 'acct'), ed = canEdit();
     const dirty = JSON.stringify(ui.woMap) !== JSON.stringify(o.woMap || {});
-    D.innerHTML = dh('Список для списания · ' + esc(ordName(o))) + `<div class="d-body">
-      <p class="dim" style="margin:0">Строки берутся из <b>бухгалтерских остатков</b> (${A ? 'загружены ' + esc(fmtDT(A.at)) + (A.file ? ', «' + esc(A.file) + '»' : '') : 'ещё не загружались'}). Количество — сумма по всем изделиям заказа.</p>
+    D.innerHTML = dh('Список для списания · ' + esc(col === 'jobs' ? `работа № ${jobNo(src)} · ${src.title}` : ordName(o))) + `<div class="d-body">
+      <p class="dim" style="margin:0">Строки берутся из <b>бухгалтерских остатков</b> (${A ? 'загружены ' + esc(fmtDT(A.at)) + (A.file ? ', «' + esc(A.file) + '»' : '') : 'ещё не загружались'}). ${col === 'jobs' ? 'Количество — из списка материалов работы.' : 'Количество — сумма по всем изделиям заказа.'}</p>
       ${o.writeoff ? `<p class="box" style="margin:0;border-color:var(--ok);background:var(--ok-soft)">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}</p>` : ''}
       ${bad.length ? `<p class="box" style="margin:0;border-color:var(--bad);background:var(--bad-soft);color:var(--bad)"><b>Не хватает в бухгалтерских остатках: ${bad.length}.</b> Такие строки выделены красным — сохранить список нельзя. Замените номенклатуру позиции (введите другую позицию склада) или обновите остатки из 1С.</p>` : L.length ? '<p class="ok-t" style="margin:0">✓ Все позиции есть в бухгалтерских остатках.</p>' : ''}
       ${L.length ? `<datalist id="wo-names">${S.stock.filter(it => (Number(it.acctQty) || 0) > 0).map(it => `<option value="${esc(it.name)}">${esc([it.sku, 'бух ' + fmtQty(it.acctQty) + ' ' + (it.unit || 'шт')].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>
@@ -2906,9 +2962,9 @@ function renderDrawer(){
             <small class="dim">${esc(x.products.join(', '))}${x.replaced ? ` · <b>номенклатура заменена</b>${ed ? ` <button class="linkish" data-act="woReset" data-id="${esc(x.keys.join('\n'))}">вернуть</button>` : ''}` : ''}</small></td>
           <td class="mono">${esc(x.sku)}</td><td>${esc(x.unit)}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${x.inStock ? fmtQty(x.acct) : '—'}</td>
           <td>${x.source === 'acct' ? 'Хватает' : x.source === 'none' ? '<b>Нет в бухгалтерских остатках</b>' : `<b>Не хватает ${fmtQty(x.shortage)}</b>`}</td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="dim">В изделиях заказа нет компонентов.</p>'}
+      </tbody></table></div>` : `<p class="dim">${col === 'jobs' ? 'В работе нет материалов — добавьте их кнопкой «+ Материалы» в карточке работы.' : 'В изделиях заказа нет компонентов.'}</p>`}
       <div class="err" id="ferr"></div>
-      <div class="row-g">${ed && L.length ? `<button class="btn primary" data-act="woSave" data-id="${o.id}" ${bad.length ? 'disabled title="Есть позиции, которых не хватает в бухгалтерских остатках"' : ''}>Сохранить список</button>` : ''}${L.length ? `<a class="btn" href="/api/orders/${o.id}/writeoff.xlsx" data-dl>Скачать Excel${dirty ? ' (сохранённый)' : ''}</a>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
+      <div class="row-g">${ed && L.length ? `<button class="btn primary" data-act="woSave" data-id="${col}|${src.id}" ${bad.length ? 'disabled title="Есть позиции, которых не хватает в бухгалтерских остатках"' : ''}>Сохранить список</button>` : ''}${L.length ? `<a class="btn" href="/api/${col}/${src.id}/writeoff.xlsx" data-dl>Скачать Excel${dirty ? ' (сохранённый)' : ''}</a>` : ''}${col === 'jobs' ? `<button class="btn" data-act="openJob" data-id="${src.id}">← К работе</button>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
     </div>`;
   }
   if (d.kind === 'dtNeeds') {
@@ -2934,14 +2990,15 @@ function renderDrawer(){
   if (d.kind === 'catEdit') {
     const c = ui.cp; if (!c) return closeDrawer();
     const mode = c.mode, ed = canEdit();
-    const title = mode === 'order' ? 'Модификация изделия в заказе' : mode === 'base' ? 'Новое изделие на основании' : c.id ? 'Изделие' : 'Новое изделие';
+    const title = mode === 'job' ? 'Материалы на списание · ' + esc(c.name || '') : mode === 'order' ? 'Модификация изделия в заказе' : mode === 'base' ? 'Новое изделие на основании' : c.id ? 'Изделие' : 'Новое изделие';
     D.innerHTML = dh(title) + `<div class="d-body">
       ${mode === 'order' ? `<p class="dim" style="margin:0">Изменения состава сохраняются только в этом заказе («Сохранить в заказе»). Чтобы получилось отдельное изделие в справочнике, задайте новое наименование и нажмите «Сохранить как новое изделие».</p>` : ''}
       ${mode === 'base' ? `<p class="dim" style="margin:0">Копия изделия «${esc(c.baseName || '')}» — измените наименование и состав.</p>` : ''}
-      <div class="form"><label class="wide">Наименование изделия<span data-keep style="display:contents"><input class="in" id="cp-name" value="${esc(c.name || '')}" ${ed ? '' : 'disabled'}></span></label>
+      ${mode === 'job' ? '<p class="dim" style="margin:0">Материалы для монтажа добавляются со склада; если позиции на складе нет — она появится на складе при сохранении. Список для списания по этим материалам формируется из бухгалтерских остатков.</p>' : ''}
+      <div class="form" ${mode === 'job' ? 'hidden' : ''}><label class="wide">Наименование изделия<span data-keep style="display:contents"><input class="in" id="cp-name" value="${esc(c.name || '')}" ${ed ? '' : 'disabled'}></span></label>
         <label>Единица<span data-keep style="display:contents"><input class="in" id="cp-unit" value="${esc(c.unit || 'шт')}" ${ed ? '' : 'disabled'}></span></label>
         <label>Примечание<span data-keep style="display:contents"><input class="in" id="cp-note" value="${esc(c.note || '')}" ${ed ? '' : 'disabled'}></span></label></div>
-      <div class="box"><h4>Компоненты на одно изделие · ${c.components.length}</h4>
+      <div class="box"><h4>${mode === 'job' ? 'Материалы' : 'Компоненты на одно изделие'} · ${c.components.length}</h4>
         ${c.components.length ? `<div class="tscroll"><table class="comp"><thead><tr><th>№</th><th>Позиция склада</th><th class="r">Кол-во</th><th>Ед.</th><th class="r">Склад: факт / бух</th><th></th></tr></thead><tbody>
           ${c.components.map((x, i) => { const st = x.stockId && S.stock.find(y => y.id === x.stockId); return `<tr><td class="n">${i + 1}</td><td><b style="font-weight:500">${esc(x.name)}</b>${st ? (st.sku ? `<small class="dim mono">${esc(st.sku)}</small>` : '') : '<small style="color:var(--warn)">нет на складе — при сохранении будет добавлена новая позиция</small>'}</td>
             <td><span data-keep style="display:contents"><input class="in mono cpq" data-i="${i}" value="${esc(x.qty)}" inputmode="decimal" style="width:80px" ${ed ? '' : 'disabled'}></span></td>
@@ -2952,10 +3009,10 @@ function renderDrawer(){
         <span data-keep style="display:contents"><input class="in" id="cp-q" type="search" placeholder="Название или артикул позиции склада" autocomplete="off"></span>
         <div id="cp-res" class="cpres"></div>` : ''}</div>
       <div class="err" id="ferr"></div>
-      <div class="row-g">${!ed ? '' : mode === 'order'
+      <div class="row-g">${!ed ? '' : mode === 'job' ? `<button class="btn primary" data-act="cpSave" data-id="job">Сохранить материалы</button>` : mode === 'order'
         ? `<button class="btn primary" data-act="cpSave" data-id="order">Сохранить в заказе</button><button class="btn" data-act="cpSave" data-id="new">Сохранить как новое изделие</button>`
         : `<button class="btn primary" data-act="cpSave" data-id="cat">${c.id ? 'Сохранить' : 'Создать изделие'}</button>`}
-        <button class="btn" data-act="${mode === 'order' ? 'close' : 'catalog'}">${mode === 'order' ? 'Отмена' : '← К списку изделий'}</button></div>
+        <button class="btn" data-act="${mode === 'job' ? 'openJob' : mode === 'order' ? 'close' : 'catalog'}" data-id="${mode === 'job' ? c.jid : ''}">${mode === 'job' ? '← К работе' : mode === 'order' ? 'Отмена' : '← К списку изделий'}</button></div>
     </div>`;
     cpResults();
   }
@@ -3293,6 +3350,7 @@ function renderDrawer(){
           : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Карта объектов»: выделите точки → «Добавить точки к работе».</p>'}
         <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${HEADish() && closed ? `<button class="btn sm" data-act="jobDone" data-id="${j.id}">Выполненные точки · ${closed}</button>` : ''}${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в карте объектов</button>` : ''}</div></div>
       ${jobPlanBox(j)}
+      ${isMount(j) ? jobMatBox(j) : ''}
       ${jobPhotoBox(j)}
       ${jobAssignBox(j)}
       ${P.length ? `<div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>` : ''}` : ''}
@@ -3762,7 +3820,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['orders', 'Производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
+const startViews = () => [['works', 'Работы'], ['orders', 'Производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -4100,7 +4158,7 @@ async function act(el){
     case 'cpNew': { cpRead(); const nm = ($('cp-q')?.value || '').trim(); if (!nm) return; ui.cp.components.push({ id: uid(), stockId: null, name: nm, qty: 1, unit: 'шт' }); renderDrawer(); $('cp-q')?.focus(); return; }
     case 'cpDel': cpRead(); ui.cp.components.splice(Number(id), 1); return renderDrawer();
     case 'cpSave': return cpSave(id);
-    case 'woSave': { el.disabled = true; try { const r = await api('POST', `/api/orders/${id}/writeoff`, { map: ui.woMap || {} }); const o = ord(id); if (o) { o.writeoff = r.writeoff; o.woMap = { ...(ui.woMap || {}) }; } await refresh(); renderDrawer(); toast('Список для списания сохранён'); } catch(e) { const f = $('ferr'); if (f) f.textContent = errText(e); el.disabled = false; } return; }
+    case 'woSave': { el.disabled = true; const [wcol, wid] = id.includes('|') ? id.split('|') : ['orders', id]; try { const r = await api('POST', `/api/${wcol}/${wid}/writeoff`, { map: ui.woMap || {} }); const o = wcol === 'jobs' ? jobOf(wid) : ord(wid); if (o) { o.writeoff = r.writeoff; o.woMap = { ...(ui.woMap || {}) }; } await refresh(); renderDrawer(); toast('Список для списания сохранён'); } catch(e) { const f = $('ferr'); if (f) f.textContent = errText(e); el.disabled = false; } return; }
     case 'woReset': { String(id).split('\n').forEach(k => delete ui.woMap[k]); return renderDrawer(); }
     case 'editProduct': return openDrawer('product', id);
     case 'delProduct': { const [oid, pid] = id.split('|'); await guard(updProduct(oid, pid, () => null)); render(); return toast('Изделие удалено'); }
@@ -4110,9 +4168,12 @@ async function act(el){
     case 'delPFile': { const [oid, pid, fid] = id.split('|'); await guard(updProduct(oid, pid, p => ({ ...p, files: (p.files || []).filter(f => f.id !== fid) }))); return render(); }
     case 'sF': ui.sF = id; return render();
     case 'sAv': ui.sAv = id; return render();
+    case 'woF': ui.woF = id; return render();
     case 'acctImport': ui.acct = null; return openDrawer('acctImport');
     case 'pickStock': ui.pickQ = ''; return openDrawer('pickStock', id);
     case 'writeoff': ui.woMap = null; return openDrawer('writeoff', id);
+    case 'jobWo': ui.woMap = null; return openDrawer('writeoff', id, 'jobs');
+    case 'jobMat': { const j = jobOf(id); if (!j) return; return cpOpen('job', { name: j.title, components: j.materials || [] }, { jid: j.id }); }
     case 'newStock': return openDrawer('stockItem');
     case 'editStock': return openDrawer('stockItem', id);
     case 'viewStock': return openDrawer('stockView', id);
@@ -4376,7 +4437,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -4432,7 +4493,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && !isHead()) || (v === 'wo' && !(isHead() || u.role === 'accountant')); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;

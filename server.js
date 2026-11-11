@@ -109,6 +109,9 @@ function cleanJob(d){
       ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
   // which photos a worker must take at every point, e.g. «Общий вид», «До замены», «После замены»
+  // materials for a montage work: warehouse positions and quantities to be written off
+  if ('materials' in d) out.materials = (Array.isArray(d.materials) ? d.materials : []).slice(0, 500).filter(x => x && String(x.name || '').trim() && Number(x.qty) > 0)
+    .map(x => ({ id: String(x.id || newId()).slice(0, 40), stockId: x.stockId && db.stock[x.stockId] ? x.stockId : null, name: String(x.name).trim().slice(0, 300), qty: Math.round(Number(x.qty) * 1000) / 1000, unit: String(x.unit || 'шт').slice(0, 20) }));
   if ('photoSpec' in d) out.photoSpec = [...new Set((Array.isArray(d.photoSpec) ? d.photoSpec : String(d.photoSpec || '').split('\n')).map(x => String(x).trim().slice(0, 80)).filter(Boolean))].slice(0, 20);
   if ('status' in d) out.status = d.status;
   return out;
@@ -738,24 +741,25 @@ async function api(req, res, url) {
   }
 
   /* saving the write-off list: only when every line is covered by the accounting balances */
-  if (p[1] === 'orders' && p[3] === 'writeoff' && m === 'POST') {
+  if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff' && m === 'POST') {
     if (!canEdit(user)) return fail(res, 403, 'Сохранить список для списания может администратор или руководитель');
-    const o = db.orders[p[2]]; if (!o) return fail(res, 404, 'Заказ не найден');
+    const o = woDoc(p[1], p[2]); if (!o) return fail(res, 404, p[1] === 'jobs' ? 'Работа не найдена' : 'Заказ не найден');
     const b = await readJsonBody(req), map = {};
     for (const [k, v] of Object.entries(b.map || {})) if (/^(id|n):/.test(k) && db.stock[v]) map[k] = v;
     const lines = writeoffLines(o, map);
-    if (!lines.length) return fail(res, 400, 'В изделиях заказа нет компонентов');
+    if (!lines.length) return fail(res, 400, p[1] === 'jobs' ? 'В работе нет материалов' : 'В изделиях заказа нет компонентов');
     const bad = lines.filter(L => L.source !== 'acct');
     if (bad.length) return fail(res, 409, 'Не хватает в бухгалтерских остатках: ' + bad.slice(0, 5).map(L => L.name).join(', ') + (bad.length > 5 ? ` и ещё ${bad.length - 5}` : '') + '. Замените номенклатуру или обновите остатки');
-    o.woMap = map;
-    o.writeoff = { at: new Date().toISOString(), by: user.id, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.need })) };
+    const target = p[1] === 'jobs' ? db.jobs[p[2]] : o;
+    target.woMap = map;
+    target.writeoff = { at: new Date().toISOString(), by: user.id, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.need })) };
     saveDb();
-    return send(res, 200, { ok: true, writeoff: o.writeoff, rev: db.rev });
+    return send(res, 200, { ok: true, writeoff: target.writeoff, rev: db.rev });
   }
   /* write-off list for an order: Excel with highlighting */
-  if (p[1] === 'orders' && p[3] === 'writeoff.xlsx' && m === 'GET') {
-    const o = db.orders[p[2]];
-    if (!o) return fail(res, 404, 'Заказ не найден');
+  if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff.xlsx' && m === 'GET') {
+    const o = woDoc(p[1], p[2]);
+    if (!o) return fail(res, 404, 'Не найдено');
     const buf = writeoffXlsx(o);
     const name = `Списание ${o.number || ''} ${o.title || ''}`.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 90) + '.xlsx';
     res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1411,6 +1415,8 @@ function markSeen(user, fileIds) {
 const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/["«»'“”„]/g, '').replace(/(\d)\s*[x×х*]\s*(?=\d)/g, '$1х').replace(/\s+/g, ' ').trim();
 /* The write-off list of an order is taken from the accounting balances (1С). A line whose position is not in the balances
    or whose balance is short is «red»; the nomenclature of a line can be replaced (o.woMap: original line key → stock id). */
+// a work's materials look like one product of quantity 1 for the write-off list
+const woDoc = (col, id) => { const x = db[col] && db[col][id]; if (!x) return null; return col === 'jobs' ? { ...x, number: 'работа № ' + (x.no || ''), products: [{ name: x.title, qty: 1, components: x.materials || [] }] } : x; };
 function writeoffLines(o, mapOverride) {
   const byName = new Map(Object.entries(db.stock).map(([id, it]) => [normName(it.name), id]));
   const map = mapOverride || o.woMap || {};
@@ -1507,7 +1513,7 @@ function writeoffXlsx(o) {
   const st = { acct: [4, 5], short: [8, 9], none: [8, 9] };
   const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : 'не загружались';
   const rows = [
-    [{ v: `Список для списания — заказ ${o.number || ''} · ${o.title || ''}`, s: 10 }],
+    [{ v: `Список для списания — ${/^работа/.test(o.number || '') ? '' : 'заказ '}${o.number || ''} · ${o.title || ''}`, s: 10 }],
     [`Сформирован: ${fmt(new Date().toISOString())}. Бухгалтерские остатки: ${db.meta.acct ? fmt(db.meta.acct.at) + (db.meta.acct.file ? ' (' + db.meta.acct.file + ')' : '') : 'не загружались'}.`],
     [],
     [`Список ${o.writeoff ? 'сохранён ' + fmt(o.writeoff.at) : 'ещё не сохранён'}.`],
