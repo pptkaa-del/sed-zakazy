@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 /*
- * Builds public/vendor/osm-moscow/roads.json for the «Редактор карты» tab: the lines of the MKAD, the TTK
+ * Builds public/vendor/osm-moscow/roads.json for the «Карта объектов» tab: the lines of the MKAD, the TTK
  * and road overpasses (bridges) of Moscow, taken from an OpenStreetMap extract.
  *
  *   node tools/osm-roads.js <extract.osm.pbf> [west,south,east,north]
@@ -83,7 +83,7 @@ const out = {
 const dst = path.join(__dirname, '..', 'public', 'vendor', 'osm-moscow', 'roads.json');
 fs.mkdirSync(path.dirname(dst), { recursive: true });
 fs.writeFileSync(dst, JSON.stringify(out));
-fs.writeFileSync(path.join(path.dirname(dst), 'LICENSE.txt'), `Линии МКАД, ТТК и эстакад Москвы для вкладки «Редактор карты».\nИсточник: OpenStreetMap, выгрузка от ${date}.\n© участники OpenStreetMap. Данные доступны по лицензии Open Database License (ODbL) 1.0: https://www.openstreetmap.org/copyright\nСобрано скриптом tools/osm-roads.js.\n`);
+fs.writeFileSync(path.join(path.dirname(dst), 'LICENSE.txt'), `Линии МКАД, ТТК и эстакад Москвы для вкладки «Карта объектов».\nИсточник: OpenStreetMap, выгрузка от ${date}.\n© участники OpenStreetMap. Данные доступны по лицензии Open Database License (ODbL) 1.0: https://www.openstreetmap.org/copyright\nСобрано скриптом tools/osm-roads.js.\n`);
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`Готово: МКАД ${out.mkad.length} линий, ТТК ${out.ttk.length}, эстакад ${out.bridge.length}; ${(fs.statSync(dst).size / 1048576).toFixed(2)} МБ → ${dst}`);
 
@@ -125,6 +125,6 @@ async function fromOverpass(box) {
   const dst = path.join(__dirname, '..', 'public', 'vendor', 'osm-moscow', 'roads.json');
   fs.mkdirSync(path.dirname(dst), { recursive: true });
   fs.writeFileSync(dst, JSON.stringify(out));
-  fs.writeFileSync(path.join(path.dirname(dst), 'LICENSE.txt'), `Линии МКАД, ТТК и эстакад Москвы для вкладки «Редактор карты».\nИсточник: OpenStreetMap (Overpass API), данные на ${date}.\n© участники OpenStreetMap. Данные доступны по лицензии Open Database License (ODbL) 1.0: https://www.openstreetmap.org/copyright\nСобрано скриптом tools/osm-roads.js --overpass.\n`);
+  fs.writeFileSync(path.join(path.dirname(dst), 'LICENSE.txt'), `Линии МКАД, ТТК и эстакад Москвы для вкладки «Карта объектов».\nИсточник: OpenStreetMap (Overpass API), данные на ${date}.\n© участники OpenStreetMap. Данные доступны по лицензии Open Database License (ODbL) 1.0: https://www.openstreetmap.org/copyright\nСобрано скриптом tools/osm-roads.js --overpass.\n`);
   console.log(`\nГотово: МКАД ${out.mkad.length} линий, ТТК ${out.ttk.length}, эстакад ${out.bridge.length}; ${(fs.statSync(dst).size / 1048576).toFixed(2)} МБ → ${dst}`);
 }

@@ -1,0 +1,4 @@
+Линии МКАД, ТТК и эстакад Москвы для вкладки «Карта объектов».
+Источник: OpenStreetMap, выгрузка от 2026-11-12.
+© участники OpenStreetMap. Данные доступны по лицензии Open Database License (ODbL) 1.0: https://www.openstreetmap.org/copyright
+Собрано скриптом tools/osm-roads.js.
