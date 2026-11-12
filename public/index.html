@@ -386,6 +386,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .jdlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.jd{border:1px solid var(--rule);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--sheet)}.jd-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.jd-h small{display:block}.jd .tw{display:inline-flex;flex-direction:column;gap:2px;align-items:center}.jd .tw small{font-size:11px}
 .seg-l{align-self:center;padding:0 6px 0 8px;font-size:13px;color:var(--ink-2)}
 .wneed{align-self:flex-start;font-size:12px;font-weight:600;color:#fff;background:var(--c);border-radius:999px;padding:1px 8px}
+.dtoff{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;border:1px solid var(--warn);border-radius:10px;background:var(--warn-soft);font-size:14px}
 .dtmark{display:flex;flex-direction:column;gap:8px;width:100%;padding:10px 12px;border:2px solid var(--stamp);border-radius:12px;background:color-mix(in srgb,var(--stamp) 5%,var(--sheet))}.dtmark-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
 .dtneeds{display:flex;flex-wrap:wrap;gap:6px}.needbtn{display:inline-flex;gap:7px;align-items:center;padding:7px 12px;border:2px solid var(--c,#9AA3AD);border-radius:999px;background:var(--sheet);font:inherit;font-size:14px;cursor:pointer;color:inherit}.needbtn i{width:12px;height:12px;border-radius:50%;background:var(--c)}.needbtn:hover:not(:disabled){background:color-mix(in srgb,var(--c) 15%,var(--sheet))}.needbtn:disabled{opacity:.45;cursor:default}.needbtn.none{border-style:dashed}
 .legbtn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--sheet);font:inherit;font-size:13px;cursor:pointer;color:inherit}.legbtn i{width:10px;height:10px;display:inline-block}.legbtn.off{opacity:.4;text-decoration:line-through}
@@ -2092,7 +2093,7 @@ function dtPopup(p, i){
     ${canCheckDt() ? `<button class="linkish" data-act="dtSelOne" data-id="${esc(p.no)}">${dtSel.has(p.no) ? 'Убрать из выделения' : 'Добавить в выделение'}</button>` : ''}
     ${p.addedAt ? `<small class="dim">Добавлена вручную: ${esc(who(p.addedBy))}, ${esc(fmtDT(p.addedAt))}</small>` : ''}
     ${dtCheckBox(p, i)}
-    <div class="row-g"><a class="btn sm" href="https://yandex.ru/maps/?pt=${p.lng},${p.lat}&z=18&l=map" target="_blank" rel="noopener">Яндекс.Карты</a><a class="btn sm" href="https://yandex.ru/maps/?rtext=~${p.lat},${p.lng}&rtt=auto" target="_blank" rel="noopener">Маршрут</a></div></div>`;
+    <div class="row-g"><a class="btn sm" href="https://yandex.ru/maps/?pt=${p.lng},${p.lat}&z=18&l=map" target="_blank" rel="noopener">Яндекс.Карты</a><a class="btn sm" href="https://yandex.ru/maps/?rtext=~${p.lat},${p.lng}&rtt=auto" target="_blank" rel="noopener">Маршрут</a>${canEdit() && ui.dtEdit !== i ? armBtn('dtdel:' + i, 'Удалить точку', 'dtDel', String(i), 'btn sm danger') : ''}</div></div>`;
 }
 function renderDt(){
   const P = DT.points, M = DT.meta || {}, ed = canEdit();
@@ -2102,8 +2103,10 @@ function renderDt(){
   $('dtInfo').innerHTML = !DT.loaded ? 'Загружаем…' : P.length
     ? `<span>Точек: <b>${P.length}</b>, модемов к замене: <b>${P.reduce((a, p) => a + dtModems(p), 0)}</b> (в ${P.filter(p => dtModems(p) > 1).length} точках по 2 и больше)${M.file ? ` · файл «${esc(M.file)}»` : ''}${M.at ? `, загружено ${esc(fmtDT(M.at))}` : ''}${M.by ? ' · ' + esc(who(M.by)) : ''}.</span>
        <span>${M.classifiedAt ? `На МКАД, ТТК или эстакадах: <b>${flagged}</b> — ${/из файла/.test(M.source || '') ? esc(M.source) : `определено ${esc(fmtDT(M.classifiedAt))} по данным ${esc(M.source || 'OpenStreetMap')} (© участники OpenStreetMap, ODbL)`}${M.radius ? ` (дороги до ${M.radius.road} м, эстакады до ${M.radius.bridge} м)` : ''}.${cnt('check') ? ` Проверить: <b>${cnt('check')}</b>.` : ''}${P.some(p => p.checkedAt) ? ` Проверено: <b>${P.filter(p => p.checkedAt).length}</b>.` : ''}${P.some(p => p.assignee) ? ` Назначено исполнителям: <b>${P.filter(p => p.assignee).length}</b>.` : ''}` : '<b>Отметки ещё не определены.</b>'}</span>`
+    : M.resetAt ? `<span>Карта сброшена ${esc(fmtDT(M.resetAt))} · ${esc(who(M.resetBy))} (убрано точек: ${M.resetCount || 0}). Точки, добавленные в работы, можно вернуть: выберите работу в списке «Все точки» → «Показать точки работы на карте». Новые точки — «Определение МКАД, ТТК, эстакад и дорог» → загрузка файла.</span>`
     : `<span>Точек пока нет. ${ed ? 'Загрузите Excel с номерами объектов и координатами.' : 'Их загружает менеджер или администратор.'}</span>`;
   const R = ui.dtR || M.radius || { road:35, bridge:20 };
+  const JW = ui.dtJob && jobOf(ui.dtJob), have = new Set(P.map(p => p.no)), off = JW ? (JW.places || []).filter(x => x.dtNo && !have.has(x.dtNo)).length : 0;
   $('dtTools').innerHTML = `
     <span data-keep style="display:contents"><input class="in" id="dtq" type="search" aria-label="Поиск по номеру объекта" value="${esc(ui.dtQ || '')}" style="flex:0 1 200px;min-width:0"></span>
     ${(() => { const MJ = S.jobs.filter(isMount); if (ui.dtJob && !MJ.some(j => j.id === ui.dtJob)) ui.dtJob = null; return `<select class="f dtjob" id="dtJob" aria-label="Показать точки работы"><option value="">Все точки</option>${MJ.map(j => `<option value="${j.id}" ${ui.dtJob === j.id ? 'selected' : ''}>Работа № ${jobNo(j)} · ${esc(j.title)} — ${(j.places || []).length} т.${j.status === 'done' ? ' (выполнена)' : ''}</option>`).join('')}</select>`; })()}
@@ -2119,6 +2122,7 @@ function renderDt(){
     ${canCheckDt() ? `<button class="btn ${ui.dtAdding ? 'primary' : ''}" data-act="dtAdd">${ui.dtAdding ? 'Отменить добавление' : '+ Точка'}</button><button class="btn" data-act="dtAddCoords">+ По координатам</button>` : ''}
     ${ui.dtAdding ? '<span class="maphint" style="color:var(--stamp);font-weight:500">Нажмите на карту там, где стоит объект</span>' : ''}
     ${canCheckDt() && P.length ? `<button class="btn ${ui.dtMarking ? 'primary' : ''}" data-act="${ui.dtMarking ? 'dtMarkEnd' : 'dtMarkStart'}">${ui.dtMarking ? '✓ Закончить разметку' : '🏷 Разметить точки по типам'}</button>` : ''}
+    ${ed && P.length ? armBtn('dtreset', 'Сбросить карту', 'dtReset', '', 'btn danger') : ''}
     ${ed ? `<details class="dtrad" data-menu="find" ${ui.dtMenu === 'find' ? 'open' : ''}><summary class="btn">Определение МКАД, ТТК, эстакад и дорог ▾</summary><div class="dtrad-pop wide">
         <label class="btn primary">Вставить размеченный файл<input type="file" data-up="dtmarked" accept=".xlsx,.xls,.csv" hidden></label>
         <small class="dim">Таблица со столбцами «МКАД», «ТТК», «Эстакада» (да/нет) — точки сразу появятся с отметками.</small>
@@ -2128,6 +2132,7 @@ function renderDt(){
         <label>Эстакада, м<span data-keep style="display:contents"><input class="in mono" id="dt-rb" value="${R.bridge}" inputmode="numeric"></span></label>
         <button class="btn primary sm" data-act="dtClassify">Определить</button>
         <small class="dim">Наибольшее расстояние от точки до оси дороги или эстакады.</small>` : ''}</div></details>` : ''}
+    ${off ? `<span class="dtoff">Точек работы «${esc(JW.title)}», которых нет на карте: <b>${off}</b>${canEdit() ? ` <button class="btn sm primary" data-act="dtRestore" data-id="${JW.id}">Показать точки работы на карте</button>` : ''}</span>` : ''}
     <span class="dim" id="dtStatus"></span>`;
   const nAsg = P.filter(p => p.assignee).length, A = dtAssignees(), lead = canCheckDt();
   if (ui.dtAsg && !['all', 'any', 'none'].includes(ui.dtAsg) && !A.includes(ui.dtAsg)) ui.dtAsg = 'all';
@@ -2147,7 +2152,8 @@ function renderDt(){
     <button class="btn primary" data-act="dtAssign" ${dtSel.size ? '' : 'disabled'}>Назначить исполнителя…</button>
     <label class="chk" style="flex-direction:row;display:flex;gap:6px;font-size:14px;${dtSel.size ? '' : 'opacity:.5'}"><input type="checkbox" id="dtOnlySel" ${ui.dtOnlySel ? 'checked' : ''} ${dtSel.size ? '' : 'disabled'}> только выделенные</label>
     <select class="f" id="dtNeedSel" ${dtSel.size ? '' : 'disabled'} aria-label="Пометка для выделенных"><option value="">Пометка для выделенных…</option>${Object.entries(DT_NEED).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}<option value="-">Снять пометку</option></select>
-    <button class="btn" data-act="dtSelClear" ${dtSel.size ? '' : 'disabled'}>Снять выделение</button>` : ''}`;
+    <button class="btn" data-act="dtSelClear" ${dtSel.size ? '' : 'disabled'}>Снять выделение</button>
+    ${canEdit() && dtSel.size ? armBtn('dtseldel', `Удалить выделенные (${dtSel.size})`, 'dtDelSel', '', 'btn danger') : ''}` : ''}`;
   // the hint lives on the map itself, so the panel above never changes height while points are being picked
   let hint = $('dtLassoHint'); if (!hint) { hint = document.createElement('div'); hint.id = 'dtLassoHint'; hint.className = 'dthint'; $('dtmap').appendChild(hint); }
   hint.hidden = !ui.dtLasso; hint.textContent = 'Режим выделения: обведите область или щёлкайте по точкам — щелчок выделяет точку, повторный снимает выделение.';
@@ -3921,6 +3927,11 @@ async function act(el){
       } catch(e) { toast(errText(e)); }
       return;
     }
+    case 'dtDelSel': { const nos = [...dtSel]; try { const r = await api('POST', '/api/dt/delete', { nos }); dtSel.clear(); ui.dtOnlySel = false; dtMap?.closePopup(); await loadDt(); toast(`Удалено точек: ${r.count}`); } catch(e) { toast(errText(e)); } return; }
+    case 'dtReset': { const inJobs = new Set(S.jobs.flatMap(j => (j.places || []).map(x => x.dtNo).filter(Boolean))), n = DT.points.length, k = DT.points.filter(p => inJobs.has(p.no)).length;
+      if (!confirm(`Убрать с карты все точки (${n})?\n\nТочки, добавленные в работы (${k}), останутся в работах — их можно снова показать на карте, выбрав работу. Остальные точки нужно будет загрузить заново.`)) return;
+      try { const r = await api('POST', '/api/dt/reset'); dtSel.clear(); ui.dtMarking = false; ui.dtLasso = false; dtMap?.closePopup(); await loadDt(); toast(`Карта сброшена — убрано точек: ${r.count}`); } catch(e) { toast(errText(e)); } return; }
+    case 'dtRestore': { try { const r = await api('POST', '/api/dt/restore', { jobId: id }); ui.dtJobFit = true; await loadDt(); toast(`На карту возвращено точек: ${r.count}`); } catch(e) { toast(errText(e)); } return; }
     case 'dtDel': {
       const i = Number(id), p = DT.points[i]; if (!p) return;
       try { await api('DELETE', '/api/dt/point', { i, no: p.no }); dtMap.closePopup(); ui.dtEdit = null; await loadDt(); toast(`Точка ${p.no} удалена`); } catch(e) { toast(errText(e)); }

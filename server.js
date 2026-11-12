@@ -688,6 +688,38 @@ async function api(req, res, url) {
       P.splice(i, 1); saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
     }
+    /* several points at once (the selection) */
+    if (m === 'POST' && p[2] === 'delete') {
+      if (!canEdit(user)) return fail(res, 403, 'Удалять точки может администратор или руководитель');
+      const b = await readJsonBody(req), nos = new Set((Array.isArray(b.nos) ? b.nos : []).map(String));
+      if (!db.dt || !nos.size) return fail(res, 400, 'Не выбрано ни одной точки');
+      const n0 = db.dt.points.length; db.dt.points = db.dt.points.filter(x => !nos.has(x.no)); saveDb();
+      return send(res, 200, { ok: true, count: n0 - db.dt.points.length, rev: db.rev });
+    }
+    /* «Сбросить карту»: every point leaves the map; the works keep theirs */
+    if (m === 'POST' && p[2] === 'reset') {
+      if (!canEdit(user)) return fail(res, 403, 'Сбросить карту может администратор или руководитель');
+      const n = db.dt ? db.dt.points.length : 0;
+      db.dt = { points: [], file: '', at: new Date().toISOString(), by: user.id, classifiedAt: null, radius: null, source: '', resetAt: new Date().toISOString(), resetBy: user.id, resetCount: n };
+      saveDb();
+      return send(res, 200, { ok: true, count: n, rev: db.rev });
+    }
+    /* the points of a work back on the map (after a reset): object number, place, marks, executor */
+    if (m === 'POST' && p[2] === 'restore') {
+      if (!canEdit(user)) return fail(res, 403, 'Недостаточно прав');
+      const b = await readJsonBody(req), j = db.jobs[String(b.jobId || '')];
+      if (!j) return fail(res, 404, 'Работа не найдена');
+      if (!db.dt) db.dt = { points: [], file: '', at: new Date().toISOString(), by: user.id, classifiedAt: null, radius: null, source: '' };
+      const have = new Set(db.dt.points.map(x => x.no)); let n = 0;
+      for (const pl of j.places || []) {
+        if (!pl.dtNo || have.has(pl.dtNo)) continue;
+        db.dt.points.push({ no: pl.dtNo, lat: pl.lat, lng: pl.lng, cats: (pl.cats || []).slice(), road: pl.road || '', bridge: '', dist: null,
+          ...(pl.assignee ? { assignee: pl.assignee } : {}), ...(isNeed(pl.need) ? { need: pl.need } : {}), restoredFrom: j.id });
+        have.add(pl.dtNo); n++;
+      }
+      saveDb();
+      return send(res, 200, { ok: true, count: n, rev: db.rev });
+    }
     if (m === 'POST' && p[2] === 'overpass') {
       // the same Overpass query from the server, for browsers that cannot reach OpenStreetMap themselves
       if (!canEdit(user)) return fail(res, 403, 'Недостаточно прав');
