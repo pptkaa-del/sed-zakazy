@@ -520,7 +520,8 @@ async function api(req, res, url) {
     // works with production made before orders were created for them
     if (HEAD(user)) { let ch = false; for (const [jid, j] of Object.entries(db.jobs || {})) if (ensureJobOrder(j, jid, user)) ch = true; if (ch) saveDb(); }
     const out = { rev: db.rev, users: Object.fromEntries(orgUsers().map(u => [u.id, u.name])), meta: db.meta,
-      staff: orgUsers().filter(u => !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) };
+      // the system administrator does not work with the organization's data: he is not offered as staff
+      staff: orgUsers().filter(u => !u.blocked && !u.sys).map(u => ({ id: u.id, name: u.name, role: u.role })) };
     // a worker gets only the points assigned to him; points without an executor only when he is the job's only worker
     const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = FIELD(user) ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
