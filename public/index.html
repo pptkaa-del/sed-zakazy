@@ -368,6 +368,8 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .g-m{position:absolute;top:4px;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;padding-left:4px}
 .g-w{position:absolute;bottom:4px;font:11px var(--f-mono);color:var(--ink-2);padding-left:3px;white-space:nowrap}
 .g-proj .g-lab{font-weight:600;background:var(--paper)}
+.g-ppl{font-weight:400;color:var(--ink)!important}
+.g-span{position:absolute;top:50%;transform:translateY(-50%);height:22px;border:1px dashed var(--rule);border-radius:6px;background:var(--sheet);color:var(--ink-2);font:inherit;font-size:12px;padding:0 8px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;z-index:1}.g-span:hover{border-color:var(--ink-2);color:var(--ink)}
 .g-proj .g-track{background-color:var(--paper)}
 .g-ord .g-lab{font-size:13px;color:var(--ink-2);padding-left:20px}
 .g-task .g-lab{padding-left:28px;cursor:pointer}
@@ -2984,13 +2986,19 @@ function vUsers(){
 }
 
 /* ===== Plan view ===== */
+/* who takes part in a work: its manager, workers, executors of its points and employees of its plan tasks */
+const jobPeople = j => { const ids = [j.leaderId, ...(j.workers || []), ...(j.places || []).map(x => x.assignee), ...S.tasks.filter(t => t.jobId === j.id).flatMap(t => t.staff || [])].filter(Boolean); return [...new Set(ids)]; };
+const peopleTxt = j => jobPeople(j).map(id => who(id) + (id === j.leaderId ? ' (рук.)' : '')).join(', ');
 const planJobs = () => S.jobs.slice().sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.no || 0) - (a.no || 0));
 function vPlan(){
   if (ui.planOrd && ui.planOrd !== '_' && !jobOf(ui.planOrd)) ui.planOrd = '';
-  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planOrd || (ui.planOrd === '_' ? !jobOf(t.jobId) : t.jobId === ui.planOrd)) && (!ui.planKind || t.kind === ui.planKind));
+  if (ui.planWho && !STAFF.some(u => u.id === ui.planWho)) ui.planWho = '';
+  const inWho = t => !ui.planWho || ((t.staff || []).length ? t.staff.includes(ui.planWho) : !!jobOf(t.jobId) && jobPeople(jobOf(t.jobId)).includes(ui.planWho));
+  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planOrd || (ui.planOrd === '_' ? !jobOf(t.jobId) : t.jobId === ui.planOrd)) && (!ui.planKind || t.kind === ui.planKind) && inWho(t));
   const PJ = planJobs();
   const head = `<div class="toolbar">
     <select class="f" id="planOrd" aria-label="Работа"><option value="">Все работы</option>${PJ.map(j => `<option value="${j.id}" ${ui.planOrd===j.id?'selected':''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}<option value="_" ${ui.planOrd==='_'?'selected':''}>Без работы</option></select>
+    <select class="f" id="planWho" aria-label="Сотрудник"><option value="">Все сотрудники</option>${STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<option value="${u.id}" ${ui.planWho===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>
     <div class="seg"><button data-act="planKind" data-id="" class="${!ui.planKind?'on':''}">Все</button><button data-act="planKind" data-id="prod" class="${ui.planKind==='prod'?'on':''}">Изготовление</button><button data-act="planKind" data-id="mount" class="${ui.planKind==='mount'?'on':''}">Монтаж</button></div>
     <div class="seg"><button data-act="scale" data-id="day" class="${ui.scale==='day'?'on':''}">Дни</button><button data-act="scale" data-id="week" class="${ui.scale==='week'?'on':''}">Недели</button></div>
     ${canEdit() ? `<button class="btn primary" data-act="newTask" data-id="${ui.planOrd && ui.planOrd !== '_' ? 'j:' + ui.planOrd : ''}">+ Задача</button>` : ''}
@@ -3027,8 +3035,10 @@ function vPlan(){
   PJ.forEach(j => {
     const jt = tasks.filter(t => t.jobId === j.id).sort(byStart); if (!jt.length) return;
     const dl = j.due && dnum(j.due) >= lo && dnum(j.due) <= hi ? `<i class="g-dl" style="left:${(dnum(j.due)-lo)*DW + DW - 1}px" title="Срок окончания работ ${fmtD(j.due)}"></i>` : '';
-    const cp = cpOf(j.customerId)?.name;
-    rows += `<div class="g-row g-proj"><div class="g-lab" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">№ ${jobNo(j)} · ${esc(j.title)}<small>${esc(WORK_KIND[j.kind || 'mount'])}${cp ? ' · ' + esc(cp) : ''}${j.due ? ' · срок ' + fmtD(j.due) : ''}</small></div>${track('', dl)}</div>` + jt.map(taskRow).join('');
+    const cp = cpOf(j.customerId)?.name, ppl = peopleTxt(j);
+    const js = Math.min(...jt.map(t => dnum(t.start))), je = Math.max(...jt.map(t => Math.max(dnum(t.start), dnum(t.end)))), jw = (je - js + 1) * DW;
+    const span = `<button class="g-span" style="left:${(js-lo)*DW}px;width:${jw}px" data-act="openJob" data-id="${j.id}" title="${esc('Участвуют: ' + (ppl || 'никто не назначен'))}">${jw > 60 ? esc(ppl ? '👥 ' + ppl : 'никто не назначен') : ''}</button>`;
+    rows += `<div class="g-row g-proj"><div class="g-lab" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">№ ${jobNo(j)} · ${esc(j.title)}<small>${esc(WORK_KIND[j.kind || 'mount'])}${cp ? ' · ' + esc(cp) : ''}${j.due ? ' · срок ' + fmtD(j.due) : ''}</small><small class="g-ppl">👥 ${ppl ? esc(ppl) : '<span class="dim">никто не назначен</span>'}</small></div>${track(span, dl)}</div>` + jt.map(taskRow).join('');
   });
   const rest = tasks.filter(t => !jobOf(t.jobId));
   ordersSorted().slice().reverse().forEach(o => {
@@ -4594,6 +4604,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'jW') { ui.jW = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
+  if (t.id === 'planWho') { ui.planWho = t.value; return render(); }
   if (t.id === 't-job') { ui.tJob = t.value; ui.tKind = (document.querySelector('input[name=t-kind]:checked') || {}).value; ['t-title','t-resp','t-start','t-end','t-people','t-brig'].forEach(k => { ui.tKeep = ui.tKeep || {}; ui.tKeep[k] = $(k)?.value; }); ui.tKeep.done = $('t-done')?.checked; renderDrawer(); Object.entries(ui.tKeep).forEach(([k, v]) => { if (k === 'done') { if ($('t-done')) $('t-done').checked = v; } else if ($(k) && v !== undefined) $(k).value = v; }); ui.tKeep = null; return; }
   if (t.name === 't-kind') { ui.tKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); return; }
   if (t.classList.contains('pci')) {
