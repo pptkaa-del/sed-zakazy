@@ -2829,7 +2829,7 @@ function vShared(){
   const L = NOTES.filter(n => ntype(n) === 'shared').sort((a, b) => (a.done - b.done) || String(b.at).localeCompare(String(a.at)));
   const pick = (name, sel) => others.map(u => `<label class="chk"><input type="checkbox" name="${name}" value="${u.id}" ${sel.includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('');
   return `<div class="notes">
-    <div class="box shnew" data-keep><textarea class="in" id="sh-new" rows="2" maxlength="4000" aria-label="Новая общая задача" placeholder="Что нужно сделать"></textarea>
+    <div class="box shnew" data-keep><textarea class="in" id="sh-new" rows="2" maxlength="4000" aria-label="Новая общая задача" placeholder="Что нужно сделать">${esc(ui.shText || '')}</textarea>
       <span style="font-size:13px;color:var(--ink-2)">Кто видит и может комментировать</span><div class="tstaff">${pick('sh-users', ui.shUsers || []) || '<span class="dim">Других пользователей нет</span>'}</div>
       <div class="row-g"><button class="btn primary" data-act="sharedAdd">Создать общую задачу</button></div></div>
     ${L.length ? `<ul class="memo-list">${L.map(n => { const own = n.by === me.id; return `<li class="memo shared ${n.done ? 'done' : ''}">
@@ -4167,7 +4167,7 @@ async function act(el){
       try { const r = await api('PATCH', '/api/notes/' + nid, { files: (n.files || []).filter(f => f.id !== fid) }); Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
     case 'sharedAdd': { const text = ($('sh-new')?.value || '').trim(), share = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value);
       if (!text) return toast('Напишите, что нужно сделать'); if (!share.length) return toast('Отметьте, кто увидит задачу');
-      try { const r = await api('POST', '/api/notes', { type: 'shared', text, share }); NOTES.unshift(r.note); ui.shUsers = []; $('sh-new').value = ''; document.activeElement?.blur(); render(); toast('Общая задача создана'); } catch(e) { toast(errText(e)); } return; }
+      try { const r = await api('POST', '/api/notes', { type: 'shared', text, share }); NOTES.unshift(r.note); ui.shUsers = []; ui.shText = ''; $('sh-new').value = ''; document.activeElement?.blur(); render(); toast('Общая задача создана'); } catch(e) { toast(errText(e)); } return; }
     case 'shCmt': { const inp = $('shc-' + id), text = (inp?.value || '').trim(); if (!text) return;
       try { const r = await api('POST', `/api/notes/${id}/comments`, { text }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); inp.value = ''; document.activeElement?.blur(); render(); } catch(e) { toast(errText(e)); } return; }
     case 'shCmtDel': { const [nid, cid] = id.split('|'); try { const r = await api('DELETE', `/api/notes/${nid}/comments/${cid}`); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
@@ -4443,6 +4443,7 @@ $('drawer').addEventListener('submit', onSubmit);
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'cp-q') return cpResults();
+  if (t.id === 'sh-new') { ui.shText = t.value; return; }
   if (t.classList.contains('cpq') && ui.cp) { ui.cp.components[Number(t.dataset.i)].qty = t.value; return; }
   if (t.classList.contains('cpu') && ui.cp) { ui.cp.components[Number(t.dataset.i)].unit = t.value; return; }
   if (t.id === 'cat-q') { ui.catQ = t.value; const pos = t.selectionStart; renderDrawer(); const n = $('cat-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } return; }
