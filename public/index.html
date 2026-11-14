@@ -391,6 +391,8 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .dtneeds{display:flex;flex-wrap:wrap;gap:6px}.needbtn{display:inline-flex;gap:7px;align-items:center;padding:7px 12px;border:2px solid var(--c,#9AA3AD);border-radius:999px;background:var(--sheet);font:inherit;font-size:14px;cursor:pointer;color:inherit}.needbtn i{width:12px;height:12px;border-radius:50%;background:var(--c)}.needbtn:hover:not(:disabled){background:color-mix(in srgb,var(--c) 15%,var(--sheet))}.needbtn:disabled{opacity:.45;cursor:default}.needbtn.none{border-style:dashed}
 .legbtn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--sheet);font:inherit;font-size:13px;cursor:pointer;color:inherit}.legbtn i{width:10px;height:10px;display:inline-block}.legbtn.off{opacity:.4;text-decoration:line-through}
 .worow{display:grid;grid-template-columns:minmax(0,1fr) 90px 220px auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}.worow:first-child{border-top:0}.worow small{display:block}@media (max-width:820px){.worow{grid-template-columns:1fr auto}}
+.tstaff{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;max-height:160px;overflow:auto}.tstaff .chk{flex-direction:row;display:flex;gap:6px;align-items:center;font-size:14px}
+.staffc .ch{align-items:flex-start}.stnums{display:flex;gap:18px}.stnums div{text-align:right}.stnums b{display:block;font-size:22px;font-family:var(--f-mono)}.stnums small{font-size:12px;color:var(--ink-2)}.stlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.stlist small{display:block}
 .shortbox{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:var(--warn-soft)}.shortbox small{display:block}
 .catlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.catlist li{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--sheet)}.catlist small{display:block}
 .cpres{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto;margin-top:6px}.cphit{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;padding:8px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);cursor:pointer;font:inherit;color:inherit}.cphit:hover{border-color:var(--stamp)}.cphit small{display:block}.cphit.new{border-style:dashed}
@@ -810,6 +812,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#works" data-v="works">Работы</a>
       <a href="#stock" data-v="stock">Склад</a>
       <a href="#cps" data-v="cps">Контрагенты</a>
+      <a href="#staff" data-v="staff" id="staffTab" hidden>Сотрудники</a>
       <a href="#wo" data-v="wo" id="woTab" hidden>Списание материалов</a>
       <a href="#pay" data-v="pay">Счета в оплату <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
@@ -1034,7 +1037,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : vOrders();
   if (changed) animateView(V);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
@@ -2721,6 +2724,33 @@ function vBackups(){
 /* ---------- «Мои задачи»: a personal to-do list ---------- */
 let NOTES = [];
 /* ---------- «Списание материалов»: every write-off list — of montage works and of production orders ---------- */
+/* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
+function vStaff(){
+  const day = ui.stDay || today(), q = (ui.stq || '').trim().toLowerCase();
+  const rows = STAFF.filter(u => !q || u.name.toLowerCase().includes(q)).map(u => {
+    const jobs = S.jobs.filter(j => j.status !== 'done' && ((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id)));
+    const mine = j => (j.places || []).filter(x => x.assignee === u.id);
+    const doneAll = S.jobs.flatMap(j => (j.places || []).filter(x => x.doneAt && (x.doneBy === u.id || (!x.doneBy && x.assignee === u.id))).map(x => ({ j, x })));
+    const doneDay = doneAll.filter(({ x }) => localDay(x.doneAt) === day);
+    const tasks = S.tasks.filter(t => !t.done && (t.staff || []).includes(u.id) && t.end >= day);
+    return { u, jobs, mine, doneAll, doneDay, tasks, open: jobs.reduce((a, j) => a + mine(j).filter(x => !x.doneAt).length, 0) };
+  }).filter(r => r.jobs.length || r.tasks.length || r.doneAll.length || ['worker', 'contractor'].includes(r.u.role))
+    .sort((a, b) => b.doneDay.length - a.doneDay.length || b.open - a.open || a.u.name.localeCompare(b.u.name, 'ru'));
+  const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="stq" type="search" aria-label="Поиск сотрудника" value="${esc(ui.stq || '')}" style="flex:1 1 200px;max-width:300px"></span>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px">День<input class="in" type="date" id="st-day" value="${day}" max="${today()}" style="width:auto"></label>
+    <button class="btn sm" data-act="stDay" data-id="${today()}">Сегодня</button><button class="btn sm" data-act="stDay" data-id="${localDay(Date.now() - 864e5)}">Вчера</button>
+    <span class="dim">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}: <b>${rows.reduce((a, r) => a + r.doneDay.length, 0)}</b></span></div>`;
+  if (!rows.length) return head + '<div class="empty"><h3>Сотрудников нет</h3>Добавьте пользователей с ролью «Сотрудник» или «Подрядчик» на вкладке «Пользователи».</div>';
+  return head + rows.map(r => `<section class="card staffc">
+    <div class="ch"><div><h3 style="margin:0">${esc(r.u.name)}</h3><small class="dim">${esc(ROLE_NAMES[r.u.role] || '')}</small></div>
+      <div class="stnums"><div><b class="${r.doneDay.length ? 'ok-t' : ''}">${r.doneDay.length}</b><small>сделано за ${day === today() ? 'сегодня' : fmtD(day)}</small></div><div><b>${r.open}</b><small>точек в работе</small></div><div><b>${r.doneAll.length}</b><small>всего сделано</small></div></div></div>
+    ${r.jobs.length ? `<h4 class="sub-h">Назначено</h4><ul class="stlist">${r.jobs.map(j => { const m = r.mine(j), left = m.filter(x => !x.doneAt), cp = cpOf(j.customerId); return `<li><button class="linkish" data-act="openJob" data-id="${j.id}"><b>№ ${jobNo(j)} · ${esc(j.title)}</b></button> <span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>
+      <small class="dim">${[cp && cp.name, m.length ? `точек ${m.length}, осталось ${left.length}` : '', j.due && 'срок ' + fmtD(j.due)].filter(Boolean).map(esc).join(' · ')}</small>
+      ${left.length ? `<small class="dim">Где: ${left.slice(0, 4).map(x => esc(x.label || (x.lat.toFixed(4) + ', ' + x.lng.toFixed(4)))).join('; ')}${left.length > 4 ? ` и ещё ${left.length - 4}` : ''}</small>` : ''}</li>`; }).join('')}</ul>` : ''}
+    ${r.tasks.length ? `<h4 class="sub-h">В план-графике</h4><ul class="stlist">${r.tasks.map(t => `<li><button class="linkish" data-act="editTask" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([KIND[t.kind], jobOf(t.jobId) && '№ ' + jobNo(jobOf(t.jobId)) + ' · ' + jobOf(t.jobId).title, fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small></li>`).join('')}</ul>` : ''}
+    ${r.doneDay.length ? `<h4 class="sub-h">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}</h4><ul class="stlist">${r.doneDay.sort((a, b) => b.x.doneAt.localeCompare(a.x.doneAt)).map(({ j, x }) => `<li><small><b>${esc(fmtDT(x.doneAt).slice(-5))}</b> · ${esc(x.label || 'точка')} · ${esc(j.title)}${x.notWorking ? ' · <span style="color:var(--bad)">не работает</span>' : ''}</small></li>`).join('')}</ul>` : ''}
+  </section>`).join('');
+}
 function vWoList(){
   const f = ui.woF || 'all';
   const rows = [
@@ -2818,14 +2848,15 @@ function vPlan(){
   }
   const todayLine = `<i class="g-today" style="left:${(tn-lo)*DW + DW/2 - 1}px"></i>`;
   const track = (inner, extra='') => `<div class="g-track" style="width:${W}px">${todayLine}${extra}${inner}</div>`;
-  const tip = t => `${t.title}: ${fmtD(t.start)} – ${fmtD(t.end)}${crew(t)?' · '+crew(t):''}${t.resp?' · '+t.resp:''}`;
+  const tip = t => `${t.title}: ${fmtD(t.start)} – ${fmtD(t.end)}${crew(t)?' · '+crew(t):''}${t.resp?' · '+t.resp:''}${(t.staff || []).length ? ' · сотрудники: ' + t.staff.map(id => who(id)).join(', ') : ''}`;
   const bar = t => {
     const s = dnum(t.start), e = Math.max(s, dnum(t.end)), w = (e - s + 1) * DW;
     const late = !t.done && e < tn;
     const text = (t.done?'✓ ':'') + t.title + (crewShort(t) ? ' · ' + crewShort(t) : '');
     return `<button class="bar ${t.kind} ${t.done?'done':''} ${late?'late':''} ${brigadesOf(t)?'contr':''}" style="left:${(s-lo)*DW}px;width:${w}px" data-act="editTask" data-id="${t.id}" title="${esc(tip(t))}">${w > 70 ? esc(text) : ''}</button>`;
   };
-  const meta = t => [KIND[t.kind], crew(t), t.resp].filter(Boolean).map(esc).join(' · ');
+  const staffOf = t => (t.staff || []).map(id => who(id)).join(', ');
+  const meta = t => [KIND[t.kind], crew(t), t.resp, staffOf(t) && '👤 ' + staffOf(t)].filter(Boolean).map(esc).join(' · ');
   const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}<small>${meta(t)}</small></div>${track(bar(t))}</div>`;
   const byStart = (a,b) => a.start.localeCompare(b.start);
   let rows = '';
@@ -3451,6 +3482,7 @@ function renderDrawer(){
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Тип</span><div class="seg kindseg" role="radiogroup" style="margin-top:6px">${Object.entries(kinds).map(([k, n]) => `<label class="${k === ksel ? 'on' : ''}"><input type="radio" name="t-kind" value="${k}" ${k === ksel ? 'checked' : ''}> ${n}</label>`).join('')}</div>
         ${J && (J.kind || 'mount') !== 'both' ? `<small class="dim" style="font-size:12px">Работа «${esc(WORK_KIND[J.kind || 'mount'])}» — доступен только этот тип.</small>` : ''}</div>
       <label>Ответственный<input class="in" id="t-resp" value="${v(t,'resp')}"></label>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействованы сотрудники</span><div class="tstaff">${STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<label class="chk"><input type="checkbox" name="t-staff" value="${u.id}" ${(t?.staff || []).includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('') || '<span class="dim">Пользователей нет</span>'}</div></div>
       <label class="wide">Название<input class="in" id="t-title" value="${v(t,'title')}" required></label>
       <label>Начало<input class="in" type="date" id="t-start" value="${esc(st)}" required></label>
       <label>Окончание<input class="in" type="date" id="t-end" value="${esc(t?.end || dstr(dnum(st)+7))}" required></label>
@@ -3765,7 +3797,7 @@ async function onSubmit(e){
       if (en < s) return fail('Окончание не может быть раньше начала.');
       const brigades = val('t-brig') === '' ? 0 : Math.round(num(val('t-brig')));
       if (brigades < 0 || brigades > 99) return fail('Подрядчиков — от 0 до 99.');
-      const data = { jobId, kind:tk, resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
+      const data = { jobId, kind:tk, staff:[...document.querySelectorAll('input[name=t-staff]:checked')].map(x => x.value), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
         people, brigades, contractors: brigades > 0, contractorsNote: '' };
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
       ui.tJob = undefined; ui.tKind = undefined;
@@ -3832,7 +3864,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
+const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['staff', 'Сотрудники'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -4186,6 +4218,7 @@ async function act(el){
     case 'sF': ui.sF = id; return render();
     case 'sAv': ui.sAv = id; return render();
     case 'woF': ui.woF = id; return render();
+    case 'stDay': ui.stDay = id; return render();
     case 'acctImport': ui.acct = null; return openDrawer('acctImport');
     case 'pickStock': ui.pickQ = ''; return openDrawer('pickStock', id);
     case 'writeoff': ui.woMap = null; return openDrawer('writeoff', id);
@@ -4287,6 +4320,7 @@ document.addEventListener('input', e => {
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
+  if (t.id === 'stq') { ui.stq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaff(); const n = $('stq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wlq') { ui.wlq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorkList(); const n = $('wlq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.dataset.ph !== undefined && ui.jPhotoRows) { ui.jPhotoRows[Number(t.dataset.ph)] = t.value; return; }
   if (t.id === 'jq') { ui.jq = t.value; const pos = t.selectionStart; $('view').innerHTML = vJobs(); const n = $('jq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -4329,6 +4363,7 @@ document.addEventListener('change', async e => {
   if (t.classList.contains('wo-name')) { const it = stockByName(t.value); if (!it) { toast('Нет такой позиции на складе — выберите из списка'); return renderDrawer(); }
     t.dataset.keys.split('\n').forEach(k => { if (k === 'id:' + it.id) delete ui.woMap[k]; else ui.woMap[k] = it.id; }); return renderDrawer(); }
   if (t.dataset.ndcolor) { try { await api('PATCH', '/api/dt/needs/' + t.dataset.ndcolor, { color: t.value }); await refresh(); renderDt(); } catch(err) { toast(errText(err)); } return; }
+  if (t.id === 'st-day') { ui.stDay = t.value || today(); return render(); }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
@@ -4454,7 +4489,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (h === 'staff' && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -4510,7 +4545,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && !isHead()) || (v === 'wo' && !(isHead() || u.role === 'accountant')); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && !isHead()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (v === 'staff' && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
