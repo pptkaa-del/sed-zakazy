@@ -393,6 +393,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .worow{display:grid;grid-template-columns:minmax(0,1fr) 90px 220px auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}.worow:first-child{border-top:0}.worow small{display:block}@media (max-width:820px){.worow{grid-template-columns:1fr auto}}
 .tstaff{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;max-height:160px;overflow:auto}.tstaff .chk{flex-direction:row;display:flex;gap:6px;align-items:center;font-size:14px}
 .staffc .ch{align-items:flex-start}.stnums{display:flex;gap:18px}.stnums div{text-align:right}.stnums b{display:block;font-size:22px;font-family:var(--f-mono)}.stnums small{font-size:12px;color:var(--ink-2)}.stlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.stlist small{display:block}
+[data-ed]{cursor:text;border-radius:4px}[data-ed]:hover{box-shadow:0 0 0 1px var(--rule)}[data-ed].editing{box-shadow:none}.ed-in{font:inherit;width:100%;min-width:160px}
 .shortbox{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:var(--warn-soft)}.shortbox small{display:block}
 .catlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.catlist li{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--sheet)}.catlist small{display:block}
 .cpres{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto;margin-top:6px}.cphit{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;padding:8px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);cursor:pointer;font:inherit;color:inherit}.cphit:hover{border-color:var(--stamp)}.cphit small{display:block}.cphit.new{border-style:dashed}
@@ -972,6 +973,33 @@ function toast(m){ const t = $('toast'); t.textContent = m; t.hidden = false; cl
 function errText(err){
   return (err?.message || 'Нет связи с сервером').replace(/\.$/,'') + '.';
 }
+/* ---------- editing a text right where it is shown: double click, Enter saves (Shift+Enter — a new line in long texts), Esc cancels ---------- */
+const edAttr = (col, id, field, multi) => canEdit() || col === 'notes' ? `data-ed="${col}|${esc(id)}|${field}${multi ? '|m' : ''}" title="Дважды щёлкните, чтобы изменить"` : '';
+const edValue = (col, id, field) => { const x = col === 'notes' ? NOTES.find(n => n.id === id) : (S[col] || []).find(d => d.id === id); return x ? String(x[field] ?? '') : ''; };
+let edActive = null;
+document.addEventListener('dblclick', e => {
+  const el = e.target.closest('[data-ed]'); if (!el || edActive) return;
+  e.preventDefault(); window.getSelection()?.removeAllRanges();
+  const [col, id, field, m] = el.dataset.ed.split('|'), multi = m === 'm', old = edValue(col, id, field);
+  const inp = document.createElement(multi ? 'textarea' : 'input'); inp.className = 'in ed-in'; inp.value = old; if (multi) inp.rows = Math.min(8, Math.max(2, old.split('\n').length + 1));
+  const keep = document.createElement('span'); keep.dataset.keep = ''; keep.style.display = 'contents'; keep.appendChild(inp);
+  edActive = { el, html: el.innerHTML }; el.innerHTML = ''; el.appendChild(keep); el.classList.add('editing'); inp.focus(); inp.select();
+  let done = false;
+  const finish = async save => {
+    if (done) return; done = true; const v = inp.value.trim(); edActive = null; el.classList.remove('editing');
+    if (!save || v === old.trim()) { inp.blur(); render(); if (ui.drawer) renderDrawer(); return; }
+    if (!v && ['title', 'name', 'text'].includes(field)) { toast('Поле не может быть пустым'); render(); if (ui.drawer) renderDrawer(); return; }
+    try {
+      if (col === 'notes') { const r = await api('PATCH', '/api/notes/' + id, { [field]: v }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); }
+      else await upd(col, id, { [field]: v });
+      toast('Сохранено');
+    } catch(err) { toast(errText(err)); }
+    inp.blur(); render(); if (ui.drawer) renderDrawer();
+  };
+  inp.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.preventDefault(); finish(false); } else if (ev.key === 'Enter' && !(multi && ev.shiftKey)) { ev.preventDefault(); finish(true); } });
+  inp.addEventListener('blur', () => finish(true));
+  inp.addEventListener('click', ev => ev.stopPropagation());
+});
 const guard = p => Promise.resolve(p).catch(e => toast('Не сохранено: ' + errText(e)));
 
 /* ---------- data layer (REST API) ---------- */
@@ -1460,7 +1488,7 @@ function orderDetail(o){
   return `<button class="btn ghost back" data-act="back">← К работе</button>
   <div class="ohead">
     <div style="min-width:0">
-      <h2>${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
+      <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
@@ -1697,7 +1725,7 @@ function cpDetail(c){
   const ks = (c.contracts || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
   const cts = contactsOf(c);
   return `<button class="btn ghost back" data-act="backCp">← Все контрагенты</button>
-  <div class="ohead"><div style="min-width:0"><h2>${esc(c.name)}${exTag(c)}</h2>
+  <div class="ohead"><div style="min-width:0"><h2><span ${edAttr('counterparties', c.id, 'name')}>${esc(c.name)}</span>${exTag(c)}</h2>
       <div class="roles-chips" style="margin-top:6px">${(c.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('') || '<span class="dim">Роль не указана</span>'}</div></div>
     <div class="row-g"><button class="btn sm" data-act="editCp" data-id="${c.id}">Изменить</button></div></div>
   <section class="card"><div class="ch"><h3>Контактные данные <span class="dim">${cts.length||''}</span></h3><button class="btn sm primary" data-act="newContact" data-id="${c.id}">+ Контакт</button></div>
@@ -2777,7 +2805,7 @@ function vNotes(){
       <div class="note-t">${ed ? `<span data-keep style="display:contents"><textarea class="in note-ed" id="note-ed" rows="3" maxlength="2000">${esc(n.text)}</textarea></span>
           <label class="note-urg"><input type="checkbox" id="note-ed-urg" ${n.urgent ? 'checked' : ''}> Срочная</label>
           <div class="row-g" style="margin-top:6px"><button class="btn sm primary" type="button" data-act="noteSave" data-id="${esc(n.id)}">Сохранить</button><button class="btn sm" type="button" data-act="noteEditCancel">Отмена</button></div>`
-        : `<div>${esc(n.text)}</div>`}
+        : `<div ${edAttr('notes', n.id, 'text', true)}>${esc(n.text)}</div>`}
         <small>${esc(fmtDT(n.at))}${n.editedAt ? ' · изменено ' + esc(fmtDT(n.editedAt)) : ''}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}` : ''}</small>
         ${n.urgent && !n.done && !ed ? '<span class="note-urgtag">Срочная</span>' : ''}</div>
       <div class="note-acts"><button class="btn ghost sm" type="button" data-act="noteDel" data-id="${esc(n.id)}" title="Удалить" aria-label="Удалить">✕</button>
@@ -3114,7 +3142,8 @@ function renderDrawer(){
   if (d.kind === 'stockView') {
     const it = S.stock.find(x => x.id === d.id); if (!it) return closeDrawer();
     const mv = (it.moves || []).slice().reverse();
-    D.innerHTML = dh(esc(it.name)) + `<div class="d-body">
+    D.innerHTML = dh(`<span ${edAttr('stock', it.id, 'name')}>${esc(it.name)}</span>`) + `<div class="d-body">
+      ${canEdit() ? `<p class="jdesc ${it.note ? '' : 'dim'}" style="margin:0" ${edAttr('stock', it.id, 'note', true)}>${it.note ? esc(it.note) : 'Примечание — дважды щёлкните, чтобы добавить'}</p>` : ''}
       <dl class="kv"><dt>Остаток</dt><dd><b class="mono ${isLow(it) ? 'warn-t' : ''}" style="font-size:18px">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</b></dd>
         <dt>Артикул</dt><dd class="mono">${esc(it.sku || '—')}</dd><dt>Место хранения</dt><dd>${esc(it.location || '—')}</dd>
         <dt>Минимальный запас</dt><dd>${it.minQty ? fmtQty(it.minQty) + ' ' + esc(it.unit || 'шт') : '—'}</dd>${it.note ? `<dt>Примечание</dt><dd>${esc(it.note)}</dd>` : ''}</dl>
@@ -3373,7 +3402,7 @@ function renderDrawer(){
     const byPerson = {}; P.forEach(x => { const k = x.assignee || ''; (byPerson[k] = byPerson[k] || { t:0, c:0 }).t++; if (x.doneAt) byPerson[k].c++; });
     D.innerHTML = dh(`${esc(WORK_KIND[j.kind || 'mount'])} · № ${jobNo(j)}`) + `<div class="d-body">
       <div class="row-g"><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${overdue(j) ? '<span class="chip c-bad">Срок прошёл</span>' : ''}</div>
-      <h3 style="margin:0;font-size:20px">${esc(j.title)}</h3>
+      <h3 style="margin:0;font-size:20px" ${edAttr('jobs', j.id, 'title')}>${esc(j.title)}</h3>
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
@@ -3381,7 +3410,7 @@ function renderDrawer(){
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
-      ${j.description ? `<p class="jdesc">${esc(j.description)}</p>` : ''}
+      ${j.description || canEdit() ? `<p class="jdesc ${j.description ? '' : 'dim'}" ${edAttr('jobs', j.id, 'description', true)}>${j.description ? esc(j.description) : 'Описание — дважды щёлкните, чтобы добавить'}</p>` : ''}
       <div class="box"><h4>Документы${(j.docs || []).length ? ' · ' + j.docs.length : ''}</h4>
         ${(j.docs || []).length ? `<ul class="files">${j.docs.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at || '').slice(0, 10))}</small>${ed ? armBtn('jdoc:' + f.id, '✕', 'jobDocDel', j.id + '|' + f.id, 'icon') : ''}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документов нет.</p>'}
         ${ed ? `<div class="row-g"><label class="btn sm">Загрузить документы<input type="file" data-up="jobDoc" data-id="${j.id}" accept="${ACCEPT}" multiple hidden></label></div>` : ''}</div>
