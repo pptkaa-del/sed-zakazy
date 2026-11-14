@@ -525,36 +525,56 @@ async function api(req, res, url) {
     const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = FIELD(user) ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
-    if (HEAD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id);
+    if (!FIELD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
     return send(res, 200, out);
   }
   /* «Мои задачи»: a personal to-do list — each administrator sees and changes only his own notes */
+  /* «Мои задачи»: personal tasks («task»), notes with drawings and pictures («memo») and shared tasks («shared»):
+     a shared task is seen by the users chosen by its author; they can write comments */
   if (p[1] === 'notes') {
-    if (!HEAD(user)) return fail(res, 403, '«Мои задачи» доступны администраторам и руководителям');
+    if (FIELD(user)) return fail(res, 403, '«Мои задачи» недоступны');
     if (!Array.isArray(db.notes)) db.notes = [];
     const N = db.notes;
-    if (m === 'GET' && !p[2]) return send(res, 200, N.filter(n => n.by === user.id));
+    const sees = n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id));
+    const cleanFiles = a => (Array.isArray(a) ? a : []).filter(f => f && db.files[f.id]).slice(0, 30).map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), type: db.files[f.id].type, at: db.files[f.id].at }));
+    const cleanShare = a => [...new Set((Array.isArray(a) ? a : []).filter(id => id !== user.id && orgUsers().some(u => u.id === id && !FIELD(u) && !u.sys)))].slice(0, 50);
+    if (m === 'GET' && !p[2]) return send(res, 200, N.filter(sees));
     if (m === 'POST' && !p[2]) {
-      const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 2000);
-      if (!text) return fail(res, 400, 'Напишите текст задачи');
-      const n = { id: newId(), text, done: false, urgent: !!b.urgent, at: new Date().toISOString(), by: user.id };
+      const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 4000), type = ['task', 'memo', 'shared'].includes(b.type) ? b.type : 'task';
+      if (!text && !(b.files || []).length) return fail(res, 400, 'Напишите текст');
+      if (type === 'shared' && !cleanShare(b.share).length) return fail(res, 400, 'Выберите, кто увидит общую задачу');
+      const n = { id: newId(), type, text, done: false, urgent: !!b.urgent, at: new Date().toISOString(), by: user.id, files: cleanFiles(b.files) };
+      if (type === 'shared') { n.share = cleanShare(b.share); n.comments = []; }
       if (n.urgent) n.urgentAt = n.at;
       N.unshift(n); saveDb();
       return send(res, 200, { ok: true, note: n, rev: db.rev });
     }
-    const n = p[2] && N.find(x => x.id === p[2] && x.by === user.id);
+    const n = p[2] && N.find(x => x.id === p[2] && sees(x));
     if (!n) return fail(res, 404, 'Задача не найдена — обновите страницу');
+    const own = n.by === user.id;
+    // comments on a shared task: everyone who sees it
+    if (p[3] === 'comments') {
+      n.comments = Array.isArray(n.comments) ? n.comments : [];
+      if (m === 'POST') { const b = await readJsonBody(req), t = String(b.text || '').trim().slice(0, 2000); if (!t) return fail(res, 400, 'Пустой комментарий');
+        const c = { id: newId(), by: user.id, at: new Date().toISOString(), text: t }; n.comments.push(c); saveDb(); return send(res, 200, { ok: true, note: n, rev: db.rev }); }
+      if (m === 'DELETE' && p[4]) { const c = n.comments.find(x => x.id === p[4]); if (!c) return fail(res, 404, 'Комментарий не найден'); if (c.by !== user.id && !own) return fail(res, 403, 'Удалить можно только свой комментарий');
+        n.comments = n.comments.filter(x => x !== c); saveDb(); return send(res, 200, { ok: true, note: n, rev: db.rev }); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
     if (m === 'PATCH') {
       const b = await readJsonBody(req);
-      if (b.text !== undefined) { const t = String(b.text).trim().slice(0, 2000); if (!t) return fail(res, 400, 'Напишите текст задачи'); n.text = t; }
+      // participants of a shared task may tick it done; everything else is for its author
+      if (!own && Object.keys(b).some(k => k !== 'done')) return fail(res, 403, 'Изменить общую задачу может её автор');
+      if (b.text !== undefined) { const t = String(b.text).trim().slice(0, 4000); if (!t && !(n.files || []).length) return fail(res, 400, 'Напишите текст'); n.text = t; n.editedAt = new Date().toISOString(); }
       // urgent: the task goes to the top of the list and is shown in red
       if (b.urgent !== undefined) { n.urgent = !!b.urgent; n.urgentAt = n.urgent ? new Date().toISOString() : null; }
-      if (b.text !== undefined) n.editedAt = new Date().toISOString();
+      if (b.files !== undefined) n.files = cleanFiles(b.files);
+      if (b.share !== undefined && n.type === 'shared') { const sh = cleanShare(b.share); if (!sh.length) return fail(res, 400, 'Выберите, кто увидит общую задачу'); n.share = sh; }
       if (b.done !== undefined) { n.done = !!b.done; n.doneAt = n.done ? new Date().toISOString() : null; n.doneBy = n.done ? user.id : null; }
       saveDb();
       return send(res, 200, { ok: true, note: n, rev: db.rev });
     }
-    if (m === 'DELETE') { N.splice(N.indexOf(n), 1); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    if (m === 'DELETE') { if (!own) return fail(res, 403, 'Удалить общую задачу может её автор'); N.splice(N.indexOf(n), 1); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'password' && m === 'POST') {

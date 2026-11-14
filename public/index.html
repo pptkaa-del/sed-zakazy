@@ -394,6 +394,10 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .tstaff{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;max-height:160px;overflow:auto}.tstaff .chk{flex-direction:row;display:flex;gap:6px;align-items:center;font-size:14px}
 .staffc .ch{align-items:flex-start}.stnums{display:flex;gap:18px}.stnums div{text-align:right}.stnums b{display:block;font-size:22px;font-family:var(--f-mono)}.stnums small{font-size:12px;color:var(--ink-2)}.stlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.stlist small{display:block}
 [data-ed]{cursor:text;border-radius:4px}[data-ed]:hover{box-shadow:0 0 0 1px var(--rule)}[data-ed].editing{box-shadow:none}.ed-in{font:inherit;width:100%;min-width:160px}
+.ntabs{margin-bottom:14px}.memo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.memo{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--rule);border-radius:12px;background:var(--sheet)}.memo-t{white-space:pre-wrap;overflow-wrap:anywhere}.memo small{display:block}.memo.done .memo-t{text-decoration:line-through;color:var(--ink-2)}
+.shnew{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}.sh-h{display:flex;gap:10px;align-items:flex-start}.sh-h .memo-t{flex:1}.sh-c{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--rule-2);padding-top:8px}.cmt1 div{white-space:pre-wrap}.shedit{display:inline-block}.shedit .tstaff{margin-top:4px}
+.drawbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}.dcolors{display:flex;gap:4px}.dcol{width:28px;height:28px;border-radius:50%;border:2px solid var(--rule);background:var(--c);cursor:pointer}.dcol.on{box-shadow:0 0 0 3px var(--stamp)}
+.drawwrap{border:1px solid var(--rule);border-radius:12px;overflow:hidden;background:#fff}#drawc{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
 .shortbox{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:var(--warn-soft)}.shortbox small{display:block}
 .catlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.catlist li{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--sheet)}.catlist small{display:block}
 .cpres{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto;margin-top:6px}.cphit{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;padding:8px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);cursor:pointer;font:inherit;color:inherit}.cphit:hover{border-color:var(--stamp)}.cphit small{display:block}.cphit.new{border-style:dashed}
@@ -1020,7 +1024,7 @@ async function refresh(){
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products'].forEach(c => S[c] = d[c] || []);
   STAFF = d.staff || []; NOTES = d.notes || [];
-  { const n = NOTES.filter(x => !x.done).length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
+  { const n = NOTES.filter(x => !x.done && (x.type || 'task') !== 'memo').length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
   render();
@@ -1067,6 +1071,7 @@ function render(){
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
   V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : vOrders();
   if (changed) animateView(V);
+  if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
@@ -2796,13 +2801,97 @@ function vWoList(){
       <div>${r.src.writeoff ? `<span class="chip c-ok">Сохранён</span><small class="dim">${esc(fmtDT(r.src.writeoff.at))} · ${esc(who(r.src.writeoff.by))}</small>` : r.bad ? `<span class="chip c-bad">Не хватает: ${r.bad}</span>` : '<span class="chip c-warn">Не сохранён</span>'}</div>
       <div class="row-g"><button class="btn sm" data-act="${r.col === 'jobs' ? 'jobWo' : 'writeoff'}" data-id="${r.id}">Открыть</button><a class="btn sm" href="/api/${r.col}/${r.id}/writeoff.xlsx" data-dl>Excel</a></div></div>`).join('')}</section>`;
 }
+const NOTE_TABS = [['task', 'Задачи'], ['memo', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']];
+const ntype = n => n.type || 'task';
 function vNotes(){
+  const tab = ui.ntab || 'task';
+  const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'memo' ? NOTES.filter(n => ntype(n) === 'memo').length : 0;
+  const tabs = `<div class="seg ntabs" role="tablist">${NOTE_TABS.map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
+  return tabs + (tab === 'memo' ? vMemos() : tab === 'shared' ? vShared() : tab === 'draw' ? vDraw() : vTasksList());
+}
+const thumbF = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp)$/i.test(f.name || '') ? `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener" class="thumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>` : `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>`;
+/* «Заметки»: text, pictures and drawings */
+function vMemos(){
+  const L = NOTES.filter(n => ntype(n) === 'memo').sort((a, b) => String(b.editedAt || b.at).localeCompare(String(a.editedAt || a.at)));
+  return `<div class="notes">
+    <div class="note-add" data-keep><textarea id="memo-new" rows="2" maxlength="4000" aria-label="Новая заметка"></textarea><button class="btn primary" type="button" data-act="memoAdd">Добавить</button></div>
+    <div class="dim note-hint">Заметку можно дополнить картинкой («Прикрепить картинку») или рисунком из «Рисовалки». Текст меняется двойным щелчком.</div>
+    ${L.length ? `<ul class="memo-list">${L.map(n => `<li class="memo">
+      <div class="memo-t" ${edAttr('notes', n.id, 'text', true)}>${n.text ? esc(n.text) : '<span class="dim">без текста</span>'}</div>
+      ${(n.files || []).length ? `<div class="thumbs">${n.files.map(f => `<span class="tw">${thumbF(f)}<button class="btn sm ghost" data-act="memoFileDel" data-id="${esc(n.id)}|${esc(f.id)}" aria-label="Убрать">✕</button></span>`).join('')}</div>` : ''}
+      <small class="dim">${esc(fmtDT(n.at))}${n.editedAt ? ' · изменено ' + esc(fmtDT(n.editedAt)) : ''}</small>
+      <div class="row-g"><button class="btn sm" data-act="memoDraw" data-id="${esc(n.id)}">✎ Нарисовать</button><label class="btn sm">Прикрепить картинку<input type="file" accept="image/*" data-up="noteFile" data-id="${esc(n.id)}" multiple hidden></label><button class="btn sm ghost" data-act="noteDel" data-id="${esc(n.id)}">Удалить</button></div></li>`).join('')}</ul>`
+      : '<div class="empty"><h3>Заметок пока нет</h3>Напишите заметку в поле выше.</div>'}</div>`;
+}
+/* «Общие задачи»: chosen users see the task and write comments */
+function vShared(){
+  const others = STAFF.filter(u => u.id !== me.id && !['worker', 'contractor'].includes(u.role)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const L = NOTES.filter(n => ntype(n) === 'shared').sort((a, b) => (a.done - b.done) || String(b.at).localeCompare(String(a.at)));
+  const pick = (name, sel) => others.map(u => `<label class="chk"><input type="checkbox" name="${name}" value="${u.id}" ${sel.includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('');
+  return `<div class="notes">
+    <div class="box shnew" data-keep><textarea class="in" id="sh-new" rows="2" maxlength="4000" aria-label="Новая общая задача" placeholder="Что нужно сделать"></textarea>
+      <span style="font-size:13px;color:var(--ink-2)">Кто видит и может комментировать</span><div class="tstaff">${pick('sh-users', ui.shUsers || []) || '<span class="dim">Других пользователей нет</span>'}</div>
+      <div class="row-g"><button class="btn primary" data-act="sharedAdd">Создать общую задачу</button></div></div>
+    ${L.length ? `<ul class="memo-list">${L.map(n => { const own = n.by === me.id; return `<li class="memo shared ${n.done ? 'done' : ''}">
+      <div class="sh-h"><label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label><div class="memo-t" ${own ? edAttr('notes', n.id, 'text', true) : ''}>${esc(n.text)}</div>${own ? `<button class="btn ghost sm" data-act="noteDel" data-id="${esc(n.id)}" aria-label="Удалить">✕</button>` : ''}</div>
+      <small class="dim">Автор: ${esc(who(n.by))} · ${esc(fmtDT(n.at))}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))} (${esc(who(n.doneBy))})` : ''}</small>
+      <small class="dim">Видят: ${(n.share || []).map(id => esc(who(id))).join(', ')}${own ? ` <details class="shedit"><summary class="linkish">изменить</summary><div class="tstaff" data-shfor="${esc(n.id)}">${pick('sh-edit-' + n.id, n.share || [])}</div></details>` : ''}</small>
+      <div class="sh-c">${(n.comments || []).map(c => `<div class="cmt1"><b>${esc(who(c.by))}</b> <small class="dim">${esc(fmtDT(c.at))}</small>${c.by === me.id || own ? ` <button class="linkish" data-act="shCmtDel" data-id="${esc(n.id)}|${esc(c.id)}">удалить</button>` : ''}<div>${esc(c.text)}</div></div>`).join('')}
+        <div class="row-g" data-keep><input class="in" id="shc-${esc(n.id)}" placeholder="Комментарий" style="flex:1 1 220px"><button class="btn sm" data-act="shCmt" data-id="${esc(n.id)}">Отправить</button></div></div></li>`; }).join('')}</ul>`
+      : '<div class="empty"><h3>Общих задач пока нет</h3>Создайте задачу и выберите, кто её увидит.</div>'}</div>`;
+}
+/* «Рисовалка»: draw, insert a picture, attach the drawing to a note or a task */
+const DRAW = { img: null, undo: [], color: '#111111', width: 4, eraser: false };
+function vDraw(){
+  const targets = NOTES.filter(n => ntype(n) !== 'shared' || n.by === me.id);
+  return `<div class="drawbar">
+      <div class="dcolors">${['#111111', '#E02424', '#1F6FEB', '#2E9E4F', '#F57C00', '#7B2CBF', '#FFFFFF'].map(c => `<button class="dcol ${DRAW.color === c && !DRAW.eraser ? 'on' : ''}" style="--c:${c}" data-act="drColor" data-id="${c}" aria-label="Цвет ${c}"></button>`).join('')}</div>
+      <select class="f" id="dr-w" aria-label="Толщина">${[2, 4, 8, 16, 28].map(w => `<option value="${w}" ${DRAW.width === w ? 'selected' : ''}>Толщина ${w}</option>`).join('')}</select>
+      <button class="btn sm ${DRAW.eraser ? 'primary' : ''}" data-act="drEraser">Ластик</button><button class="btn sm" data-act="drUndo">↶ Отменить</button><button class="btn sm" data-act="drClear">Очистить</button>
+      <label class="btn sm">Вставить картинку<input type="file" accept="image/*" id="dr-img" hidden></label>
+      <span class="dtsep"></span>
+      <select class="f" id="dr-target" aria-label="Куда прикрепить"><option value="">Прикрепить к новой заметке</option>${targets.map(n => `<option value="${esc(n.id)}" ${ui.drawTarget === n.id ? 'selected' : ''}>${esc((ntype(n) === 'memo' ? 'Заметка: ' : ntype(n) === 'shared' ? 'Общая: ' : 'Задача: ') + (n.text || 'без текста').slice(0, 50))}</option>`).join('')}</select>
+      <button class="btn primary" data-act="drAttach">Прикрепить рисунок</button></div>
+    <div class="drawwrap"><canvas id="drawc" width="1600" height="1000"></canvas></div>`;
+}
+function initDraw(){
+  const c = $('drawc'); if (!c || c._ready) return; c._ready = true;
+  const x = c.getContext('2d');
+  const paintBg = () => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height); };
+  paintBg();
+  if (DRAW.img) { const im = new Image(); im.onload = () => x.drawImage(im, 0, 0); im.src = DRAW.img; }
+  const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  let drawing = false, last = null;
+  c.addEventListener('pointerdown', e => { e.preventDefault(); c.setPointerCapture(e.pointerId); drawing = true; last = pos(e); DRAW.undo.push(c.toDataURL()); if (DRAW.undo.length > 20) DRAW.undo.shift();
+    x.beginPath(); x.fillStyle = DRAW.eraser ? '#ffffff' : DRAW.color; x.arc(last[0], last[1], (DRAW.eraser ? DRAW.width * 3 : DRAW.width) / 2, 0, Math.PI * 2); x.fill(); });
+  c.addEventListener('pointermove', e => { if (!drawing) return; e.preventDefault(); const p = pos(e); x.strokeStyle = DRAW.eraser ? '#ffffff' : DRAW.color; x.lineWidth = DRAW.eraser ? DRAW.width * 3 : DRAW.width; x.lineCap = 'round'; x.lineJoin = 'round';
+    x.beginPath(); x.moveTo(last[0], last[1]); x.lineTo(p[0], p[1]); x.stroke(); last = p; });
+  const end = () => { if (!drawing) return; drawing = false; DRAW.img = c.toDataURL(); };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end); c.addEventListener('pointerleave', end);
+  c._clear = () => { DRAW.undo.push(c.toDataURL()); paintBg(); DRAW.img = c.toDataURL(); };
+  c._undo = () => { const u = DRAW.undo.pop(); if (!u) return toast('Отменять нечего'); const im = new Image(); im.onload = () => { paintBg(); x.drawImage(im, 0, 0); DRAW.img = c.toDataURL(); }; im.src = u; };
+  c._image = file => { const rd = new FileReader(); rd.onload = () => { const im = new Image(); im.onload = () => { DRAW.undo.push(c.toDataURL()); const k = Math.min(c.width / im.width, c.height / im.height, 1), w = im.width * k, h = im.height * k; x.drawImage(im, (c.width - w) / 2, (c.height - h) / 2, w, h); DRAW.img = c.toDataURL(); toast('Картинка вставлена — можно рисовать поверх'); }; im.src = rd.result; }; rd.readAsDataURL(file); };
+}
+async function drAttach(){
+  const c = $('drawc'); if (!c) return;
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  const file = new File([blob], `Рисунок ${fmtDT(new Date().toISOString()).replace(/[:,]/g, '-')}.png`, { type: 'image/png' });
+  try {
+    toast('Сохраняем рисунок…');
+    const f = await upload(file), tgt = $('dr-target').value, ff = { id: f.id, name: f.name };
+    if (tgt) { const n = NOTES.find(x => x.id === tgt); const r = await api('PATCH', '/api/notes/' + tgt, { files: [...(n.files || []), ff] }); Object.assign(n, r.note); toast('Рисунок прикреплён'); }
+    else { const r = await api('POST', '/api/notes', { type: 'memo', text: '', files: [ff] }); NOTES.unshift(r.note); toast('Рисунок сохранён в новой заметке'); }
+    ui.drawTarget = null; DRAW.img = null; DRAW.undo = []; ui.ntab = 'memo'; render(); refresh().catch(() => {});
+  } catch(e) { toast(errText(e)); }
+}
+function vTasksList(){
   // urgent tasks go first (the last marked on top), then the rest, newest first
-  const open = NOTES.filter(n => !n.done).sort((a, b) => (!!b.urgent - !!a.urgent) || String(b.urgent ? b.urgentAt || '' : b.at).localeCompare(String(a.urgent ? a.urgentAt || '' : a.at)));
-  const done = NOTES.filter(n => n.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
+  const TL = NOTES.filter(n => ntype(n) === 'task');
+  const open = TL.filter(n => !n.done).sort((a, b) => (!!b.urgent - !!a.urgent) || String(b.urgent ? b.urgentAt || '' : b.at).localeCompare(String(a.urgent ? a.urgentAt || '' : a.at)));
+  const done = TL.filter(n => n.done).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
   const row = n => { const ed = ui.noteEdit === n.id; return `<li class="note ${n.done ? 'done' : ''} ${n.urgent && !n.done ? 'urgent' : ''}">
       <label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label>
-      <div class="note-t">${ed ? `<span data-keep style="display:contents"><textarea class="in note-ed" id="note-ed" rows="3" maxlength="2000">${esc(n.text)}</textarea></span>
+      <div class="note-t">${(n.files || []).length && !ed ? `<div class="thumbs" style="margin-bottom:4px">${n.files.map(thumbF).join('')}</div>` : ''}${ed ? `<span data-keep style="display:contents"><textarea class="in note-ed" id="note-ed" rows="3" maxlength="2000">${esc(n.text)}</textarea></span>
           <label class="note-urg"><input type="checkbox" id="note-ed-urg" ${n.urgent ? 'checked' : ''}> Срочная</label>
           <div class="row-g" style="margin-top:6px"><button class="btn sm primary" type="button" data-act="noteSave" data-id="${esc(n.id)}">Сохранить</button><button class="btn sm" type="button" data-act="noteEditCancel">Отмена</button></div>`
         : `<div ${edAttr('notes', n.id, 'text', true)}>${esc(n.text)}</div>`}
@@ -2815,15 +2904,15 @@ function vNotes(){
     <div class="note-add" data-keep><textarea id="note-new" rows="1" maxlength="2000" aria-label="Новая задача"></textarea><button class="btn primary" type="button" data-act="noteAdd">Добавить</button></div>
     <label class="note-urg note-urg-new"><input type="checkbox" id="note-new-urg" ${ui.noteNewUrg ? 'checked' : ''}> Срочная</label>
     <div class="dim note-hint">Enter — добавить, Shift+Enter — новая строка. Свои задачи видите только вы.</div>
-    ${NOTES.length ? '' : '<div class="empty"><h3>Задач пока нет</h3>Напишите задачу в поле выше.</div>'}
-    ${open.length ? `<ul class="note-list">${open.map(row).join('')}</ul>` : NOTES.length ? '<div class="dim note-hint">Все задачи выполнены.</div>' : ''}
+    ${TL.length ? '' : '<div class="empty"><h3>Задач пока нет</h3>Напишите задачу в поле выше.</div>'}
+    ${open.length ? `<ul class="note-list">${open.map(row).join('')}</ul>` : TL.length ? '<div class="dim note-hint">Все задачи выполнены.</div>' : ''}
     ${done.length ? `<h4 class="note-h">Выполненные · ${done.length}${done.length > 1 ? ' <button class="btn ghost sm" type="button" data-act="noteClear">Удалить выполненные</button>' : ''}</h4><ul class="note-list">${done.map(row).join('')}</ul>` : ''}
   </div>`;
 }
 async function noteAdd(){
   const t = $('note-new'), text = t.value.trim();
   if (!text) { t.focus(); return toast('Напишите текст задачи'); }
-  try { const r = await api('POST', '/api/notes', { text, urgent: !!$('note-new-urg')?.checked }); NOTES.unshift(r.note); ui.noteNewUrg = false; t.value = ''; t.style.height = ''; t.blur(); render(); $('note-new')?.focus(); refresh().catch(() => {}); }
+  try { const r = await api('POST', '/api/notes', { text, urgent: !!$('note-new-urg')?.checked }); NOTES.unshift(r.note); ui.noteNewUrg = false; t.value = ''; t.style.height = ''; document.activeElement?.blur(); render(); $('note-new')?.focus(); refresh().catch(() => {}); }
   catch(e) { toast(errText(e)); }
 }
 
@@ -3893,7 +3982,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['staff', 'Сотрудники'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
+const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['staff', 'Сотрудники'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -4070,13 +4159,30 @@ async function act(el){
     case 'dtShowAll': Object.keys(DT_SHOW).forEach(k => DT_SHOW[k] = true); ui.dtOnlyCheck = false; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} prefsSave({ dtShow: { ...DT_SHOW } }); return renderDt();
     case 'jdDayClear': ui.jdDay = ''; return renderDrawer();
     case 'noteAdd': return noteAdd();
+    case 'ntab': ui.ntab = id; return render();
+    case 'memoAdd': { const t = $('memo-new'), text = t.value.trim(); if (!text) return toast('Напишите текст заметки');
+      try { const r = await api('POST', '/api/notes', { type: 'memo', text }); NOTES.unshift(r.note); t.value = ''; document.activeElement?.blur(); render(); toast('Заметка добавлена'); } catch(e) { toast(errText(e)); } return; }
+    case 'memoDraw': ui.drawTarget = id; DRAW.img = null; DRAW.undo = []; ui.ntab = 'draw'; return render();
+    case 'memoFileDel': { const [nid, fid] = id.split('|'), n = NOTES.find(x => x.id === nid); if (!n) return;
+      try { const r = await api('PATCH', '/api/notes/' + nid, { files: (n.files || []).filter(f => f.id !== fid) }); Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
+    case 'sharedAdd': { const text = ($('sh-new')?.value || '').trim(), share = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value);
+      if (!text) return toast('Напишите, что нужно сделать'); if (!share.length) return toast('Отметьте, кто увидит задачу');
+      try { const r = await api('POST', '/api/notes', { type: 'shared', text, share }); NOTES.unshift(r.note); ui.shUsers = []; $('sh-new').value = ''; document.activeElement?.blur(); render(); toast('Общая задача создана'); } catch(e) { toast(errText(e)); } return; }
+    case 'shCmt': { const inp = $('shc-' + id), text = (inp?.value || '').trim(); if (!text) return;
+      try { const r = await api('POST', `/api/notes/${id}/comments`, { text }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); inp.value = ''; document.activeElement?.blur(); render(); } catch(e) { toast(errText(e)); } return; }
+    case 'shCmtDel': { const [nid, cid] = id.split('|'); try { const r = await api('DELETE', `/api/notes/${nid}/comments/${cid}`); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
+    case 'drColor': DRAW.color = id; DRAW.eraser = false; return render();
+    case 'drEraser': DRAW.eraser = !DRAW.eraser; return render();
+    case 'drUndo': return $('drawc')?._undo?.();
+    case 'drClear': return $('drawc')?._clear?.();
+    case 'drAttach': return drAttach();
     case 'noteEdit': ui.noteEdit = id; render(); { const t = $('note-ed'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } } return;
     case 'noteEditCancel': ui.noteEdit = null; document.activeElement?.blur(); return render();
     case 'noteSave': { const text = ($('note-ed')?.value || '').trim(); if (!text) return toast('Напишите текст задачи');
       try { const r = await api('PATCH', '/api/notes/' + id, { text, urgent: !!$('note-ed-urg')?.checked }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); ui.noteEdit = null; document.activeElement?.blur(); render(); toast('Задача изменена'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'noteDel': { const n = NOTES.find(x => x.id === id); if (!n) return; if (!n.done && !confirm('Удалить задачу «' + n.text.slice(0, 60) + '»?')) return;
       try { await api('DELETE', '/api/notes/' + id); NOTES = NOTES.filter(x => x.id !== id); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
-    case 'noteClear': { const ids = NOTES.filter(x => x.done).map(x => x.id); if (!confirm(`Удалить выполненные задачи (${ids.length})?`)) return;
+    case 'noteClear': { const ids = NOTES.filter(x => x.done && ntype(x) === 'task').map(x => x.id); if (!confirm(`Удалить выполненные задачи (${ids.length})?`)) return;
       try { for (const i of ids) await api('DELETE', '/api/notes/' + i); NOTES = NOTES.filter(x => !ids.includes(x.id)); render(); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'repExport': return exportJobReport(jobOf(id), ui.repDay || today()).catch(e => toast(errText(e)));
     case 'wlSt': ui.wlSt = id; return render();
@@ -4393,6 +4499,12 @@ document.addEventListener('change', async e => {
     t.dataset.keys.split('\n').forEach(k => { if (k === 'id:' + it.id) delete ui.woMap[k]; else ui.woMap[k] = it.id; }); return renderDrawer(); }
   if (t.dataset.ndcolor) { try { await api('PATCH', '/api/dt/needs/' + t.dataset.ndcolor, { color: t.value }); await refresh(); renderDt(); } catch(err) { toast(errText(err)); } return; }
   if (t.id === 'st-day') { ui.stDay = t.value || today(); return render(); }
+  if (t.id === 'dr-w') { DRAW.width = Number(t.value) || 4; return; }
+  if (t.id === 'dr-img') { const f = t.files[0]; if (f) $('drawc')?._image?.(f); t.value = ''; return; }
+  if (t.id === 'dr-target') { ui.drawTarget = t.value || null; return; }
+  if (t.name === 'sh-users') { ui.shUsers = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value); return; }
+  if (t.name && t.name.startsWith('sh-edit-')) { const nid = t.name.slice(8), share = [...document.querySelectorAll(`input[name="${t.name}"]:checked`)].map(x => x.value); if (!share.length) { t.checked = true; return toast('Хотя бы один участник'); }
+    try { const r = await api('PATCH', '/api/notes/' + nid, { share }); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); toast('Участники изменены'); } catch(err) { toast(errText(err)); } return; }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
@@ -4453,6 +4565,12 @@ document.addEventListener('change', async e => {
     const files = [...t.files]; if (!files.length) return; const j = jobOf(t.dataset.id); t.value = '';
     try { const docs = [...(j.docs || [])]; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); docs.push({ id:u.id, name:u.name }); }
       await api('PATCH', `/api/jobs/${j.id}`, { docs }); await refresh(); renderDrawer(); toast(files.length > 1 ? `Загружено документов: ${files.length}` : 'Документ загружен'); } catch(e) { toast(errText(e)); }
+    return;
+  }
+  if (t.dataset.up === 'noteFile') {
+    const files = [...t.files]; if (!files.length) return; const n = NOTES.find(x => x.id === t.dataset.id); if (!n) return;
+    try { toast('Загружаем…'); const ups = []; for (const f of files) { const u = await upload(f); ups.push({ id: u.id, name: u.name }); }
+      const r = await api('PATCH', '/api/notes/' + n.id, { files: [...(n.files || []), ...ups] }); Object.assign(n, r.note); render(); toast('Картинка прикреплена'); } catch(err) { toast(errText(err)); }
     return;
   }
   if (t.dataset.up === 'placePhoto') {
@@ -4518,7 +4636,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && isHead()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (h === 'staff' && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (h === 'staff' && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -4566,7 +4684,7 @@ async function start(u){
   $('ubtn').title = u.name + ' — ' + u.roleName;
   document.body.classList.toggle('no-edit', !canEdit()); document.body.classList.toggle('field', isWorker());
   document.body.classList.toggle('can-invoice', canAddInvoice());
-  $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = !isHead() || !!u.sys;
+  $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = isWorker() || !!u.sys;
   $('orgsTab').hidden = !u.sys; ui.orgsList = null;
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
   $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
@@ -4574,7 +4692,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && !isHead()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (v === 'staff' && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (v === 'staff' && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
