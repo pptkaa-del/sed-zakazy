@@ -927,14 +927,15 @@ async function api(req, res, url) {
     if (m === 'POST') {
       if (!canMoveStock(user)) return fail(res, 403, 'Недостаточно прав');
       if (inv.income) return fail(res, 409, 'Приход по этому счёту уже оприходован');
-      const b = await readJsonBody(req), wb = cleanWaybill(b.waybill);
-      if (!wb) return fail(res, 400, 'Загрузите накладную — приход делается на её основании');
+      // the basis: an uploaded waybill, or the invoice itself when the documents come through ЭДО
+      const b = await readJsonBody(req), edo = !!b.edo, wb = edo ? null : cleanWaybill(b.waybill);
+      if (!wb && !edo) return fail(res, 400, 'Загрузите накладную или отметьте «Документы в ЭДО» — тогда приход делается на основании счёта');
       const lines = cleanItems(b.lines).filter(x => x.qty > 0);
       if (!lines.length) return fail(res, 400, 'Нет строк с количеством');
-      const label = waybillLabel(wb, inv.supplier) + ` (счёт № ${inv.number || '—'})`;
+      const label = edo ? `счёту № ${inv.number || '—'}${inv.date ? ' от ' + inv.date.split('-').reverse().join('.') : ''}${inv.supplier ? ', ' + inv.supplier : ''} (документы в ЭДО)` : waybillLabel(wb, inv.supplier) + ` (счёт № ${inv.number || '—'})`;
       const r = postIncome(lines, label, { orderId: inv.orderId || null, invoiceId: p[2] }, user);
       inv.items = r.out.map(({ moveId, ...x }) => x);
-      inv.income = { at: r.at, by: user.id, lines: r.out, waybill: wb };
+      inv.income = { at: r.at, by: user.id, lines: r.out, ...(edo ? { edo: true } : { waybill: wb }) };
       fillOrderSuppliers(inv);
       saveDb();
       return send(res, 200, { ok: true, lines: r.out.length, created: r.created, rev: db.rev });
