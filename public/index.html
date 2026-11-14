@@ -392,7 +392,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .legbtn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--sheet);font:inherit;font-size:13px;cursor:pointer;color:inherit}.legbtn i{width:10px;height:10px;display:inline-block}.legbtn.off{opacity:.4;text-decoration:line-through}
 .worow{display:grid;grid-template-columns:minmax(0,1fr) 90px 220px auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}.worow:first-child{border-top:0}.worow small{display:block}@media (max-width:820px){.worow{grid-template-columns:1fr auto}}
 .tstaff{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;max-height:160px;overflow:auto}.tstaff .chk{flex-direction:row;display:flex;gap:6px;align-items:center;font-size:14px}
-.staffc .ch{align-items:flex-start}.stnums{display:flex;gap:18px}.stnums div{text-align:right}.stnums b{display:block;font-size:22px;font-family:var(--f-mono)}.stnums small{font-size:12px;color:var(--ink-2)}.stlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.stlist small{display:block}
+.staffc .ch{align-items:flex-start}.spbar{height:4px;border-radius:2px;background:var(--rule-2);margin-top:6px;min-width:60px;overflow:hidden}.spbar i{display:block;height:100%;background:var(--ok)}.stnums{display:flex;gap:18px}.stnums div{text-align:right}.stnums b{display:block;font-size:22px;font-family:var(--f-mono)}.stnums small{font-size:12px;color:var(--ink-2)}.stlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.stlist small{display:block}
 [data-ed]{cursor:text;border-radius:4px}[data-ed]:hover{box-shadow:0 0 0 1px var(--rule)}[data-ed].editing{box-shadow:none}.ed-in{font:inherit;width:100%;min-width:160px}
 .ntabs{margin-bottom:14px}.memo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.memo{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--rule);border-radius:12px;background:var(--sheet)}.memo-t{white-space:pre-wrap;overflow-wrap:anywhere}.memo small{display:block}.memo.done .memo-t{text-decoration:line-through;color:var(--ink-2)}
 .shnew{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}.sh-h{display:flex;gap:10px;align-items:flex-start}.sh-h .memo-t{flex:1}.sh-c{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--rule-2);padding-top:8px}.cmt1 div{white-space:pre-wrap}.shedit{display:inline-block}.shedit .tstaff{margin-top:4px}
@@ -818,6 +818,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#stock" data-v="stock">Склад</a>
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#staff" data-v="staff" id="staffTab" hidden>Сотрудники</a>
+      <a href="#staffp" data-v="staffp" hidden>По проектам</a>
       <a href="#wo" data-v="wo" id="woTab" hidden>Списание материалов</a>
       <a href="#pay" data-v="pay">Счета в оплату <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
@@ -1069,7 +1070,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : vOrders();
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -2784,6 +2785,51 @@ function vStaff(){
     ${r.doneDay.length ? `<h4 class="sub-h">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}</h4><ul class="stlist">${r.doneDay.sort((a, b) => b.x.doneAt.localeCompare(a.x.doneAt)).map(({ j, x }) => `<li><small><b>${esc(fmtDT(x.doneAt).slice(-5))}</b> · ${esc(x.label || 'точка')} · ${esc(j.title)}${x.notWorking ? ' · <span style="color:var(--bad)">не работает</span>' : ''}</small></li>`).join('')}</ul>` : ''}
   </section>`).join('');
 }
+/* ---------- «По проектам»: what each employee is assigned in every work (project) and how much he did there ---------- */
+const SP_PERIODS = [['all', 'Всё время'], ['month', 'Этот месяц'], ['week', '7 дней'], ['day', 'Сегодня']];
+const spFrom = p => { const d = new Date(); if (p === 'day') return today(); if (p === 'week') return localDay(Date.now() - 6 * 864e5); if (p === 'month') return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`; return ''; };
+function spRows(){
+  const from = spFrom(ui.spP || 'all'), inP = iso => !!iso && (!from || localDay(iso) >= from);
+  const jobs = S.jobs.filter(j => ui.spAll || j.status !== 'done'), out = [];
+  STAFF.forEach(u => jobs.forEach(j => {
+    const P = j.places || [], mine = P.filter(x => x.assignee === u.id);
+    const did = P.filter(x => x.doneAt && (x.doneBy === u.id || (!x.doneBy && x.assignee === u.id)));
+    const T = S.tasks.filter(t => t.jobId === j.id && (t.staff || []).includes(u.id));
+    const r = { u, j, assigned: mine.length, left: mine.filter(x => !x.doneAt).length, done: did.filter(x => inP(x.doneAt)).length, doneAll: did.length,
+      tOpen: T.filter(t => !t.done), tDone: T.filter(t => t.done && inP(t.doneAt || t.end)).length, worker: (j.workers || []).includes(u.id) };
+    if (r.worker || r.assigned || r.doneAll || T.length) out.push(r);
+  }));
+  return out;
+}
+function vStaffProj(){
+  const g = ui.spG || 'u', p = ui.spP || 'all', q = (ui.spq || '').trim().toLowerCase();
+  const all = spRows().filter(r => !q || r.u.name.toLowerCase().includes(q) || String(r.j.title || '').toLowerCase().includes(q) || String(jobNo(r.j)) === q.replace(/^№\s*/, ''));
+  const pName = p === 'all' ? 'всего' : p === 'day' ? 'сегодня' : p === 'week' ? 'за 7 дней' : 'в этом месяце';
+  const sum = L => L.reduce((a, r) => ({ assigned: a.assigned + r.assigned, left: a.left + r.left, done: a.done + r.done, tOpen: a.tOpen + r.tOpen.length, tDone: a.tDone + r.tDone }), { assigned: 0, left: 0, done: 0, tOpen: 0, tDone: 0 });
+  const bar = r => r.assigned ? `<div class="spbar" title="Сделано ${r.assigned - r.left} из ${r.assigned}"><i style="width:${Math.round((r.assigned - r.left) / r.assigned * 100)}%"></i></div>` : '';
+  const jobCell = j => { const cp = cpOf(j.customerId); return `<button class="linkish" data-act="openJob" data-id="${j.id}"><b>№ ${jobNo(j)} · ${esc(j.title)}</b></button> <span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${cp || j.due ? `<small>${esc([cp && cp.name, j.due && 'срок ' + fmtD(j.due)].filter(Boolean).join(' · '))}</small>` : ''}`; };
+  const userCell = u => `<b style="font-weight:500">${esc(u.name)}</b><small>${esc(ROLE_NAMES[u.role] || '')}</small>`;
+  const tasksCell = r => r.tOpen.length ? r.tOpen.map(t => `<button class="linkish" data-act="editTask" data-id="${t.id}">${esc(t.title)}</button><small>${esc([KIND[t.kind], fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small>`).join('') : '<span class="dim">—</span>';
+  const row = (r, first) => `<tr><td class="jt-t">${first(r)}</td><td class="jt-a" data-l="Назначено точек">${r.assigned || '<span class="dim">—</span>'}${bar(r)}</td><td class="jt-a" data-l="Сделано ${pName}"><b class="${r.done ? 'ok-t' : ''}">${r.done}</b>${p !== 'all' && r.doneAll !== r.done ? `<small>всего ${r.doneAll}</small>` : ''}</td><td class="jt-a" data-l="Осталось">${r.left || '<span class="dim">0</span>'}</td><td data-l="Задачи">${tasksCell(r)}${r.tDone ? `<small class="ok-t">выполнено задач: ${r.tDone}</small>` : ''}</td></tr>`;
+  const head = `<div class="toolbar"><div class="seg">${[['u', 'По сотрудникам'], ['j', 'По проектам']].map(([k, l]) => `<button data-act="spG" data-id="${k}" class="${g === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg">${SP_PERIODS.map(([k, l]) => `<button data-act="spP" data-id="${k}" class="${p === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg">${[['', 'Текущие проекты'], ['1', 'Все проекты']].map(([k, l]) => `<button data-act="spAll" data-id="${k}" class="${!!ui.spAll === !!k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <span data-keep style="display:contents"><input class="in" id="spq" type="search" aria-label="Поиск сотрудника или проекта" placeholder="Сотрудник или проект" value="${esc(ui.spq || '')}" style="flex:1 1 200px;max-width:300px"></span></div>`;
+  if (!all.length) return head + '<div class="empty"><h3>Назначений нет</h3>Назначьте сотрудников на работы и точки — здесь появится, что кому поручено и сколько сделано.</div>';
+  const T = sum(all);
+  const totals = `<div class="stats" style="margin-bottom:14px"><div class="stat"><small>Назначено точек</small><b>${T.assigned}</b></div><div class="stat"><small>Сделано ${pName}</small><b class="ok-t">${T.done}</b></div><div class="stat"><small>Осталось точек</small><b>${T.left}</b></div><div class="stat"><small>Открытых задач план-графика</small><b>${T.tOpen}</b></div></div>`;
+  const th = first => `<thead><tr><th>${first}</th><th class="jt-a">Назначено точек</th><th class="jt-a">Сделано ${pName}</th><th class="jt-a">Осталось</th><th>Задачи план-графика</th></tr></thead>`;
+  const groups = new Map();
+  all.forEach(r => { const k = g === 'u' ? r.u.id : r.j.id; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+  const cards = [...groups.values()].map(L => ({ L, s: sum(L) })).sort((a, b) => b.s.done - a.s.done || b.s.left - a.s.left || (g === 'u' ? a.L[0].u.name.localeCompare(b.L[0].u.name, 'ru') : (jobNo(b.L[0].j) | 0) - (jobNo(a.L[0].j) | 0)));
+  return head + totals + cards.map(({ L, s }) => {
+    const x = L[0], free = g === 'j' ? (x.j.places || []).filter(pl => !pl.assignee && !pl.doneAt).length : 0;
+    return `<section class="card staffc" style="padding:0;overflow:auto">
+      <div class="ch" style="padding:14px 16px 6px"><div>${g === 'u' ? `<h3 style="margin:0">${esc(x.u.name)}</h3><small class="dim">${esc(ROLE_NAMES[x.u.role] || '')} · проектов: ${L.length}</small>` : `<h3 style="margin:0;font-size:16px">${jobCell(x.j)}</h3>${free ? `<small class="warn-t">не распределено точек: ${free}</small>` : ''}`}</div>
+        <div class="stnums"><div><b class="${s.done ? 'ok-t' : ''}">${s.done}</b><small>сделано ${pName}</small></div><div><b>${s.left}</b><small>осталось точек</small></div><div><b>${s.tOpen}</b><small>задач открыто</small></div></div></div>
+      <table class="jt">${th(g === 'u' ? 'Проект' : 'Сотрудник')}<tbody>${L.sort((a, b) => b.done - a.done || b.left - a.left).map(r => row(r, g === 'u' ? r => jobCell(r.j) : r => userCell(r.u))).join('')}</tbody></table></section>`;
+  }).join('');
+}
 function vWoList(){
   const f = ui.woF || 'all';
   const rows = [
@@ -3982,7 +4028,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['staff', 'Сотрудники'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
+const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -4354,6 +4400,9 @@ async function act(el){
     case 'sAv': ui.sAv = id; return render();
     case 'woF': ui.woF = id; return render();
     case 'stDay': ui.stDay = id; return render();
+    case 'spG': ui.spG = id; return render();
+    case 'spP': ui.spP = id; return render();
+    case 'spAll': ui.spAll = !!id; return render();
     case 'acctImport': ui.acct = null; return openDrawer('acctImport');
     case 'pickStock': ui.pickQ = ''; return openDrawer('pickStock', id);
     case 'writeoff': ui.woMap = null; return openDrawer('writeoff', id);
@@ -4456,6 +4505,7 @@ document.addEventListener('input', e => {
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
+  if (t.id === 'spq') { ui.spq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaffProj(); const n = $('spq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'stq') { ui.stq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaff(); const n = $('stq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wlq') { ui.wlq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorkList(); const n = $('wlq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.dataset.ph !== undefined && ui.jPhotoRows) { ui.jPhotoRows[Number(t.dataset.ph)] = t.value; return; }
@@ -4637,7 +4687,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (h === 'staff' && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -4693,7 +4743,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (v === 'staff' && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
