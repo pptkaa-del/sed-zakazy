@@ -168,6 +168,54 @@ function cleanItems(list){
     stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null,
   })).filter(x => x.name);
 }
+/* a waybill: the uploaded file and what was read from it (or typed) — number, date, supplier */
+function cleanWaybill(w){
+  if (!w || !w.file || !db.files[w.file.id]) return null;
+  const f = db.files[w.file.id];
+  return { file: { id: w.file.id, name: String(w.file.name || f.name || 'накладная').slice(0, 200), type: f.type }, number: String(w.number || '').trim().slice(0, 60),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(w.date || '') ? w.date : '', supplier: String(w.supplier || '').trim().slice(0, 300) };
+}
+const waybillLabel = (wb, sup) => `накладной № ${wb.number || '—'}${wb.date ? ' от ' + wb.date.split('-').reverse().join('.') : ''}${(wb.supplier || sup) ? ', ' + (wb.supplier || sup) : ''}`;
+/* receipt lines go to the warehouse: a line finds its position by id, article or name, otherwise a new position is made */
+function postIncome(lines, label, ref, user){
+  const at = new Date().toISOString(), out = [];
+  let created = 0;
+  for (const ln of lines) {
+    let it = ln.stockId && db.stock[ln.stockId];
+    if (!it) {
+      const all = listOf('stock');
+      const f = (ln.sku && all.find(x => x.sku && normName(x.sku) === normName(ln.sku))) || all.find(x => normName(x.name) === normName(ln.name));
+      if (f) it = db.stock[f.id];
+    }
+    let sid;
+    if (it) sid = Object.keys(db.stock).find(k => db.stock[k] === it);
+    else {
+      sid = newId(); created++;
+      it = db.stock[sid] = { name: ln.name, sku: ln.sku, unit: ln.unit, location: '', minQty: 0, note: 'Добавлено по ' + label, qty: 0, moves: [], acctQty: 0, createdAt: at, createdBy: user.id };
+    }
+    it.qty = r3((Number(it.qty) || 0) + ln.qty);
+    it.moves = Array.isArray(it.moves) ? it.moves : [];
+    const mv = { id: newId(), type: 'in', qty: ln.qty, orderId: ref.orderId || null, ...(ref.invoiceId ? { invoiceId: ref.invoiceId } : {}), ...(ref.receiptId ? { receiptId: ref.receiptId } : {}), note: 'Приход по ' + label, by: user.id, at, balance: it.qty };
+    it.moves.push(mv); it.updatedAt = at; it.updatedBy = user.id;
+    out.push({ ...ln, stockId: sid, moveId: mv.id });
+  }
+  return { at, out, created };
+}
+/* cancelling a receipt: first check that every quantity is still on the shelf, then roll back; returns an error text or '' */
+function rollbackIncome(lines, user){
+  for (const ln of lines) {
+    const it = db.stock[ln.stockId];
+    if (it && (it.moves || []).some(x => x.id === ln.moveId) && (Number(it.qty) || 0) + 1e-9 < ln.qty)
+      return `«${it.name}»: на складе ${it.qty} ${it.unit || ''}, часть прихода уже израсходована. Отменить приход нельзя`.replace(' ,', ',');
+  }
+  for (const ln of lines) {
+    const it = db.stock[ln.stockId]; if (!it) continue;
+    const i = (it.moves || []).findIndex(x => x.id === ln.moveId); if (i < 0) continue;
+    it.moves.splice(i, 1); it.qty = r3((Number(it.qty) || 0) - ln.qty);
+    it.updatedAt = new Date().toISOString(); it.updatedBy = user.id;
+  }
+  return '';
+}
 /* The order's purchase lines bought by this invoice get its supplier and number:
    lines whose name matches a line of the invoice, or that already carry its number; a line with a supplier is left alone */
 function fillOrderSuppliers(inv){
@@ -525,6 +573,7 @@ async function api(req, res, url) {
     // a worker gets only the points assigned to him; points without an executor only when he is the job's only worker
     const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = FIELD(user) ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
+    out.receipts = FIELD(user) ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
     if (!FIELD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
     return send(res, 200, out);
@@ -870,60 +919,57 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true, qty: it.qty, move: mv });
   }
 
-  /* receipt to the warehouse from the invoice lines: posted with its own button, cancelled by a manager or admin */
+  /* receipt to the warehouse: made on the basis of an uploaded waybill (накладная) — from an invoice («Приход по счёту»)
+     or on its own («Приход по накладной»); posted with its own button, cancelled by a manager or admin */
   if (p[1] === 'invoices' && p[3] === 'income' && p.length === 4) {
     const inv = db.invoices[p[2]];
     if (!inv) return fail(res, 404, 'Счёт не найден');
-    const label = `счёту № ${inv.number || '—'}${inv.date ? ' от ' + inv.date.split('-').reverse().join('.') : ''}${inv.supplier ? ', ' + inv.supplier : ''}`;
     if (m === 'POST') {
       if (!canMoveStock(user)) return fail(res, 403, 'Недостаточно прав');
       if (inv.income) return fail(res, 409, 'Приход по этому счёту уже оприходован');
-      const b = await readJsonBody(req);
+      const b = await readJsonBody(req), wb = cleanWaybill(b.waybill);
+      if (!wb) return fail(res, 400, 'Загрузите накладную — приход делается на её основании');
       const lines = cleanItems(b.lines).filter(x => x.qty > 0);
       if (!lines.length) return fail(res, 400, 'Нет строк с количеством');
-      const at = new Date().toISOString(), out = [];
-      let created = 0;
-      for (const ln of lines) {
-        let it = ln.stockId && db.stock[ln.stockId];
-        if (!it) {
-          const all = listOf('stock');
-          const f = (ln.sku && all.find(x => x.sku && normName(x.sku) === normName(ln.sku))) || all.find(x => normName(x.name) === normName(ln.name));
-          if (f) it = db.stock[f.id];
-        }
-        let sid;
-        if (it) sid = Object.keys(db.stock).find(k => db.stock[k] === it);
-        else {
-          sid = newId(); created++;
-          it = db.stock[sid] = { name: ln.name, sku: ln.sku, unit: ln.unit, location: '', minQty: 0, note: 'Добавлено по ' + label, qty: 0, moves: [], acctQty: 0, createdAt: at, createdBy: user.id };
-        }
-        it.qty = r3((Number(it.qty) || 0) + ln.qty);
-        it.moves = Array.isArray(it.moves) ? it.moves : [];
-        const mv = { id: newId(), type: 'in', qty: ln.qty, orderId: inv.orderId || null, invoiceId: p[2], note: 'Приход по ' + label, by: user.id, at, balance: it.qty };
-        it.moves.push(mv); it.updatedAt = at; it.updatedBy = user.id;
-        out.push({ ...ln, stockId: sid, moveId: mv.id });
-      }
-      inv.items = out.map(({ moveId, ...x }) => x);
-      inv.income = { at, by: user.id, lines: out };
+      const label = waybillLabel(wb, inv.supplier) + ` (счёт № ${inv.number || '—'})`;
+      const r = postIncome(lines, label, { orderId: inv.orderId || null, invoiceId: p[2] }, user);
+      inv.items = r.out.map(({ moveId, ...x }) => x);
+      inv.income = { at: r.at, by: user.id, lines: r.out, waybill: wb };
       fillOrderSuppliers(inv);
       saveDb();
-      return send(res, 200, { ok: true, lines: out.length, created, rev: db.rev });
+      return send(res, 200, { ok: true, lines: r.out.length, created: r.created, rev: db.rev });
     }
     if (m === 'DELETE') {
       if (!canEdit(user)) return fail(res, 403, 'Отменить приход может менеджер или администратор');
       if (!inv.income) return fail(res, 409, 'Приход не оприходован');
-      // first check that every quantity is still on the shelf, then roll back
-      for (const ln of inv.income.lines) {
-        const it = db.stock[ln.stockId];
-        if (it && (it.moves || []).some(x => x.id === ln.moveId) && (Number(it.qty) || 0) + 1e-9 < ln.qty)
-          return fail(res, 409, `«${it.name}»: на складе ${it.qty} ${it.unit || ''}, часть прихода уже израсходована. Отменить приход нельзя`.replace(' ,', ','));
-      }
-      for (const ln of inv.income.lines) {
-        const it = db.stock[ln.stockId]; if (!it) continue;
-        const i = (it.moves || []).findIndex(x => x.id === ln.moveId); if (i < 0) continue;
-        it.moves.splice(i, 1); it.qty = r3((Number(it.qty) || 0) - ln.qty);
-        it.updatedAt = new Date().toISOString(); it.updatedBy = user.id;
-      }
+      const err = rollbackIncome(inv.income.lines, user); if (err) return fail(res, 409, err);
       delete inv.income; inv.updatedAt = new Date().toISOString(); inv.updatedBy = user.id;
+      saveDb();
+      return send(res, 200, { ok: true, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  if (p[1] === 'receipts') {
+    if (!db.receipts || typeof db.receipts !== 'object') db.receipts = {};
+    if (m === 'POST' && !p[2]) {
+      if (!canMoveStock(user)) return fail(res, 403, 'Недостаточно прав');
+      const b = await readJsonBody(req), wb = cleanWaybill(b.waybill);
+      if (!wb) return fail(res, 400, 'Загрузите накладную — приход делается на её основании');
+      if (!wb.number) return fail(res, 400, 'Укажите номер накладной');
+      const lines = cleanItems(b.lines).filter(x => x.qty > 0);
+      if (!lines.length) return fail(res, 400, 'Нет строк с количеством');
+      const orderId = b.orderId && db.orders[b.orderId] ? b.orderId : null, id = newId();
+      const r = postIncome(lines, waybillLabel(wb), { orderId, receiptId: id }, user);
+      db.receipts[id] = { ...wb, orderId, lines: r.out, at: r.at, by: user.id };
+      saveDb();
+      return send(res, 200, { ok: true, id, lines: r.out.length, created: r.created, rev: db.rev });
+    }
+    const rc = p[2] && db.receipts[p[2]];
+    if (!rc) return fail(res, 404, 'Приход не найден');
+    if (m === 'DELETE') {
+      if (!canEdit(user)) return fail(res, 403, 'Отменить приход может менеджер или администратор');
+      const err = rollbackIncome(rc.lines, user); if (err) return fail(res, 409, err);
+      delete db.receipts[p[2]];
       saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
     }
