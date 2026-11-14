@@ -1312,9 +1312,9 @@ function parseWaybillItems(raw){
   return out.map(x => ({ ...x, name: x.name.replace(/\s+/g, ' ').trim() }));
 }
 /* the waybill box of a receipt: upload, what was read, number / date / supplier */
-function wbBox(withSup){
+function wbBox(withSup, invId){
   const w = ui.incWb || {};
-  return `<div class="box wbbox"><h4>Накладная</h4>
+  return `<div class="box wbbox"><h4>Накладная</h4>${invId ? `<div class="row-g"><button type="button" class="btn sm" data-act="incEdo" data-id="1" title="Накладная приходит через ЭДО — оприходовать по строкам счёта">Документы в ЭДО</button><small class="dim">накладной нет на руках — приход по счёту</small></div>` : ''}
     ${w.file ? `<p style="margin:0">📄 <a href="${esc(fileUrl(w.file))}" target="_blank" rel="noopener">${esc(w.file.name)}</a> <label class="linkish" style="cursor:pointer">заменить<input type="file" data-up="waybill" accept=".pdf,application/pdf,image/*" hidden></label></p>`
       : `<label class="btn primary" style="align-self:flex-start">Загрузить накладную<input type="file" data-up="waybill" accept=".pdf,application/pdf,image/*" hidden></label>
         <small class="dim">PDF из 1С (ТОРГ-12, УПД) — номер, дата, поставщик и строки товаров подставятся сами. Скан или фото тоже можно приложить, строки тогда введите вручную.</small>`}
@@ -1383,7 +1383,7 @@ function vIncomes(q){
       <div><span class="chip c-ok">Оприходован ${esc(fmtD(r.at.slice(0, 10)))}</span></div><div class="acts"></div></div>`; }
     const i = x.i, o = ord(i.orderId), st = incState(i), n = (i.income ? i.income.lines : i.items).length, wb = i.income?.waybill;
     return `<div class="incrow click" data-act="openIncome" data-id="${i.id}" role="button" tabindex="0">
-      <div><b>${wb ? `Накладная № ${esc(wb.number || '—')}${wb.date ? ' от ' + fmtD(wb.date) : ''}` : `Счёт № ${esc(i.number)} от ${fmtD(i.date)}`}</b><small>${esc(i.supplier)}${wb ? ` · счёт № ${esc(i.number)}` : ''}${o ? ' · ' + esc(ordName(o)) : ''}</small></div>
+      <div><b>${wb ? `Накладная № ${esc(wb.number || '—')}${wb.date ? ' от ' + fmtD(wb.date) : ''}` : `Счёт № ${esc(i.number)} от ${fmtD(i.date)}`}</b><small>${esc(i.supplier)}${wb ? ` · счёт № ${esc(i.number)}` : ''}${i.income?.edo ? ' · документы в ЭДО' : ''}${o ? ' · ' + esc(ordName(o)) : ''}</small></div>
       <div class="dim">${n} стр. · ${money(i.amount)}</div>
       <div>${st === 'done' ? `<span class="chip c-ok">Оприходован ${esc(fmtD(i.income.at.slice(0, 10)))}</span>` : '<span class="chip c-warn">Ожидает накладную</span>'}</div>
       <div class="acts">${st === 'wait' && canMoveStock() ? `<button class="btn sm ok" data-act="openIncome" data-id="${i.id}">Оприходовать</button>` : ''}</div></div>`; }).join('')}</section>`;
@@ -3189,7 +3189,7 @@ function vPlan(){
 function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
-  if (kind === 'income') { const i = inv(id); ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
+  if (kind === 'income') { const i = inv(id); ui.incEdo = false; ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
   if (kind === 'receipt' && !id) { ui.incWb = null; ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; } ui.drawer = { kind, id, ctx }; ui.armed = null; $('scrim').hidden = false; $('drawer').hidden = false; renderDrawer(); if (kind === 'order') custHint();
   // «Выполнить»: start at the top, at the first photo — focusing the first field would scroll down to «Не работает» and «Закрыть точку»
   if (kind === 'wdo') { $('drawer').scrollTop = 0; $('drawer').querySelector('.d-body')?.scrollTo?.(0, 0); const first = $('drawer').querySelector('.slots li:not(.ok) label, .slots label, .upl2 label'); if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); } return; }
@@ -3715,9 +3715,9 @@ function renderDrawer(){
     D.innerHTML = dh(`Приход на склад · счёт № ${esc(i.number)}`) + `<form class="d-body" data-form="income">
       <dl class="kv"><dt>Поставщик</dt><dd>${esc(i.supplier)}</dd><dt>Счёт</dt><dd><a href="#pay" data-act="openInvoice" data-id="${i.id}">№ ${esc(i.number)} от ${fmtD(i.date)}</a> · ${money(i.amount)}</dd>
         <dt>Заказ</dt><dd>${esc(o ? ordName(o) : '—')}</dd>
-        <dt>Статус</dt><dd>${done ? `<span class="chip c-ok">Оприходован</span> ${esc(fmtDT(i.income.at))} · ${esc(who(i.income.by))}` : '<span class="chip c-warn">Ожидает оприходования</span>'}</dd>${done ? wbView(i.income.waybill) : ''}</dl>
-      ${done ? linesTable('incLines', true) : `${wbBox(false)}<div id="ln-incLines" class="lnbox">${lnInner('incLines')}</div>
-        <p class="hint" style="margin:0">Приход делается на основании накладной: загрузите её — строки заменятся строками накладной. Проверьте их, когда товар пришёл. Количество добавится к фактическому остатку склада, позиции, которых на складе нет, будут созданы. Движения привяжутся к заказу.</p>`}
+        <dt>Статус</dt><dd>${done ? `<span class="chip c-ok">Оприходован</span> ${esc(fmtDT(i.income.at))} · ${esc(who(i.income.by))}` : '<span class="chip c-warn">Ожидает оприходования</span>'}</dd>${done ? (i.income.edo ? '<dt>Основание</dt><dd>Счёт · документы в ЭДО</dd>' : wbView(i.income.waybill)) : ''}</dl>
+      ${done ? linesTable('incLines', true) : `${ui.incEdo ? `<div class="box wbbox"><h4>Основание — счёт</h4><p style="margin:0"><span class="chip c-info">Документы в ЭДО</span> Накладная приходит через ЭДО — приход делается по строкам счёта № ${esc(i.number)}. Проверьте их.</p><div><button type="button" class="btn sm" data-act="incEdo" data-id="">Загрузить накладную вместо счёта</button></div></div>` : wbBox(false, i.id)}<div id="ln-incLines" class="lnbox">${lnInner('incLines')}</div>
+        <p class="hint" style="margin:0">${ui.incEdo ? 'Приход делается по строкам счёта (документы в ЭДО).' : 'Приход делается на основании накладной: загрузите её — строки заменятся строками накладной. Если накладная приходит через ЭДО, нажмите «Документы в ЭДО».'} Проверьте строки, когда товар пришёл. Количество добавится к фактическому остатку склада, позиции, которых на складе нет, будут созданы. Движения привяжутся к заказу.</p>`}
       <div class="err" id="ferr"></div>
       <div class="row-g">${done ? (canEdit() ? armBtn('inc', 'Отменить приход', 'cancelIncome', i.id) : '') : canMoveStock() ? '<button class="btn ok" type="submit">Оприходовать на склад</button>' : '<span class="dim">Оприходовать могут руководитель, менеджер или администратор.</span>'}<button class="btn" type="button" data-act="close">Закрыть</button></div></form>`;
   }
@@ -4061,11 +4061,11 @@ async function onSubmit(e){
       const L = cleanLines(ui.incLines);
       if (!L.length) return fail('Добавьте хотя бы одну строку.');
       if (L.some(x => !(x.qty > 0))) return fail('Укажите количество во всех строках или удалите пустые.');
-      const waybill = wbData(false);
-      if (!waybill) return fail('Загрузите накладную — приход делается на её основании.');
+      const edo = !!ui.incEdo, waybill = edo ? null : wbData(false);
+      if (!waybill && !edo) return fail('Загрузите накладную или нажмите «Документы в ЭДО» — тогда приход делается на основании счёта.');
       L.forEach(x => { const it = incMatch(x); x.stockId = it ? it.id : null; });
       fail('Оприходуем…');
-      const r = await api('POST', `/api/invoices/${d.id}/income`, { lines:L, waybill });
+      const r = await api('POST', `/api/invoices/${d.id}/income`, edo ? { lines:L, edo:true } : { lines:L, waybill });
       await refresh(); renderDrawer(); render();
       toast(`Оприходовано строк: ${r.lines}${r.created ? `, новых позиций склада: ${r.created}` : ''}`);
     }
@@ -4528,6 +4528,9 @@ async function act(el){
     case 'openInvoice': return openDrawer('invoice', id);
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
+    case 'incEdo': { const i = inv(ui.drawer?.id); if (!i) return; ui.incEdo = !!id;
+      if (ui.incEdo) { ui.incLines = (i.items || []).map(x => ({ ...x })); if (!ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
+      return renderDrawer(); }
     case 'openReceipt': return openDrawer('receipt', id);
     case 'cancelReceipt': try { await api('DELETE', `/api/receipts/${id}`); await refresh(); closeDrawer(); render(); toast('Приход отменён'); } catch(e) { const fe = $('ferr'); if (fe) fe.textContent = errText(e); else toast(errText(e)); } return;
     case 'cancelIncome': try { await api('DELETE', `/api/invoices/${id}/income`); await refresh(); renderDrawer(); render(); toast('Приход отменён'); } catch(e) { const fe = $('ferr'); if (fe) fe.textContent = errText(e); else toast(errText(e)); } return;
