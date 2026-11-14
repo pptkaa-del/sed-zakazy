@@ -256,9 +256,9 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .bal{font:600 15px var(--f-mono);text-align:right}
 .stk .bal.low{color:var(--warn)}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
-.incrow{display:grid;grid-template-columns:minmax(0,1fr) 170px 150px 140px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
+.incrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
 .incrow:first-child{border-top:0}.incrow:hover{background:var(--paper)}
-.incrow b{font-weight:500}.incrow small{display:block;color:var(--ink-2);font-size:12px}.incrow .acts{display:flex;justify-content:flex-end}
+.incrow b{font-weight:500}.incrow small{display:block;color:var(--ink-2);font-size:12px}.incrow .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:820px){.incrow{grid-template-columns:1fr auto}.incrow>:nth-child(1){grid-column:1/-1}}
 @media (max-width:820px){.stk{grid-template-columns:1fr auto auto}.stk.head{display:none}.stk>:nth-child(1){grid-column:1/-1}.stk>:nth-child(2),.stk>:nth-child(3){grid-column:1}.stk .bal{grid-row:2}.stk .bal.acct{grid-row:2}.stk .acts{grid-column:1/-1;justify-content:flex-start}}
 .stk .bal small{font:500 11px var(--f-body);color:var(--ink-2);display:block}
@@ -1336,12 +1336,13 @@ async function waybillFile(file){
   const r = parseWaybillText(text), got = [];
   if (r.number) { ui.incWb.number = r.number; got.push('№ ' + esc(r.number)); }
   if (r.date) { ui.incWb.date = r.date; got.push('от ' + fmtD(r.date)); }
-  if (r.supplier) { const cp = (r.inn && S.counterparties.find(c => c.inn === r.inn)) || cpByName(r.supplier); ui.incWb.supplier = cp ? cp.name : r.supplier; got.push('поставщик ' + esc(ui.incWb.supplier)); }
+  if (r.supplier) { const cp = (r.inn && S.counterparties.find(c => c.inn === r.inn)) || cpByName(r.supplier); ui.incWb.supplier = cp ? cp.name : r.supplier; ui.incWb.inn = r.inn || (cp && cp.inn) || ''; got.push('поставщик ' + esc(ui.incWb.supplier)); }
   if (r.items.length) { ui.incLines = r.items.map(x => ({ id: uid(), name: x.name, qty: x.qty, unit: x.unit, price: x.price, sum: x.sum })); got.push('строк товаров: ' + r.items.length); }
   if (!r.items.length) return done((got.length ? 'Нашли: ' + got.join(', ') + '. ' : '') + 'Строки товаров не распознаны — введите их вручную.', true);
   done('✓ Из накладной подставлены: ' + got.join(', ') + '. Проверьте строки и количество перед оприходованием.' + (r.number ? '' : ' Номер не найден — введите вручную.'), !r.number);
 }
-const wbData = withSup => { const w = ui.incWb || {}; return w.file ? { file: w.file, number: val2('wb-num'), date: val2('wb-date'), supplier: withSup ? val2('wb-sup') : (w.supplier || '') } : null; };
+const wbData = withSup => { const w = ui.incWb || {}; const sup = withSup ? val2('wb-sup') : (w.supplier || ''); return w.file ? { file: w.file, number: val2('wb-num'), date: val2('wb-date'), supplier: sup, inn: sup === w.supplier ? (w.inn || '') : '' } : null; };
+const dl1c = href => `<a class="btn sm" href="${href}" download data-dl title="Файл Excel для загрузки в 1С: «Поступление» → «Товары» → «Загрузить из файла»">Скачать для 1С</a>`;
 const wbView = w => w ? `<dt>Накладная</dt><dd>№ ${esc(w.number || '—')}${w.date ? ' от ' + fmtD(w.date) : ''}${w.file ? ` · <a href="${esc(fileUrl(w.file))}" target="_blank" rel="noopener">${esc(w.file.name)}</a>` : ''}</dd>` : '';
 
 /* ===== Goods lines of an invoice and the receipt to the warehouse ===== */
@@ -1380,13 +1381,13 @@ function vIncomes(q){
       return `<div class="incrow click" data-act="openReceipt" data-id="${r.id}" role="button" tabindex="0">
       <div><b>Накладная № ${esc(r.number || '—')}${r.date ? ' от ' + fmtD(r.date) : ''}</b><small>${esc(r.supplier || '')}${o ? ' · ' + esc(ordName(o)) : ''}</small></div>
       <div class="dim">${(r.lines || []).length} стр.</div>
-      <div><span class="chip c-ok">Оприходован ${esc(fmtD(r.at.slice(0, 10)))}</span></div><div class="acts"></div></div>`; }
+      <div><span class="chip c-ok">Оприходован ${esc(fmtD(r.at.slice(0, 10)))}</span></div><div class="acts">${dl1c(`/api/receipts/${r.id}/receipt.xlsx`)}</div></div>`; }
     const i = x.i, o = ord(i.orderId), st = incState(i), n = (i.income ? i.income.lines : i.items).length, wb = i.income?.waybill;
     return `<div class="incrow click" data-act="openIncome" data-id="${i.id}" role="button" tabindex="0">
       <div><b>${wb ? `Накладная № ${esc(wb.number || '—')}${wb.date ? ' от ' + fmtD(wb.date) : ''}` : `Счёт № ${esc(i.number)} от ${fmtD(i.date)}`}</b><small>${esc(i.supplier)}${wb ? ` · счёт № ${esc(i.number)}` : ''}${i.income?.edo ? ' · документы в ЭДО' : ''}${o ? ' · ' + esc(ordName(o)) : ''}</small></div>
       <div class="dim">${n} стр. · ${money(i.amount)}</div>
       <div>${st === 'done' ? `<span class="chip c-ok">Оприходован ${esc(fmtD(i.income.at.slice(0, 10)))}</span>` : '<span class="chip c-warn">Ожидает накладную</span>'}</div>
-      <div class="acts">${st === 'wait' && canMoveStock() ? `<button class="btn sm ok" data-act="openIncome" data-id="${i.id}">Оприходовать</button>` : ''}</div></div>`; }).join('')}</section>`;
+      <div class="acts">${st === 'wait' && canMoveStock() ? `<button class="btn sm ok" data-act="openIncome" data-id="${i.id}">Оприходовать</button>` : ''}${dl1c(`/api/invoices/${i.id}/income.xlsx`)}</div></div>`; }).join('')}</section>`;
 }
 function incomeBox(i){
   const st = incState(i), n = (i.income ? i.income.lines : i.items || []).length;
@@ -3719,7 +3720,7 @@ function renderDrawer(){
       ${done ? linesTable('incLines', true) : `${ui.incEdo ? `<div class="box wbbox"><h4>Основание — счёт</h4><p style="margin:0"><span class="chip c-info">Документы в ЭДО</span> Накладная приходит через ЭДО — приход делается по строкам счёта № ${esc(i.number)}. Проверьте их.</p><div><button type="button" class="btn sm" data-act="incEdo" data-id="">Загрузить накладную вместо счёта</button></div></div>` : wbBox(false, i.id)}<div id="ln-incLines" class="lnbox">${lnInner('incLines')}</div>
         <p class="hint" style="margin:0">${ui.incEdo ? 'Приход делается по строкам счёта (документы в ЭДО).' : 'Приход делается на основании накладной: загрузите её — строки заменятся строками накладной. Если накладная приходит через ЭДО, нажмите «Документы в ЭДО».'} Проверьте строки, когда товар пришёл. Количество добавится к фактическому остатку склада, позиции, которых на складе нет, будут созданы. Движения привяжутся к заказу.</p>`}
       <div class="err" id="ferr"></div>
-      <div class="row-g">${done ? (canEdit() ? armBtn('inc', 'Отменить приход', 'cancelIncome', i.id) : '') : canMoveStock() ? '<button class="btn ok" type="submit">Оприходовать на склад</button>' : '<span class="dim">Оприходовать могут руководитель, менеджер или администратор.</span>'}<button class="btn" type="button" data-act="close">Закрыть</button></div></form>`;
+      <div class="row-g">${done ? dl1c(`/api/invoices/${i.id}/income.xlsx`) + (canEdit() ? armBtn('inc', 'Отменить приход', 'cancelIncome', i.id) : '') : canMoveStock() ? '<button class="btn ok" type="submit">Оприходовать на склад</button>' : '<span class="dim">Оприходовать могут руководитель, менеджер или администратор.</span>'}<button class="btn" type="button" data-act="close">Закрыть</button></div></form>`;
   }
   if (d.kind === 'receipt') {
     if (d.id) {
@@ -3730,7 +3731,7 @@ function renderDrawer(){
           <dt>Статус</dt><dd><span class="chip c-ok">Оприходован</span> ${esc(fmtDT(r.at))} · ${esc(who(r.by))}</dd></dl>
         ${linesTable('incLines', true)}
         <div class="err" id="ferr"></div>
-        <div class="row-g">${canEdit() ? armBtn('rc', 'Отменить приход', 'cancelReceipt', r.id) : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div></div>`;
+        <div class="row-g">${dl1c(`/api/receipts/${r.id}/receipt.xlsx`)}${canEdit() ? armBtn('rc', 'Отменить приход', 'cancelReceipt', r.id) : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div></div>`;
       return;
     }
     D.innerHTML = dh('Приход по накладной') + `<form class="d-body" data-form="receipt">

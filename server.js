@@ -173,7 +173,7 @@ function cleanWaybill(w){
   if (!w || !w.file || !db.files[w.file.id]) return null;
   const f = db.files[w.file.id];
   return { file: { id: w.file.id, name: String(w.file.name || f.name || 'накладная').slice(0, 200), type: f.type }, number: String(w.number || '').trim().slice(0, 60),
-    date: /^\d{4}-\d{2}-\d{2}$/.test(w.date || '') ? w.date : '', supplier: String(w.supplier || '').trim().slice(0, 300) };
+    date: /^\d{4}-\d{2}-\d{2}$/.test(w.date || '') ? w.date : '', supplier: String(w.supplier || '').trim().slice(0, 300), inn: /^(\d{10}|\d{12})$/.test(w.inn || '') ? w.inn : '' };
 }
 const waybillLabel = (wb, sup) => `накладной № ${wb.number || '—'}${wb.date ? ' от ' + wb.date.split('-').reverse().join('.') : ''}${(wb.supplier || sup) ? ', ' + (wb.supplier || sup) : ''}`;
 /* receipt lines go to the warehouse: a line finds its position by id, article or name, otherwise a new position is made */
@@ -921,6 +921,25 @@ async function api(req, res, url) {
 
   /* receipt to the warehouse: made on the basis of an uploaded waybill (накладная) — from an invoice («Приход по счёту»)
      or on its own («Приход по накладной»); posted with its own button, cancelled by a manager or admin */
+  /* a receipt as an Excel file for 1C: «Поступление (акты, накладные, УПД)» → «Товары» → «Загрузить» → «Из файла» */
+  if (m === 'GET' && ((p[1] === 'invoices' && p[3] === 'income.xlsx') || (p[1] === 'receipts' && p[3] === 'receipt.xlsx')) && p.length === 4) {
+    if (FIELD(user)) return fail(res, 403, 'Недостаточно прав');
+    let doc;
+    if (p[1] === 'invoices') {
+      const inv = db.invoices[p[2]]; if (!inv) return fail(res, 404, 'Счёт не найден');
+      const wb = inv.income && inv.income.waybill;
+      doc = { lines: inv.income ? inv.income.lines : inv.items || [], number: wb ? wb.number : inv.number, date: wb ? wb.date : inv.date, kind: wb ? 'Накладная' : 'Счёт' + (inv.income && inv.income.edo ? ' (документы в ЭДО)' : ''),
+        supplier: (wb && wb.supplier) || inv.supplier, inn: (wb && wb.inn) || inv.supplierInn || '', invoice: `№ ${inv.number || '—'}${inv.date ? ' от ' + ruDate(inv.date) : ''}`, orderId: inv.orderId, income: inv.income };
+    } else {
+      const r = (db.receipts || {})[p[2]]; if (!r) return fail(res, 404, 'Приход не найден');
+      doc = { lines: r.lines, number: r.number, date: r.date, kind: 'Накладная', supplier: r.supplier, inn: r.inn || '', invoice: '', orderId: r.orderId, income: r };
+    }
+    const buf = receiptXlsx(doc);
+    const name = `Поступление ${doc.number || ''} ${doc.date ? ruDate(doc.date) : ''} ${doc.supplier || ''}`.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) + '.xlsx';
+    res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="receipt.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`, 'Content-Length': buf.length, 'Cache-Control': 'no-store' });
+    return res.end(buf);
+  }
   if (p[1] === 'invoices' && p[3] === 'income' && p.length === 4) {
     const inv = db.invoices[p[2]];
     if (!inv) return fail(res, 404, 'Счёт не найден');
@@ -1577,7 +1596,8 @@ function zipStore(entries) {
 const xmlEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 const colName = i => { let s = ''; i++; while (i) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; };
 /* rows: arrays of { v, s } (s = style index); numbers become numeric cells */
-function xlsxBuffer(sheetName, rows, widths) {
+const xlsxBuffer = (sheetName, rows, widths) => xlsxBook([{ name: sheetName, rows, widths }]);
+function xlsxSheet(rows, widths) {
   const sheetRows = rows.map((r, ri) => `<row r="${ri + 1}">` + r.map((c, ci) => {
     if (c == null) return '';
     const ref = colName(ci) + (ri + 1), cell = typeof c === 'object' ? c : { v: c };
@@ -1586,7 +1606,10 @@ function xlsxBuffer(sheetName, rows, widths) {
     return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(cell.v)}</t></is></c>`;
   }).join('') + '</row>').join('');
   const cols = widths ? '<cols>' + widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols>' : '';
-  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${cols}<sheetData>${sheetRows}</sheetData></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${cols}<sheetData>${sheetRows}</sheetData></worksheet>`;
+}
+/* sheets: [{ name, rows, widths }] */
+function xlsxBook(sheets) {
   const fill = rgb => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.###"/></numFmts>
@@ -1609,14 +1632,49 @@ function xlsxBuffer(sheetName, rows, widths) {
 <xf numFmtId="164" fillId="6" borderId="1" applyNumberFormat="1" applyFill="1" applyBorder="1"/>
 </cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   const files = [
-    { name: '[Content_Types].xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+    { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((x, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
     { name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
-    { name: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(sheetName).slice(0, 31)}" sheetId="1" r:id="rId1"/></sheets></workbook>` },
-    { name: 'xl/_rels/workbook.xml.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+    { name: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((x, i) => `<sheet name="${xmlEsc(x.name).slice(0, 31)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>` },
+    { name: 'xl/_rels/workbook.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((x, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
     { name: 'xl/styles.xml', data: styles },
-    { name: 'xl/worksheets/sheet1.xml', data: sheet },
+    ...sheets.map((x, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: xlsxSheet(x.rows, x.widths) })),
   ];
   return zipStore(files);
+}
+/* sheet «Товары»: one header row and the goods — the form 1C reads with «Загрузить из файла» (columns are recognized by their headers);
+   names are taken from the warehouse position, which carries the 1C name after the balances import; sheet «Реквизиты»: the document */
+function receiptXlsx(d) {
+  const lines = (d.lines || []).filter(x => x && x.name);
+  const nameOf = x => { const it = x.stockId && db.stock[x.stockId]; return it ? it.name : x.name; };
+  const skuOf = x => { const it = x.stockId && db.stock[x.stockId]; return (it && it.sku) || x.sku || ''; };
+  const sumOf = x => Number(x.sum) > 0 ? r2(x.sum) : r2((Number(x.qty) || 0) * (Number(x.price) || 0));
+  const head = ['№', 'Артикул', 'Номенклатура', 'Единица', 'Количество', 'Цена', 'Сумма', 'Наименование в накладной'].map(v => ({ v, s: 1 }));
+  const goods = [head, ...lines.map((x, i) => [{ v: i + 1, s: 3 }, { v: skuOf(x), s: 2 }, { v: nameOf(x), s: 2 }, { v: x.unit || 'шт', s: 2 }, { v: Number(x.qty) || 0, s: 3 },
+    { v: Number(x.price) || 0, s: 3 }, { v: sumOf(x), s: 3 }, { v: x.name !== nameOf(x) ? x.name : '', s: 2 }])];
+  const cp = d.inn ? null : Object.values(db.counterparties || {}).find(c => normName(c.name) === normName(d.supplier));
+  const o = d.orderId && db.orders[d.orderId], u = d.income && d.income.by && users.find(x => x.id === d.income.by);
+  const total = r2(lines.reduce((a, x) => a + sumOf(x), 0));
+  const info = [
+    [{ v: 'Поступление товаров', s: 10 }],
+    [],
+    ['Основание', d.kind],
+    ['Номер входящего документа', d.number || ''],
+    ['Дата входящего документа', d.date ? ruDate(d.date) : ''],
+    ['Поставщик (контрагент)', d.supplier || ''],
+    ['ИНН поставщика', d.inn || (cp && cp.inn) || ''],
+    ...(d.invoice ? [['Счёт поставщика', d.invoice]] : []),
+    ...(o ? [['Заказ', `${o.number || ''} · ${o.title || ''}`]] : []),
+    ['Строк', lines.length],
+    ['Сумма по строкам', total],
+    ['Оприходовано на склад', d.income && d.income.at ? new Date(d.income.at).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) + (u ? ', ' + u.name : '') : 'ещё не оприходовано'],
+    [],
+    ['Как загрузить в 1С:Бухгалтерию 8:'],
+    ['1. Покупки → Поступление (акты, накладные, УПД) → Поступление → Товары (накладная, УПД).'],
+    ['2. Заполните контрагента, номер и дату входящего документа с этого листа.'],
+    ['3. На вкладке «Товары» нажмите «Загрузить» (или «Ещё» → «Загрузить из файла») и выберите этот файл — данные на листе «Товары».'],
+    ['4. Проверьте сопоставление номенклатуры и ставку НДС, проведите документ.'],
+  ];
+  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 16, 50, 9, 12, 13, 14, 40] }, { name: 'Реквизиты', rows: info, widths: [30, 60] }]);
 }
 function writeoffXlsx(o) {
   const lines = writeoffLines(o);
