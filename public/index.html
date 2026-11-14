@@ -150,7 +150,7 @@ main{padding-block:20px 48px}
 .ometa{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 .pad{padding:10px 14px;margin:0;font-size:14px}
 .odetail{display:flex;flex-direction:column;gap:16px;min-width:0}
-.back{display:none;align-self:flex-start}
+.back{display:none;align-self:flex-start}.odetail.solo .back{display:inline-flex;margin-bottom:8px}
 .ohead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
 .bill{margin-top:4px;font-size:14px}
 .bill b{font-weight:600}
@@ -808,7 +808,6 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wdone" data-v="wdone" id="wdoneTab" hidden>Выполненные</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
-      <a href="#orders" data-v="orders">Производство</a>
       <a href="#stock" data-v="stock">Склад</a>
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#wo" data-v="wo" id="woTab" hidden>Списание материалов</a>
@@ -1394,6 +1393,10 @@ function workRow(t, tn){
 
 /* ===== Orders view ===== */
 function vOrders(){
+  // production is part of «Работы»: the order sheet of a work, without the list of orders
+  const so = ord(ui.order);
+  if (so) return `<section class="odetail solo">${orderDetail(so)}</section>`;
+  return `<div class="empty"><h3>Производство теперь в «Работах»</h3>Откройте работу с типом «Производство» или «Производство и монтаж» и нажмите «Открыть производство».<div class="row-g" style="justify-content:center;margin-top:12px"><a class="btn primary" href="#works">К работам</a></div></div>`;
   if (!S.orders.length) return `<div class="empty"><h3>Пока нет ни одного заказа на производство</h3>Создайте заказ: в нём хранятся документы, строки для закупки, счета и задачи план-графика.<div class="row-g"><button class="btn primary" data-act="newOrder">+ Заказ</button> <button class="btn" data-act="catalog">Изделия</button></div></div>`;
   const o = ord(ui.order);
   const q = ui.oq.trim().toLowerCase();
@@ -1451,7 +1454,7 @@ function orderDetail(o){
   const is = invOf(o.id).sort((a,b) => (a.date||'').localeCompare(b.date||''));
   const ts = tasksOf(o.id);
   const specs = o.specs || [];
-  return `<button class="btn ghost back" data-act="back">← Все заказы</button>
+  return `<button class="btn ghost back" data-act="back">← К работе</button>
   <div class="ohead">
     <div style="min-width:0">
       <h2>${esc(o.number)} · ${esc(o.title)}${exTag(o)}</h2>
@@ -1745,13 +1748,13 @@ async function exportJobReport(j, day){
 function vWorkList(){
   const q = (ui.wlq || '').trim().toLowerCase(), K = ui.wlKind || 'all', St = ui.wlSt || 'active';
   const hay = j => [j.title, cpOf(j.customerId)?.name, j.description, '№' + j.no].join(' ').toLowerCase();
-  const base = S.jobs.filter(j => St === 'all' || (St === 'done' ? j.status === 'done' : j.status !== 'done'));
+  const base = S.jobs.filter(j => St === 'all' || (St === 'active' ? j.status !== 'done' : (j.status || 'new') === St));
   const L = base.filter(j => (K === 'all' || (j.kind || 'mount') === K) && (!q || hay(j).includes(q)))
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9999').localeCompare(b.due || '9999') || (b.createdAt || '').localeCompare(a.createdAt || ''));
   const head = `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
-    <div class="seg">${[['active', 'Текущие'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => k === 'all' || (k === 'active' ? j.status !== 'done' : (j.status || 'new') === k)).length}</span></button>`).join('')}</div>
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
@@ -1766,8 +1769,8 @@ function vWorkList(){
 }
 const isWorker = () => me && (me.role === 'worker' || me.role === 'contractor');   // «Сотрудник» и «Подрядчик»
 const canLead = () => canEdit();
-const JOB_ST = { new:'Новая', work:'В работе', done:'Выполнена' };
-const JOB_CHIP = { new:'c-info', work:'c-warn', done:'c-ok' };
+const JOB_ST = { new:'В планах', wait:'Ожидание старта', work:'В работе', done:'Выполнена' };
+const JOB_CHIP = { new:'c-info', wait:'c-mute', work:'c-warn', done:'c-ok' };
 const jobOf = id => S.jobs.find(j => j.id === id);
 const mayEditJob = j => canEdit();
 const onJob = j => me && (j.leaderId === me.id || (j.workers || []).includes(me.id));
@@ -3343,7 +3346,7 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
-        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Заказ на производство</dt><dd>${ord(j.orderId) ? `<a href="#orders" data-act="gotoOrder" data-id="${j.orderId}">${esc(ordName(ord(j.orderId)))}</a> · <span class="dim">${esc(ORDER_ST[ord(j.orderId).status] || '')}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
+        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
@@ -3375,6 +3378,7 @@ function renderDrawer(){
       <label class="wide">Название проекта<input class="in" id="j-title" value="${v(j,'title')}" required></label>
       <label class="wide">Контрагент<input class="in" id="j-cust" list="j-cust-list" autocomplete="off" value="${esc(cp ? cp.name : '')}"><datalist id="j-cust-list">${cpsSorted().map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist><small class="dim" style="font-size:12px">Выберите из списка или впишите нового — он добавится в контрагенты.</small></label>
       <label>Срок окончания работ<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
+      <label>Статус<select class="in" id="j-status">${Object.entries(JOB_ST).filter(([k]) => j || k !== 'done').map(([k, l]) => `<option value="${k}" ${(j?.status || 'new') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="wide">Документы<input class="in" type="file" id="j-files" accept="${ACCEPT}" multiple>${j && (j.docs || []).length ? `<small class="dim" style="font-size:12px">Уже загружено: ${j.docs.length}. Новые файлы добавятся к ним.</small>` : ''}</label>
       <label class="wide" id="j-photos-w" ${kind === 'prod' ? 'hidden' : ''}>Какие фото нужны на каждой точке — по одному в строке<textarea class="in" id="j-photos" rows="3">${esc(j ? (j.photoSpec || []).join('\n') : 'Общий вид\nДо замены\nПосле замены')}</textarea><small class="dim" style="font-size:12px">Сотрудник увидит эти пункты в окне точки. Пусто — фото не обязательны.</small></label>
       <label class="wide">Описание (необязательно)<textarea class="in" id="j-desc" rows="2">${esc(j?.description || '')}</textarea></label>
@@ -3704,7 +3708,7 @@ async function onSubmit(e){
       const old = d.id && jobOf(d.id), docs = [...(old?.docs || [])];
       const files = [...($('j-files').files || [])];
       for (const fl of files) { fail(`Загружаем «${fl.name}»…`); const u = await upload(fl); docs.push({ id:u.id, name:u.name }); }
-      const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs,
+      const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs, ...(!old || old.status !== $('j-status').value ? { status: $('j-status').value } : {}),
         photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
       if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Работа сохранена'); }
@@ -3828,7 +3832,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['orders', 'Производство'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
+const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ...(isHead() ? [['notes', 'Мои задачи']] : [])];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -4116,7 +4120,7 @@ async function act(el){
     }
     case 'userDel': try { await api('DELETE', '/api/users/' + id); toast('Пользователь удалён'); } catch(e) { toast(errText(e)); } return loadUsers();
     case 'selOrder': if (ui.order !== id) ui.orderTab = 'main'; ui.order = id; ui.animNext = true; remember(); render(); window.scrollTo({top:0}); return;
-    case 'back': ui.order = null; remember(); return render();
+    case 'back': { const o = ord(ui.order), jid = o && (o.jobId || S.jobs.find(j => j.orderId === o.id)?.id); ui.order = null; remember(); location.hash = 'works'; if (jid) setTimeout(() => openDrawer('job', jid), 50); return; }
     case 'gotoOrder': closeDrawer(); ui.order = id; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); return;
     case 'newOrder': return openDrawer('order');
     case 'selCp': ui.cp = id; ui.animNext = true; render(); window.scrollTo({top:0}); return;

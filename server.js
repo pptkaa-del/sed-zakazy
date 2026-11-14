@@ -82,7 +82,8 @@ const POINT_STATUS_FIELDS = ['status', 'doneAt', 'doneBy'];
 const canWork = u => !FIELD(u);
 /* Assignments («Задачи сотрудникам»): admins, managers and leaders create them; a worker sees only his own and changes only the status */
 const canLead = u => canEdit(u);
-const JOB_STATUS = ['new', 'work', 'done'];
+// «В планах», «Ожидание старта», «В работе», «Выполнена»
+const JOB_STATUS = ['new', 'wait', 'work', 'done'];
 const JOB_WORKER_FIELDS = ['status', 'report'];
 const onJob = (u, j) => j.leaderId === u.id || (j.workers || []).includes(u.id);
 const mayEditJob = (u, j) => canEdit(u);
@@ -508,6 +509,14 @@ async function api(req, res, url) {
       for (const j of Object.values(db.jobs || {})) for (const pl of j.places || []) if (pl.dtNo && !pl.need && nd.has(pl.dtNo)) { pl.need = nd.get(pl.dtNo); ch = true; }
       if (ch) saveDb();
     }
+    // production is part of «Работы»: an order without a work gets one
+    if (HEAD(user)) { let ch = false; const linked = new Set(Object.values(db.jobs || {}).map(j => j.orderId).filter(Boolean));
+      for (const [oid, o] of Object.entries(db.orders || {})) if (!linked.has(oid) && !o.jobId) {
+        const id = newId(), st = o.status === 'closed' ? 'done' : o.status === 'work' ? 'work' : 'new';
+        db.jobs[id] = { kind: 'prod', title: o.title || o.number || 'Заказ', customerId: o.customerId || null, due: o.deadline || '', description: '', docs: [], photoSpec: [], workers: [], places: [], status: st, report: '',
+          no: Math.max(0, ...Object.values(db.jobs).map(j => j.no || 0)) + 1, orderId: oid, leaderId: null, createdBy: user.id, createdAt: o.createdAt || new Date().toISOString(), fromOrder: true };
+        o.jobId = id; ch = true; }
+      if (ch) saveDb(); }
     // works with production made before orders were created for them
     if (HEAD(user)) { let ch = false; for (const [jid, j] of Object.entries(db.jobs || {})) if (ensureJobOrder(j, jid, user)) ch = true; if (ch) saveDb(); }
     const out = { rev: db.rev, users: Object.fromEntries(orgUsers().map(u => [u.id, u.name])), meta: db.meta,
@@ -926,7 +935,7 @@ async function api(req, res, url) {
       // the job follows its points: in work after the first one, done when every point is closed
       const all = j.places || [], left = all.filter(x => !x.doneAt).length;
       if (!left && j.status !== 'done') Object.assign(j, { status: 'done', doneAt: at, doneBy: user.id });
-      else if (left && j.status === 'new') Object.assign(j, { status: 'work', startedAt: at, startedBy: user.id });
+      else if (left && (j.status === 'new' || j.status === 'wait')) Object.assign(j, { status: 'work', startedAt: at, startedBy: user.id });
       saveDb();
       return send(res, 200, { ok: true, place: pl, left, status: j.status, rev: db.rev });
     }
@@ -1001,10 +1010,11 @@ async function api(req, res, url) {
     if (!(col === 'invoices' ? canAddInvoice(user) : col === 'points' ? canWork(user) : col === 'jobs' ? canLead(user) : canEdit(user))) return fail(res, 403, 'Недостаточно прав');
     let data = clean(await readJsonBody(req));
     if (col === 'jobs') {
-      data = cleanJob({ ...data, status: undefined, report: undefined });
+      const wantSt = data.status;
+      data = cleanJob({ ...data, status: undefined, report: undefined }); data._st = wantSt;
       if (!data.title) return fail(res, 400, 'Укажите название проекта');
       data.kind = data.kind || 'mount'; data.workers = data.workers || []; data.docs = data.docs || [];
-      data.status = 'new'; data.report = ''; data.places = data.places || [];
+      data.status = ['new', 'wait', 'work'].includes(data._st) ? data._st : 'new'; delete data._st; data.report = ''; data.places = data.places || [];
       jobWorkersFromPlaces(data);
       data.no = Math.max(0, ...Object.values(db.jobs).map(j => j.no || 0)) + 1;
       if (!data.leaderId) data.leaderId = canLead(user) ? user.id : null;
