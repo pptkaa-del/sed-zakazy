@@ -276,6 +276,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .lblinline{position:absolute;z-index:3;box-sizing:border-box;margin:0;padding:0 2px;border:2px solid #3446B8;border-radius:3px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;line-height:1.15;resize:none;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #lbl-prev .li[data-li]{cursor:move}
 #lbl-prev .li{cursor:move;outline:1px dashed transparent}#lbl-prev .li:hover{outline-color:rgba(52,70,184,.5)}#lbl-prev .li.sel{outline:1px dashed #3446B8;outline-offset:1px}
+.lblscan{padding:10px 12px;border:1px dashed var(--rule);border-radius:10px}.lblscan .in{width:280px}
 .lblman{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end}.lblman label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.lblman .in{width:220px}.lblcheck{flex:1 1 100%;font-size:13px}
 .lblprint{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.lblnext{font-size:16px;padding:12px 18px}.lblcnt{display:flex;flex-direction:column;font-size:12px;color:var(--ink-2)}.lblcnt .in{width:80px}
 .lblwh{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;grid-column:1/-1}.lblwh label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
@@ -1135,14 +1136,14 @@ async function api(method, url, body, headers = {}){
   const j = await r.json().catch(() => ({}));
   if (r.status === 401 && !url.endsWith('/login')) { showLogin(); throw { message:'Сеанс завершён, войдите снова' }; }
   if (r.status === 423 && j.orgBlocked && !url.endsWith('/login')) { showBlocked(j.error); throw { message: j.error, status:423 }; }
-  if (!r.ok) throw { message: j.error || ('Ошибка сервера ' + r.status), status:r.status, dup: j.dup };
+  if (!r.ok) throw { message: j.error || ('Ошибка сервера ' + r.status), status:r.status, dup: j.dup, dupScan: j.dupScan };
   return j;
 }
 async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; DEVS = d.devs || [];
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || [];
   $('devsTab').hidden = !!me?.sys || reqMode() || (isWorker() && !DEVS.length);
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -3170,9 +3171,9 @@ async function devApi(method, url, body){
 }
 
 /* ===== «Этикетки»: label designer for production — size in mm, text with fields, serial number, barcode; «Печать следующей» ===== */
-let LABELS = [], LABEL_SN = {};
+let LABELS = [], LABEL_SN = {}, LABEL_SCAN = {};
 const LBL_SIZES = [[58, 40], [58, 30], [40, 25], [30, 20], [43, 25], [75, 50], [100, 50], [100, 70], [100, 150]];
-const LBL_FIELDS = [['{serial}', 'серийный номер'], ['{name}', 'изделие / работа'], ['{order}', 'номер заказа'], ['{customer}', 'заказчик'], ['{date}', 'дата печати']];
+const LBL_FIELDS = [['{serial}', 'серийный номер'], ['{scan}', 'поле со сканера'], ['{name}', 'изделие / работа'], ['{order}', 'номер заказа'], ['{customer}', 'заказчик'], ['{date}', 'дата печати']];
 const LBL_TYPES = { text: 'Текст', barcode: 'Штрихкод', line: 'Линия', box: 'Рамка' };
 // Code 128: bar/space widths of the 107 symbols (103 data, 3 starts, stop)
 const C128 = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '
@@ -3202,10 +3203,10 @@ function lblCtx(t){
   const r = t.ref, o = r?.type === 'order' ? ord(r.id) : null, j = r?.type === 'job' ? jobOf(r.id) : null;
   return { name: o ? o.title : j ? j.title : '', order: o ? o.number : j ? '№ ' + jobNo(j) : '', customer: o ? custName(o) : j ? (cpOf(j.customerId)?.name || '') : '' };
 }
-const lblFill = (s, t, n, c) => String(s || '').replace(/\{serial\}/g, lblSerial(t, n)).replace(/\{date\}/g, fmtD(today())).replace(/\{name\}/g, c.name).replace(/\{order\}/g, c.order).replace(/\{customer\}/g, c.customer);
+const lblFill = (s, t, n, c) => String(s || '').replace(/\{serial\}/g, lblSerial(t, n)).replace(/\{date\}/g, fmtD(today())).replace(/\{name\}/g, c.name).replace(/\{order\}/g, c.order).replace(/\{customer\}/g, c.customer).replace(/\{scan\}/g, c.scan || '');
 // the label in millimetres; the same markup goes to the preview and to the printer
-function labelHtml(t, n, sel){
-  const c = lblCtx(t);
+function labelHtml(t, n, sel, scan){
+  const c = { ...lblCtx(t), scan: scan || '' };
   const items = (t.items || []).map(x => {
     const pos = `position:absolute;left:${x.x}mm;top:${x.y}mm;width:${x.w}mm;`, mark = sel ? ` data-li="${x.id}" class="li${sel === x.id ? ' sel' : ''}"` : '';
     if (x.type === 'text') return `<div${mark} style="${pos}font-size:${x.size}pt;font-weight:${x.bold ? 700 : 400};text-align:${x.align};line-height:1.15;white-space:pre-wrap;overflow-wrap:anywhere">${esc(lblFill(x.text, t, n, c))}</div>`;
@@ -3217,12 +3218,12 @@ function labelHtml(t, n, sel){
   return `<div class="lbl" style="position:relative;width:${t.w}mm;height:${t.h}mm;overflow:hidden;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif">${items}</div>`;
 }
 // printing: a hidden frame with the page of the label's size
-function printLabels(t, nums){
+function printLabels(t, nums, scan){
   const fr = document.createElement('iframe'); fr.setAttribute('aria-hidden', 'true');
   fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
   document.body.appendChild(fr);
   const d = fr.contentDocument;
-  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)}</title><style>@page{size:${t.w}mm ${t.h}mm;margin:0}html,body{margin:0;padding:0;background:#fff}.lbl{height:${Math.max(1, t.h - 0.4)}mm!important}.lbl+.lbl{page-break-before:always;break-before:page}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${nums.map(n => labelHtml(t, n)).join('')}</body></html>`); d.close();
+  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)}</title><style>@page{size:${t.w}mm ${t.h}mm;margin:0}html,body{margin:0;padding:0;background:#fff}.lbl{height:${Math.max(1, t.h - 0.4)}mm!important}.lbl+.lbl{page-break-before:always;break-before:page}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${nums.map(n => labelHtml(t, n, undefined, scan)).join('')}</body></html>`); d.close();
   setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch(e) { toast('Не удалось открыть печать: ' + e.message); } setTimeout(() => fr.remove(), 60000); }, 150);
 }
 const lblDraft = () => ui.lblDraft;
@@ -3250,6 +3251,8 @@ function vLabels(){
           <label class="lblcnt">Штук<input class="in mono" id="lbl-count" type="number" min="1" max="500" value="${esc(ui.lblCount || 1)}"></label>
           <span class="row-g"><input class="in mono" id="lbl-re" placeholder="№ для повтора" style="width:150px" list="lbl-mans"><button class="btn sm" data-act="lblReprint">Повторить печать</button></span>
         </div>
+        <div class="lblman lblscan"><label>Поле со сканера<input class="in mono" id="lbl-scan" value="${esc(ui.lblScan || '')}" placeholder="щёлкните и отсканируйте" maxlength="200" autocomplete="off" spellcheck="false"></label>
+          <small id="lbl-scancheck" class="lblcheck">${lblScanCheck(t, ui.lblScan)}</small></div>
         <div class="lblman"><label>Свой серийный номер<input class="in mono" id="lbl-man" list="lbl-mans" value="${esc(ui.lblMan || '')}" placeholder="например, ${esc(lblSerial(t, t.serial.next + 100))}" maxlength="60" autocomplete="off"></label>
           <button class="btn" data-act="lblManual">🖨 Печать с этим номером</button>
           <small id="lbl-mancheck" class="lblcheck">${lblManCheck(ui.lblMan)}</small></div>
@@ -3262,17 +3265,39 @@ function vLabels(){
 }
 // screen pixels per millimetre of the preview: as large as fits the panel
 const lblK = t => Math.min(6, 440 / t.w, 300 / t.h);
+// the label uses the value from the scanner
+const lblUsesScan = t => (t.items || []).some(x => /\{scan\}/.test(x.text || ''));
+const scanInfo = v => { const x = LABEL_SCAN[v]; if (!x) return null; const t = LABELS.find(l => l.id === x[0]); return `${fmtDT(x[1])}${x[3] ? ' с номером ' + x[3] : ''}${x[2] ? ', ' + who(x[2]) : ''}${t ? ` · этикетка «${t.name}»` : ''}`; };
+function lblScanCheck(t, v){
+  v = String(v || '').trim();
+  if (!v) return lblUsesScan(t) ? 'Щёлкните по полю и отсканируйте код — прежнее значение сотрётся. Без значения со сканера этикетка не напечатается.' : 'В этикетке нет поля {scan} — значение сохранится и проверится, но на этикетке видно не будет.';
+  const i = scanInfo(v);
+  return i ? `<span class="bad-t">⚠ Это значение уже печаталось: ${esc(i)}</span>` : '<span class="ok-t">✓ Значение ещё не встречалось</span>';
+}
 function lblManCheck(v){
   v = String(v || '').trim(); if (!v) return 'Введите номер — он появится на этикетке; программа проверит, не печатался ли он раньше.';
   const i = snInfo(v);
   return i ? `<span class="bad-t">⚠ Номер уже печатался: ${esc(i)}</span>` : '<span class="ok-t">✓ Номер ещё не печатался</span>';
 }
+function lblScanReady(t, scan, cnt){
+  if (lblUsesScan(t) && !scan) { toast('Отсканируйте код в «Поле со сканера»'); $('lbl-scan')?.focus(); return false; }
+  if (scan && cnt > 1) { toast('Со значением со сканера печатается одна этикетка — поставьте «Штук: 1»'); return false; }
+  return true;
+}
+function lblScanDone(scan, sn){ if (!scan) return; LABEL_SCAN[scan] = LABEL_SCAN[scan] || [ui.lblId, new Date().toISOString(), me.id, sn]; ui.lblScan = ''; }
+// the server refused a repeated scanned value: say where it was printed and offer a repeat on purpose
+function lblScanDupShow(e, forceAct){
+  const el = $('lbl-scancheck'); if (!e.dupScan || !el) return false;
+  const d = e.dupScan, tl = LABELS.find(x => x.id === d.l); LABEL_SCAN[d.scan] = LABEL_SCAN[d.scan] || [d.l, d.at, d.by, d.serial || ''];
+  el.innerHTML = `<span class="bad-t">⚠ «${esc(d.scan)}» уже печаталось: ${esc(fmtDT(d.at))}${d.serial ? ' с номером ' + esc(d.serial) : ''}${d.by ? ', ' + esc(who(d.by)) : ''}${tl ? ` · этикетка «${esc(tl.name)}»` : ''}.</span> <button type="button" class="btn sm danger" data-act="${forceAct}">Всё равно напечатать</button>`;
+  return true;
+}
 function lblPreview(){
   const t = lblDraft(); if (!t) return '';
   const k = lblK(t);
-  return `<div class="lblscale" style="width:${t.w * k}px;height:${t.h * k}px"><div style="transform:scale(${k / (96 / 25.4)});transform-origin:0 0">${labelHtml(t, ui.lblMan || t.serial.next, ui.lblSel || '-')}</div></div><small class="dim">${t.w}×${t.h} мм · щёлкните по надписи, чтобы изменить текст; перетаскивайте элементы мышью</small>`;
+  return `<div class="lblscale" style="width:${t.w * k}px;height:${t.h * k}px"><div style="transform:scale(${k / (96 / 25.4)});transform-origin:0 0">${labelHtml(t, ui.lblMan || t.serial.next, ui.lblSel || '-', ui.lblScan || (lblUsesScan(t) ? '‹скан›' : ''))}</div></div><small class="dim">${t.w}×${t.h} мм · щёлкните по надписи, чтобы изменить текст; перетаскивайте элементы мышью</small>`;
 }
-const lblLog = t => { const P = (t.prints || []).slice(-12).reverse(); return P.length ? `<ul class="lbllog">${P.map(x => `<li><small class="dim">${esc(fmtDT(x.at))} · ${esc(who(x.by))}</small> ${x.set !== undefined ? `счётчик установлен: следующий ${esc(lblSerial(t, x.set))}` : x.manual ? `${x.reprint ? 'повтор' : 'свой номер'} <span class="mono">${esc(x.manual)}</span>` : `${x.reprint ? 'повтор ' : ''}<span class="mono">${x.list ? x.list.map(esc).join(', ') : esc(lblSerial(t, x.from)) + (x.count > 1 ? ' – ' + esc(lblSerial(t, x.from + x.count - 1)) : '')}</span>${x.count > 1 ? ` (${x.count} шт.)` : ''}${x.skipped ? ` <small class="dim" style="display:inline">пропущены уже напечатанные: ${x.skipped.map(esc).join(', ')}</small>` : ''}`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Ещё не печатали.</p>'; };
+const lblLog = t => { const P = (t.prints || []).slice(-12).reverse(); return P.length ? `<ul class="lbllog">${P.map(x => `<li><small class="dim">${esc(fmtDT(x.at))} · ${esc(who(x.by))}</small> ${x.set !== undefined ? `счётчик установлен: следующий ${esc(lblSerial(t, x.set))}` : x.manual ? `${x.reprint ? 'повтор' : 'свой номер'} <span class="mono">${esc(x.manual)}</span>` : `${x.reprint ? 'повтор ' : ''}<span class="mono">${x.list ? x.list.map(esc).join(', ') : esc(lblSerial(t, x.from)) + (x.count > 1 ? ' – ' + esc(lblSerial(t, x.from + x.count - 1)) : '')}</span>${x.count > 1 ? ` (${x.count} шт.)` : ''}${x.skipped ? ` <small class="dim" style="display:inline">пропущены уже напечатанные: ${x.skipped.map(esc).join(', ')}</small>` : ''}`}${x.scan ? ` <small class="dim" style="display:inline">· скан <span class="mono">${esc(x.scan)}</span></small>` : ''}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Ещё не печатали.</p>'; };
 function lblForm(t){
   const sel = (t.items || []).find(x => x.id === ui.lblSel);
   const n = (k, v, extra = '') => `<input class="in mono" data-lb="${k}" value="${esc(v)}" inputmode="decimal" ${extra}>`;
@@ -3290,7 +3315,7 @@ function lblForm(t){
     <label>Следующий номер<span class="row-g"><input class="in mono" id="lbl-setnext" value="${t.serial.next}" inputmode="numeric" style="width:110px"><button type="button" class="btn sm" data-act="lblSetNext">Установить</button></span></label>
     <small class="wide dim">Сейчас следующим будет <b class="mono">${esc(lblSerial(t, t.serial.next))}</b>. ${/[^\x20-\x7e]/.test(t.serial.prefix + t.serial.suffix) ? '<span class="bad-t">В штрихкоде можно только латиницу и цифры — кириллица в префиксе заменится знаком «?».</span>' : ''}</small></div>
   <h4 class="sub-h">Элементы</h4>
-  <div class="row-g">${Object.entries(LBL_TYPES).map(([k, l]) => `<button type="button" class="btn sm" data-act="lblAdd" data-id="${k}">+ ${l}</button>`).join('')}<button type="button" class="btn sm" data-act="lblAdd" data-id="serial">+ Серийный номер</button></div>
+  <div class="row-g">${Object.entries(LBL_TYPES).map(([k, l]) => `<button type="button" class="btn sm" data-act="lblAdd" data-id="${k}">+ ${l}</button>`).join('')}<button type="button" class="btn sm" data-act="lblAdd" data-id="serial">+ Серийный номер</button><button type="button" class="btn sm" data-act="lblAdd" data-id="scan">+ Поле со сканера</button></div>
   <ul class="lblitems">${(t.items || []).map((x, i) => `<li class="${x.id === ui.lblSel ? 'on' : ''}"><button type="button" class="linkish" data-act="lblSel" data-id="${x.id}">${i + 1}. ${LBL_TYPES[x.type]}${x.type === 'text' || x.type === 'barcode' ? ': ' + esc((x.text || '').slice(0, 30)) : ''}</button>
       <span class="row-g"><button type="button" class="btn sm ghost" data-act="lblUp" data-id="${x.id}" title="Выше по списку (рисуется раньше)">↑</button><button type="button" class="btn sm ghost" data-act="lblDel" data-id="${x.id}" aria-label="Удалить элемент">✕</button></span></li>`).join('')}</ul>
   ${sel ? `<div class="box lblsel"><h4>${LBL_TYPES[sel.type]}</h4><div class="form">
@@ -3350,6 +3375,13 @@ function lblInlineEdit(x){
   ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); fin(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fin(false); } });
   ta.addEventListener('blur', () => fin(true));
 }
+// «Поле со сканера»: a click on it wipes the previous value — the field waits for a new scan; the scanner's Enter does nothing else
+document.addEventListener('focusin', e => {
+  if (e.target.id !== 'lbl-scan') return;
+  e.target.value = ''; ui.lblScan = '';
+  const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-scancheck'); if (c) c.innerHTML = lblScanCheck(lblDraft(), '');
+});
+document.addEventListener('keydown', e => { if (e.target.id === 'lbl-scan' && e.key === 'Enter') { e.preventDefault(); e.target.select(); } });
 // dragging an element on the preview
 document.addEventListener('pointerdown', e => {
   const it = e.target.closest('#lbl-prev [data-li]'); if (!it || !canEdit()) return;
@@ -5154,7 +5186,7 @@ async function act(el){
     case 'lblNew': ui.lblId = null; ui.lblDraft = lblNewTpl(null); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; if (await lblSave()) toast('Этикетка создана'); $('view').innerHTML = vLabels(); return;
     case 'lblSel': ui.lblSel = id; lblRedraw(); { const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(lblDraft()); } return;
     case 'lblAdd': { const t = lblDraft(), bottom = Math.max(0, ...t.items.filter(x => x.type !== 'box').map(x => x.y + (x.type === 'text' ? x.size * 0.42 * Math.max(1, String(x.text).split('\n').length) : x.h + (x.type === 'barcode' && x.bold ? x.size * 0.4 : 0)))), y = bottom + 5 <= t.h ? Math.round((bottom + 0.5) * 2) / 2 : 1;
-      const x = id === 'serial' ? { type: 'text', text: '{serial}', size: 9, bold: true, h: 5 } : id === 'barcode' ? { type: 'barcode', text: '{serial}', size: 7, bold: true, h: Math.min(15, t.h / 3) } : id === 'line' ? { type: 'line', h: 0.3 } : id === 'box' ? { type: 'box', h: t.h - 2, size: 6 } : { type: 'text', text: 'Текст', size: 9, bold: false, h: 5 };
+      const x = id === 'scan' ? { type: 'text', text: '{scan}', size: 8, bold: false, h: 5 } : id === 'serial' ? { type: 'text', text: '{serial}', size: 9, bold: true, h: 5 } : id === 'barcode' ? { type: 'barcode', text: '{serial}', size: 7, bold: true, h: Math.min(15, t.h / 3) } : id === 'line' ? { type: 'line', h: 0.3 } : id === 'box' ? { type: 'box', h: t.h - 2, size: 6 } : { type: 'text', text: 'Текст', size: 9, bold: false, h: 5 };
       const it = { id: uid(), x: 1, y: id === 'box' ? 1 : y, w: t.w - 2, align: 'center', bold: false, size: 8, text: '', ...x }; t.items.push(it); ui.lblSel = it.id; ui.lblDirty = true;
       lblRedraw(); { const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(t); } return; }
     case 'lblDel': { const t = lblDraft(); t.items = t.items.filter(x => x.id !== id); if (ui.lblSel === id) ui.lblSel = t.items[0]?.id || null; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); return; }
@@ -5165,26 +5197,29 @@ async function act(el){
     case 'lblSetNext': { const n = Math.floor(Number($('lbl-setnext')?.value)); if (!(n >= 0)) return toast('Введите номер');
       if (ui.lblDirty && !(await lblSave())) return;
       try { const r = await api('PUT', '/api/labels/' + ui.lblId, { ...lblDraft(), serial: { ...lblDraft().serial, setNext: n } }); const i = LABELS.findIndex(x => x.id === ui.lblId); LABELS[i] = r.label; lblPick(ui.lblId); $('view').innerHTML = vLabels(); toast('Следующий номер: ' + lblSerial(r.label, n)); } catch(e) { toast(errText(e)); } return; }
-    case 'lblNext': { const cnt = Math.max(1, Math.min(500, Math.floor(Number($('lbl-count')?.value) || 1))); ui.lblCount = cnt;
+    case 'lblNext': case 'lblNextForce': { const cnt = Math.max(1, Math.min(500, Math.floor(Number($('lbl-count')?.value) || 1))); ui.lblCount = cnt;
+      const scan = (ui.lblScan || '').trim(); if (!lblScanReady(lblDraft(), scan, cnt)) return;
       if (ui.lblDirty && !(await lblSave())) return;
-      try { const r = await api('POST', `/api/labels/${ui.lblId}/next`, { count: cnt }), t = lblDraft();
-        printLabels(t, r.nums);
+      try { const r = await api('POST', `/api/labels/${ui.lblId}/next`, { count: cnt, scan, force: a === 'lblNextForce' }), t = lblDraft();
+        printLabels(t, r.nums, scan); lblScanDone(scan, r.serials[0]);
         const L = LABELS.find(x => x.id === ui.lblId), at = new Date().toISOString(); r.serials.forEach(sn => { LABEL_SN[sn] = [ui.lblId, at, me.id]; });
         [L, t].forEach(x => { if (!x) return; x.serial.next = r.next; x.prints = (x.prints || []).concat({ at, by: me.id, from: r.from, count: r.count, skipped: r.skipped.length ? r.skipped : undefined }); });
         $('view').innerHTML = vLabels(); toast(`Отправлено на печать: ${r.serials[0]}${r.count > 1 ? ' – ' + r.serials[r.serials.length - 1] : ''}${r.skipped.length ? ` (пропущены уже напечатанные: ${r.skipped.slice(0, 5).join(', ')}${r.skipped.length > 5 ? '…' : ''})` : ''}`); refresh().catch(() => {});
-      } catch(e) { toast(errText(e)); } return; }
+      } catch(e) { if (!lblScanDupShow(e, 'lblNextForce')) toast(errText(e)); } return; }
     case 'lblReprint': { const t = lblDraft(), raw = ($('lbl-re')?.value || '').trim(); if (!raw) return toast('Введите номер для повтора');
       // «125» means the 125th number of this label; anything else is taken as the printed text
       const sn = /^\d+$/.test(raw) && !LABEL_SN[raw] ? lblSerial(t, Number(raw)) : raw;
       if (!LABEL_SN[sn]) return toast(`Номер ${sn} ещё не печатался`);
-      try { await api('POST', `/api/labels/${ui.lblId}/reprint`, { serial: sn }); printLabels(t, [sn]); toast('Повторная печать ' + sn); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+      try { const r = await api('POST', `/api/labels/${ui.lblId}/reprint`, { serial: sn }); printLabels(t, [sn], r.scan); toast('Повторная печать ' + sn + (r.scan ? ' · скан ' + r.scan : '')); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'lblManual': case 'lblManualForce': { const t = lblDraft(), sn = ($('lbl-man')?.value || '').trim(); if (!sn) return toast('Введите серийный номер');
+      const scan = (ui.lblScan || '').trim(); if (!lblScanReady(t, scan, 1)) return;
       if (ui.lblDirty && !(await lblSave())) return;
-      try { const r = await api('POST', `/api/labels/${ui.lblId}/manual`, { serial: sn, force: a === 'lblManualForce' });
-        printLabels(t, [sn]); LABEL_SN[sn] = LABEL_SN[sn] || [ui.lblId, new Date().toISOString(), me.id];
+      try { const r = await api('POST', `/api/labels/${ui.lblId}/manual`, { serial: sn, scan, force: a === 'lblManualForce' });
+        printLabels(t, [sn], scan); lblScanDone(scan, sn); LABEL_SN[sn] = LABEL_SN[sn] || [ui.lblId, new Date().toISOString(), me.id];
         const L = LABELS.find(x => x.id === ui.lblId); [L, t].forEach(x => { if (!x) return; x.manual = [sn, ...(x.manual || []).filter(y => y !== sn)]; x.prints = (x.prints || []).concat({ at: new Date().toISOString(), by: me.id, manual: sn, reprint: r.repeat || undefined }); });
         ui.lblMan = ''; $('view').innerHTML = vLabels(); toast((r.repeat ? 'Повторная печать ' : 'Отправлено на печать: ') + sn); refresh().catch(() => {});
       } catch(e) { const el = $('lbl-mancheck');
+        if (lblScanDupShow(e, 'lblManualForce')) return;
         if (e.dup && el) { const d = e.dup, tl = LABELS.find(x => x.id === d.l); LABEL_SN[sn] = LABEL_SN[sn] || [d.l, d.at, d.by]; el.innerHTML = `<span class="bad-t">⚠ Номер ${esc(sn)} уже печатался: ${esc(fmtDT(d.at))}${d.by ? ', ' + esc(who(d.by)) : ''}${tl ? ` · этикетка «${esc(tl.name)}»` : ''}.</span> <button type="button" class="btn sm danger" data-act="lblManualForce">Всё равно напечатать повторно</button>`; } else toast(errText(e)); }
       return; }
     case 'reqOpen': ui.reqEdit = null; return openDrawer('req', id);
@@ -5345,6 +5380,7 @@ document.addEventListener('input', e => {
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
   if (t.dataset.lb) { lblChange(t.dataset.lb, t); return; }
   if (t.id === 'lbl-count') { ui.lblCount = t.value; return; }
+  if (t.id === 'lbl-scan') { ui.lblScan = t.value.trim(); const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-scancheck'); if (c) c.innerHTML = lblScanCheck(lblDraft(), ui.lblScan); return; }
   if (t.id === 'lbl-man') { ui.lblMan = t.value.trim(); const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-mancheck'); if (c) c.innerHTML = lblManCheck(ui.lblMan); return; }
   if (t.id === 'iq') { ui.iq = t.value; const pos = t.selectionStart; $('view').innerHTML = stockTabs() + vIncView(); const n = $('iq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'devq') { ui.devQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vDevs(); const n = $('devq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
