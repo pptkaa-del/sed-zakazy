@@ -248,7 +248,7 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .feat .fbtn{display:flex;gap:2px;flex:none;padding-top:2px}
 .feat-add{display:flex;gap:8px;align-items:flex-start}
 .ok-t{color:var(--ok);font-weight:600}.warn-t{color:var(--warn);font-weight:600}
-.stk{display:grid;grid-template-columns:minmax(0,1fr) 110px 120px 110px 120px 172px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px}
+.stk{display:grid;grid-template-columns:minmax(0,1fr) 110px 120px 190px 120px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px}
 .stk:first-child{border-top:0}
 .stk.head{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px}
 .stk.click{cursor:pointer}.stk.click:hover{background:var(--paper)}
@@ -1680,14 +1680,13 @@ function vStock(){
   if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canAcct() ? 'Загрузите выгрузку остатков из 1С — позиции создадутся сами — или ' : ''}${canEdit() ? 'добавьте позиции вручную: наименование, артикул, единицу, место хранения и минимальный запас. Затем отмечайте приход и расход.' : 'Позиции склада добавляют менеджер или администратор.'}</div>`;
   if (!list.length) return head + (ui.sDiff && !nDiff ? `<div class="empty"><h3>Расхождений нет</h3>Фактический и бухгалтерский остатки совпадают по всем позициям.</div>` : `<div class="empty"><h3>Ничего не найдено</h3>Измените поиск или фильтр.</div>`);
   return head + `<section class="card" style="padding:0;overflow:hidden">
-    <div class="stk head"><span>Наименование</span><span>Артикул</span><span>Место</span><span style="text-align:right">Фактический</span><span style="text-align:right">Бухгалтерский</span><span></span></div>
+    <div class="stk head"><span>Наименование</span><span>Артикул</span><span>Место</span><span style="text-align:right">Бухгалтерский</span><span style="text-align:right">Фактический</span></div>
     ${list.map(it => `<div class="stk click" data-act="viewStock" data-id="${it.id}" role="button" tabindex="0">
       <div><b>${esc(it.name)}</b>${it.note ? `<small>${esc(it.note)}</small>` : ''}${isLow(it) ? '<small style="color:var(--warn)">меньше минимального запаса (' + fmtQty(it.minQty) + ')</small>' : ''}</div>
       <div class="mono dim">${esc(it.sku || '—')}</div>
       <div class="dim">${esc(it.location || '—')}</div>
-      <div class="bal ${isLow(it) ? 'low' : ''}">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}<small>фактический</small></div>
       <div class="bal acct">${fmtQty(it.acctQty) + ' ' + esc(it.unit || 'шт')}<small>бухгалтерский${Math.abs((Number(it.acctQty)||0) - (Number(it.qty)||0)) > 1e-9 ? ` · <span class="diff">разница ${((Number(it.qty)||0) - (Number(it.acctQty)||0) > 0 ? '+' : '')}${fmtQty((Number(it.qty)||0) - (Number(it.acctQty)||0))}</span>` : ''}</small></div>
-      <div class="acts">${canMoveStock() ? `<button class="btn sm" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}</div>
+      <div class="bal ${isLow(it) ? 'low' : ''}">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}<small>фактический</small></div>
     </div>`).join('')}
   </section>
   <datalist id="stock-names">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist>`;
