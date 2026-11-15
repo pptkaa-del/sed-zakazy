@@ -274,7 +274,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .lblstage{display:flex;justify-content:center;padding:22px 10px;border-radius:10px;background:repeating-conic-gradient(var(--mute-soft) 0 25%, var(--sheet) 0 50%) 0 0/16px 16px}
 #lbl-prev{display:flex;flex-direction:column;align-items:center;gap:6px}.lblscale{box-shadow:0 4px 18px rgba(0,0,0,.18);background:#fff;position:relative;overflow:hidden}
 .lblinline{position:absolute;z-index:3;box-sizing:border-box;margin:0;padding:0 2px;border:2px solid #3446B8;border-radius:3px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;line-height:1.15;resize:none;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.2)}
-#lbl-prev .li[data-li]{cursor:move}
+#lbl-prev .li[data-li]{cursor:move}#lbl-prev .li img{pointer-events:none}
 #lbl-prev .li{cursor:move;outline:1px dashed transparent}#lbl-prev .li:hover{outline-color:rgba(52,70,184,.5)}#lbl-prev .li.sel{outline:1px dashed #3446B8;outline-offset:1px}
 .qrels{display:flex;flex-direction:column;gap:4px}.qrels label{display:flex!important;flex-direction:row!important;gap:6px;align-items:baseline;font-size:14px;color:var(--ink)!important;flex-wrap:wrap}
 .qrfields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 12px}.qrfields label{display:flex;flex-direction:row!important;gap:6px;align-items:center;font-size:14px;color:var(--ink)!important}
@@ -3178,7 +3178,7 @@ async function devApi(method, url, body){
 let LABELS = [], LABEL_SN = {}, LABEL_SCAN = {};
 const LBL_SIZES = [[58, 40], [58, 30], [40, 25], [30, 20], [43, 25], [75, 50], [100, 50], [100, 70], [100, 150]];
 const LBL_FIELDS = [['{serial}', 'серийный номер'], ['{scan}', 'поле со сканера'], ['{name}', 'изделие / работа'], ['{order}', 'номер заказа'], ['{customer}', 'заказчик'], ['{date}', 'дата на этикетке (по умолчанию сегодня)']];
-const LBL_TYPES = { text: 'Текст', barcode: 'Штрихкод', qr: 'QR-код', line: 'Линия', box: 'Рамка' };
+const LBL_TYPES = { text: 'Текст', barcode: 'Штрихкод', qr: 'QR-код', image: 'Картинка', line: 'Линия', box: 'Рамка' };
 const QR_FIELDS = [['serial', 'Серийный номер'], ['scan', 'Поле со сканера'], ['name', 'Изделие / работа'], ['order', 'Номер заказа'], ['customer', 'Заказчик'], ['date', 'Дата печати']];
 const QR_MODES = [['fields', 'Элементы этикетки через разделитель'], ['text', 'Введённые данные'], ['mix', 'Введённые данные с полями']];
 // Code 128: bar/space widths of the 107 symbols (103 data, 3 starts, stop)
@@ -3238,6 +3238,7 @@ function labelHtml(t, n, sel, scan, date){
     if (x.type === 'text') return `<div${mark} style="${pos}font-size:${x.size}pt;font-weight:${x.bold ? 700 : 400};text-align:${x.align};line-height:1.15;white-space:pre-wrap;overflow-wrap:anywhere">${esc(lblFill(x.text, t, n, c))}</div>`;
     if (x.type === 'barcode') { const v = lblFill(x.text || '{serial}', t, n, c);
       return `<div${mark} style="${pos}height:${x.h}mm;display:flex;flex-direction:column"><div style="flex:1;min-height:0">${barcodeSvg(v)}</div>${x.bold ? `<div style="font-size:${x.size}pt;text-align:center;line-height:1.1;font-family:monospace">${esc(v)}</div>` : ''}</div>`; }
+    if (x.type === 'image') return `<div${mark} style="${pos}height:${x.h}mm"><img src="/files/${esc(x.img.id)}" alt="" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;${x.bw ? 'filter:grayscale(1) contrast(1.15);' : ''}"></div>`;
     if (x.type === 'qr') return `<div${mark} style="${pos}height:${x.w}mm" title="${esc(qrValue(x, t, n, c))}">${qrSvg(qrValue(x, t, n, c), x.ec)}</div>`;
     if (x.type === 'line') return `<div${mark} style="${pos}height:${x.h}mm;background:#000"></div>`;
     return `<div${mark} style="${pos}height:${x.h}mm;border:${Math.max(0.1, x.size / 30)}mm solid #000;box-sizing:border-box"></div>`;
@@ -3251,7 +3252,8 @@ function printLabels(t, nums, scan, date){
   document.body.appendChild(fr);
   const d = fr.contentDocument;
   d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)}</title><style>@page{size:${t.w}mm ${t.h}mm;margin:0}html,body{margin:0;padding:0;background:#fff}.lbl{height:${Math.max(1, t.h - 0.4)}mm!important}.lbl+.lbl{page-break-before:always;break-before:page}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${nums.map(n => labelHtml(t, n, undefined, scan, date ?? ui.lblDate)).join('')}</body></html>`); d.close();
-  setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch(e) { toast('Не удалось открыть печать: ' + e.message); } setTimeout(() => fr.remove(), 60000); }, 150);
+  const imgs = [...d.images], ready = Promise.race([Promise.all(imgs.map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; }))), new Promise(r => setTimeout(r, 8000))]);
+  ready.then(() => setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch(e) { toast('Не удалось открыть печать: ' + e.message); } setTimeout(() => fr.remove(), 60000); }, 150));
 }
 const lblDraft = () => ui.lblDraft;
 function lblNewTpl(ref){
@@ -3314,6 +3316,16 @@ function lblDateNote(){
   const b = document.querySelector('[data-act=lblDateToday]'); if (b) b.disabled = !ui.lblDate;
   lblRedraw(); const t = lblDraft(), f = document.querySelector('.lblform'); if (f && t && !f.contains(document.activeElement)) f.innerHTML = lblForm(t);
 }
+async function svgToPng(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Не удалось прочитать SVG')); i.src = url; });
+    const w0 = im.naturalWidth || 300, h0 = im.naturalHeight || 300, k = 1600 / Math.max(w0, h0), c = document.createElement('canvas');
+    c.width = Math.round(w0 * k); c.height = Math.round(h0 * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    return new File([blob], file.name.replace(/\.svg$/i, '') + '.png', { type: 'image/png' });
+  } finally { URL.revokeObjectURL(url); }
+}
 function lblScanReady(t, scan, cnt){
   if (lblUsesScan(t) && !scan) { toast('Отсканируйте код в «Поле со сканера»'); $('lbl-scan')?.focus(); return false; }
   if (scan && cnt > 1) { toast('Со значением со сканера печатается одна этикетка — поставьте «Штук: 1»'); return false; }
@@ -3350,8 +3362,8 @@ function lblForm(t){
     <label>Следующий номер<span class="row-g"><input class="in mono" id="lbl-setnext" value="${t.serial.next}" inputmode="numeric" style="width:110px"><button type="button" class="btn sm" data-act="lblSetNext">Установить</button></span></label>
     <small class="wide dim">Сейчас следующим будет <b class="mono">${esc(lblSerial(t, t.serial.next))}</b>. ${/[^\x20-\x7e]/.test(t.serial.prefix + t.serial.suffix) ? '<span class="bad-t">В штрихкоде можно только латиницу и цифры — кириллица в префиксе заменится знаком «?».</span>' : ''}</small></div>
   <h4 class="sub-h">Элементы</h4>
-  <div class="row-g">${Object.entries(LBL_TYPES).map(([k, l]) => `<button type="button" class="btn sm" data-act="lblAdd" data-id="${k}">+ ${l}</button>`).join('')}<button type="button" class="btn sm" data-act="lblAdd" data-id="serial">+ Серийный номер</button><button type="button" class="btn sm" data-act="lblAdd" data-id="scan">+ Поле со сканера</button><button type="button" class="btn sm" data-act="lblAdd" data-id="date">+ Дата</button></div>
-  <ul class="lblitems">${(t.items || []).map((x, i) => `<li class="${x.id === ui.lblSel ? 'on' : ''}"><button type="button" class="linkish" data-act="lblSel" data-id="${x.id}">${i + 1}. ${LBL_TYPES[x.type]}${x.type === 'text' || x.type === 'barcode' ? ': ' + esc((x.text || '').slice(0, 30)) : x.type === 'qr' ? ': ' + esc((x.mode === 'fields' ? (qrEls(x, t).map(id => '№ ' + ((t.items || []).findIndex(e => e.id === id) + 1)).filter(s => s !== '№ 0').join(` ${x.sep ?? ';'} `) || 'элементы не выбраны') : x.text || 'пусто').slice(0, 40)) : ''}</button>
+  <div class="row-g">${Object.entries(LBL_TYPES).map(([k, l]) => k === 'image' ? `<label class="btn sm">+ ${l}<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" data-up="lblImg" hidden></label>` : `<button type="button" class="btn sm" data-act="lblAdd" data-id="${k}">+ ${l}</button>`).join('')}<button type="button" class="btn sm" data-act="lblAdd" data-id="serial">+ Серийный номер</button><button type="button" class="btn sm" data-act="lblAdd" data-id="scan">+ Поле со сканера</button><button type="button" class="btn sm" data-act="lblAdd" data-id="date">+ Дата</button></div>
+  <ul class="lblitems">${(t.items || []).map((x, i) => `<li class="${x.id === ui.lblSel ? 'on' : ''}"><button type="button" class="linkish" data-act="lblSel" data-id="${x.id}">${i + 1}. ${LBL_TYPES[x.type]}${x.type === 'text' || x.type === 'barcode' ? ': ' + esc((x.text || '').slice(0, 30)) : x.type === 'image' ? ': ' + esc(x.img.name.slice(0, 30)) : x.type === 'qr' ? ': ' + esc((x.mode === 'fields' ? (qrEls(x, t).map(id => '№ ' + ((t.items || []).findIndex(e => e.id === id) + 1)).filter(s => s !== '№ 0').join(` ${x.sep ?? ';'} `) || 'элементы не выбраны') : x.text || 'пусто').slice(0, 40)) : ''}</button>
       <span class="row-g"><button type="button" class="btn sm ghost" data-act="lblUp" data-id="${x.id}" title="Выше по списку (рисуется раньше)">↑</button><button type="button" class="btn sm ghost" data-act="lblDel" data-id="${x.id}" aria-label="Удалить элемент">✕</button></span></li>`).join('')}</ul>
   ${sel ? `<div class="box lblsel"><h4>${LBL_TYPES[sel.type]}</h4><div class="form">
     ${sel.type === 'qr' ? `<label class="wide">Что вставить в QR-код<select class="in" data-lb="it.mode">${QR_MODES.map(([k, l]) => `<option value="${k}" ${sel.mode === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -3362,6 +3374,9 @@ function lblForm(t){
       <small class="wide dim">Сейчас в коде: <span class="mono" id="qr-now">${esc(qrValue(sel, t, ui.lblMan || t.serial.next, { ...lblCtx(t), scan: ui.lblScan || '‹скан›', date: ui.lblDate }) || '—')}</span></small>
       <span class="lblwh"><label>X, мм${n('it.x', sel.x)}</label><label>Y, мм${n('it.y', sel.y)}</label><label>Размер, мм${n('it.w', sel.w)}</label></span>` : ''}
     ${sel.type === 'text' || sel.type === 'barcode' ? `<label class="wide">${sel.type === 'barcode' ? 'Что кодировать' : 'Текст'}<textarea class="in" data-lb="it.text" rows="${sel.type === 'text' ? 2 : 1}">${esc(sel.text)}</textarea><small class="dim">Поля: ${LBL_FIELDS.map(([k, l]) => `<button type="button" class="linkish mono" data-act="lblIns" data-id="${k}" title="${l}">${k}</button>`).join(' ')}</small></label>` : ''}
+    ${sel.type === 'image' ? `<div class="wide row-g" style="align-items:center"><img src="/files/${esc(sel.img.id)}" alt="" style="width:56px;height:40px;object-fit:contain;border:1px solid var(--rule);border-radius:6px;background:#fff"><span class="dim" style="font-size:13px">${esc(sel.img.name)}</span><label class="btn sm">Заменить картинку<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" data-up="lblImg" data-id="${esc(sel.id)}" hidden></label></div>
+      <label class="wide" style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" data-lb="it.lock" ${sel.lock !== false ? 'checked' : ''}> Сохранять пропорции</label>
+      <label class="wide" style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" data-lb="it.bw" ${sel.bw !== false ? 'checked' : ''}> Чёрно-белая (для принтера этикеток)</label>` : ''}
     ${sel.type === 'qr' ? '' : `<span class="lblwh"><label>X, мм${n('it.x', sel.x)}</label><label>Y, мм${n('it.y', sel.y)}</label><label>Ширина${n('it.w', sel.w)}</label>${sel.type !== 'text' ? `<label>${sel.type === 'line' ? 'Толщина' : 'Высота'}${n('it.h', sel.h)}</label>` : ''}</span>`}
     ${sel.type === 'text' || sel.type === 'barcode' ? `<label>${sel.type === 'barcode' ? 'Размер подписи, пт' : 'Размер шрифта, пт'}${n('it.size', sel.size)}</label>` : ''}
     ${sel.type === 'box' ? `<label>Толщина рамки${n('it.size', sel.size)}<small class="dim">3 = 0,1 мм</small></label>` : ''}
@@ -3384,7 +3399,8 @@ function lblChange(key, el){
   else if (key.startsWith('serial.')) { const k = key.slice(7); t.serial[k] = k === 'digits' ? Math.max(1, Math.min(12, nv | 0 || 1)) : v; }
   else if (key.startsWith('it.e:') && sel) { const k = key.slice(5), E = qrEls(sel, t).filter(x => x !== k); sel.els = (t.items || []).map(e => e.id).filter(id => id === k ? v : E.includes(id)); }
   else if (key.startsWith('it.f:') && sel) { const k = key.slice(5), F = (sel.fields || []).filter(x => x !== k); sel.fields = v ? QR_FIELDS.map(f => f[0]).filter(f => f === k || F.includes(f)) : F; }
-  else if (key.startsWith('it.') && sel) { const k = key.slice(3); sel[k] = ['text', 'align', 'bold', 'mode', 'sep', 'ec'].includes(k) ? v : (Number.isFinite(nv) ? nv : sel[k]); if (sel.type === 'qr' && k === 'w') sel.h = sel.w; }
+  else if (key.startsWith('it.') && sel) { const k = key.slice(3); sel[k] = ['text', 'align', 'bold', 'mode', 'sep', 'ec', 'lock', 'bw'].includes(k) ? v : (Number.isFinite(nv) ? nv : sel[k]); if (sel.type === 'qr' && k === 'w') sel.h = sel.w;
+    if (sel.type === 'image' && sel.lock !== false && (k === 'w' || k === 'h') && sel.ar) { if (k === 'w') sel.h = Math.round(sel.w / sel.ar * 10) / 10; else sel.w = Math.round(sel.h * sel.ar * 10) / 10; const o = document.querySelector(`[data-lb="it.${k === 'w' ? 'h' : 'w'}"]`); if (o) o.value = k === 'w' ? sel.h : sel.w; } }
   ui.lblDirty = true; lblRedraw(key === 'size' || key === 'serial.prefix' || key === 'serial.suffix' || key === 'serial.digits' || key === 'it.mode' || key.startsWith('it.f:') || key.startsWith('it.e:'));
   const qn = $('qr-now'); if (qn && sel && sel.type === 'qr') qn.textContent = qrValue(sel, t, ui.lblMan || t.serial.next, { ...lblCtx(t), scan: ui.lblScan || '‹скан›', date: ui.lblDate }) || '—';
 }
@@ -5543,6 +5559,20 @@ document.addEventListener('change', async e => {
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
   }
+  if (t.dataset.up === 'lblImg') { let fl = t.files[0]; const rid = t.dataset.id; t.value = ''; if (!fl) return;
+    if (!/^image\//.test(fl.type)) return toast('Нужна картинка: PNG, JPG, GIF, WEBP или SVG');
+    try { toast('Загружаем картинку…');
+      // SVG is turned into PNG here: the server shows only raster pictures
+      if (/svg/.test(fl.type)) fl = await svgToPng(fl);
+      const u = await upload(fl), ar = await new Promise(r => { const im = new Image(), url = URL.createObjectURL(fl); im.onload = () => { URL.revokeObjectURL(url); r(im.naturalWidth && im.naturalHeight ? im.naturalWidth / im.naturalHeight : 1); }; im.onerror = () => r(1); im.src = url; });
+      const tpl = lblDraft(), img = { id: u.id, name: u.name };
+      const ex = rid && tpl.items.find(x => x.id === rid);
+      if (ex) { ex.img = img; ex.ar = ar; if (ex.lock !== false) ex.h = Math.round(ex.w / ar * 10) / 10; }
+      else { let w = Math.min(20, tpl.w - 2), h = Math.round(w / ar * 10) / 10; if (h > tpl.h - 2) { h = tpl.h - 2; w = Math.round(h * ar * 10) / 10; }
+        const it = { id: uid(), type: 'image', img, ar, lock: true, bw: true, x: 1, y: 1, w, h, size: 8, text: '', align: 'left', bold: false }; tpl.items.push(it); ui.lblSel = it.id; }
+      ui.lblDirty = true; lblRedraw(); const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(tpl); toast('Картинка добавлена — перетащите её на место');
+    } catch(e) { toast(errText(e)); }
+    return; }
   if (t.dataset.up === 'devFile') { const files = [...t.files], did = t.dataset.id; t.value = ''; if (!files.length) return;
     try { const x = DEVS.find(z => z.id === did), add = []; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); add.push({ id: u.id, name: u.name, at: u.at, by: u.by }); }
       await devApi('PATCH', '/api/devs/' + did, { files: [...(x.files || []), ...add] }); renderDrawer(); toast(add.length > 1 ? `Загружено файлов: ${add.length}` : 'Файл загружен'); } catch(e) { toast(errText(e)); }

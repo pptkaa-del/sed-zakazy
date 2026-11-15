@@ -680,14 +680,16 @@ async function api(req, res, url) {
       return { name: String(b.name || old.name || 'Этикетка').trim().slice(0, 120) || 'Этикетка', w: num(b.w, 10, 300, 58), h: num(b.h, 10, 300, 40), ref,
         serial: { prefix: String(sr.prefix || '').slice(0, 30), suffix: String(sr.suffix || '').slice(0, 30), digits: num(sr.digits, 1, 12, 6) | 0,
           next: old.serial ? old.serial.next : Math.max(0, Math.floor(Number(sr.next) || 1)) },
-        items: (Array.isArray(b.items) ? b.items : []).slice(0, 40).filter(x => x && ['text', 'barcode', 'line', 'box', 'qr'].includes(x.type)).map(x => ({
+        items: (Array.isArray(b.items) ? b.items : []).slice(0, 40).filter(x => x && ['text', 'barcode', 'line', 'box', 'qr', 'image'].includes(x.type) && (x.type !== 'image' || (x.img && db.files[x.img.id]))).map(x => ({
           id: String(x.id || newId()).slice(0, 20), type: x.type, text: String(x.text || '').slice(0, 300), x: num(x.x, -50, 300, 2), y: num(x.y, -50, 300, 2),
           w: num(x.w, 0.2, 300, 30), h: num(x.h, 0.2, 300, 8), size: num(x.size, 3, 120, 10), bold: !!x.bold, align: ['left', 'center', 'right'].includes(x.align) ? x.align : 'left',
           // a QR code: what it holds — fields joined by a separator, a typed text, or a typed text with fields
           ...(x.type === 'qr' ? { mode: ['fields', 'text', 'mix'].includes(x.mode) ? x.mode : 'fields', fields: (Array.isArray(x.fields) ? x.fields : []).filter(k => ['serial', 'scan', 'name', 'order', 'customer', 'date'].includes(k)).slice(0, 6),
             // the elements of the label (by their numbers) whose printed values go into the code
             ...(Array.isArray(x.els) ? { els: x.els.map(e => String(e).slice(0, 20)).slice(0, 40) } : {}),
-            sep: String(x.sep ?? ';').slice(0, 5), ec: ['L', 'M', 'Q', 'H'].includes(x.ec) ? x.ec : 'M' } : {}) })) };
+            sep: String(x.sep ?? ';').slice(0, 5), ec: ['L', 'M', 'Q', 'H'].includes(x.ec) ? x.ec : 'M' } : {}),
+          // a picture: an uploaded file, its proportions, black-and-white or in colour
+          ...(x.type === 'image' ? { img: { id: x.img.id, name: String(x.img.name || db.files[x.img.id].name).slice(0, 200) }, ar: num(x.ar, 0.01, 100, 1), lock: x.lock !== false, bw: x.bw !== false } : {}) })) };
     };
     if (m === 'POST' && !p[2]) {
       if (!canEdit(user)) return fail(res, 403, 'Создавать этикетки может руководитель или администратор');
