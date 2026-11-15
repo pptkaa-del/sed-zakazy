@@ -322,6 +322,17 @@ const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === '
 const REQ_ROLES = ['admin', 'head', 'worker'];
 // a request is seen by its author, its executor, the administrator and the manager
 const reqSees = (u, r) => HEAD(u) || r.by === u.id || r.assignee === u.id;
+/* serial numbers of labels: the text of a number and the index of every number already printed in the organization */
+const serialStr = (t, n) => (t.serial.prefix || '') + String(n).padStart(t.serial.digits || 1, '0') + (t.serial.suffix || '');
+function labelSerials(){
+  if (db.labelSerials && typeof db.labelSerials === 'object') return db.labelSerials;
+  const S = db.labelSerials = {};
+  for (const [id, t] of Object.entries(db.labels || {})) for (const x of t.prints || []) {
+    if (x.manual && !S[x.manual]) S[x.manual] = { l: id, at: x.at, by: x.by, manual: true };
+    else if (x.from !== undefined && !x.reprint && x.count) for (let n = x.from; n < x.from + x.count; n++) { const sn = serialStr(t, n); if (!S[sn]) S[sn] = { l: id, at: x.at, by: x.by }; }
+  }
+  return S;
+}
 /* «Потенциальные разработки»: the author and the administrator manage a development; the author chooses who sees it
    and who may add data to it (fields, documents, links, comments) */
 const devManage = (u, d) => d.by === u.id || u.role === 'admin';
@@ -595,6 +606,8 @@ async function api(req, res, url) {
     }
     out.devs = Object.entries(db.devs || {}).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d));
     out.labels = FIELD(user) ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
+    // printed serial numbers — the page warns about a repeat while the number is typed
+    if (!FIELD(user) && out.labels.length) { const S = labelSerials(); out.labelSerials = Object.fromEntries(Object.entries(S).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by]])); }
     out.receipts = FIELD(user) ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
     if (!FIELD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
@@ -680,19 +693,38 @@ async function api(req, res, url) {
       if (b.serial && b.serial.setNext !== undefined) { const n = Math.floor(Number(b.serial.setNext)); if (!(n >= 0 && n < 1e12)) return fail(res, 400, 'Неверный номер'); t.serial.next = n; t.prints.push({ at: now, by: user.id, set: n }); }
       saveDb(); return send(res, 200, { ok: true, label: { id: p[2], ...t }, rev: db.rev });
     }
-    // «Печать следующей»: reserve the next number(s), raise the counter and write it into the log
+    // every printed serial number of the organization: serial → where and when it was printed first
+    const S = labelSerials();
+    const mark = (sn, extra = {}) => { if (!S[sn]) S[sn] = { l: p[2], at: now, by: user.id, ...extra }; };
+    // «Печать следующей»: the next free number(s) — numbers already printed (by hand or before the counter was moved back) are skipped
     if (m === 'POST' && p[3] === 'next') {
       const b = await readJsonBody(req), count = Math.min(500, Math.max(1, Math.floor(Number(b.count) || 1)));
-      const from = t.serial.next; t.serial.next = from + count;
-      t.prints = (t.prints || []).concat({ at: now, by: user.id, from, count }).slice(-300);
-      saveDb(); return send(res, 200, { ok: true, from, count, next: t.serial.next, rev: db.rev });
+      const nums = [], skipped = []; let n = t.serial.next;
+      while (nums.length < count && n < t.serial.next + count + 10000) { const sn = serialStr(t, n); if (S[sn]) skipped.push(sn); else { nums.push(n); mark(sn); } n++; }
+      if (nums.length < count) return fail(res, 409, 'Не удалось подобрать свободные номера — проверьте префикс и счётчик');
+      t.serial.next = nums[nums.length - 1] + 1;
+      const serials = nums.map(x => serialStr(t, x));
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, from: nums[0], count, list: serials.length > 1 && nums[nums.length - 1] - nums[0] + 1 !== count ? serials : undefined, skipped: skipped.length ? skipped.slice(0, 50) : undefined }).slice(-300);
+      saveDb(); return send(res, 200, { ok: true, from: nums[0], count, nums, serials, skipped, next: t.serial.next, rev: db.rev });
     }
-    // reprint of numbers already given out: only written into the log
+    // a serial number typed by hand: printed if it was never printed before; a repeat only on purpose (force)
+    if (m === 'POST' && p[3] === 'manual') {
+      const b = await readJsonBody(req), sn = String(b.serial || '').trim().slice(0, 60);
+      if (!sn) return fail(res, 400, 'Введите серийный номер');
+      const was = S[sn];
+      if (was && !b.force) { const tl = L[was.l], u = users.find(x => x.id === was.by);
+        return send(res, 409, { error: `Номер ${sn} уже печатался ${new Date(was.at).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' })}${u ? ', ' + u.name : ''}${tl ? ` (этикетка «${tl.name}»)` : ''}`, dup: { serial: sn, ...was, label: tl ? tl.name : '' } }); }
+      mark(sn, { manual: true });
+      t.manual = [sn, ...(t.manual || []).filter(x => x !== sn)].slice(0, 200);
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, manual: sn, ...(was ? { reprint: true } : {}) }).slice(-300);
+      saveDb(); return send(res, 200, { ok: true, serial: sn, repeat: !!was, rev: db.rev });
+    }
+    // reprint of a number already printed: only written into the log
     if (m === 'POST' && p[3] === 'reprint') {
-      const b = await readJsonBody(req), n = Math.floor(Number(b.n));
-      if (!(n >= 0 && n < t.serial.next)) return fail(res, 400, 'Этот номер ещё не печатался');
-      t.prints = (t.prints || []).concat({ at: now, by: user.id, from: n, count: 1, reprint: true }).slice(-300);
-      saveDb(); return send(res, 200, { ok: true, rev: db.rev });
+      const b = await readJsonBody(req), sn = b.serial !== undefined ? String(b.serial).trim() : serialStr(t, Math.floor(Number(b.n)));
+      if (!S[sn]) return fail(res, 400, `Номер ${sn} ещё не печатался`);
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, manual: sn, reprint: true }).slice(-300);
+      saveDb(); return send(res, 200, { ok: true, serial: sn, rev: db.rev });
     }
     if (m === 'DELETE' && p.length === 3) {
       if (!canEdit(user)) return fail(res, 403, 'Удалить этикетку может руководитель или администратор');
