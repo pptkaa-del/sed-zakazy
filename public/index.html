@@ -276,6 +276,8 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .lblinline{position:absolute;z-index:3;box-sizing:border-box;margin:0;padding:0 2px;border:2px solid #3446B8;border-radius:3px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;line-height:1.15;resize:none;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #lbl-prev .li[data-li]{cursor:move}#lbl-prev .li img{pointer-events:none}
 #lbl-prev .li{cursor:move;outline:1px dashed transparent}#lbl-prev .li:hover{outline-color:rgba(52,70,184,.5)}#lbl-prev .li.sel{outline:1px dashed #3446B8;outline-offset:1px}
+.sectree{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 18px}.secg{display:flex;flex-direction:column;gap:2px}
+.form .sectree label,.sectree label{display:flex!important;flex-direction:row!important;gap:8px;align-items:center;font-size:14px;color:var(--ink)!important}.secsubs{display:flex;flex-direction:column;gap:2px;padding-left:24px}.secsubs label{font-size:13px!important}.secbox{gap:8px}
 .qrels{display:flex;flex-direction:column;gap:4px}.qrels label{display:flex!important;flex-direction:row!important;gap:6px;align-items:baseline;font-size:14px;color:var(--ink)!important;flex-wrap:wrap}
 .qrfields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 12px}.qrfields label{display:flex;flex-direction:row!important;gap:6px;align-items:center;font-size:14px;color:var(--ink)!important}
 .lblscan{padding:10px 12px;border:1px dashed var(--rule);border-radius:10px}.lblscan .in{width:280px}
@@ -1148,7 +1150,7 @@ async function refresh(){
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || [];
-  $('devsTab').hidden = !!me?.sys || reqMode() || (isWorker() && !DEVS.length);
+  $('devsTab').hidden = !!me?.sys || reqMode() || !can('devs') || (isWorker() && !DEVS.length);
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
   if (reqMode()) { const n = reqTodo().length; $('reqBadge').hidden = !n; $('reqBadge').textContent = n; if (ui.drawer?.kind === 'req' && !drawerBusy()) renderDrawer(); }
@@ -1183,13 +1185,28 @@ function animateView(el){
   el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter');
   clearTimeout(enterTimer); enterTimer = setTimeout(() => el.classList.remove('enter'), 700);
 }
+/* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
+const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Склад', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]]];
+const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
+// a tab of the menu is shown when it is open and at least one of its sub-tabs is
+const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
+const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes' };
+const viewOk = v => !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
+// the checkbox tree of the organization and user forms: checked — shown; what the organization hides is not offered to its users
+function secTree(hide, orgHide){
+  hide = hide || []; orgHide = orgHide || [];
+  const off = k => orgHide.includes(k) || orgHide.includes(k.split(':')[0]);
+  return `<div class="sectree">${SECTIONS_UI.filter(([k]) => !off(k)).map(([k, l, subs]) => `<div class="secg"><label class="sect"><input type="checkbox" data-sec="${k}" ${hide.includes(k) ? '' : 'checked'}> <b>${l}</b></label>${subs ? `<div class="secsubs">${subs.filter(([x]) => !off(k + ':' + x)).map(([x, sl]) => `<label><input type="checkbox" data-sec="${k}:${x}" data-top="${k}" ${hide.includes(k + ':' + x) ? '' : 'checked'} ${hide.includes(k) ? 'disabled' : ''}> ${sl}</label>`).join('')}</div>` : ''}</div>`).join('')}</div>`;
+}
+const secHide = root => [...root.querySelectorAll('[data-sec]')].filter(i => !i.checked).map(i => i.dataset.sec);
 /* «Склад»: the warehouse, the write-off lists and the invoices in one tab */
 const STOCK_VIEWS = ['stock', 'inc', 'wo', 'pay'];
 const canWo = () => isHead() || me?.role === 'accountant';
 function stockTabs(){
   const n = S.invoices.filter(i => i.status === 'topay').length;
   const inc = S.invoices.filter(i => incState(i) === 'wait').length;
-  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']];
+  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k));
   return `<nav class="seg stabs" aria-label="Разделы склада">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : k === 'inc' && inc ? ` <span class="badge" title="Ждут оприходования">${inc}</span>` : ''}</a>`).join('')}</nav>`;
 }
 function render(){
@@ -1814,7 +1831,7 @@ function orderDetail(o){
       <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
-    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="labelsFor" data-id="order:${o.id}">🏷 Этикетки</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
+    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button>${can('works:labels') ? `<button class="btn sm" data-act="labelsFor" data-id="order:${o.id}">🏷 Этикетки</button>` : ''}<button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
   </div>
   <div class="seg otabs" role="tablist" aria-label="Разделы заказа">
     <button role="tab" data-act="orderTab" data-id="main" class="${ui.orderTab !== 'products' ? 'on' : ''}" aria-selected="${ui.orderTab !== 'products'}">Заказ</button>
@@ -2136,7 +2153,7 @@ function vWorkList(){
     <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
     <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => k === 'all' || (k === 'active' ? j.status !== 'done' : (j.status || 'new') === k)).length}</span></button>`).join('')}</div>
-    <a class="btn" href="#labels" title="Конструктор этикеток с серийным номером">🏷 Этикетки</a>
+    ${can('works:labels') ? '<a class="btn" href="#labels" title="Конструктор этикеток с серийным номером">🏷 Этикетки</a>' : ''}
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
@@ -3629,9 +3646,9 @@ const NOTE_TABS = [['task', 'Заметки'], ['shared', 'Общие задач
 const ntype = n => n.type || 'task';
 const isOwnNote = n => ntype(n) === 'task' || ntype(n) === 'memo';
 function vNotes(){
-  const tab = ['task', 'shared', 'draw'].includes(ui.ntab) ? ui.ntab : 'task';
+  const open = NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k), tab = open.includes(ui.ntab) ? ui.ntab : open[0];
   const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'memo' ? NOTES.filter(n => ntype(n) === 'memo').length : 0;
-  const tabs = `<div class="seg ntabs" role="tablist">${NOTE_TABS.map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
+  const tabs = `<div class="seg ntabs" role="tablist">${NOTE_TABS.filter(([k]) => open.includes(k)).map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
   return tabs + (tab === 'shared' ? vShared() : tab === 'draw' ? vDraw() : vTasksList());
 }
 const thumbF = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp)$/i.test(f.name || '') ? `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener" class="thumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>` : `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>`;
@@ -3753,7 +3770,7 @@ function vUsers(){
   const rows = L.slice().sort((a,b) => (a.blocked - b.blocked) || (order.indexOf(a.role) - order.indexOf(b.role)) || a.name.localeCompare(b.name,'ru')).map(u => {
     const self = u.id === me.id;
     return `<div class="urow ${u.blocked?'blocked':''}">
-      <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}${u.sys ? ' · администратор системы' : ''}</small></div>
+      <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}${u.sys ? ' · администратор системы' : ''}</small>${(u.hide || []).length ? `<small class="dim">скрыто разделов: ${u.hide.length}</small>` : ''}</div>
       <div><span class="chip ${u.role==='admin'||u.role==='head'?'c-work':u.role==='accountant'?'c-ok':u.role==='contractor'?'c-warn':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
       <div>${u.blocked ? '<span class="chip c-bad">Заблокирован</span>' : u.expired ? '<span class="chip c-bad">Доступ истёк</span>' : '<span class="chip c-ok">Активен</span>'}${u.accessUntil ? `<small>доступ до ${fmtD(u.accessUntil)}</small>` : ''}</div>
       <div><small>Последний вход</small>${u.lastLoginAt ? esc(fmtDT(u.lastLoginAt)) : '<span class="dim">не входил</span>'}</div>
@@ -4207,6 +4224,7 @@ function renderDrawer(){
       <fieldset class="wide otype"><legend>Тип системы</legend>
         ${[['all', 'Все сервисы', 'Работы, заказы, склад, контрагенты, счета, план-график, карта объектов, задачи.'], ['requests', 'Управление заявками', 'Пользователь создаёт заявку и выбирает исполнителя, исполнитель отмечает её выполнение.']].map(([k, l, h]) => `<label><input type="radio" name="o-type" value="${k}" ${(o?.type || 'all') === k ? 'checked' : ''}> <span><b>${l}</b><small class="dim">${h}</small></span></label>`).join('')}
         ${o ? '<small class="dim">Смена типа не удаляет данные: при возврате они снова будут видны.</small>' : ''}</fieldset>
+      <fieldset class="wide otype secbox" id="o-secs" ${(o?.type || 'all') === 'requests' ? 'hidden' : ''}><legend>Какие вкладки и подвкладки видит организация</legend>${secTree(o?.hide || [])}<small class="dim">Снятая галочка скрывает раздел у всех пользователей организации. Администратор организации может дополнительно закрыть разделы отдельным пользователям.</small></fieldset>
       <label>Доступ до (включительно)<input class="in" type="date" id="o-until" value="${v(o,'until')}"><small class="dim" style="font-size:12px">Пусто — без срока. После этой даты всем в организации покажется сообщение о блокировке.</small></label>
       ${o ? '' : `<label>Код (латиницей, необязательно)<input class="in mono" id="o-id" pattern="[a-z0-9][a-z0-9-]{1,30}"></label>`}
       <label class="wide">Заметка (видна только вам)<input class="in" id="o-note" value="${v(o,'note')}"></label>
@@ -4348,7 +4366,7 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
-        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd><button class="btn sm" data-act="labelsFor" data-id="${ord(j.orderId) ? 'order:' + j.orderId : 'job:' + j.id}">🏷 Этикетки</button> ${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
+        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${can('works:labels') ? `<button class="btn sm" data-act="labelsFor" data-id="${ord(j.orderId) ? 'order:' + j.orderId : 'job:' + j.id}">🏷 Этикетки</button> ` : ''}${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
@@ -4494,6 +4512,7 @@ function renderDrawer(){
       <label class="wide" id="uf-until-w" ${(u?.role || 'worker') === 'contractor' ? '' : 'hidden'}>Доступ подрядчика до (включительно)<input class="in" type="date" id="uf-until" value="${esc(u?.accessUntil || '')}"><small class="dim" style="font-size:12px">На следующий день вход для подрядчика закроется.</small></label>
       <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<span class="pwrow"><input class="in mono" id="uf-pass" autocomplete="new-password" ${u?'':'required'}><span class="pwgen"><button type="button" class="btn sm" data-act="genPass" data-id="#uf-pass" title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm ghost" data-act="copyPass" data-id="#uf-pass" title="Скопировать пароль">Копировать</button></span></span></label></div>
       <p class="hint dim" id="uf-info" style="margin:0">${esc(roleInfo(u?.role || 'worker'))}</p>
+      ${reqMode() ? '' : `<fieldset class="wide otype secbox" id="uf-secs"><legend>Какие вкладки и подвкладки видит пользователь</legend>${secTree(u?.hide || [], me.org?.hide || [])}<small class="dim">Показаны разделы, открытые организации. Права роли действуют как прежде: например, «Списание материалов» видят только администратор, руководитель и бухгалтер.</small></fieldset>`}
       ${u ? '<p class="hint" style="margin:0">После смены пароля сотрудник выйдет со всех устройств.</p>' : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${u?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -4730,7 +4749,7 @@ async function onSubmit(e){
       else { const r = await reqApi('POST', '/api/requests', { ...body, assignee: val('rq-to') || null }); ui.reqFiles = []; openDrawer('req', r.request.id); render(); toast(`Заявка № ${r.request.no} создана`); }
     }
     if (kind === 'org') {
-      const body = { name:val('o-name'), until:val('o-until'), note:val('o-note'), type: f.querySelector('[name=o-type]:checked')?.value || 'all' };
+      const body = { name:val('o-name'), until:val('o-until'), note:val('o-note'), type: f.querySelector('[name=o-type]:checked')?.value || 'all', hide: secHide($('o-secs')) };
       if ($('o-blocked')) { body.blocked = $('o-blocked').checked; body.blockNote = val('o-bnote'); }
       if (!d.id) { body.id = val('o-id'); body.admin = { name:val('oa-name'), login:val('oa-login'), password:$('oa-pass').value }; }
       if (d.id) await api('PATCH', `/api/orgs/${d.id}`, body); else await api('POST', '/api/orgs', body);
@@ -4825,6 +4844,7 @@ async function onSubmit(e){
     }
     if (kind === 'userForm') {
       const body = { name:val('uf-name'), login:val('uf-login'), role:$('uf-role').value };
+      if ($('uf-secs')) body.hide = secHide($('uf-secs'));
       if (body.role === 'contractor') { body.accessUntil = val('uf-until'); if (!body.accessUntil) return fail('Укажите, до какой даты у подрядчика доступ.'); }
       const pw = $('uf-pass').value;
       if (d.id) {
@@ -5538,6 +5558,8 @@ document.addEventListener('change', async e => {
   if (t.id === 'jW') { ui.jW = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
+  if (t.dataset.sec && !t.dataset.top) { t.closest('.secg')?.querySelectorAll('[data-top]').forEach(x => { x.disabled = !t.checked; }); return; }
+  if (t.name === 'o-type') { const b = $('o-secs'); if (b) b.hidden = t.value === 'requests'; return; }
   if (t.dataset.dacc) { ui.devAcc = ui.devAcc || {}; if (t.value) ui.devAcc[t.dataset.dacc] = t.value; else delete ui.devAcc[t.dataset.dacc]; return; }
   if (t.id === 'rq-assign') { const rid = ui.drawer?.id; try { await reqApi('PATCH', '/api/requests/' + rid, { action: 'assign', assignee: t.value || null }); renderDrawer(); render(); toast(t.value ? 'Исполнитель назначен' : 'Исполнитель снят'); } catch(e) { toast(errText(e)); renderDrawer(); } return; }
   if (t.id === 'planWho') { ui.planWho = t.value; return render(); }
@@ -5659,6 +5681,12 @@ function route(){
     : reqMode() ? (h === 'users' && me.role === 'admin' ? 'users' : 'req')
     : isWorker() ? (['wwork', 'wdone', 'devs'].includes(h) ? h : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+  if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
+    const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
+    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
+    ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
+    try { history.replaceState(null, '', '#' + ui.view); } catch(e) {}
+  }
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
@@ -5715,7 +5743,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : reqMode() ? !(v === 'req' || (v === 'users' && u.role === 'admin')) : v === 'req' ? true : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(v === 'req' || (v === 'users' && u.role === 'admin')) : v === 'req' ? true : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
