@@ -320,6 +320,13 @@ const orgById = id => orgs.find(o => o.id === id);
 const ORG_TYPES = ['all', 'requests'];
 const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === 'requests' ? 'requests' : 'all'; };
 const REQ_ROLES = ['admin', 'head', 'worker'];
+/* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
+const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared', 'draw'] };
+const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
+const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
+// what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
+const hiddenFor = u => { const o = u && orgById(u.orgId); return [...new Set([...((o && o.hide) || []), ...((u && u.hide) || [])])]; };
+const sees = (u, key) => { const H = hiddenFor(u), top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a request is seen by its author, its executor, the administrator and the manager
 const reqSees = (u, r) => HEAD(u) || r.by === u.id || r.assignee === u.id;
 /* serial numbers of labels: the text of a number and the index of every number already printed in the organization */
@@ -534,7 +541,8 @@ async function api(req, res, url) {
       if (orgType(user) === 'requests' && !REQ_ROLES.includes(b.role)) return fail(res, 400, 'В системе заявок роли: администратор, руководитель, сотрудник');
       if (b.role === 'contractor' && !/^\d{4}-\d{2}-\d{2}$/.test(String(b.accessUntil || ''))) return fail(res, 400, 'Для подрядчика укажите, до какой даты у него доступ');
       const nu = addUser(String(b.login), b.role, String(b.name).trim(), String(b.password), user.orgId);
-      if (b.role === 'contractor') { nu.accessUntil = String(b.accessUntil); saveUsers(); }
+      if (b.role === 'contractor') nu.accessUntil = String(b.accessUntil);
+      nu.hide = cleanHide(b.hide); saveUsers();
       return send(res, 200, adminUser(nu));
     }
     if (!target) return fail(res, 404, 'Пользователь не найден');
@@ -554,6 +562,7 @@ async function api(req, res, url) {
           target.accessUntil = d;
         } else delete target.accessUntil;
       }
+      if (b.hide !== undefined) target.hide = cleanHide(b.hide);
       if (b.name !== undefined) { if (!String(b.name).trim()) return fail(res, 400, 'Укажите имя'); target.name = String(b.name).trim().slice(0, 120); }
       if (b.login !== undefined) {
         const login = String(b.login).trim().toLowerCase();
@@ -609,16 +618,19 @@ async function api(req, res, url) {
       out.requests = Object.entries(db.requests || {}).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r));
       out.reqUsers = orgUsers().filter(u => !u.blocked && !u.sys).map(u => ({ id: u.id, name: u.name, role: u.role }));
     }
-    out.devs = Object.entries(db.devs || {}).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d));
-    out.labels = FIELD(user) ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
+    out.devs = sees(user, 'devs') ? Object.entries(db.devs || {}).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d)) : [];
+    out.labels = FIELD(user) || !sees(user, 'works:labels') ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
     // printed serial numbers — the page warns about a repeat while the number is typed
     if (!FIELD(user) && out.labels.length) { const S = labelSerials(), SC = labelScans(); out.labelSerials = Object.fromEntries(Object.entries(S).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by]]));
       out.labelScans = Object.fromEntries(Object.entries(SC).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by, v.serial || '']])); }
-    out.receipts = FIELD(user) ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
+    out.receipts = FIELD(user) || !sees(user, 'stock:inc') ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
-    if (!FIELD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
+    if (!FIELD(user) && sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
     return send(res, 200, out);
   }
+  // hidden sections: their data is not given and their actions are refused
+  { const need = { devs: 'devs', labels: 'works:labels', receipts: 'stock:inc', notes: 'notes', 'stock-acct': 'stock:stock' }[p[1]];
+    if (need && !user.sys && !sees(user, need)) return fail(res, 403, 'Этот раздел для вас закрыт'); }
   if (p[1] === 'devs') {
     if (orgType(user) === 'requests') return fail(res, 403, 'Разработки есть только в системе «Все сервисы»');
     if (!db.devs || typeof db.devs !== 'object') db.devs = {};
@@ -1500,7 +1512,7 @@ async function api(req, res, url) {
 const ORG_ID = /^[a-z0-9][a-z0-9-]{1,30}$/;
 const orgOut = o => {
   const st = orgState(o), us = users.filter(u => u.orgId === o.id);
-  return { id: o.id, name: o.name, type: o.type === 'requests' ? 'requests' : 'all', until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '', createdAt: o.createdAt || null,
+  return { id: o.id, name: o.name, type: o.type === 'requests' ? 'requests' : 'all', hide: o.hide || [], until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '', createdAt: o.createdAt || null,
     state: st.blocked ? st.reason : 'active', left: st.left ?? null, users: us.length,
     admins: us.filter(u => u.role === 'admin').map(u => ({ id: u.id, login: u.login, name: u.name, blocked: !!u.blocked, sys: !!u.sys, lastLoginAt: u.lastLoginAt || null })) };
 };
@@ -1520,7 +1532,7 @@ async function orgsApi(req, res, p, m, user) {
     let id = String(b.id || '').trim().toLowerCase();
     if (id && (!ORG_ID.test(id) || orgById(id))) return fail(res, 400, 'Код организации: латиница, цифры и дефис, не занятый');
     if (!id) do { id = 'o' + crypto.randomBytes(4).toString('hex'); } while (orgById(id));
-    const org = { id, name, type: ORG_TYPES.includes(b.type) ? b.type : 'all', until, blocked: false, note: String(b.note || '').slice(0, 1000), createdAt: new Date().toISOString(), createdBy: user.id };
+    const org = { id, name, type: ORG_TYPES.includes(b.type) ? b.type : 'all', hide: cleanHide(b.hide), until, blocked: false, note: String(b.note || '').slice(0, 1000), createdAt: new Date().toISOString(), createdBy: user.id };
     orgs.push(org); saveOrgs(); orgEntry(id);
     addUser(String(a.login), 'admin', String(a.name).trim(), String(a.password), id);
     return send(res, 200, orgOut(org));
@@ -1535,6 +1547,7 @@ async function orgsApi(req, res, p, m, user) {
     }
     if (b.until !== undefined) { if (!validDate(String(b.until))) return fail(res, 400, 'Неверная дата'); o.until = String(b.until); }
     if (b.type !== undefined) { if (!ORG_TYPES.includes(b.type)) return fail(res, 400, 'Неизвестный тип системы'); o.type = b.type; }
+    if (b.hide !== undefined) o.hide = cleanHide(b.hide);
     if (b.blocked !== undefined) o.blocked = !!b.blocked;
     if (b.blockNote !== undefined) o.blockNote = String(b.blockNote).slice(0, 500);
     if (b.note !== undefined) o.note = String(b.note).slice(0, 1000);
@@ -1786,8 +1799,8 @@ const MAP = {
   subdomains: process.env.MAP_SUBDOMAINS || 'abc',
   maxZoom: Number(process.env.MAP_MAX_ZOOM || 19),
 };
-const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), prefs: u.prefs || {}, map: MAP, sys: !!u.sys, org: o ? { id: o.id, name: o.name, until: o.until || '', type: orgType(u) } : null, orgWarn: st.warn || '' }; };
-const adminUser = u => ({ ...publicUser(u), sys: !!u.sys, accessUntil: u.accessUntil || '', expired: !!contractorExpired(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
+const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), prefs: u.prefs || {}, map: MAP, sys: !!u.sys, hide: u.sys ? [] : hiddenFor(u), org: o ? { id: o.id, name: o.name, until: o.until || '', type: orgType(u), hide: o.hide || [] } : null, orgWarn: st.warn || '' }; };
+const adminUser = u => ({ ...publicUser(u), sys: !!u.sys, hide: u.hide || [], accessUntil: u.accessUntil || '', expired: !!contractorExpired(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
 /* Remember that the accountant has opened the invoice file(s) */
 function markSeen(user, fileIds) {
