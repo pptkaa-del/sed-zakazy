@@ -258,6 +258,7 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
 .incrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
 .buyst{white-space:nowrap}.buyst small{display:block;font-size:12px}tr.buy-got td{opacity:.6}
+.stabs{margin:0 0 14px;width:max-content;max-width:100%;flex-wrap:wrap}.stabs a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:7px 14px;border-radius:7px;font-size:15px;color:var(--ink-2)}.stabs a:hover{color:var(--ink)}.stabs a.on{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .devcost{display:grid;grid-template-columns:1fr;gap:0;margin:2px 0;font-size:14px}.devcost dt{color:var(--ink-2);font-size:12px;margin-top:4px}.devcost dd{margin:0;white-space:pre-line;overflow:hidden;text-overflow:ellipsis}
@@ -920,12 +921,10 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wdone" data-v="wdone" id="wdoneTab" hidden>Выполненные</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
-      <a href="#stock" data-v="stock">Склад</a>
+      <a href="#stock" data-v="stock">Склад <span class="badge" id="payBadge" hidden title="Счета к оплате"></span></a>
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#staff" data-v="staff" id="staffTab" hidden>Сотрудники</a>
       <a href="#staffp" data-v="staffp" hidden>По проектам</a>
-      <a href="#wo" data-v="wo" id="woTab" hidden>Списание материалов</a>
-      <a href="#pay" data-v="pay">Счета в оплату <span class="badge" id="payBadge" hidden></span></a>
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
       <a href="#dt" data-v="dt">Карта объектов</a>
@@ -1176,10 +1175,19 @@ function animateView(el){
   el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter');
   clearTimeout(enterTimer); enterTimer = setTimeout(() => el.classList.remove('enter'), 700);
 }
+/* «Склад»: the warehouse, the write-off lists and the invoices in one tab */
+const STOCK_VIEWS = ['stock', 'wo', 'pay'];
+const canWo = () => isHead() || me?.role === 'accountant';
+function stockTabs(){
+  const n = S.invoices.filter(i => i.status === 'topay').length;
+  const T = [['stock', 'Склад'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']];
+  return `<nav class="seg stabs" aria-label="Разделы склада">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : ''}</a>`).join('')}</nav>`;
+}
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
   pending = false;
-  document.querySelectorAll('#views a').forEach(a => a.classList.toggle('on', a.dataset.v === ui.view));
+  const navV = STOCK_VIEWS.includes(ui.view) ? 'stock' : ui.view;
+  document.querySelectorAll('#views a').forEach(a => a.classList.toggle('on', a.dataset.v === navV));
   const n = S.invoices.filter(i => i.status === 'topay').length;
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
   const V = $('view');
@@ -1190,7 +1198,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : vOrders();
+  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : '') + (ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -4742,7 +4750,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Счета в оплату'], ['wo', 'Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
+const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Склад → Счета'], ['wo', 'Склад → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
