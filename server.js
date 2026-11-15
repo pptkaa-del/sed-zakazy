@@ -315,6 +315,12 @@ function syncFromDisk() {
 const saveUsers = () => { writeJSON(USERS_FILE, users); usersStamp = stamp(USERS_FILE); };
 const saveOrgs = () => { writeJSON(ORGS_FILE, orgs); orgsStamp = stamp(ORGS_FILE); };
 const orgById = id => orgs.find(o => o.id === id);
+/* the kind of system an organization works in: «Все сервисы» (all) or «Управление заявками» (requests) */
+const ORG_TYPES = ['all', 'requests'];
+const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === 'requests' ? 'requests' : 'all'; };
+const REQ_ROLES = ['admin', 'head', 'worker'];
+// a request is seen by its author, its executor, the administrator and the manager
+const reqSees = (u, r) => HEAD(u) || r.by === u.id || r.assignee === u.id;
 
 /* the database of the organization the current request works in (AsyncLocalStorage keeps it per request) */
 const dbs = new Map();
@@ -492,7 +498,8 @@ async function api(req, res, url) {
   // the system administrator manages organizations, backups and the server, not the work of an organization
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
-  if (FIELD(user) && !['rev', 'data', 'password', 'jobs'].includes(p[1])) return fail(res, 403, 'Недостаточно прав');
+  // in the requests system an employee makes and does requests and attaches files to them
+  if (FIELD(user) && !['rev', 'data', 'password', 'jobs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && orgUsers().find(u => u.id === p[2]);
@@ -501,6 +508,7 @@ async function api(req, res, url) {
       const b = await readJsonBody(req);
       const err = validateUser(b, true); if (err) return fail(res, 400, err);
       if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
+      if (orgType(user) === 'requests' && !REQ_ROLES.includes(b.role)) return fail(res, 400, 'В системе заявок роли: администратор, руководитель, сотрудник');
       if (b.role === 'contractor' && !/^\d{4}-\d{2}-\d{2}$/.test(String(b.accessUntil || ''))) return fail(res, 400, 'Для подрядчика укажите, до какой даты у него доступ');
       const nu = addUser(String(b.login), b.role, String(b.name).trim(), String(b.password), user.orgId);
       if (b.role === 'contractor') { nu.accessUntil = String(b.accessUntil); saveUsers(); }
@@ -512,6 +520,7 @@ async function api(req, res, url) {
       const b = await readJsonBody(req);
       if (b.role !== undefined) {
         if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
+        if (orgType(user) === 'requests' && !REQ_ROLES.includes(b.role)) return fail(res, 400, 'В системе заявок роли: администратор, руководитель, сотрудник');
         if (target.id === user.id && b.role !== 'admin') return fail(res, 400, 'Нельзя снять роль администратора с самого себя');
         target.role = b.role;
       }
@@ -573,10 +582,89 @@ async function api(req, res, url) {
     // a worker gets only the points assigned to him; points without an executor only when he is the job's only worker
     const mine = j => ({ ...j, places: (j.places || []).filter(x => x.assignee ? x.assignee === user.id : (j.workers || []).length === 1) });
     COLLECTIONS.forEach(c => { out[c] = FIELD(user) ? (c === 'jobs' ? listOf(c).filter(j => (j.workers || []).includes(user.id)).map(mine) : []) : listOf(c); });
+    if (orgType(user) === 'requests') {
+      out.requests = Object.entries(db.requests || {}).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r));
+      out.reqUsers = orgUsers().filter(u => !u.blocked && !u.sys).map(u => ({ id: u.id, name: u.name, role: u.role }));
+    }
     out.receipts = FIELD(user) ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
     if (!FIELD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
     return send(res, 200, out);
+  }
+  /* «Управление заявками»: a user makes a request and chooses who does it; the executor takes it and marks it done;
+     the author cancels it or sends it back to work; the administrator and the manager see and change everything */
+  if (p[1] === 'requests') {
+    if (orgType(user) !== 'requests') return fail(res, 403, 'Заявки есть только в системе «Управление заявками»');
+    if (!db.requests || typeof db.requests !== 'object') db.requests = {};
+    const R = db.requests, boss = HEAD(user), now = new Date().toISOString();
+    const okUser = id => !!id && orgUsers().some(u => u.id === id && !u.blocked && !u.sys);
+    const cleanFiles = a => (Array.isArray(a) ? a : []).filter(f => f && db.files[f.id]).slice(0, 30).map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), type: db.files[f.id].type }));
+    const out = (id, r) => ({ ok: true, request: { id, ...r }, rev: db.rev });
+    if (m === 'GET' && !p[2]) return send(res, 200, Object.entries(R).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r)));
+    if (m === 'POST' && !p[2]) {
+      const b = await readJsonBody(req), title = String(b.title || '').trim().slice(0, 200);
+      if (!title) return fail(res, 400, 'Напишите, что нужно сделать');
+      if (b.assignee && !okUser(b.assignee)) return fail(res, 400, 'Исполнитель не найден');
+      const id = newId(), no = Math.max(0, ...Object.values(R).map(r => r.no || 0)) + 1;
+      R[id] = { no, title, text: String(b.text || '').trim().slice(0, 4000), due: /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : '', urgent: !!b.urgent,
+        assignee: b.assignee || null, files: cleanFiles(b.files), status: 'new', by: user.id, at: now, comments: [], history: [{ at: now, by: user.id, act: 'created', to: b.assignee || null }] };
+      saveDb();
+      return send(res, 200, out(id, R[id]));
+    }
+    const r = p[2] && R[p[2]];
+    if (!r || !reqSees(user, r)) return fail(res, 404, 'Заявка не найдена — обновите страницу');
+    const author = r.by === user.id, executor = r.assignee === user.id;
+    if (p[3] === 'comments' && m === 'POST') {
+      const b = await readJsonBody(req), t = String(b.text || '').trim().slice(0, 2000);
+      if (!t) return fail(res, 400, 'Пустой комментарий');
+      r.comments = Array.isArray(r.comments) ? r.comments : [];
+      r.comments.push({ id: newId(), by: user.id, at: now, text: t }); r.updatedAt = now;
+      saveDb();
+      return send(res, 200, out(p[2], r));
+    }
+    if (m === 'PATCH' && p.length === 3) {
+      const b = await readJsonBody(req), act = b.action, note = String(b.note || '').trim().slice(0, 2000);
+      const log = (a, extra = {}) => { r.history = Array.isArray(r.history) ? r.history : []; r.history.push({ at: now, by: user.id, act: a, ...(note ? { note } : {}), ...extra }); r.updatedAt = now; };
+      if (act === 'take') {
+        if (!(executor || boss || (!r.assignee))) return fail(res, 403, 'Взять в работу может исполнитель заявки');
+        if (r.status !== 'new') return fail(res, 409, 'Заявка уже в работе или закрыта');
+        if (!r.assignee) r.assignee = user.id;
+        r.status = 'work'; r.takenAt = now; log('take');
+      } else if (act === 'done') {
+        if (!(executor || boss)) return fail(res, 403, 'Отметить выполнение может исполнитель заявки');
+        if (!['new', 'work'].includes(r.status)) return fail(res, 409, 'Заявка уже закрыта');
+        r.status = 'done'; r.doneAt = now; r.doneBy = user.id; r.doneNote = note; log('done');
+      } else if (act === 'reopen') {
+        if (!(author || boss)) return fail(res, 403, 'Вернуть заявку в работу может её автор');
+        if (!['done', 'cancel'].includes(r.status)) return fail(res, 409, 'Заявка не закрыта');
+        r.status = r.assignee ? 'work' : 'new'; r.doneAt = null; r.doneBy = null; log('reopen');
+      } else if (act === 'cancel') {
+        if (!(author || boss)) return fail(res, 403, 'Отменить заявку может её автор');
+        if (!['new', 'work'].includes(r.status)) return fail(res, 409, 'Заявка уже закрыта');
+        r.status = 'cancel'; r.cancelAt = now; log('cancel');
+      } else if (act === 'assign') {
+        if (!(boss || (author && r.status === 'new'))) return fail(res, 403, 'Сменить исполнителя может руководитель или автор, пока заявка не в работе');
+        if (b.assignee && !okUser(b.assignee)) return fail(res, 400, 'Исполнитель не найден');
+        if (!['new', 'work'].includes(r.status)) return fail(res, 409, 'Заявка закрыта');
+        r.assignee = b.assignee || null; if (!r.assignee) r.status = 'new'; log('assign', { to: r.assignee });
+      } else if (act === 'edit') {
+        if (!(boss || (author && r.status === 'new'))) return fail(res, 403, 'Изменить заявку может автор, пока её не взяли в работу');
+        if (b.title !== undefined) { const t = String(b.title).trim().slice(0, 200); if (!t) return fail(res, 400, 'Напишите, что нужно сделать'); r.title = t; }
+        if (b.text !== undefined) r.text = String(b.text).trim().slice(0, 4000);
+        if (b.due !== undefined) r.due = /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : '';
+        if (b.urgent !== undefined) r.urgent = !!b.urgent;
+        if (b.files !== undefined) r.files = cleanFiles(b.files);
+        log('edit');
+      } else return fail(res, 400, 'Неизвестное действие');
+      saveDb();
+      return send(res, 200, out(p[2], r));
+    }
+    if (m === 'DELETE' && p.length === 3) {
+      if (!(boss || (author && r.status === 'new' && !(r.comments || []).length))) return fail(res, 403, 'Удалить можно свою заявку, пока её не взяли в работу, — иначе отмените её');
+      delete R[p[2]]; saveDb();
+      return send(res, 200, { ok: true, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Мои задачи»: a personal to-do list — each administrator sees and changes only his own notes */
   /* «Мои задачи»: personal tasks («task»), notes with drawings and pictures («memo») and shared tasks («shared»):
@@ -884,7 +972,7 @@ async function api(req, res, url) {
   }
 
   if (p[1] === 'files' && m === 'POST') {
-    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user)) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
+    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user) && orgType(user) !== 'requests') return fail(res, 403, 'Недостаточно прав для загрузки файлов');
     let name = 'файл';
     try { name = decodeURIComponent(String(req.headers['x-filename'] || 'файл')); } catch {}
     name = name.replace(/[\\/\r\n"]/g, '_').slice(0, 200) || 'файл';
@@ -1237,7 +1325,7 @@ async function api(req, res, url) {
 const ORG_ID = /^[a-z0-9][a-z0-9-]{1,30}$/;
 const orgOut = o => {
   const st = orgState(o), us = users.filter(u => u.orgId === o.id);
-  return { id: o.id, name: o.name, until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '', createdAt: o.createdAt || null,
+  return { id: o.id, name: o.name, type: o.type === 'requests' ? 'requests' : 'all', until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '', createdAt: o.createdAt || null,
     state: st.blocked ? st.reason : 'active', left: st.left ?? null, users: us.length,
     admins: us.filter(u => u.role === 'admin').map(u => ({ id: u.id, login: u.login, name: u.name, blocked: !!u.blocked, sys: !!u.sys, lastLoginAt: u.lastLoginAt || null })) };
 };
@@ -1257,7 +1345,7 @@ async function orgsApi(req, res, p, m, user) {
     let id = String(b.id || '').trim().toLowerCase();
     if (id && (!ORG_ID.test(id) || orgById(id))) return fail(res, 400, 'Код организации: латиница, цифры и дефис, не занятый');
     if (!id) do { id = 'o' + crypto.randomBytes(4).toString('hex'); } while (orgById(id));
-    const org = { id, name, until, blocked: false, note: String(b.note || '').slice(0, 1000), createdAt: new Date().toISOString(), createdBy: user.id };
+    const org = { id, name, type: ORG_TYPES.includes(b.type) ? b.type : 'all', until, blocked: false, note: String(b.note || '').slice(0, 1000), createdAt: new Date().toISOString(), createdBy: user.id };
     orgs.push(org); saveOrgs(); orgEntry(id);
     addUser(String(a.login), 'admin', String(a.name).trim(), String(a.password), id);
     return send(res, 200, orgOut(org));
@@ -1271,6 +1359,7 @@ async function orgsApi(req, res, p, m, user) {
       o.name = name;
     }
     if (b.until !== undefined) { if (!validDate(String(b.until))) return fail(res, 400, 'Неверная дата'); o.until = String(b.until); }
+    if (b.type !== undefined) { if (!ORG_TYPES.includes(b.type)) return fail(res, 400, 'Неизвестный тип системы'); o.type = b.type; }
     if (b.blocked !== undefined) o.blocked = !!b.blocked;
     if (b.blockNote !== undefined) o.blockNote = String(b.blockNote).slice(0, 500);
     if (b.note !== undefined) o.note = String(b.note).slice(0, 1000);
@@ -1522,7 +1611,7 @@ const MAP = {
   subdomains: process.env.MAP_SUBDOMAINS || 'abc',
   maxZoom: Number(process.env.MAP_MAX_ZOOM || 19),
 };
-const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), prefs: u.prefs || {}, map: MAP, sys: !!u.sys, org: o ? { id: o.id, name: o.name, until: o.until || '' } : null, orgWarn: st.warn || '' }; };
+const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), prefs: u.prefs || {}, map: MAP, sys: !!u.sys, org: o ? { id: o.id, name: o.name, until: o.until || '', type: orgType(u) } : null, orgWarn: st.warn || '' }; };
 const adminUser = u => ({ ...publicUser(u), sys: !!u.sys, accessUntil: u.accessUntil || '', expired: !!contractorExpired(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
 /* Remember that the accountant has opened the invoice file(s) */
