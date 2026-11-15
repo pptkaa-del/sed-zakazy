@@ -1108,6 +1108,70 @@ async function pdfText(file){
   }
   return out;
 }
+/* ===== Recognition of pictures and scans (Tesseract.js, in the browser — files do not leave the system) ===== */
+let tessLib = null;
+function loadTesseract(){
+  if (tessLib) return tessLib;
+  tessLib = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '/vendor/tesseract/tesseract.min.js';
+    sc.onload = () => res(window.Tesseract); sc.onerror = () => { tessLib = null; rej(new Error('Не удалось загрузить модуль распознавания')); }; document.head.appendChild(sc); });
+  return tessLib;
+}
+const isImageFile = f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|bmp|gif|tiff?|heic)$/i.test(f.name);
+// a picture → canvas: grey, at most ~2600 px on the long side, small photos are enlarged so that small print is read
+async function imageCanvas(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Формат изображения не поддерживается браузером — сохраните его как JPG или PNG')); im.src = url; });
+    const long = Math.max(img.naturalWidth, img.naturalHeight), k = long > 2600 ? 2600 / long : long < 1600 ? 1600 / long : 1;
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    const g = c.getContext('2d'); g.filter = 'grayscale(1) contrast(1.2)'; g.drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  } finally { URL.revokeObjectURL(url); }
+}
+async function pdfCanvases(file, max = 3){
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported:false }).promise, out = [];
+  for (let n = 1; n <= Math.min(doc.numPages, max); n++) {
+    const page = await doc.getPage(n), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(3, 2400 / Math.max(vp0.width, vp0.height)) });
+    const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: g, viewport: vp }).promise; out.push(c);
+  }
+  return out;
+}
+// one worker for the page's lifetime: the language data is loaded once (and cached by the browser)
+let tessWorker = null, tessProgress = null;
+async function ocrCanvases(canvases, onProgress){
+  const T = await loadTesseract();
+  if (!tessWorker) tessWorker = T.createWorker('rus', 1, { workerPath: '/vendor/tesseract/worker.min.js', corePath: '/vendor/tesseract/core', langPath: '/vendor/tesseract/lang', workerBlobURL: false,
+    logger: m => tessProgress && tessProgress(m) }).then(async w => { await w.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' }); return w; }).catch(e => { tessWorker = null; throw e; });
+  const w = await tessWorker;
+  let text = '';
+  for (let i = 0; i < canvases.length; i++) {
+    tessProgress = m => { if (!onProgress) return; if (m.status === 'recognizing text') onProgress(`Распознаём текст${canvases.length > 1 ? `, страница ${i + 1} из ${canvases.length}` : ''}… ${Math.round(m.progress * 100)}%`);
+      else if (/load|initializ/i.test(m.status)) onProgress('Загружаем модуль распознавания (первый раз — около 10 МБ)…'); };
+    const { data } = await w.recognize(canvases[i]);
+    text += data.text + '\n';
+  }
+  tessProgress = null;
+  // OCR noise: a stray space before the kopecks, «ООО» read as «000» / «©000», a table rule after the row number, odd quotes
+  return text.replace(/(\d) ([.,]\d{2})(?!\d)/g, '$1$2').replace(/[©®]?\b[0О]{3}\b(?=\s*["«])/g, 'ООО').replace(/^(\d{1,3})\s+[—–|-]+\s+/gm, '$1 ').replace(/^[Зз](?=\s+\S.*\d[.,]\d{2})/gm, '3')
+    .replace(/[‘’`]/g, "'").replace(/[—–]/g, '-').replace(/ {2,}/g, ' ');
+}
+/* text of a document file: the PDF text layer; a picture or a scan is recognized. ocr: true when the text was recognized */
+async function docText(file, onProgress){
+  const isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name);
+  if (/^text\//.test(file.type) || /\.(txt|csv)$/i.test(file.name)) return { text: await file.text(), ocr: false };
+  if (isPdf) {
+    const text = await pdfText(file);
+    if (text.replace(/\s/g, '').length > 40) return { text, ocr: false };
+    onProgress && onProgress('В PDF нет текста — это скан, распознаём…');
+    return { text: await ocrCanvases(await pdfCanvases(file), onProgress), ocr: true };
+  }
+  if (isImageFile(file)) return { text: await ocrCanvases([await imageCanvas(file)], onProgress), ocr: true };
+  return null;
+}
+const OCR_NOTE = ' <b>Текст распознан с изображения — сверьте номер, сумму и строки с документом.</b>';
 const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 function parseInvoiceText(raw){
   const t = String(raw || '').replace(/ /g, ' ').replace(/[ \t]+/g, ' ');
@@ -1213,14 +1277,12 @@ function parseInvoiceItems(raw){
 async function parseInvoiceFile(file){
   const box = $('f-parse'); if (!box || !file) return;
   const show = (html, warn) => { box.hidden = false; box.className = 'wide parsed' + (warn ? ' warn' : ''); box.innerHTML = html; };
-  const isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name);
-  const isText = /^text\//.test(file.type) || /\.(txt|csv)$/i.test(file.name);
-  if (!isPdf && !isText) return show('Номер и сумма читаются автоматически только из PDF со встроенным текстом. Введите их вручную.', true);
   show('Читаем счёт…');
-  let text = '';
-  try { text = isPdf ? await pdfText(file) : await file.text(); }
+  let text = '', ocr = false;
+  try { const r = await docText(file, msg => show(esc(msg))); if (!r) return show('Номер и сумма читаются автоматически из PDF и изображений (JPG, PNG). Для этого файла введите их вручную.', true); text = r.text; ocr = r.ocr; }
   catch(e) { return show('Не удалось прочитать файл: ' + esc(e.message || 'ошибка') + '. Введите номер и сумму вручную.', true); }
-  if (!text.replace(/\s/g, '').length) return show('В файле нет текста — похоже, это скан. Введите номер и сумму вручную.', true);
+  if ($('f-file')?.files[0] !== file) return;   // another file was chosen meanwhile
+  if (!text.replace(/\s/g, '').length) return show('Текст в файле не найден. Введите номер и сумму вручную.', true);
   const r = parseInvoiceText(text);
   const got = [];
   if (r.number) { $('f-num').value = r.number; got.push('№ ' + esc(r.number)); }
@@ -1235,8 +1297,8 @@ async function parseInvoiceFile(file){
     ui.invItems = r.items.map(x => ({ id:uid(), ...x })); drawLines('invItems');
     got.push('строк товаров: ' + r.items.length);
   }
-  if (!r.number || !r.amount) return show((got.length ? 'Нашли в файле: ' + got.join(', ') + '. ' : '') + `Не нашли ${!r.number && !r.amount ? 'номер и сумму' : !r.number ? 'номер' : 'сумму'} — введите вручную.`, true);
-  show('✓ Из файла подставлены: ' + got.join(', ') + '. Проверьте перед сохранением.');
+  if (!r.number || !r.amount) return show((got.length ? 'Нашли в файле: ' + got.join(', ') + '. ' : '') + `Не нашли ${!r.number && !r.amount ? 'номер и сумму' : !r.number ? 'номер' : 'сумму'} — введите вручную.` + (ocr ? OCR_NOTE : ''), true);
+  show('✓ Из файла подставлены: ' + got.join(', ') + '. Проверьте перед сохранением.' + (ocr ? OCR_NOTE : ''), ocr);
 }
 
 /* ===== Reading a waybill (накладная): ТОРГ-12, УПД or a simple one — number, date, supplier and goods lines ===== */
@@ -1317,7 +1379,7 @@ function wbBox(withSup, invId){
   return `<div class="box wbbox"><h4>Накладная</h4>${invId ? `<div class="row-g"><button type="button" class="btn sm" data-act="incEdo" data-id="1" title="Накладная приходит через ЭДО — оприходовать по строкам счёта">Документы в ЭДО</button><small class="dim">накладной нет на руках — приход по счёту</small></div>` : ''}
     ${w.file ? `<p style="margin:0">📄 <a href="${esc(fileUrl(w.file))}" target="_blank" rel="noopener">${esc(w.file.name)}</a> <label class="linkish" style="cursor:pointer">заменить<input type="file" data-up="waybill" accept=".pdf,application/pdf,image/*" hidden></label></p>`
       : `<label class="btn primary" style="align-self:flex-start">Загрузить накладную<input type="file" data-up="waybill" accept=".pdf,application/pdf,image/*" hidden></label>
-        <small class="dim">PDF из 1С (ТОРГ-12, УПД) — номер, дата, поставщик и строки товаров подставятся сами. Скан или фото тоже можно приложить, строки тогда введите вручную.</small>`}
+        <small class="dim">PDF из 1С (ТОРГ-12, УПД), скан или фото — номер, дата, поставщик и строки товаров подставятся сами. Распознанное с изображения проверьте особенно внимательно.</small>`}
     <div id="wb-parse" class="parsed ${w.warn ? 'warn' : ''}" ${w.msg ? '' : 'hidden'}>${w.msg || ''}</div>
     <div class="form"><label>Номер накладной<input class="in" id="wb-num" value="${esc(w.number || '')}" maxlength="60"></label>
       <label>Дата<input class="in" type="date" id="wb-date" value="${esc(w.date || '')}"></label>
@@ -1327,19 +1389,20 @@ async function waybillFile(file){
   ui.incWb = { ...(ui.incWb || {}), msg: 'Загружаем накладную…', warn: false }; renderDrawer();
   try { const u = await upload(file); ui.incWb.file = { id: u.id, name: u.name }; }
   catch(e) { ui.incWb.msg = 'Не удалось загрузить файл: ' + esc(errText(e)); ui.incWb.warn = true; return renderDrawer(); }
-  const isPdf = /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name);
   const done = (msg, warn) => { ui.incWb.msg = msg; ui.incWb.warn = !!warn; renderDrawer(); };
-  if (!isPdf) return done('Файл приложен. Строки читаются автоматически только из PDF с текстом — введите номер и строки вручную.', true);
-  let text = '';
-  try { text = await pdfText(file); } catch(e) { return done('Файл приложен, но прочитать его не удалось — введите номер и строки вручную.', true); }
-  if (!text.replace(/\s/g, '').length) return done('Файл приложен. В нём нет текста — похоже, это скан. Введите номер и строки вручную.', true);
+  const wb = ui.incWb, step = msg => { if (ui.incWb !== wb) return; const box = $('wb-parse'); ui.incWb.msg = esc(msg); if (box) { box.hidden = false; box.innerHTML = esc(msg); } };
+  let text = '', ocr = false;
+  try { const d = await docText(file, step); if (!d) return done('Файл приложен. Строки читаются автоматически из PDF и изображений (JPG, PNG) — для этого файла введите их вручную.', true); text = d.text; ocr = d.ocr; }
+  catch(e) { return done('Файл приложен, но прочитать его не удалось (' + esc(e.message || 'ошибка') + ') — введите номер и строки вручную.', true); }
+  if (ui.incWb !== wb) return;   // the window was closed or another file chosen
+  if (!text.replace(/\s/g, '').length) return done('Файл приложен. Текст в нём не найден — введите номер и строки вручную.', true);
   const r = parseWaybillText(text), got = [];
   if (r.number) { ui.incWb.number = r.number; got.push('№ ' + esc(r.number)); }
   if (r.date) { ui.incWb.date = r.date; got.push('от ' + fmtD(r.date)); }
   if (r.supplier) { const cp = (r.inn && S.counterparties.find(c => c.inn === r.inn)) || cpByName(r.supplier); ui.incWb.supplier = cp ? cp.name : r.supplier; ui.incWb.inn = r.inn || (cp && cp.inn) || ''; got.push('поставщик ' + esc(ui.incWb.supplier)); }
   if (r.items.length) { ui.incLines = r.items.map(x => ({ id: uid(), name: x.name, qty: x.qty, unit: x.unit, price: x.price, sum: x.sum })); got.push('строк товаров: ' + r.items.length); }
-  if (!r.items.length) return done((got.length ? 'Нашли: ' + got.join(', ') + '. ' : '') + 'Строки товаров не распознаны — введите их вручную.', true);
-  done('✓ Из накладной подставлены: ' + got.join(', ') + '. Проверьте строки и количество перед оприходованием.' + (r.number ? '' : ' Номер не найден — введите вручную.'), !r.number);
+  if (!r.items.length) return done((got.length ? 'Нашли: ' + got.join(', ') + '. ' : '') + 'Строки товаров не распознаны — введите их вручную.' + (ocr ? OCR_NOTE : ''), true);
+  done('✓ Из накладной подставлены: ' + got.join(', ') + '. Проверьте строки и количество перед оприходованием.' + (r.number ? '' : ' Номер не найден — введите вручную.') + (ocr ? OCR_NOTE : ''), !r.number || ocr);
 }
 const wbData = withSup => { const w = ui.incWb || {}; const sup = withSup ? val2('wb-sup') : (w.supplier || ''); return w.file ? { file: w.file, number: val2('wb-num'), date: val2('wb-date'), supplier: sup, inn: sup === w.supplier ? (w.inn || '') : '' } : null; };
 const dl1c = href => `<a class="btn sm" href="${href}" download data-dl title="Файл Excel для загрузки в 1С: «Поступление» → «Товары» → «Загрузить из файла»">Скачать для 1С</a>`;
