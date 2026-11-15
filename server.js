@@ -586,10 +586,62 @@ async function api(req, res, url) {
       out.requests = Object.entries(db.requests || {}).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r));
       out.reqUsers = orgUsers().filter(u => !u.blocked && !u.sys).map(u => ({ id: u.id, name: u.name, role: u.role }));
     }
+    out.labels = FIELD(user) ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
     out.receipts = FIELD(user) ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
     if (!FIELD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
     return send(res, 200, out);
+  }
+  /* label templates for production: size in millimetres, elements (text with fields, barcode of the serial number) and the serial counter;
+     the next serial number is handed out by the server, so two people never print the same one */
+  if (p[1] === 'labels') {
+    if (!db.labels || typeof db.labels !== 'object') db.labels = {};
+    const L = db.labels, now = new Date().toISOString();
+    const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n * 10) / 10)) : d; };
+    const cleanTpl = (b, old = {}) => {
+      const ref = b.ref && ((b.ref.type === 'order' && db.orders[b.ref.id]) || (b.ref.type === 'job' && db.jobs[b.ref.id])) ? { type: b.ref.type, id: b.ref.id } : null;
+      const sr = b.serial || {};
+      return { name: String(b.name || old.name || 'Этикетка').trim().slice(0, 120) || 'Этикетка', w: num(b.w, 10, 300, 58), h: num(b.h, 10, 300, 40), ref,
+        serial: { prefix: String(sr.prefix || '').slice(0, 30), suffix: String(sr.suffix || '').slice(0, 30), digits: num(sr.digits, 1, 12, 6) | 0,
+          next: old.serial ? old.serial.next : Math.max(0, Math.floor(Number(sr.next) || 1)) },
+        items: (Array.isArray(b.items) ? b.items : []).slice(0, 40).filter(x => x && ['text', 'barcode', 'line', 'box'].includes(x.type)).map(x => ({
+          id: String(x.id || newId()).slice(0, 20), type: x.type, text: String(x.text || '').slice(0, 300), x: num(x.x, -50, 300, 2), y: num(x.y, -50, 300, 2),
+          w: num(x.w, 0.2, 300, 30), h: num(x.h, 0.2, 300, 8), size: num(x.size, 3, 120, 10), bold: !!x.bold, align: ['left', 'center', 'right'].includes(x.align) ? x.align : 'left' })) };
+    };
+    if (m === 'POST' && !p[2]) {
+      if (!canEdit(user)) return fail(res, 403, 'Создавать этикетки может руководитель или администратор');
+      const id = newId(); L[id] = { ...cleanTpl(await readJsonBody(req)), prints: [], createdAt: now, createdBy: user.id };
+      saveDb(); return send(res, 200, { ok: true, id, label: { id, ...L[id] }, rev: db.rev });
+    }
+    const t = p[2] && L[p[2]];
+    if (!t) return fail(res, 404, 'Этикетка не найдена — обновите страницу');
+    if (m === 'PUT' && p.length === 3) {
+      if (!canEdit(user)) return fail(res, 403, 'Менять этикетки может руководитель или администратор');
+      const b = await readJsonBody(req);
+      Object.assign(t, cleanTpl(b, t), { updatedAt: now, updatedBy: user.id });
+      // the counter is changed on purpose only: «Следующий номер»
+      if (b.serial && b.serial.setNext !== undefined) { const n = Math.floor(Number(b.serial.setNext)); if (!(n >= 0 && n < 1e12)) return fail(res, 400, 'Неверный номер'); t.serial.next = n; t.prints.push({ at: now, by: user.id, set: n }); }
+      saveDb(); return send(res, 200, { ok: true, label: { id: p[2], ...t }, rev: db.rev });
+    }
+    // «Печать следующей»: reserve the next number(s), raise the counter and write it into the log
+    if (m === 'POST' && p[3] === 'next') {
+      const b = await readJsonBody(req), count = Math.min(500, Math.max(1, Math.floor(Number(b.count) || 1)));
+      const from = t.serial.next; t.serial.next = from + count;
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, from, count }).slice(-300);
+      saveDb(); return send(res, 200, { ok: true, from, count, next: t.serial.next, rev: db.rev });
+    }
+    // reprint of numbers already given out: only written into the log
+    if (m === 'POST' && p[3] === 'reprint') {
+      const b = await readJsonBody(req), n = Math.floor(Number(b.n));
+      if (!(n >= 0 && n < t.serial.next)) return fail(res, 400, 'Этот номер ещё не печатался');
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, from: n, count: 1, reprint: true }).slice(-300);
+      saveDb(); return send(res, 200, { ok: true, rev: db.rev });
+    }
+    if (m === 'DELETE' && p.length === 3) {
+      if (!canEdit(user)) return fail(res, 403, 'Удалить этикетку может руководитель или администратор');
+      delete L[p[2]]; saveDb(); return send(res, 200, { ok: true, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Управление заявками»: a user makes a request and chooses who does it; the executor takes it and marks it done;
      the author cancels it or sends it back to work; the administrator and the manager see and change everything */
