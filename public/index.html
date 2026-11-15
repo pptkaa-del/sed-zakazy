@@ -276,6 +276,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .lblinline{position:absolute;z-index:3;box-sizing:border-box;margin:0;padding:0 2px;border:2px solid #3446B8;border-radius:3px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;line-height:1.15;resize:none;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #lbl-prev .li[data-li]{cursor:move}
 #lbl-prev .li{cursor:move;outline:1px dashed transparent}#lbl-prev .li:hover{outline-color:rgba(52,70,184,.5)}#lbl-prev .li.sel{outline:1px dashed #3446B8;outline-offset:1px}
+.qrels{display:flex;flex-direction:column;gap:4px}.qrels label{display:flex!important;flex-direction:row!important;gap:6px;align-items:baseline;font-size:14px;color:var(--ink)!important;flex-wrap:wrap}
 .qrfields{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 12px}.qrfields label{display:flex;flex-direction:row!important;gap:6px;align-items:center;font-size:14px;color:var(--ink)!important}
 .lblscan{padding:10px 12px;border:1px dashed var(--rule);border-radius:10px}.lblscan .in{width:280px}
 .lblman{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end}.lblman label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.lblman .in{width:220px}.lblcheck{flex:1 1 100%;font-size:13px}
@@ -3179,7 +3180,7 @@ const LBL_SIZES = [[58, 40], [58, 30], [40, 25], [30, 20], [43, 25], [75, 50], [
 const LBL_FIELDS = [['{serial}', 'серийный номер'], ['{scan}', 'поле со сканера'], ['{name}', 'изделие / работа'], ['{order}', 'номер заказа'], ['{customer}', 'заказчик'], ['{date}', 'дата печати']];
 const LBL_TYPES = { text: 'Текст', barcode: 'Штрихкод', qr: 'QR-код', line: 'Линия', box: 'Рамка' };
 const QR_FIELDS = [['serial', 'Серийный номер'], ['scan', 'Поле со сканера'], ['name', 'Изделие / работа'], ['order', 'Номер заказа'], ['customer', 'Заказчик'], ['date', 'Дата печати']];
-const QR_MODES = [['fields', 'Поля через разделитель'], ['text', 'Введённые данные'], ['mix', 'Введённые данные с полями']];
+const QR_MODES = [['fields', 'Элементы этикетки через разделитель'], ['text', 'Введённые данные'], ['mix', 'Введённые данные с полями']];
 // Code 128: bar/space widths of the 107 symbols (103 data, 3 starts, stop)
 const C128 = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '
   + '221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 '
@@ -3196,9 +3197,14 @@ function code128(text){
   const check = (start + codes.reduce((a, c, i) => a + c * (i + 1), 0)) % 103;
   return [start, ...codes, check, 106].map(i => C128[i]).join('');
 }
+// what an element shows on the label: a text with its fields filled in, the value of a barcode
+const qrSrc = x => x.type === 'text' || x.type === 'barcode';
+const qrEls = (x, t) => Array.isArray(x.els) ? x.els : (t.items || []).filter(e => qrSrc(e) && (x.fields || []).some(k => (e.text || (e.type === 'barcode' ? '{serial}' : '')).includes('{' + k + '}'))).map(e => e.id);
+const elValue = (e, t, n, c) => e.type === 'barcode' ? lblFill(e.text || '{serial}', t, n, c) : lblFill(e.text, t, n, c);
 function qrValue(x, t, n, c){
   if (x.mode === 'text') return String(x.text || '');
   if (x.mode === 'mix') return lblFill(x.text, t, n, c);
+  if (Array.isArray(x.els)) return (t.items || []).filter(e => e.id !== x.id && qrSrc(e) && x.els.includes(e.id)).map(e => elValue(e, t, n, c)).join(x.sep ?? ';');
   const v = { serial: lblSerial(t, n), scan: c.scan, name: c.name, order: c.order, customer: c.customer, date: fmtD(today()) };
   return (x.fields || []).map(k => v[k] ?? '').join(x.sep ?? ';');
 }
@@ -3337,11 +3343,11 @@ function lblForm(t){
     <small class="wide dim">Сейчас следующим будет <b class="mono">${esc(lblSerial(t, t.serial.next))}</b>. ${/[^\x20-\x7e]/.test(t.serial.prefix + t.serial.suffix) ? '<span class="bad-t">В штрихкоде можно только латиницу и цифры — кириллица в префиксе заменится знаком «?».</span>' : ''}</small></div>
   <h4 class="sub-h">Элементы</h4>
   <div class="row-g">${Object.entries(LBL_TYPES).map(([k, l]) => `<button type="button" class="btn sm" data-act="lblAdd" data-id="${k}">+ ${l}</button>`).join('')}<button type="button" class="btn sm" data-act="lblAdd" data-id="serial">+ Серийный номер</button><button type="button" class="btn sm" data-act="lblAdd" data-id="scan">+ Поле со сканера</button></div>
-  <ul class="lblitems">${(t.items || []).map((x, i) => `<li class="${x.id === ui.lblSel ? 'on' : ''}"><button type="button" class="linkish" data-act="lblSel" data-id="${x.id}">${i + 1}. ${LBL_TYPES[x.type]}${x.type === 'text' || x.type === 'barcode' ? ': ' + esc((x.text || '').slice(0, 30)) : x.type === 'qr' ? ': ' + esc((x.mode === 'fields' ? (x.fields || []).map(k => (QR_FIELDS.find(f => f[0] === k) || [k, k])[1]).join(` ${x.sep ?? ';'} `) || 'поля не выбраны' : x.text || 'пусто').slice(0, 40)) : ''}</button>
+  <ul class="lblitems">${(t.items || []).map((x, i) => `<li class="${x.id === ui.lblSel ? 'on' : ''}"><button type="button" class="linkish" data-act="lblSel" data-id="${x.id}">${i + 1}. ${LBL_TYPES[x.type]}${x.type === 'text' || x.type === 'barcode' ? ': ' + esc((x.text || '').slice(0, 30)) : x.type === 'qr' ? ': ' + esc((x.mode === 'fields' ? (qrEls(x, t).map(id => '№ ' + ((t.items || []).findIndex(e => e.id === id) + 1)).filter(s => s !== '№ 0').join(` ${x.sep ?? ';'} `) || 'элементы не выбраны') : x.text || 'пусто').slice(0, 40)) : ''}</button>
       <span class="row-g"><button type="button" class="btn sm ghost" data-act="lblUp" data-id="${x.id}" title="Выше по списку (рисуется раньше)">↑</button><button type="button" class="btn sm ghost" data-act="lblDel" data-id="${x.id}" aria-label="Удалить элемент">✕</button></span></li>`).join('')}</ul>
   ${sel ? `<div class="box lblsel"><h4>${LBL_TYPES[sel.type]}</h4><div class="form">
     ${sel.type === 'qr' ? `<label class="wide">Что вставить в QR-код<select class="in" data-lb="it.mode">${QR_MODES.map(([k, l]) => `<option value="${k}" ${sel.mode === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-      ${sel.mode === 'fields' ? `<div class="wide qrfields">${QR_FIELDS.map(([k, l]) => `<label><input type="checkbox" data-lb="it.f:${k}" ${(sel.fields || []).includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div>
+      ${sel.mode === 'fields' ? `<div class="wide qrels"><span class="dim" style="font-size:13px">Какие элементы этикетки вставить — по номерам из списка «Элементы», в этом порядке:</span>${(t.items || []).map((e, i) => qrSrc(e) && e.id !== sel.id ? `<label><input type="checkbox" data-lb="it.e:${e.id}" ${(qrEls(sel, t)).includes(e.id) ? 'checked' : ''}> <b>${i + 1}.</b> ${LBL_TYPES[e.type]}: <span class="mono">${esc((e.text || (e.type === 'barcode' ? '{serial}' : '')).slice(0, 40))}</span> <small class="dim">→ ${esc(elValue(e, t, ui.lblMan || t.serial.next, { ...lblCtx(t), scan: ui.lblScan || '‹скан›' }).slice(0, 40)) || 'пусто'}</small></label>` : '').join('') || '<span class="dim">На этикетке нет надписей и штрихкодов — добавьте их.</span>'}</div>
         <label>Разделитель<input class="in mono" data-lb="it.sep" value="${esc(sel.sep ?? ';')}" maxlength="5" style="width:80px"></label>`
       : `<label class="wide">${sel.mode === 'mix' ? 'Текст с полями' : 'Текст или ссылка'}<textarea class="in" data-lb="it.text" rows="2" placeholder="${sel.mode === 'mix' ? 'например, https://site.ru/p/{serial}' : 'например, https://site.ru или +7 495 000-00-00'}">${esc(sel.text)}</textarea>${sel.mode === 'mix' ? `<small class="dim">Поля: ${LBL_FIELDS.map(([k, l]) => `<button type="button" class="linkish mono" data-act="lblIns" data-id="${k}" title="${l}">${k}</button>`).join(' ')}</small>` : ''}</label>`}
       <label>Коррекция ошибок<select class="in" data-lb="it.ec">${[['L', 'L — 7%'], ['M', 'M — 15%'], ['Q', 'Q — 25%'], ['H', 'H — 30%']].map(([k, l]) => `<option value="${k}" ${sel.ec === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -3368,15 +3374,17 @@ function lblChange(key, el){
   else if (key === 'name') t.name = v;
   else if (key === 'w' || key === 'h') { if (nv > 0) t[key] = nv; }
   else if (key.startsWith('serial.')) { const k = key.slice(7); t.serial[k] = k === 'digits' ? Math.max(1, Math.min(12, nv | 0 || 1)) : v; }
+  else if (key.startsWith('it.e:') && sel) { const k = key.slice(5), E = qrEls(sel, t).filter(x => x !== k); sel.els = (t.items || []).map(e => e.id).filter(id => id === k ? v : E.includes(id)); }
   else if (key.startsWith('it.f:') && sel) { const k = key.slice(5), F = (sel.fields || []).filter(x => x !== k); sel.fields = v ? QR_FIELDS.map(f => f[0]).filter(f => f === k || F.includes(f)) : F; }
   else if (key.startsWith('it.') && sel) { const k = key.slice(3); sel[k] = ['text', 'align', 'bold', 'mode', 'sep', 'ec'].includes(k) ? v : (Number.isFinite(nv) ? nv : sel[k]); if (sel.type === 'qr' && k === 'w') sel.h = sel.w; }
-  ui.lblDirty = true; lblRedraw(key === 'size' || key === 'serial.prefix' || key === 'serial.suffix' || key === 'serial.digits' || key === 'it.mode' || key.startsWith('it.f:'));
+  ui.lblDirty = true; lblRedraw(key === 'size' || key === 'serial.prefix' || key === 'serial.suffix' || key === 'serial.digits' || key === 'it.mode' || key.startsWith('it.f:') || key.startsWith('it.e:'));
   const qn = $('qr-now'); if (qn && sel && sel.type === 'qr') qn.textContent = qrValue(sel, t, ui.lblMan || t.serial.next, { ...lblCtx(t), scan: ui.lblScan || '‹скан›' }) || '—';
 }
 function lblRedraw(full){
   const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview();
   const t = lblDraft(), nx = $('lbl-nextno'); if (nx && t) nx.textContent = lblSerial(t, t.serial.next);
   const pz = $('lbl-papersz'); if (pz && t) pz.textContent = `${t.w}×${t.h} мм`;
+  const sc = $('lbl-scancheck'); if (sc && t && !sc.querySelector('button')) sc.innerHTML = lblScanCheck(t, ui.lblScan);
   const sb = document.querySelector('[data-act=lblSave]'); if (sb) sb.disabled = !ui.lblDirty;
   if (full) { const f = document.querySelector('.lblform'); if (f && (!f.contains(document.activeElement) || /^(SELECT|INPUT)$/.test(document.activeElement.tagName) && document.activeElement.type !== 'text')) f.innerHTML = lblForm(t); }
 }
@@ -5216,7 +5224,7 @@ async function act(el){
     case 'lblNew': ui.lblId = null; ui.lblDraft = lblNewTpl(null); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; if (await lblSave()) toast('Этикетка создана'); $('view').innerHTML = vLabels(); return;
     case 'lblSel': ui.lblSel = id; lblRedraw(); { const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(lblDraft()); } return;
     case 'lblAdd': { const t = lblDraft(), bottom = Math.max(0, ...t.items.filter(x => x.type !== 'box').map(x => x.y + (x.type === 'text' ? x.size * 0.42 * Math.max(1, String(x.text).split('\n').length) : x.h + (x.type === 'barcode' && x.bold ? x.size * 0.4 : 0)))), y = bottom + 5 <= t.h ? Math.round((bottom + 0.5) * 2) / 2 : 1;
-      const x = id === 'qr' ? { type: 'qr', mode: 'fields', fields: ['serial', 'name'], sep: ';', ec: 'M', text: '', size: 8, h: 18, w: Math.min(18, t.h - 2) } : id === 'scan' ? { type: 'text', text: '{scan}', size: 8, bold: false, h: 5 } : id === 'serial' ? { type: 'text', text: '{serial}', size: 9, bold: true, h: 5 } : id === 'barcode' ? { type: 'barcode', text: '{serial}', size: 7, bold: true, h: Math.min(15, t.h / 3) } : id === 'line' ? { type: 'line', h: 0.3 } : id === 'box' ? { type: 'box', h: t.h - 2, size: 6 } : { type: 'text', text: 'Текст', size: 9, bold: false, h: 5 };
+      const x = id === 'qr' ? { type: 'qr', mode: 'fields', els: t.items.filter(qrSrc).map(e => e.id), sep: ';', ec: 'M', text: '', size: 8, h: 18, w: Math.min(18, t.h - 2) } : id === 'scan' ? { type: 'text', text: '{scan}', size: 8, bold: false, h: 5 } : id === 'serial' ? { type: 'text', text: '{serial}', size: 9, bold: true, h: 5 } : id === 'barcode' ? { type: 'barcode', text: '{serial}', size: 7, bold: true, h: Math.min(15, t.h / 3) } : id === 'line' ? { type: 'line', h: 0.3 } : id === 'box' ? { type: 'box', h: t.h - 2, size: 6 } : { type: 'text', text: 'Текст', size: 9, bold: false, h: 5 };
       const it = { id: uid(), x: 1, y: id === 'box' ? 1 : y, w: t.w - 2, align: 'center', bold: false, size: 8, text: '', ...x }; if (id === 'qr') { it.x = Math.max(1, t.w - it.w - 1); it.y = 1; } t.items.push(it); ui.lblSel = it.id; ui.lblDirty = true;
       lblRedraw(); { const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(t); } return; }
     case 'lblDel': { const t = lblDraft(); t.items = t.items.filter(x => x.id !== id); if (ui.lblSel === id) ui.lblSel = t.items[0]?.id || null; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); return; }
