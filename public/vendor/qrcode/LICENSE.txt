@@ -1,0 +1,2 @@
+qrcode-generator 1.4.4 — Copyright (c) 2009 Kazuhiko Arase, MIT license (https://github.com/kazuhikoarase/qrcode-generator).
+«QR Code» is a registered trademark of DENSO WAVE INCORPORATED.
