@@ -257,6 +257,12 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .bal.low{color:var(--warn)}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
 .incrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
+.reqrow{display:grid;grid-template-columns:minmax(0,1fr) 170px 110px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
+.reqrow:first-child{border-top:0}.reqrow:hover{background:var(--paper)}.reqrow b{font-weight:500}.reqrow small{display:block;color:var(--ink-2);font-size:12px}.reqrow.closed b{color:var(--ink-2)}.reqrow>:last-child{text-align:right}
+@media (max-width:820px){.reqrow{grid-template-columns:1fr auto}.reqrow>:nth-child(1){grid-column:1/-1}.reqrow>:last-child{text-align:left}}
+.reqfeed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.reqfeed li.c{padding:8px 10px;border:1px solid var(--rule-2);border-radius:8px}.reqfeed li.c div{white-space:pre-wrap;margin-top:2px}
+.otype{border:1px solid var(--rule);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:8px;margin:0}.otype legend{font-size:13px;color:var(--ink-2);padding:0 4px}
+.form .otype label{display:flex;gap:10px;align-items:flex-start;flex-direction:row;font-size:14px;color:var(--ink)}.otype input[type=radio]{margin-top:3px}.otype label span{display:flex;flex-direction:column}.otype small{font-size:12px}
 .incrow:first-child{border-top:0}.incrow:hover{background:var(--paper)}
 .incrow b{font-weight:500}.incrow small{display:block;color:var(--ink-2);font-size:12px}.incrow .acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:820px){.incrow{grid-template-columns:1fr auto}.incrow>:nth-child(1){grid-column:1/-1}}
@@ -810,9 +816,10 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <div><h1>Управление предприятием</h1><p class="sub" id="hsub">Заказы, контрагенты, документы, счета и план-график</p></div>
+      <div><h1 id="happ">Управление предприятием</h1><p class="sub" id="hsub">Заказы, контрагенты, документы, счета и план-график</p></div>
     </div>
     <nav class="views" id="views">
+      <a href="#req" data-v="req" id="reqTab" hidden>Заявки <span class="badge" id="reqBadge" hidden></span></a>
       <a href="#wwork" data-v="wwork" id="wworkTab" hidden>В работе <span class="badge" id="wBadge" hidden></span></a>
       <a href="#wdone" data-v="wdone" id="wdoneTab" hidden>Выполненные</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
@@ -919,6 +926,14 @@ const KIND = { prod:'Изготовление', mount:'Монтаж', buy:'За�
 const PLAN_KIND = { prod:'Изготовление', mount:'Монтаж' };
 const planKinds = j => { const k = j ? j.kind || 'mount' : 'both'; return k === 'prod' ? { prod:PLAN_KIND.prod } : k === 'mount' ? { mount:PLAN_KIND.mount } : PLAN_KIND; };
 const ROLE_NAMES = { admin:'Администратор', head:'Руководитель', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
+const ROLE_NAMES_REQ = { admin:'Администратор', head:'Руководитель', worker:'Сотрудник' };
+const ROLE_INFO_REQ = {
+  admin:'Видит и меняет все заявки, назначает исполнителей, управляет пользователями.',
+  head:'Видит и меняет все заявки, назначает и меняет исполнителей.',
+  worker:'Создаёт заявки и выбирает исполнителя; выполняет порученные ему заявки. Видит свои и порученные ему заявки.'
+};
+const roleNames = () => reqMode() ? ROLE_NAMES_REQ : ROLE_NAMES;
+const roleInfo = k => (reqMode() ? ROLE_INFO_REQ : ROLE_INFO)[k] || '';
 const ROLE_INFO = {
   admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, карта объектов, назначение точек, пользователи.',
   head:'Всё, что может администратор, кроме отметки оплаты счетов и управления пользователями.',
@@ -932,6 +947,8 @@ let STAFF = [];
 let META = {};
 let me = null, rev = -1, mode = 'loading';
 const isHead = () => me && (me.role === 'admin' || me.role === 'head');
+/* «Управление заявками»: the organization works only with requests */
+const reqMode = () => !!(me && !me.sys && me.org && me.org.type === 'requests');
 const canEdit = () => isHead();
 const canPay = () => me && (me.role === 'admin' || me.role === 'accountant');
 const canAddInvoice = () => canEdit();
@@ -1026,7 +1043,8 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || [];
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || [];
+  if (reqMode()) { const n = reqTodo().length; $('reqBadge').hidden = !n; $('reqBadge').textContent = n; if (ui.drawer?.kind === 'req' && !drawerBusy()) renderDrawer(); }
   { const n = NOTES.filter(x => !x.done && (x.type || 'task') !== 'memo').length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
@@ -1072,7 +1090,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : vOrders();
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -1985,7 +2003,7 @@ function vWorkList(){
       <div class="wrk-p">${ppl.slice(0, 3).map(id => `<span class="wchip">${esc(who(id))}</span>`).join(' ')}${ppl.length > 3 ? ` <span class="dim">+${ppl.length - 3}</span>` : ''}</div>
       <div class="wrk-st"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${isMount(j) && P.length ? `<button class="btn sm" data-act="jobReport" data-id="${j.id}">Отчёт</button>` : ''}</div></div>`; }).join('')}</section>`;
 }
-const isWorker = () => me && (me.role === 'worker' || me.role === 'contractor');   // «Сотрудник» и «Подрядчик»
+const isWorker = () => me && !reqMode() && (me.role === 'worker' || me.role === 'contractor');   // «Сотрудник» и «Подрядчик»
 const canLead = () => canEdit();
 const JOB_ST = { new:'В планах', wait:'Ожидание старта', work:'В работе', done:'Выполнена' };
 const JOB_CHIP = { new:'c-info', wait:'c-mute', work:'c-warn', done:'c-ok' };
@@ -2909,7 +2927,7 @@ function vOrgs(){
   const rows = L.slice().sort((a, b) => (a.id === me.org?.id ? -1 : b.id === me.org?.id ? 1 : 0) || a.name.localeCompare(b.name, 'ru')).map(o => {
     const [cc, cl] = ORG_STATE(o), mine = o.id === me.org?.id;
     return `<div class="orow ${o.state !== 'active' ? 'off' : ''}">
-      <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
+      <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b> <span class="chip ${o.type === 'requests' ? 'c-info' : 'c-mute'}">${o.type === 'requests' ? 'Управление заявками' : 'Все сервисы'}</span><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
       <div><small class="lbl">Пользователей</small>${o.users}</div>
       <div><small class="lbl">Администраторы</small>${!o.admins.some(a => !a.sys) ? '<span class="chip c-warn">нет администратора организации</span><br>' : ''}${o.admins.length ? o.admins.map(a => `${esc(a.name)} <span class="mono dim">${esc(a.login)}</span>${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}`).join('<br>') : '<span class="dim">нет</span>'}</div>
       <div><span class="chip ${cc}">${cl}</span><small>${o.until ? 'до ' + fmtD(o.until) + ' включительно' : 'без срока'}</small></div>
@@ -2939,6 +2957,83 @@ function vBackups(){
 /* ---------- «Мои задачи»: a personal to-do list ---------- */
 let NOTES = [];
 /* ---------- «Списание материалов»: every write-off list — of montage works and of production orders ---------- */
+/* ===== «Управление заявками» ===== */
+let REQS = [], REQ_USERS = [];
+const REQ_ST = { new: 'Новая', work: 'В работе', done: 'Выполнена', cancel: 'Отменена' };
+const REQ_CHIP = { new: 'c-info', work: 'c-warn', done: 'c-ok', cancel: 'c-mute' };
+const REQ_ACT = { created: 'заявка создана', take: 'взята в работу', done: 'выполнена', reopen: 'возвращена в работу', cancel: 'отменена', assign: 'исполнитель', edit: 'заявка изменена' };
+const reqOpen = r => r.status === 'new' || r.status === 'work';
+const reqLate = r => reqOpen(r) && r.due && r.due < today();
+// what waits for me: requests I must do; for the administrator and the manager also new ones without an executor
+const reqTodo = () => REQS.filter(r => reqOpen(r) && (r.assignee === me?.id || (isHead() && !r.assignee)));
+const reqWho = id => id ? esc(who(id)) : '<span class="dim">не назначен</span>';
+function vReq(){
+  const f = ui.reqF || (isHead() ? 'all' : 'todo'), st = ui.reqSt || 'open', q = (ui.reqQ || '').trim().toLowerCase();
+  const byF = { todo: r => r.assignee === me.id || (isHead() && !r.assignee), mine: r => r.by === me.id, all: () => true };
+  const byS = { open: reqOpen, done: r => r.status === 'done', cancel: r => r.status === 'cancel', any: () => true };
+  const L = REQS.filter(r => (byF[f] || byF.all)(r) && (byS[st] || byS.any)(r) && (!q || [r.no, r.title, r.text, who(r.by), who(r.assignee)].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => (reqOpen(b) - reqOpen(a)) || (b.urgent - a.urgent) || (reqLate(b) - reqLate(a)) || String(b.at).localeCompare(String(a.at)));
+  const cnt = k => REQS.filter(r => reqOpen(r) && byF[k](r)).length;
+  const head = `<div class="toolbar"><button class="btn primary" data-act="reqNew">+ Заявка</button>
+    <div class="seg">${[['todo', 'Мне выполнить'], ['mine', 'Мои заявки'], ...(isHead() ? [['all', 'Все']] : [])].map(([k, l]) => `<button data-act="reqF" data-id="${k}" class="${f === k ? 'on' : ''}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>
+    <div class="seg">${[['open', 'Открытые'], ['done', 'Выполненные'], ['cancel', 'Отменённые'], ['any', 'Все']].map(([k, l]) => `<button data-act="reqSt" data-id="${k}" class="${st === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <span data-keep style="display:contents"><input class="in" id="reqq" type="search" aria-label="Поиск заявки" placeholder="Номер, текст, автор, исполнитель" value="${esc(ui.reqQ || '')}" style="flex:1 1 200px;max-width:320px"></span></div>`;
+  if (!L.length) return head + `<div class="empty"><h3>${REQS.length ? 'Нет заявок по выбранному фильтру' : 'Заявок пока нет'}</h3>${f === 'todo' ? 'Здесь появятся заявки, которые поручены вам.' : 'Создайте заявку: опишите, что нужно сделать, и выберите исполнителя.'}</div>`;
+  return head + `<section class="card" style="padding:0;overflow:hidden">${L.map(r => `<div class="reqrow click ${reqOpen(r) ? '' : 'closed'}" data-act="reqOpen" data-id="${r.id}" role="button" tabindex="0">
+      <div><b>№ ${r.no} · ${esc(r.title)}</b>${r.urgent && reqOpen(r) ? ' <span class="chip c-bad">Срочно</span>' : ''}<small>${esc(who(r.by))} → ${reqWho(r.assignee)} · ${esc(fmtDT(r.at))}${(r.comments || []).length ? ` · 💬 ${r.comments.length}` : ''}</small></div>
+      <div>${r.due ? `<small class="${reqLate(r) ? 'bad-t' : 'dim'}">срок ${fmtD(r.due)}${reqLate(r) ? ' · просрочена' : ''}</small>` : ''}</div>
+      <div><span class="chip ${REQ_CHIP[r.status]}">${REQ_ST[r.status]}</span></div></div>`).join('')}</section>`;
+}
+const reqUserOpts = sel => `<option value="">— не назначен —</option>` + REQ_USERS.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<option value="${u.id}" ${u.id === sel ? 'selected' : ''}>${esc(u.name)}${u.id === me.id ? ' (я)' : ''} · ${esc(ROLE_NAMES_REQ[u.role] || '')}</option>`).join('');
+function reqFormHtml(r){
+  const F = ui.reqFiles || [];
+  return `<form class="d-body" data-form="reqForm"><div class="form">
+    <label class="wide">Что нужно сделать<input class="in" id="rq-title" value="${esc(r?.title || '')}" maxlength="200" required></label>
+    <label class="wide">Подробности<textarea class="in" id="rq-text" rows="4" maxlength="4000">${esc(r?.text || '')}</textarea></label>
+    ${r ? '' : `<label>Исполнитель<select class="in" id="rq-to">${reqUserOpts('')}</select></label>`}
+    <label>Срок<input class="in" type="date" id="rq-due" value="${esc(r?.due || '')}"></label>
+    <label class="wide" style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="rq-urg" ${r?.urgent ? 'checked' : ''}> Срочная</label>
+    <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Файлы и фото</span>
+      <div class="row-g" style="margin-top:4px">${F.map((x, i) => `<span class="chip c-mute">📎 ${esc(x.name)} <button type="button" class="linkish" data-act="reqFileDel" data-id="${i}" aria-label="Убрать файл">✕</button></span>`).join('')}
+      <label class="btn sm">Приложить<input type="file" data-up="reqFile" multiple hidden></label></div></div></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" type="submit">${r ? 'Сохранить' : 'Создать заявку'}</button><button class="btn" type="button" data-act="${r ? 'reqOpen' : 'close'}" data-id="${r ? r.id : ''}">Отмена</button></div></form>`;
+}
+function reqViewHtml(r){
+  const boss = isHead(), author = r.by === me.id, exec = r.assignee === me.id, open = reqOpen(r);
+  const canTake = r.status === 'new' && (exec || boss || !r.assignee), canDone = open && (exec || boss), canAssign = open && (boss || (author && r.status === 'new'));
+  const canEdit = boss || (author && r.status === 'new'), canDel = boss || (author && r.status === 'new' && !(r.comments || []).length);
+  const H = (r.history || []).map(h => ({ ...h, kind: 'h' })), C = (r.comments || []).map(c => ({ ...c, kind: 'c' }));
+  const feed = [...H, ...C].sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return `<div class="d-body">
+    <div><span class="chip ${REQ_CHIP[r.status]}">${REQ_ST[r.status]}</span>${r.urgent && reqOpen(r) ? ' <span class="chip c-bad">Срочно</span>' : ''}${reqLate(r) ? ' <span class="chip c-bad">Просрочена</span>' : ''}</div>
+    <dl class="kv"><dt>Автор</dt><dd>${esc(who(r.by))} · ${esc(fmtDT(r.at))}</dd>
+      <dt>Исполнитель</dt><dd>${canAssign ? `<select class="in" id="rq-assign" aria-label="Исполнитель" style="max-width:320px">${reqUserOpts(r.assignee || '')}</select>` : reqWho(r.assignee)}</dd>
+      ${r.due ? `<dt>Срок</dt><dd>${fmtD(r.due)}</dd>` : ''}
+      ${r.status === 'done' ? `<dt>Выполнена</dt><dd>${esc(fmtDT(r.doneAt))} · ${esc(who(r.doneBy))}</dd>` : ''}</dl>
+    ${r.text ? `<div class="box" style="white-space:pre-wrap">${esc(r.text)}</div>` : ''}
+    ${(r.files || []).length ? `<div class="row-g">${r.files.map(x => `<a class="chip c-mute" href="${esc(fileUrl(x))}" target="_blank" rel="noopener">📎 ${esc(x.name)}</a>`).join('')}</div>` : ''}
+    ${r.status === 'done' && r.doneNote ? `<div class="box" style="border-color:var(--ok);background:var(--ok-soft)"><b>Отчёт исполнителя:</b> ${esc(r.doneNote)}</div>` : ''}
+    ${canDone ? `<div class="box"><h4>Выполнение</h4><textarea class="in" id="rq-note" rows="2" maxlength="2000" placeholder="Что сделано (необязательно)"></textarea>
+      <div class="row-g">${canTake ? `<button class="btn" data-act="reqDo" data-id="${r.id}|take">Взять в работу</button>` : ''}<button class="btn ok" data-act="reqDo" data-id="${r.id}|done">Выполнено</button></div></div>` : ''}
+    <div class="row-g">${!open && (author || boss) ? `<button class="btn" data-act="reqDo" data-id="${r.id}|reopen">Вернуть в работу</button>` : ''}
+      ${open && (author || boss) ? armBtn('rqc:' + r.id, 'Отменить заявку', 'reqDo', r.id + '|cancel', 'btn') : ''}
+      ${canEdit ? `<button class="btn" data-act="reqEdit" data-id="${r.id}">Изменить</button>` : ''}
+      ${canDel ? armBtn('rqd:' + r.id, 'Удалить', 'reqDel', r.id, 'btn danger') : ''}</div>
+    <h4 class="sub-h">Ход заявки и комментарии</h4>
+    <ul class="reqfeed">${feed.map(x => x.kind === 'c' ? `<li class="c"><b>${esc(who(x.by))}</b> <small class="dim">${esc(fmtDT(x.at))}</small><div>${esc(x.text)}</div></li>`
+      : `<li class="h"><small class="dim">${esc(fmtDT(x.at))} · ${esc(who(x.by))}: ${REQ_ACT[x.act] || x.act}${x.act === 'assign' ? ' — ' + (x.to ? esc(who(x.to)) : 'не назначен') : x.act === 'created' && x.to ? ', исполнитель ' + esc(who(x.to)) : ''}${x.note ? ' — ' + esc(x.note) : ''}</small></li>`).join('')}</ul>
+    <div class="row-g" data-keep><input class="in" id="rq-cmt" placeholder="Комментарий" style="flex:1 1 220px" maxlength="2000"><button class="btn" data-act="reqCmt" data-id="${r.id}">Отправить</button></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+async function reqApi(method, url, body){
+  const r = await api(method, url, body);
+  if (r.request) { const i = REQS.findIndex(x => x.id === r.request.id); if (i >= 0) REQS[i] = r.request; else REQS.unshift(r.request); }
+  refresh().catch(() => {});
+  return r;
+}
+
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 function vStaff(){
   const day = ui.stDay || today(), q = (ui.stq || '').trim().toLowerCase();
@@ -3161,7 +3256,7 @@ function vUsers(){
     </div>`;
   }).join('');
   return head + `<section class="card" style="padding:0;overflow:hidden"><div class="urow head"><span>Сотрудник</span><span>Роль</span><span>Статус</span><span>Вход</span><span></span></div>${rows}</section>
-    <div class="roles">${Object.entries(ROLE_NAMES).map(([k,n]) => `<div><b>${n}</b><span class="dim">${ROLE_INFO[k]}</span></div>`).join('')}</div>`;
+    <div class="roles">${Object.entries(roleNames()).map(([k,n]) => `<div><b>${n}</b><span class="dim">${roleInfo(k)}</span></div>`).join('')}</div>`;
 }
 
 /* ===== Plan view ===== */
@@ -3586,10 +3681,19 @@ function renderDrawer(){
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Сохранить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
+  if (d.kind === 'req') {
+    const r = REQS.find(x => x.id === d.id); if (!r) return closeDrawer();
+    D.innerHTML = dh(`Заявка № ${r.no} · ${esc(r.title)}`) + (ui.reqEdit === r.id ? reqFormHtml(r) : reqViewHtml(r));
+    return;
+  }
+  if (d.kind === 'reqForm') { D.innerHTML = dh('Новая заявка') + reqFormHtml(null); return; }
   if (d.kind === 'orgForm') {
     const o = d.id && orgOf(d.id), mine = o && o.id === me.org?.id;
     D.innerHTML = dh(o ? esc(o.name) : 'Новая организация') + `<form class="d-body" data-form="org"><div class="form">
       <label class="wide">Название организации<input class="in" id="o-name" value="${v(o,'name')}" required></label>
+      <fieldset class="wide otype"><legend>Тип системы</legend>
+        ${[['all', 'Все сервисы', 'Работы, заказы, склад, контрагенты, счета, план-график, карта объектов, задачи.'], ['requests', 'Управление заявками', 'Пользователь создаёт заявку и выбирает исполнителя, исполнитель отмечает её выполнение.']].map(([k, l, h]) => `<label><input type="radio" name="o-type" value="${k}" ${(o?.type || 'all') === k ? 'checked' : ''}> <span><b>${l}</b><small class="dim">${h}</small></span></label>`).join('')}
+        ${o ? '<small class="dim">Смена типа не удаляет данные: при возврате они снова будут видны.</small>' : ''}</fieldset>
       <label>Доступ до (включительно)<input class="in" type="date" id="o-until" value="${v(o,'until')}"><small class="dim" style="font-size:12px">Пусто — без срока. После этой даты всем в организации покажется сообщение о блокировке.</small></label>
       ${o ? '' : `<label>Код (латиницей, необязательно)<input class="in mono" id="o-id" pattern="[a-z0-9][a-z0-9-]{1,30}"></label>`}
       <label class="wide">Заметка (видна только вам)<input class="in" id="o-note" value="${v(o,'note')}"></label>
@@ -3873,10 +3977,10 @@ function renderDrawer(){
     D.innerHTML = dh(u ? 'Пользователь: ' + esc(u.name) : 'Новый пользователь') + `<form class="d-body" data-form="userForm"><div class="form">
       <label class="wide">Имя<input class="in" id="uf-name" value="${v(u,'name')}" required></label>
       <label>Логин (латиницей)<input class="in" id="uf-login" value="${v(u,'login')}" autocomplete="off" required></label>
-      <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(ROLE_NAMES, u?.role || 'worker')}</select></label>
+      <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(roleNames(), u?.role || 'worker')}</select></label>
       <label class="wide" id="uf-until-w" ${(u?.role || 'worker') === 'contractor' ? '' : 'hidden'}>Доступ подрядчика до (включительно)<input class="in" type="date" id="uf-until" value="${esc(u?.accessUntil || '')}"><small class="dim" style="font-size:12px">На следующий день вход для подрядчика закроется.</small></label>
       <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<span class="pwrow"><input class="in mono" id="uf-pass" autocomplete="new-password" ${u?'':'required'}><span class="pwgen"><button type="button" class="btn sm" data-act="genPass" data-id="#uf-pass" title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm ghost" data-act="copyPass" data-id="#uf-pass" title="Скопировать пароль">Копировать</button></span></span></label></div>
-      <p class="hint dim" id="uf-info" style="margin:0">${esc(ROLE_INFO[u?.role || 'worker'])}</p>
+      <p class="hint dim" id="uf-info" style="margin:0">${esc(roleInfo(u?.role || 'worker'))}</p>
       ${u ? '<p class="hint" style="margin:0">После смены пароля сотрудник выйдет со всех устройств.</p>' : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${u?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -4099,8 +4203,14 @@ async function onSubmit(e){
       if (mineTouched) { await refresh().catch(() => {}); }
       await loadOrgs();
     }
+    if (kind === 'reqForm') {
+      const body = { title: val('rq-title'), text: $('rq-text').value.trim(), due: val('rq-due'), urgent: $('rq-urg').checked, files: ui.reqFiles || [] };
+      if (!body.title) return fail('Напишите, что нужно сделать.');
+      if (d.kind === 'req') { await reqApi('PATCH', '/api/requests/' + d.id, { action: 'edit', ...body }); ui.reqEdit = null; renderDrawer(); render(); toast('Заявка изменена'); }
+      else { const r = await reqApi('POST', '/api/requests', { ...body, assignee: val('rq-to') || null }); ui.reqFiles = []; openDrawer('req', r.request.id); render(); toast(`Заявка № ${r.request.no} создана`); }
+    }
     if (kind === 'org') {
-      const body = { name:val('o-name'), until:val('o-until'), note:val('o-note') };
+      const body = { name:val('o-name'), until:val('o-until'), note:val('o-note'), type: f.querySelector('[name=o-type]:checked')?.value || 'all' };
       if ($('o-blocked')) { body.blocked = $('o-blocked').checked; body.blockNote = val('o-bnote'); }
       if (!d.id) { body.id = val('o-id'); body.admin = { name:val('oa-name'), login:val('oa-login'), password:$('oa-pass').value }; }
       if (d.id) await api('PATCH', `/api/orgs/${d.id}`, body); else await api('POST', '/api/orgs', body);
@@ -4592,6 +4702,18 @@ async function act(el){
     case 'openInvoice': return openDrawer('invoice', id);
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
+    case 'reqNew': ui.reqFiles = []; return openDrawer('reqForm');
+    case 'reqOpen': ui.reqEdit = null; return openDrawer('req', id);
+    case 'reqEdit': { const r = REQS.find(x => x.id === id); ui.reqFiles = (r?.files || []).map(x => ({ ...x })); ui.reqEdit = id; return renderDrawer(); }
+    case 'reqF': ui.reqF = id; return render();
+    case 'reqSt': ui.reqSt = id; return render();
+    case 'reqFileDel': (ui.reqFiles || []).splice(Number(id), 1); { const keep = { t: $('rq-title')?.value, x: $('rq-text')?.value, d: $('rq-due')?.value, u: $('rq-urg')?.checked, a: $('rq-to')?.value }; renderDrawer(); if ($('rq-title')) { $('rq-title').value = keep.t; $('rq-text').value = keep.x; $('rq-due').value = keep.d; $('rq-urg').checked = keep.u; if ($('rq-to')) $('rq-to').value = keep.a; } } return;
+    case 'reqDo': { const [rid, action] = id.split('|'), note = $('rq-note')?.value || '';
+      try { await reqApi('PATCH', '/api/requests/' + rid, { action, note }); renderDrawer(); render(); toast({ take: 'Заявка взята в работу', done: 'Заявка выполнена', reopen: 'Заявка возвращена в работу', cancel: 'Заявка отменена' }[action] || 'Готово'); }
+      catch(e) { const fe = $('ferr'); if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
+    case 'reqCmt': { const t = ($('rq-cmt')?.value || '').trim(); if (!t) return toast('Напишите комментарий');
+      try { await reqApi('POST', `/api/requests/${id}/comments`, { text: t }); $('rq-cmt').value = ''; document.activeElement?.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    case 'reqDel': try { await api('DELETE', '/api/requests/' + id); REQS = REQS.filter(x => x.id !== id); closeDrawer(); render(); refresh().catch(() => {}); toast('Заявка удалена'); } catch(e) { toast(errText(e)); } return;
     case 'incEdo': { const i = inv(ui.drawer?.id); if (!i) return; ui.incEdo = !!id;
       if (ui.incEdo) { ui.incLines = (i.items || []).map(x => ({ ...x })); if (!ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
       return renderDrawer(); }
@@ -4737,6 +4859,7 @@ document.addEventListener('input', e => {
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
+  if (t.id === 'reqq') { ui.reqQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReq(); const n = $('reqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'spq') { ui.spq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaffProj(); const n = $('spq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'stq') { ui.stq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaff(); const n = $('stq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wlq') { ui.wlq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorkList(); const n = $('wlq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -4807,7 +4930,7 @@ document.addEventListener('change', async e => {
     const F = (o.features || []).map(f => f.id === fid ? { ...f, text, editedBy:me.id, editedAt:new Date().toISOString() } : f).filter(f => f.text);
     await saveFeatures(oid, F); return render();
   }
-  if (t.id === 'uf-role') { $('uf-info').textContent = ROLE_INFO[t.value] || ''; $('uf-until-w').hidden = t.value !== 'contractor'; return; }
+  if (t.id === 'uf-role') { $('uf-info').textContent = roleInfo(t.value); $('uf-until-w').hidden = t.value !== 'contractor'; return; }
   if (t.id === 'f-file') { parseInvoiceFile(t.files[0]); return; }
   if (t.id === 'acct-file') {
     const file = t.files[0]; if (!file) return;
@@ -4826,6 +4949,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'jW') { ui.jW = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
+  if (t.id === 'rq-assign') { const rid = ui.drawer?.id; try { await reqApi('PATCH', '/api/requests/' + rid, { action: 'assign', assignee: t.value || null }); renderDrawer(); render(); toast(t.value ? 'Исполнитель назначен' : 'Исполнитель снят'); } catch(e) { toast(errText(e)); renderDrawer(); } return; }
   if (t.id === 'planWho') { ui.planWho = t.value; return render(); }
   if (t.id === 't-job') { ui.tJob = t.value; ui.tKind = (document.querySelector('input[name=t-kind]:checked') || {}).value; ['t-title','t-resp','t-start','t-end','t-people','t-brig'].forEach(k => { ui.tKeep = ui.tKeep || {}; ui.tKeep[k] = $(k)?.value; }); ui.tKeep.done = $('t-done')?.checked; renderDrawer(); Object.entries(ui.tKeep).forEach(([k, v]) => { if (k === 'done') { if ($('t-done')) $('t-done').checked = v; } else if ($(k) && v !== undefined) $(k).value = v; }); ui.tKeep = null; return; }
   if (t.name === 't-kind') { ui.tKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); return; }
@@ -4845,6 +4969,10 @@ document.addEventListener('change', async e => {
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
   }
+  if (t.dataset.up === 'reqFile') { const files = [...t.files]; t.value = ''; if (!files.length) return;
+    const keep = { t: $('rq-title')?.value, x: $('rq-text')?.value, d: $('rq-due')?.value, u: $('rq-urg')?.checked, a: $('rq-to')?.value };
+    try { ui.reqFiles = ui.reqFiles || []; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); ui.reqFiles.push({ id: u.id, name: u.name }); } } catch(e) { toast(errText(e)); }
+    renderDrawer(); if ($('rq-title')) { $('rq-title').value = keep.t; $('rq-text').value = keep.x; $('rq-due').value = keep.d; $('rq-urg').checked = keep.u; if ($('rq-to')) $('rq-to').value = keep.a; } return; }
   if (t.dataset.up === 'waybill') { const fl = t.files[0]; t.value = ''; if (fl) await waybillFile(fl); return; }
   if (t.dataset.up === 'jobDoc') {
     const files = [...t.files]; if (!files.length) return; const j = jobOf(t.dataset.id); t.value = '';
@@ -4920,6 +5048,7 @@ document.addEventListener('change', async e => {
 function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
+    : reqMode() ? (h === 'users' && me.role === 'admin' ? 'users' : 'req')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
     : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
@@ -4969,15 +5098,16 @@ async function start(u){
   $('ubtn').title = u.name + ' — ' + u.roleName;
   document.body.classList.toggle('no-edit', !canEdit()); document.body.classList.toggle('field', isWorker());
   document.body.classList.toggle('can-invoice', canAddInvoice());
-  $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = isWorker() || !!u.sys;
+  $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = isWorker() || !!u.sys || reqMode();
   $('orgsTab').hidden = !u.sys; ui.orgsList = null;
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
+  $('happ').textContent = reqMode() ? 'Управление заявками' : 'Управление предприятием';
   $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
   $('orgwarn').hidden = !u.orgWarn; $('orgwarn').textContent = u.orgWarn ? '⚠ ' + u.orgWarn + ' Для продления обратитесь к администратору системы.' : '';
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : reqMode() ? !(v === 'req' || (v === 'users' && u.role === 'admin')) : v === 'req' ? true : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
