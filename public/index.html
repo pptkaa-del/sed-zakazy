@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Управление предприятием</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<script>try{var t=localStorage.getItem('sed-theme');if(t==='light'||t==='dark'||t==='telecom')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<script>try{var t=localStorage.getItem('sed-theme');if(['light','dark','telecom','pink','engineer'].indexOf(t)>=0)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&family=Montserrat:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&family=Montserrat:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
 /* Layout: header with three workspaces (Заказы · Бухгалтерия · План-график); orders = project tree + order sheet; accounting = grouped payables; plan = Gantt. */
 :root{
@@ -23,7 +23,7 @@
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-theme="telecom"]){
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-theme="telecom"]):not([data-theme="pink"]):not([data-theme="engineer"]){
   --paper:#11151B; --sheet:#181E26; --ink:#E6EAF0; --ink-2:#9AA5B4; --rule:#2C343F; --rule-2:#222932;
   --stamp:#8C9BFF; --stamp-soft:#252C55; --stamp-ink:#0E1220; --work:#4FD1C5; --work-soft:#173634;
   --ok:#5CCB92; --ok-soft:#173327; --warn:#F0AE55; --warn-soft:#3A2A14; --bad:#FF7B7B; --bad-soft:#3E1C1F;
@@ -449,6 +449,80 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 :root[data-theme="telecom"] .comp th,:root[data-theme="telecom"] .urow.head{background:#DCE8E2;color:#1F4D40}
 :root[data-theme="telecom"] .oitem.on,:root[data-theme="telecom"] .pitem.on{background:#DCE8E2;box-shadow:inset 3px 0 0 var(--stamp)}
 :root[data-theme="telecom"] .avatar{background:var(--stamp);color:#fff}
+/* ===== Theme «Розовая»: светлая, глубокий розовый, мягкий узор в точку ===== */
+:root[data-theme="pink"]{
+  --paper:#FBF0F4; --sheet:#FFFFFF; --ink:#2E1A24; --ink-2:#76586A; --rule:#EFD6E1; --rule-2:#F7E6ED;
+  --stamp:#C2306E; --stamp-soft:#FBE1EC; --stamp-ink:#FFFFFF; --work:#9C3D8F; --work-soft:#F5E0F1;
+  --ok:#2D7A55; --ok-soft:#E0F2E8; --warn:#A35A00; --warn-soft:#FBEBD3; --bad:#B4233A; --bad-soft:#FBE0E5;
+  --info:#7A4FB5; --info-soft:#EEE6FA; --mute:#86707C; --mute-soft:#F4E9EE;
+  --shadow:0 14px 40px rgba(140,40,90,.16); --tile-filter:sepia(.15) saturate(.9) hue-rotate(-10deg);
+  --f-display:"Nunito","IBM Plex Sans",system-ui,sans-serif;
+  --f-body:"Nunito","IBM Plex Sans",system-ui,sans-serif;
+  color-scheme:light;
+}
+:root[data-theme="pink"]{background:var(--paper)}
+:root[data-theme="pink"] body{min-height:100vh;background:
+  radial-gradient(1200px 500px at 100% -10%, rgba(194,48,110,.13), transparent 60%) no-repeat,
+  radial-gradient(900px 420px at -10% 0%, rgba(156,61,143,.08), transparent 60%) no-repeat,
+  radial-gradient(circle at 10px 10px, rgba(194,48,110,.10) 1.6px, transparent 2px) 0 0/22px 22px, var(--paper)}
+:root[data-theme="pink"] header.top{background:linear-gradient(115deg,rgba(255,255,255,.94),rgba(255,240,246,.85) 60%,rgba(194,48,110,.12));backdrop-filter:blur(4px);border-bottom-color:var(--rule)}
+:root[data-theme="pink"] h1{font-weight:800;letter-spacing:-.01em;color:#8E1F50}
+:root[data-theme="pink"] nav.views{background:rgba(194,48,110,.07);border-radius:16px}
+:root[data-theme="pink"] nav.views a{border-radius:12px}
+:root[data-theme="pink"] nav.views a.on{background:linear-gradient(135deg,#D9417F,#B02A63);color:#fff;box-shadow:0 6px 16px rgba(194,48,110,.30)}
+:root[data-theme="pink"] .btn{border-radius:999px}
+:root[data-theme="pink"] .btn.primary{background:linear-gradient(135deg,#D9417F,#B02A63);border-color:#B02A63;box-shadow:0 6px 16px rgba(194,48,110,.25)}
+:root[data-theme="pink"] .in{border-radius:12px}
+:root[data-theme="pink"] .card,:root[data-theme="pink"] .pgroup,:root[data-theme="pink"] .wgroup,:root[data-theme="pink"] .pproj,
+:root[data-theme="pink"] .empty,:root[data-theme="pink"] .gantt,:root[data-theme="pink"] .plist,:root[data-theme="pink"] .box{border-radius:18px;box-shadow:0 8px 24px rgba(140,40,90,.07)}
+:root[data-theme="pink"] .card,:root[data-theme="pink"] .empty,:root[data-theme="pink"] .gantt{background:rgba(255,255,255,.92)}
+:root[data-theme="pink"] .chip{border-radius:999px}
+:root[data-theme="pink"] .tile{background:linear-gradient(140deg,#D9417F,#9C2A5C);border-color:#9C2A5C;color:#fff;box-shadow:0 10px 26px rgba(140,40,90,.25)}
+:root[data-theme="pink"] .tile span,:root[data-theme="pink"] .tile small{color:rgba(255,255,255,.8)}
+:root[data-theme="pink"] .tile b{color:#fff}
+:root[data-theme="pink"] .g-head .g-lab,:root[data-theme="pink"] .g-head .g-track,:root[data-theme="pink"] .comp th,:root[data-theme="pink"] .urow.head,:root[data-theme="pink"] table.jt th{background:#FBE1EC;color:#8E1F50}
+:root[data-theme="pink"] .avatar{background:var(--stamp);color:#fff}
+:root[data-theme="pink"] .drawer{border-top-left-radius:20px;border-bottom-left-radius:20px}
+
+/* ===== Theme «Инженерная»: чертёж-«синька» — тёмно-синий, миллиметровая сетка, моноширинный шрифт, прямые углы ===== */
+:root[data-theme="engineer"]{
+  --paper:#0E2741; --sheet:#12304F; --ink:#E4F1FF; --ink-2:#93B4D4; --rule:#2B5378; --rule-2:#1C4063;
+  --stamp:#5CC8FF; --stamp-soft:#173D60; --stamp-ink:#06192B; --work:#7FE0D0; --work-soft:#123F48;
+  --ok:#6EE0A0; --ok-soft:#123E35; --warn:#FFC266; --warn-soft:#3D3320; --bad:#FF8A80; --bad-soft:#47262E;
+  --info:#8EC9FF; --info-soft:#173A5C; --mute:#9DB3C9; --mute-soft:#183A5A;
+  --shadow:0 14px 40px rgba(0,8,20,.55); --tile-filter:invert(1) hue-rotate(185deg) saturate(.6) brightness(.85) contrast(.9);
+  --f-display:"JetBrains Mono","IBM Plex Mono",ui-monospace,monospace;
+  --f-body:"IBM Plex Sans",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+:root[data-theme="engineer"]{background:var(--paper)}
+:root[data-theme="engineer"] body{min-height:100vh;background:
+  linear-gradient(rgba(140,200,255,.10) 1px, transparent 1px) 0 0/100px 100px,
+  linear-gradient(90deg, rgba(140,200,255,.10) 1px, transparent 1px) 0 0/100px 100px,
+  linear-gradient(rgba(140,200,255,.045) 1px, transparent 1px) 0 0/20px 20px,
+  linear-gradient(90deg, rgba(140,200,255,.045) 1px, transparent 1px) 0 0/20px 20px,
+  radial-gradient(1200px 600px at 50% -20%, #174A78, transparent 70%) no-repeat, var(--paper)}
+:root[data-theme="engineer"] header.top{background:rgba(10,32,54,.86);backdrop-filter:blur(4px);border-bottom:1px solid var(--stamp);box-shadow:0 1px 0 rgba(92,200,255,.25)}
+:root[data-theme="engineer"] h1{font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:20px}
+:root[data-theme="engineer"] h1::before{content:"⌖ ";color:var(--stamp)}
+:root[data-theme="engineer"] nav.views{background:transparent;border:1px solid var(--rule);border-radius:2px}
+:root[data-theme="engineer"] nav.views a{border-radius:0;font-family:var(--f-mono);font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+:root[data-theme="engineer"] nav.views a.on{background:var(--stamp);color:var(--stamp-ink);box-shadow:none}
+:root[data-theme="engineer"] .btn{border-radius:2px;font-family:var(--f-mono);font-size:13px}
+:root[data-theme="engineer"] .btn.primary{background:var(--stamp);border-color:var(--stamp);color:var(--stamp-ink)}
+:root[data-theme="engineer"] .in{border-radius:2px;background:rgba(6,25,43,.55)}
+:root[data-theme="engineer"] .card,:root[data-theme="engineer"] .pgroup,:root[data-theme="engineer"] .wgroup,:root[data-theme="engineer"] .pproj,
+:root[data-theme="engineer"] .empty,:root[data-theme="engineer"] .gantt,:root[data-theme="engineer"] .plist,:root[data-theme="engineer"] .box,:root[data-theme="engineer"] .stat{border-radius:2px;background:rgba(18,48,79,.88);border-color:var(--rule);box-shadow:none}
+:root[data-theme="engineer"] .card{outline:1px dashed rgba(92,200,255,.18);outline-offset:3px}
+:root[data-theme="engineer"] .chip{border-radius:2px;font-family:var(--f-mono);font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+:root[data-theme="engineer"] h3,:root[data-theme="engineer"] h4,:root[data-theme="engineer"] .d-head h2{font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.04em}
+:root[data-theme="engineer"] table.jt th,:root[data-theme="engineer"] .comp th,:root[data-theme="engineer"] .urow.head,:root[data-theme="engineer"] .g-head .g-lab,:root[data-theme="engineer"] .g-head .g-track{background:#0B2238;color:var(--stamp);font-family:var(--f-mono)}
+:root[data-theme="engineer"] .tile{background:#0B2238;border:1px solid var(--stamp);color:var(--ink);border-radius:2px}
+:root[data-theme="engineer"] .tile b{color:var(--stamp);font-family:var(--f-mono)}
+:root[data-theme="engineer"] .avatar{background:var(--stamp);color:var(--stamp-ink);border-radius:2px}
+:root[data-theme="engineer"] .drawer{border-left:1px solid var(--stamp);background:var(--sheet)}
+:root[data-theme="engineer"] .badge{border-radius:2px}
 .themes{display:flex;gap:4px;padding:4px 6px 8px;flex-wrap:wrap}
 .upop .themes button{flex:1 1 40%;padding:6px 8px;font-size:12px;border:1px solid var(--rule);border-radius:7px;background:var(--sheet);color:var(--ink);text-align:center}
 .upop .themes button:hover{border-color:var(--ink-2);background:var(--sheet)}
@@ -3763,7 +3837,7 @@ function renderDrawer(){
   }
   if (d.kind === 'prefs') {
     const th = PREFS.theme || themeGet(), sc = PREFS.scale || 1, field = isWorker() || me.sys;
-    const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком' };
+    const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40', pink:'#C2306E', engineer:'#123A5E' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком', pink:'Розовая', engineer:'Инженерная' };
     const col = (k, l) => { const v = k.startsWith('n_') ? NEED_COLOR[k.slice(2)] : DT_COLOR[k]; return `<label class="pcol"><input type="color" data-pcolor="${k}" value="${v}"><span>${esc(l)}</span></label>`; };
     D.innerHTML = dh('Настройки') + `<div class="d-body">
       <p class="dim" style="margin:0">Настройки ваши личные: они сохраняются в вашей учётной записи и действуют на любом устройстве.</p>
@@ -4339,7 +4413,7 @@ async function onSubmit(e){
 }
 
 /* ---------- theme ---------- */
-const THEMES = ['system', 'light', 'dark', 'telecom'];
+const THEMES = ['system', 'light', 'dark', 'telecom', 'pink', 'engineer'];
 function themeGet(){ try { const t = localStorage.getItem('sed-theme'); return THEMES.includes(t) ? t : 'system'; } catch(e) { return 'system'; } }
 function themeSet(t){
   try { if (t === 'system') localStorage.removeItem('sed-theme'); else localStorage.setItem('sed-theme', t); } catch(e){}

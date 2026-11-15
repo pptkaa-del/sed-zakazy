@@ -1595,7 +1595,7 @@ const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role,
 const HEX = v => /^#[0-9a-f]{6}$/i.test(String(v || '')) ? String(v).toLowerCase() : null;
 function cleanPrefs(b){
   const o = {};
-  if (['system', 'light', 'dark', 'telecom'].includes(b.theme)) o.theme = b.theme;
+  if (['system', 'light', 'dark', 'telecom', 'pink', 'engineer'].includes(b.theme)) o.theme = b.theme;
   if ([1, 1.1, 1.2, 1.35].includes(Number(b.scale))) o.scale = Number(b.scale);
   if (['pin', 'dot'].includes(b.marker)) o.marker = b.marker;
   if (['type', 'need', 'person'].includes(b.dtColor)) o.dtColor = b.dtColor;
