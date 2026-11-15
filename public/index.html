@@ -3640,7 +3640,7 @@ function vWoList(){
       <div><span class="chip ${r.col === 'jobs' ? 'c-info' : 'c-mute'}">${r.kind}</span> <b>${esc(r.title)}</b>${r.sub ? `<small class="dim">${esc(r.sub)}</small>` : ''}</div>
       <div><small class="dim">позиций</small>${r.n}</div>
       <div>${r.src.writeoff ? `<span class="chip c-ok">Сохранён</span><small class="dim">${esc(fmtDT(r.src.writeoff.at))} · ${esc(who(r.src.writeoff.by))}</small>` : r.bad ? `<span class="chip c-bad">Не хватает: ${r.bad}</span>` : '<span class="chip c-warn">Не сохранён</span>'}</div>
-      <div class="row-g"><button class="btn sm" data-act="${r.col === 'jobs' ? 'jobWo' : 'writeoff'}" data-id="${r.id}">Открыть</button><a class="btn sm" href="/api/${r.col}/${r.id}/writeoff.xlsx" data-dl>Excel</a></div></div>`).join('')}</section>`;
+      <div class="row-g"><button class="btn sm" data-act="${r.col === 'jobs' ? 'jobWo' : 'writeoff'}" data-id="${r.id}">Открыть</button><a class="btn sm" href="/api/${r.col}/${r.id}/writeoff.xlsx" data-dl title="Excel для загрузки в 1С: «Требование-накладная» → «Загрузить из файла»">Для 1С</a></div></div>`).join('')}</section>`;
 }
 const NOTE_TABS = [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']];
 const ntype = n => n.type || 'task';
@@ -3977,7 +3977,7 @@ function renderDrawer(){
           <td>${x.source === 'acct' ? 'Хватает' : x.source === 'none' ? '<b>Нет в бухгалтерских остатках</b>' : `<b>Не хватает ${fmtQty(x.shortage)}</b>`}</td></tr>`).join('')}
       </tbody></table></div>` : `<p class="dim">${col === 'jobs' ? 'В работе нет материалов — добавьте их кнопкой «+ Материалы» в карточке работы.' : 'В изделиях заказа нет компонентов.'}</p>`}
       <div class="err" id="ferr"></div>
-      <div class="row-g">${ed && L.length ? `<button class="btn primary" data-act="woSave" data-id="${col}|${src.id}" ${bad.length ? 'disabled title="Есть позиции, которых не хватает в бухгалтерских остатках"' : ''}>Сохранить список</button>` : ''}${L.length ? `<a class="btn" href="/api/${col}/${src.id}/writeoff.xlsx" data-dl>Скачать Excel${dirty ? ' (сохранённый)' : ''}</a>` : ''}${col === 'jobs' ? `<button class="btn" data-act="openJob" data-id="${src.id}">← К работе</button>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
+      <div class="row-g">${ed && L.length ? `<button class="btn primary" data-act="woSave" data-id="${col}|${src.id}" ${bad.length ? 'disabled title="Есть позиции, которых не хватает в бухгалтерских остатках"' : ''}>Сохранить список</button>` : ''}${L.length ? `<a class="btn" href="/api/${col}/${src.id}/writeoff.xlsx" data-dl title="Excel для загрузки в 1С: «Требование-накладная» → «Загрузить из файла»">Скачать для 1С${dirty ? ' (сохранённый)' : ''}</a>` : ''}${col === 'jobs' ? `<button class="btn" data-act="openJob" data-id="${src.id}">← К работе</button>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
     </div>`;
   }
   if (d.kind === 'dtNeeds') {
