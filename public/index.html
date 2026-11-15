@@ -257,6 +257,13 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .bal.low{color:var(--warn)}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
 .incrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
+.devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.devcost{display:grid;grid-template-columns:1fr;gap:0;margin:2px 0;font-size:14px}.devcost dt{color:var(--ink-2);font-size:12px;margin-top:4px}.devcost dd{margin:0;white-space:pre-line;overflow:hidden;text-overflow:ellipsis}
+.devsec{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--rule-2);padding-top:12px}.devsec h4{margin:0}.devtxt{white-space:pre-wrap;line-height:1.5}
+.devfiles,.devlinks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.devfiles li,.devlinks li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}.devfiles small,.devlinks small{flex:1 1 200px;overflow-wrap:anywhere}
+.devlinkadd{display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px}@media (max-width:640px){.devlinkadd{grid-template-columns:1fr}}
+table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{font-size:12px;color:var(--ink-2);font-weight:500;text-align:center;padding:6px}table.devacc th:first-child,table.devacc td:first-child{text-align:left}table.devacc td{padding:6px;border-top:1px solid var(--rule-2);text-align:center}
 .lblwrap{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
 .lbllist{display:flex;flex-direction:column;gap:8px}.lblcard{text-align:left;border:1px solid var(--rule);background:var(--sheet);border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--ink);font:inherit}
 .lblcard b{display:block;font-weight:500}.lblcard small{color:var(--ink-2);font-size:12px}.lblcard.on{border-color:var(--stamp);box-shadow:inset 3px 0 0 var(--stamp)}
@@ -921,6 +928,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#plan" data-v="plan">План-график</a>
       <a href="#map" data-v="map">Карта</a>
       <a href="#dt" data-v="dt">Карта объектов</a>
+      <a href="#devs" data-v="devs" id="devsTab">Разработки</a>
       <a href="#notes" data-v="notes" id="notesTab" hidden>Мои задачи <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
@@ -1131,7 +1139,9 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; LABELS = d.labels || [];
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; LABELS = d.labels || []; DEVS = d.devs || [];
+  $('devsTab').hidden = !!me?.sys || reqMode() || (isWorker() && !DEVS.length);
+  if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
   if (reqMode()) { const n = reqTodo().length; $('reqBadge').hidden = !n; $('reqBadge').textContent = n; if (ui.drawer?.kind === 'req' && !drawerBusy()) renderDrawer(); }
   { const n = NOTES.filter(x => !x.done && (x.type || 'task') !== 'memo').length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
@@ -1179,7 +1189,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : vOrders();
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -3047,6 +3057,77 @@ function vBackups(){
 /* ---------- «Мои задачи»: a personal to-do list ---------- */
 let NOTES = [];
 /* ---------- «Списание материалов»: every write-off list — of montage works and of production orders ---------- */
+/* ===== «Потенциальные разработки» ===== */
+let DEVS = [];
+const devManage = d => d && me && (d.by === me.id || me.role === 'admin');
+const devEdit = d => d && me && (devManage(d) || (d.editors || []).includes(me.id));
+const DEV_TEXT = [['desc', 'Описание'], ['features', 'Отличительные особенности от конкурентов'], ['needs', 'Что необходимо']];
+const devAccTxt = d => { const e = (d.editors || []).length, v = (d.viewers || []).length; return e + v ? `доступ: ${e ? 'добавляют ' + e : ''}${e && v ? ', ' : ''}${v ? 'видят ' + v : ''}` : 'видят только автор и администратор'; };
+function vDevs(){
+  const q = (ui.devQ || '').trim().toLowerCase();
+  const L = DEVS.filter(d => !q || [d.no, d.name, d.short, d.desc, d.features, d.needs, who(d.by)].join(' ').toLowerCase().includes(q))
+    .sort((a, b) => String(b.updatedAt || b.at).localeCompare(String(a.updatedAt || a.at)));
+  const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="devq" type="search" aria-label="Поиск разработки" placeholder="Поиск по названию, описанию" value="${esc(ui.devQ || '')}" style="flex:1 1 220px;max-width:340px"></span>
+    ${isWorker() ? '' : '<button class="btn primary" data-act="devNew">+ Разработка</button>'}
+    <span class="dim">Каждую разработку видят только автор, администратор и те, кого выбрал автор.</span></div>`;
+  if (!L.length) return head + `<div class="empty"><h3>${DEVS.length ? 'Ничего не найдено' : 'Потенциальных разработок пока нет'}</h3>${DEVS.length ? 'Измените строку поиска.' : 'Запишите идею проекта: что это, сколько может стоить, что у конкурентов и чем ваш вариант лучше. Приложите документы и ссылки и выберите, кто увидит и сможет дополнять.'}</div>`;
+  return head + `<div class="devgrid">${L.map(d => `<article class="card devcard click" data-act="devOpen" data-id="${d.id}" role="button" tabindex="0">
+      <small class="dim">№ ${d.no} · ${esc(who(d.by))}</small><h3>${esc(d.name)}</h3>${d.short ? `<p>${esc(d.short)}</p>` : ''}
+      <dl class="devcost">${d.cost ? `<dt>Приблизительная стоимость</dt><dd>${esc(d.cost)}</dd>` : ''}${d.compCost ? `<dt>У конкурентов</dt><dd>${esc(d.compCost)}</dd>` : ''}</dl>
+      <small class="dim">${[(d.files || []).length && '📎 ' + d.files.length, (d.links || []).length && '🔗 ' + d.links.length, (d.comments || []).length && '💬 ' + d.comments.length].filter(Boolean).join(' · ')}${(d.files || []).length + (d.links || []).length + (d.comments || []).length ? ' · ' : ''}${devManage(d) ? esc(devAccTxt(d)) : devEdit(d) ? 'вы можете добавлять данные' : 'только просмотр'}</small></article>`).join('')}</div>`;
+}
+const devFileRow = (d, f, ed) => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a><small class="dim">${f.size ? fmtSize(f.size) + ' · ' : ''}${f.by ? esc(who(f.by)) + ' · ' : ''}${f.at ? esc(fmtDT(f.at)) : ''}</small>${ed ? `<button class="btn sm ghost" data-act="devFileDel" data-id="${d.id}|${f.id}" aria-label="Убрать файл">✕</button>` : ''}</li>`;
+function devViewHtml(d){
+  const ed = devEdit(d), mg = devManage(d);
+  const acc = [...(d.editors || []).map(id => [id, 'добавляет данные']), ...(d.viewers || []).map(id => [id, 'видит'])];
+  return `<div class="d-body">
+    <h3 style="margin:0;font-size:20px">${esc(d.name)}</h3>${d.short ? `<p style="margin:0">${esc(d.short)}</p>` : ''}
+    <dl class="kv"><dt>Приблизительная стоимость</dt><dd>${d.cost ? esc(d.cost) : '<span class="dim">не указана</span>'}</dd>
+      <dt>Стоимость у конкурентов</dt><dd style="white-space:pre-wrap">${d.compCost ? esc(d.compCost) : '<span class="dim">не указана</span>'}</dd>
+      <dt>Автор</dt><dd>${esc(who(d.by))} · ${esc(fmtDT(d.at))}${d.updatedAt ? `<small class="dim" style="display:block">изменено ${esc(fmtDT(d.updatedAt))} · ${esc(who(d.updatedBy))}</small>` : ''}</dd>
+      <dt>Доступ</dt><dd>${acc.length ? acc.map(([id, l]) => `${esc(who(id))} <small class="dim">— ${l}</small>`).join('<br>') : '<span class="dim">только автор и администратор</span>'}</dd></dl>
+    ${ed ? `<div class="row-g"><button class="btn" data-act="devEdit" data-id="${d.id}">Изменить${mg ? ' и доступ' : ''}</button>${mg ? armBtn('dev:' + d.id, 'Удалить разработку', 'devDel', d.id, 'btn danger') : ''}</div>` : '<p class="dim" style="margin:0">У вас только просмотр.</p>'}
+    ${DEV_TEXT.map(([k, l]) => `<section class="devsec"><h4>${l}</h4>${d[k] ? `<div class="devtxt">${esc(d[k])}</div>` : '<p class="dim" style="margin:0">Не заполнено.</p>'}</section>`).join('')}
+    <section class="devsec"><h4>Документы по проекту</h4>
+      ${(d.files || []).length ? `<ul class="devfiles">${d.files.map(f => devFileRow(d, f, ed)).join('')}</ul>` : '<p class="dim" style="margin:0">Файлов нет.</p>'}
+      ${ed ? `<div><label class="btn sm">+ Загрузить файлы<input type="file" data-up="devFile" data-id="${d.id}" multiple hidden></label></div>` : ''}</section>
+    <section class="devsec"><h4>Ссылки</h4>
+      ${(d.links || []).length ? `<ul class="devlinks">${d.links.map(l => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(l.title)}</a><small class="dim">${esc(l.url)}</small>${ed ? `<button class="btn sm ghost" data-act="devLinkDel" data-id="${d.id}|${l.id}" aria-label="Удалить ссылку">✕</button>` : ''}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Ссылок нет.</p>'}
+      ${ed ? `<div class="devlinkadd" data-keep><input class="in" id="dl-title" placeholder="Наименование ссылки" maxlength="200"><input class="in" id="dl-url" placeholder="https://…" maxlength="1000" inputmode="url"><button class="btn sm" data-act="devLinkAdd" data-id="${d.id}">Добавить</button></div>` : ''}</section>
+    <section class="devsec"><h4>Комментарии</h4>
+      ${(d.comments || []).length ? `<ul class="reqfeed">${d.comments.map(c => `<li class="c"><b>${esc(who(c.by))}</b> <small class="dim">${esc(fmtDT(c.at))}</small>${c.by === me.id || mg ? ` <button class="linkish" data-act="devCmtDel" data-id="${d.id}|${c.id}">удалить</button>` : ''}<div>${esc(c.text)}</div></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Комментариев нет.</p>'}
+      ${ed ? `<div class="row-g" data-keep><textarea class="in" id="dc-text" rows="2" placeholder="Комментарий" style="flex:1 1 260px" maxlength="4000"></textarea><button class="btn" data-act="devCmt" data-id="${d.id}">Отправить</button></div>` : ''}</section>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+function devFormHtml(d){
+  const mg = !d || devManage(d), A = ui.devAcc || {};
+  const people = STAFF.filter(u => u.id !== (d ? d.by : me.id)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  return `<form class="d-body" data-form="devForm"><div class="form">
+    <label class="wide">Наименование проекта<input class="in" id="dv-name" value="${esc(d?.name || '')}" maxlength="200" required></label>
+    <label class="wide">Краткое описание<textarea class="in" id="dv-short" rows="2" maxlength="1000">${esc(d?.short || '')}</textarea></label>
+    <label>Приблизительная стоимость<input class="in" id="dv-cost" value="${esc(d?.cost || '')}" maxlength="200" placeholder="например, 1,5 млн ₽"></label>
+    <label>Стоимость у конкурентов<textarea class="in" id="dv-comp" rows="2" maxlength="1000" placeholder="Компания — цена; по строке на конкурента">${esc(d?.compCost || '')}</textarea></label>
+    <label class="wide">Описание<textarea class="in" id="dv-desc" rows="5" maxlength="10000">${esc(d?.desc || '')}</textarea></label>
+    <label class="wide">Отличительные особенности от конкурентов<textarea class="in" id="dv-feat" rows="4" maxlength="5000">${esc(d?.features || '')}</textarea></label>
+    <label class="wide">Что необходимо<textarea class="in" id="dv-needs" rows="3" maxlength="5000" placeholder="люди, оборудование, деньги, сроки, документы…">${esc(d?.needs || '')}</textarea></label></div>
+    ${mg ? `<div class="box"><h4>Кто видит и может добавлять данные</h4>
+      <p class="dim" style="margin:0;font-size:13px">«Добавляет» — может менять поля, загружать документы, добавлять ссылки и комментарии. «Видит» — только просмотр. Автор и администратор видят всегда.</p>
+      ${people.length ? `<div class="tscroll"><table class="devacc"><thead><tr><th>Сотрудник</th><th>Нет доступа</th><th>Видит</th><th>Добавляет</th></tr></thead><tbody>
+        ${people.map(u => `<tr><td>${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></td>${['', 'view', 'edit'].map(v => `<td><input type="radio" name="dacc-${u.id}" value="${v}" data-dacc="${u.id}" ${(A[u.id] || '') === v ? 'checked' : ''} aria-label="${esc(u.name)}: ${v === 'edit' ? 'добавляет' : v === 'view' ? 'видит' : 'нет доступа'}"></td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>
+      <div class="row-g"><button type="button" class="btn sm" data-act="devAccAll" data-id="view">Все видят</button><button type="button" class="btn sm" data-act="devAccAll" data-id="edit">Все добавляют</button><button type="button" class="btn sm" data-act="devAccAll" data-id="">Никто</button></div>` : '<p class="dim">Других пользователей нет.</p>'}</div>` : ''}
+    ${d ? '' : '<p class="hint" style="margin:0">Документы и ссылки можно добавить сразу после создания — в карточке разработки.</p>'}
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" type="submit">${d ? 'Сохранить' : 'Создать разработку'}</button><button class="btn" type="button" data-act="${d ? 'devOpen' : 'close'}" data-id="${d ? d.id : ''}">Отмена</button></div></form>`;
+}
+async function devApi(method, url, body){
+  const r = await api(method, url, body);
+  if (r.dev) { const i = DEVS.findIndex(x => x.id === r.dev.id); if (i >= 0) DEVS[i] = r.dev; else DEVS.unshift(r.dev); }
+  refresh().catch(() => {});
+  return r;
+}
+
 /* ===== «Этикетки»: label designer for production — size in mm, text with fields, serial number, barcode; «Печать следующей» ===== */
 let LABELS = [];
 const LBL_SIZES = [[58, 40], [58, 30], [40, 25], [30, 20], [43, 25], [75, 50], [100, 50], [100, 70], [100, 150]];
@@ -3604,7 +3685,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incEdo = false; ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
@@ -3940,6 +4021,12 @@ function renderDrawer(){
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">Сохранить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
+  if (d.kind === 'dev') {
+    const x = DEVS.find(z => z.id === d.id); if (!x) return closeDrawer();
+    D.innerHTML = dh(`Разработка № ${x.no}`) + (ui.devEditing === x.id ? devFormHtml(x) : devViewHtml(x));
+    return;
+  }
+  if (d.kind === 'devForm') { D.innerHTML = dh('Новая разработка') + devFormHtml(null); return; }
   if (d.kind === 'req') {
     const r = REQS.find(x => x.id === d.id); if (!r) return closeDrawer();
     D.innerHTML = dh(`Заявка № ${r.no} · ${esc(r.title)}`) + (ui.reqEdit === r.id ? reqFormHtml(r) : reqViewHtml(r));
@@ -4462,6 +4549,13 @@ async function onSubmit(e){
       if (mineTouched) { await refresh().catch(() => {}); }
       await loadOrgs();
     }
+    if (kind === 'devForm') {
+      const body = { name: val('dv-name'), short: $('dv-short').value, cost: val('dv-cost'), compCost: $('dv-comp').value, desc: $('dv-desc').value, features: $('dv-feat').value, needs: $('dv-needs').value };
+      if (!body.name) return fail('Укажите наименование проекта.');
+      if (f.querySelector('[data-dacc]')) { const A = ui.devAcc || {}; body.editors = Object.keys(A).filter(k => A[k] === 'edit'); body.viewers = Object.keys(A).filter(k => A[k] === 'view'); }
+      if (d.kind === 'dev') { await devApi('PATCH', '/api/devs/' + d.id, body); ui.devEditing = null; renderDrawer(); render(); toast('Сохранено'); }
+      else { const r = await devApi('POST', '/api/devs', body); ui.devEditing = null; openDrawer('dev', r.dev.id); render(); toast(`Разработка № ${r.dev.no} создана — добавьте документы и ссылки`); }
+    }
     if (kind === 'reqForm') {
       const body = { title: val('rq-title'), text: $('rq-text').value.trim(), due: val('rq-due'), urgent: $('rq-urg').checked, files: ui.reqFiles || [] };
       if (!body.title) return fail('Напишите, что нужно сделать.');
@@ -4962,6 +5056,22 @@ async function act(el){
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
     case 'reqNew': ui.reqFiles = []; return openDrawer('reqForm');
+    case 'devNew': ui.devAcc = {}; ui.devEditing = null; return openDrawer('devForm');
+    case 'devOpen': ui.devEditing = null; return openDrawer('dev', id);
+    case 'devEdit': { const x = DEVS.find(z => z.id === id); ui.devAcc = {}; (x?.viewers || []).forEach(u => ui.devAcc[u] = 'view'); (x?.editors || []).forEach(u => ui.devAcc[u] = 'edit'); ui.devEditing = id; return renderDrawer(); }
+    case 'devAccAll': document.querySelectorAll('[data-dacc]').forEach(r => { if (r.value === id) { r.checked = true; ui.devAcc = ui.devAcc || {}; if (id) ui.devAcc[r.dataset.dacc] = id; else delete ui.devAcc[r.dataset.dacc]; } }); return;
+    case 'devDel': try { await api('DELETE', '/api/devs/' + id); DEVS = DEVS.filter(x => x.id !== id); closeDrawer(); render(); refresh().catch(() => {}); toast('Разработка удалена'); } catch(e) { toast(errText(e)); } return;
+    case 'devFileDel': { const [did, fid] = id.split('|'), x = DEVS.find(z => z.id === did);
+      try { await devApi('PATCH', '/api/devs/' + did, { files: (x.files || []).filter(f => f.id !== fid) }); renderDrawer(); toast('Файл убран'); } catch(e) { toast(errText(e)); } return; }
+    case 'devLinkAdd': { const x = DEVS.find(z => z.id === id), title = ($('dl-title')?.value || '').trim(); let url = ($('dl-url')?.value || '').trim();
+      if (!url) return toast('Вставьте ссылку'); if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      if (!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(url)) return toast('Похоже, это не ссылка');
+      try { await devApi('PATCH', '/api/devs/' + id, { links: [...(x.links || []), { title: title || url, url }] }); renderDrawer(); toast('Ссылка добавлена'); } catch(e) { toast(errText(e)); } return; }
+    case 'devLinkDel': { const [did, lid] = id.split('|'), x = DEVS.find(z => z.id === did);
+      try { await devApi('PATCH', '/api/devs/' + did, { links: (x.links || []).filter(l => l.id !== lid) }); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    case 'devCmt': { const t = ($('dc-text')?.value || '').trim(); if (!t) return toast('Напишите комментарий');
+      try { await devApi('POST', `/api/devs/${id}/comments`, { text: t }); document.activeElement?.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    case 'devCmtDel': { const [did, cid] = id.split('|'); try { await devApi('DELETE', `/api/devs/${did}/comments/${cid}`); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
     case 'labelsFor': { const [ty, rid] = id.split(':'), ex = LABELS.find(x => x.ref?.type === ty && x.ref.id === rid);
       closeDrawer();
       if (ex) lblPick(ex.id); else if (canEdit()) { ui.lblId = null; ui.lblDraft = lblNewTpl({ type: ty, id: rid }); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; await lblSave(); }
@@ -5149,6 +5259,7 @@ document.addEventListener('input', e => {
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
   if (t.dataset.lb) { lblChange(t.dataset.lb, t); return; }
   if (t.id === 'lbl-count') { ui.lblCount = t.value; return; }
+  if (t.id === 'devq') { ui.devQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vDevs(); const n = $('devq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'reqq') { ui.reqQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReq(); const n = $('reqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'spq') { ui.spq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaffProj(); const n = $('spq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'stq') { ui.stq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaff(); const n = $('stq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -5239,6 +5350,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'jW') { ui.jW = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
+  if (t.dataset.dacc) { ui.devAcc = ui.devAcc || {}; if (t.value) ui.devAcc[t.dataset.dacc] = t.value; else delete ui.devAcc[t.dataset.dacc]; return; }
   if (t.id === 'rq-assign') { const rid = ui.drawer?.id; try { await reqApi('PATCH', '/api/requests/' + rid, { action: 'assign', assignee: t.value || null }); renderDrawer(); render(); toast(t.value ? 'Исполнитель назначен' : 'Исполнитель снят'); } catch(e) { toast(errText(e)); renderDrawer(); } return; }
   if (t.id === 'planWho') { ui.planWho = t.value; return render(); }
   if (t.id === 't-job') { ui.tJob = t.value; ui.tKind = (document.querySelector('input[name=t-kind]:checked') || {}).value; ['t-title','t-resp','t-start','t-end','t-people','t-brig'].forEach(k => { ui.tKeep = ui.tKeep || {}; ui.tKeep[k] = $(k)?.value; }); ui.tKeep.done = $('t-done')?.checked; renderDrawer(); Object.entries(ui.tKeep).forEach(([k, v]) => { if (k === 'done') { if ($('t-done')) $('t-done').checked = v; } else if ($(k) && v !== undefined) $(k).value = v; }); ui.tKeep = null; return; }
@@ -5259,6 +5371,10 @@ document.addEventListener('change', async e => {
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
   }
+  if (t.dataset.up === 'devFile') { const files = [...t.files], did = t.dataset.id; t.value = ''; if (!files.length) return;
+    try { const x = DEVS.find(z => z.id === did), add = []; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); add.push({ id: u.id, name: u.name, at: u.at, by: u.by }); }
+      await devApi('PATCH', '/api/devs/' + did, { files: [...(x.files || []), ...add] }); renderDrawer(); toast(add.length > 1 ? `Загружено файлов: ${add.length}` : 'Файл загружен'); } catch(e) { toast(errText(e)); }
+    return; }
   if (t.dataset.up === 'reqFile') { const files = [...t.files]; t.value = ''; if (!files.length) return;
     const keep = { t: $('rq-title')?.value, x: $('rq-text')?.value, d: $('rq-due')?.value, u: $('rq-urg')?.checked, a: $('rq-to')?.value };
     try { ui.reqFiles = ui.reqFiles || []; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); ui.reqFiles.push({ id: u.id, name: u.name }); } } catch(e) { toast(errText(e)); }
@@ -5339,8 +5455,8 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (h === 'users' && me.role === 'admin' ? 'users' : 'req')
-    : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt','labels'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : isWorker() ? (['wwork', 'wdone', 'devs'].includes(h) ? h : 'wwork')
+    : ['works','orders','stock','cps','pay','plan','dt','labels','devs'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();

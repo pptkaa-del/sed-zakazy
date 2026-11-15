@@ -321,6 +321,11 @@ const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === '
 const REQ_ROLES = ['admin', 'head', 'worker'];
 // a request is seen by its author, its executor, the administrator and the manager
 const reqSees = (u, r) => HEAD(u) || r.by === u.id || r.assignee === u.id;
+/* «Потенциальные разработки»: the author and the administrator manage a development; the author chooses who sees it
+   and who may add data to it (fields, documents, links, comments) */
+const devManage = (u, d) => d.by === u.id || u.role === 'admin';
+const devEdit = (u, d) => devManage(u, d) || (d.editors || []).includes(u.id);
+const devSees = (u, d) => devEdit(u, d) || (d.viewers || []).includes(u.id);
 
 /* the database of the organization the current request works in (AsyncLocalStorage keeps it per request) */
 const dbs = new Map();
@@ -499,7 +504,8 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if (FIELD(user) && !['rev', 'data', 'password', 'jobs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))) return fail(res, 403, 'Недостаточно прав');
+  if (FIELD(user) && !['rev', 'data', 'password', 'jobs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+    && !(p[1] === 'devs' || (p[1] === 'files' && Object.values(db.devs || {}).some(d => devEdit(user, d))))) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && orgUsers().find(u => u.id === p[2]);
@@ -586,11 +592,61 @@ async function api(req, res, url) {
       out.requests = Object.entries(db.requests || {}).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r));
       out.reqUsers = orgUsers().filter(u => !u.blocked && !u.sys).map(u => ({ id: u.id, name: u.name, role: u.role }));
     }
+    out.devs = Object.entries(db.devs || {}).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d));
     out.labels = FIELD(user) ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
     out.receipts = FIELD(user) ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
     if (!FIELD(user)) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
     return send(res, 200, out);
+  }
+  if (p[1] === 'devs') {
+    if (orgType(user) === 'requests') return fail(res, 403, 'Разработки есть только в системе «Все сервисы»');
+    if (!db.devs || typeof db.devs !== 'object') db.devs = {};
+    const D = db.devs, now = new Date().toISOString();
+    const txt = (v, n) => String(v || '').trim().slice(0, n);
+    const cleanFiles = a => (Array.isArray(a) ? a : []).filter(f => f && db.files[f.id]).slice(0, 200).map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), type: db.files[f.id].type, size: db.files[f.id].size, at: f.at || db.files[f.id].at, by: f.by || db.files[f.id].by }));
+    const cleanLinks = a => (Array.isArray(a) ? a : []).slice(0, 100).map(l => ({ id: String(l && l.id || newId()).slice(0, 20), title: txt(l && l.title, 200), url: txt(l && l.url, 1000) }))
+      .filter(l => /^https?:\/\/[^\s]+$/i.test(l.url)).map(l => ({ ...l, title: l.title || l.url }));
+    const people = a => [...new Set((Array.isArray(a) ? a : []).filter(id => orgUsers().some(u => u.id === id && !u.sys)))].slice(0, 200);
+    const fields = (b, d) => { for (const [k, n] of [['name', 200], ['short', 1000], ['cost', 200], ['compCost', 1000], ['desc', 10000], ['features', 5000], ['needs', 5000]]) if (b[k] !== undefined) d[k] = txt(b[k], n);
+      if (b.files !== undefined) d.files = cleanFiles(b.files); if (b.links !== undefined) d.links = cleanLinks(b.links); };
+    const access = (b, d) => { if (b.editors !== undefined) d.editors = people(b.editors).filter(id => id !== d.by);
+      if (b.viewers !== undefined) d.viewers = people(b.viewers).filter(id => id !== d.by && !(d.editors || []).includes(id)); };
+    const out = (id, d) => ({ ok: true, dev: { id, ...d }, rev: db.rev });
+    if (m === 'GET' && !p[2]) return send(res, 200, Object.entries(D).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d)));
+    if (m === 'POST' && !p[2]) {
+      if (FIELD(user)) return fail(res, 403, 'Создавать разработки может администратор, руководитель или бухгалтер');
+      const b = await readJsonBody(req);
+      if (!txt(b.name, 200)) return fail(res, 400, 'Укажите наименование проекта');
+      const id = newId(), d = { no: Math.max(0, ...Object.values(D).map(x => x.no || 0)) + 1, by: user.id, at: now, files: [], links: [], comments: [], viewers: [], editors: [] };
+      fields(b, d); access(b, d); D[id] = d; saveDb();
+      return send(res, 200, out(id, d));
+    }
+    const d = p[2] && D[p[2]];
+    if (!d || !devSees(user, d)) return fail(res, 404, 'Разработка не найдена — обновите страницу');
+    if (p[3] === 'comments') {
+      if (!devEdit(user, d)) return fail(res, 403, 'Добавлять данные к разработке могут только те, кому это разрешено');
+      d.comments = Array.isArray(d.comments) ? d.comments : [];
+      if (m === 'POST') { const b = await readJsonBody(req), t = txt(b.text, 4000); if (!t) return fail(res, 400, 'Пустой комментарий');
+        d.comments.push({ id: newId(), by: user.id, at: now, text: t }); d.updatedAt = now; d.updatedBy = user.id; saveDb(); return send(res, 200, out(p[2], d)); }
+      if (m === 'DELETE' && p[4]) { const c = d.comments.find(x => x.id === p[4]); if (!c) return fail(res, 404, 'Комментарий не найден');
+        if (c.by !== user.id && !devManage(user, d)) return fail(res, 403, 'Удалить можно только свой комментарий');
+        d.comments = d.comments.filter(x => x !== c); saveDb(); return send(res, 200, out(p[2], d)); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
+    if (m === 'PATCH' && p.length === 3) {
+      if (!devEdit(user, d)) return fail(res, 403, 'Добавлять данные к разработке могут только те, кому это разрешено');
+      const b = await readJsonBody(req);
+      if ((b.viewers !== undefined || b.editors !== undefined) && !devManage(user, d)) return fail(res, 403, 'Кто видит разработку, выбирает её автор или администратор');
+      if (b.name !== undefined && !txt(b.name, 200)) return fail(res, 400, 'Укажите наименование проекта');
+      fields(b, d); access(b, d); d.updatedAt = now; d.updatedBy = user.id; saveDb();
+      return send(res, 200, out(p[2], d));
+    }
+    if (m === 'DELETE' && p.length === 3) {
+      if (!devManage(user, d)) return fail(res, 403, 'Удалить разработку может её автор или администратор');
+      delete D[p[2]]; saveDb(); return send(res, 200, { ok: true, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
   }
   /* label templates for production: size in millimetres, elements (text with fields, barcode of the serial number) and the serial counter;
      the next serial number is handed out by the server, so two people never print the same one */
@@ -1024,7 +1080,7 @@ async function api(req, res, url) {
   }
 
   if (p[1] === 'files' && m === 'POST') {
-    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user) && orgType(user) !== 'requests') return fail(res, 403, 'Недостаточно прав для загрузки файлов');
+    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user) && orgType(user) !== 'requests' && !Object.values(db.devs || {}).some(d => devEdit(user, d))) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
     let name = 'файл';
     try { name = decodeURIComponent(String(req.headers['x-filename'] || 'файл')); } catch {}
     name = name.replace(/[\\/\r\n"]/g, '_').slice(0, 200) || 'файл';
