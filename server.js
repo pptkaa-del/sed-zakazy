@@ -193,9 +193,10 @@ function postIncome(lines, label, ref, user){
       sid = newId(); created++;
       it = db.stock[sid] = { name: ln.name, sku: ln.sku, unit: ln.unit, location: '', minQty: 0, note: 'Добавлено по ' + label, qty: 0, moves: [], acctQty: 0, createdAt: at, createdBy: user.id };
     }
-    it.qty = r3((Number(it.qty) || 0) + ln.qty);
+    // a receipt goes both to the actual and to the accounting balance
+    it.qty = r3((Number(it.qty) || 0) + ln.qty); it.acctQty = r3((Number(it.acctQty) || 0) + ln.qty);
     it.moves = Array.isArray(it.moves) ? it.moves : [];
-    const mv = { id: newId(), type: 'in', qty: ln.qty, orderId: ref.orderId || null, ...(ref.invoiceId ? { invoiceId: ref.invoiceId } : {}), ...(ref.receiptId ? { receiptId: ref.receiptId } : {}), note: 'Приход по ' + label, by: user.id, at, balance: it.qty };
+    const mv = { id: newId(), type: 'in', acct: true, acctBalance: it.acctQty, qty: ln.qty, orderId: ref.orderId || null, ...(ref.invoiceId ? { invoiceId: ref.invoiceId } : {}), ...(ref.receiptId ? { receiptId: ref.receiptId } : {}), note: 'Приход по ' + label, by: user.id, at, balance: it.qty };
     it.moves.push(mv); it.updatedAt = at; it.updatedBy = user.id;
     out.push({ ...ln, stockId: sid, moveId: mv.id });
   }
@@ -211,7 +212,7 @@ function rollbackIncome(lines, user){
   for (const ln of lines) {
     const it = db.stock[ln.stockId]; if (!it) continue;
     const i = (it.moves || []).findIndex(x => x.id === ln.moveId); if (i < 0) continue;
-    it.moves.splice(i, 1); it.qty = r3((Number(it.qty) || 0) - ln.qty);
+    const was = it.moves[i]; it.moves.splice(i, 1); it.qty = r3((Number(it.qty) || 0) - ln.qty); if (was.acct) it.acctQty = r3((Number(it.acctQty) || 0) - ln.qty);
     it.updatedAt = new Date().toISOString(); it.updatedBy = user.id;
   }
   return '';
@@ -1015,7 +1016,7 @@ async function api(req, res, url) {
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'stock-acct' && m === 'POST') {
-    if (!canEdit(user) && user.role !== 'accountant') return fail(res, 403, 'Загружать бухгалтерские остатки могут бухгалтер, менеджер или администратор');
+    if (user.role !== 'admin') return fail(res, 403, 'Загружать выгрузку из 1С может только администратор');
     const b = await readJsonBody(req);
     const rows = Array.isArray(b.rows) ? b.rows.slice(0, 20000) : [];
     if (!rows.length) return fail(res, 400, 'В файле не найдено строк с остатками');
@@ -1057,9 +1058,18 @@ async function api(req, res, url) {
     if (!lines.length) return fail(res, 400, p[1] === 'jobs' ? 'В работе нет материалов' : 'В изделиях заказа нет компонентов');
     const bad = lines.filter(L => L.source !== 'acct');
     if (bad.length) return fail(res, 409, 'Не хватает в бухгалтерских остатках: ' + bad.slice(0, 5).map(L => L.name).join(', ') + (bad.length > 5 ? ` и ещё ${bad.length - 5}` : '') + '. Замените номенклатуру или обновите остатки');
-    const target = p[1] === 'jobs' ? db.jobs[p[2]] : o;
+    const target = p[1] === 'jobs' ? db.jobs[p[2]] : o, at = new Date().toISOString(), prev = woTaken(target), next = {};
+    lines.forEach(L => { next[L.stockId] = r3((next[L.stockId] || 0) + L.need); });
+    const what = p[1] === 'jobs' ? `работе № ${target.no || ''} · ${target.title || ''}` : `заказу ${o.number || ''} · ${o.title || ''}`;
+    for (const sid of new Set([...Object.keys(prev), ...Object.keys(next)])) {
+      const it = db.stock[sid], d = r3((next[sid] || 0) - (prev[sid] || 0)); if (!it || !d) continue;
+      it.acctQty = r3((Number(it.acctQty) || 0) - d);
+      it.moves = Array.isArray(it.moves) ? it.moves : [];
+      it.moves.push({ id: newId(), type: 'wo', qty: d, acct: true, acctBalance: it.acctQty, balance: Number(it.qty) || 0, orderId: p[1] === 'orders' ? p[2] : (target.orderId || null), note: (prev[sid] ? 'Изменён список для списания по ' : 'Списание по ') + what, by: user.id, at });
+      it.updatedAt = at; it.updatedBy = user.id;
+    }
     target.woMap = map;
-    target.writeoff = { at: new Date().toISOString(), by: user.id, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.need })) };
+    target.writeoff = { at, by: user.id, applied: true, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.need })) };
     saveDb();
     return send(res, 200, { ok: true, writeoff: target.writeoff, rev: db.rev });
   }
@@ -1107,8 +1117,10 @@ async function api(req, res, url) {
     if (b.type === 'out' && qty > bal + 1e-9) return fail(res, 409, `На складе только ${bal} ${it.unit || ''}`.trim());
     if (b.orderId && !db.orders[b.orderId]) return fail(res, 400, 'Заказ не найден');
     it.qty = Math.round((bal + (b.type === 'in' ? qty : -qty)) * 1000) / 1000;
+    // a receipt goes to the accounting balance too; an issue («Расход») changes only the actual one
+    if (b.type === 'in') it.acctQty = r3((Number(it.acctQty) || 0) + qty);
     it.moves = Array.isArray(it.moves) ? it.moves : [];
-    const mv = { id: newId(), type: b.type, qty, orderId: b.orderId || null, note: String(b.note || '').slice(0, 500), by: user.id, at: new Date().toISOString(), balance: it.qty };
+    const mv = { id: newId(), type: b.type, ...(b.type === 'in' ? { acct: true, acctBalance: it.acctQty } : {}), qty, orderId: b.orderId || null, note: String(b.note || '').slice(0, 500), by: user.id, at: new Date().toISOString(), balance: it.qty };
     it.moves.push(mv);
     it.updatedAt = mv.at; it.updatedBy = user.id;
     saveDb();
@@ -1743,7 +1755,9 @@ const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace
    or whose balance is short is «red»; the nomenclature of a line can be replaced (o.woMap: original line key → stock id). */
 // a work's materials look like one product of quantity 1 for the write-off list
 const woDoc = (col, id) => { const x = db[col] && db[col][id]; if (!x) return null; return col === 'jobs' ? { ...x, number: 'работа № ' + (x.no || ''), products: [{ name: x.title, qty: 1, components: x.materials || [] }] } : x; };
+const woTaken = o => { const t = {}; if (o && o.writeoff && o.writeoff.applied) for (const L of o.writeoff.lines || []) if (L.stockId) t[L.stockId] = r3((t[L.stockId] || 0) + (Number(L.qty) || 0)); return t; };
 function writeoffLines(o, mapOverride) {
+  const taken = woTaken(o);
   const byName = new Map(Object.entries(db.stock).map(([id, it]) => [normName(it.name), id]));
   const map = mapOverride || o.woMap || {};
   const lines = new Map();
@@ -1756,7 +1770,7 @@ function writeoffLines(o, mapOverride) {
       const sid = map[key0] && db.stock[map[key0]] ? map[key0] : sid0;
       const it = sid ? db.stock[sid] : null;
       const key = sid ? 'id:' + sid : key0;
-      const L = lines.get(key) || { key, keys: [], name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, stockId: sid || null, replaced: false, products: [] };
+      const L = lines.get(key) || { key, keys: [], name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? r3((Number(it.acctQty) || 0) + (taken[sid] || 0)) : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, stockId: sid || null, replaced: false, products: [] };
       if (!L.keys.includes(key0)) L.keys.push(key0);
       if (sid !== sid0) L.replaced = true;
       L.need = Math.round((L.need + (Number(c.qty) || 0) * k) * 1000) / 1000;

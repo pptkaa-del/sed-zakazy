@@ -1837,11 +1837,14 @@ function orderDetail(o){
 /* ===== Products of an order: components per unit, totals, stock, files ===== */
 const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/["«»'“”„]/g, '').replace(/(\d)\s*[x×х*]\s*(?=\d)/g, '$1х').replace(/\s+/g, ' ').trim();
 const stockFor = c => (c.stockId && S.stock.find(x => x.id === c.stockId)) || stockByName(c.name);
-const canAcct = () => me && (canEdit() || me.role === 'accountant');
+// the 1C export of balances is loaded by the administrator only
+const canAcct = () => me && me.role === 'admin';
 const SOURCE_LABEL = { acct: 'Хватает', short: 'Не хватает', none: 'Нет в бухгалтерских остатках' };
 /* the write-off list: from the accounting balances; map = replaced nomenclature (original line key → stock id) */
+// what the saved write-off list already took from the books is available to the same list again
+const woTaken = o => { const t = {}; if (o?.writeoff?.applied) for (const L of o.writeoff.lines || []) if (L.stockId) t[L.stockId] = (t[L.stockId] || 0) + (Number(L.qty) || 0); return t; };
 function writeoffLines(o, map){
-  map = map || o.woMap || {};
+  map = map || o.woMap || {}; const taken = woTaken(o);
   const lines = new Map();
   for (const p of o.products || []) {
     const k = Number(p.qty) || 0;
@@ -1851,7 +1854,7 @@ function writeoffLines(o, map){
       const key0 = it0 ? 'id:' + it0.id : 'n:' + normName(c.name);
       const it = (map[key0] && S.stock.find(x => x.id === map[key0])) || it0;
       const key = it ? 'id:' + it.id : key0;
-      const L = lines.get(key) || { key, keys: [], name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Number(it.acctQty) || 0 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, stockId: it ? it.id : null, replaced: false, products: [] };
+      const L = lines.get(key) || { key, keys: [], name: it ? it.name : c.name, sku: it ? it.sku || '' : '', unit: (it && it.unit) || c.unit || 'шт', need: 0, acct: it ? Math.round(((Number(it.acctQty) || 0) + (taken[it.id] || 0)) * 1000) / 1000 : 0, real: it ? Number(it.qty) || 0 : 0, inStock: !!it, stockId: it ? it.id : null, replaced: false, products: [] };
       if (!L.keys.includes(key0)) L.keys.push(key0);
       if (it !== it0) L.replaced = true;
       L.need = Math.round((L.need + (Number(c.qty) || 0) * k) * 1000) / 1000;
@@ -3946,7 +3949,7 @@ function renderDrawer(){
         <dt>Минимальный запас</dt><dd>${it.minQty ? fmtQty(it.minQty) + ' ' + esc(it.unit || 'шт') : '—'}</dd>${it.note ? `<dt>Примечание</dt><dd>${esc(it.note)}</dd>` : ''}</dl>
       <div class="row-g">${canMoveStock() ? `<button class="btn ok" data-act="stockIn" data-id="${it.id}">+ Приход</button><button class="btn" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}${canEdit() ? `<button class="btn" data-act="editStock" data-id="${it.id}">Изменить</button>` : ''}</div>
       <div><h4 class="sub-h" style="margin:4px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)">Движение</h4>
-      ${mv.length ? `<ul class="mvs">${mv.map(m => `<li><span class="q ${m.type}">${m.type === 'in' ? '+' : '−'}${fmtQty(m.qty)}</span><span>${m.type === 'in' ? 'Приход' : 'Расход'}${ord(m.orderId) ? ' · ' + esc(ordName(ord(m.orderId))) : ''}${m.note ? `<small>${esc(m.note)}</small>` : ''}<small>${esc(who(m.by))}, ${esc(fmtDT(m.at))}</small></span><span class="dim mono">ост. ${fmtQty(m.balance)}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Движений пока не было.</p>'}</div>
+      ${mv.length ? `<ul class="mvs">${mv.map(m => `<li><span class="q ${m.type === 'wo' ? 'out' : m.type}">${m.type === 'in' || (m.type === 'wo' && m.qty < 0) ? '+' : '−'}${fmtQty(Math.abs(m.qty))}</span><span>${m.type === 'in' ? 'Приход' + (m.acct ? ' <small class="dim" style="display:inline">· в фактический и бухгалтерский</small>' : '') : m.type === 'wo' ? 'Списание <small class="dim" style="display:inline">· из бухгалтерского</small>' : 'Расход <small class="dim" style="display:inline">· из фактического</small>'}${ord(m.orderId) ? ' · ' + esc(ordName(ord(m.orderId))) : ''}${m.note ? `<small>${esc(m.note)}</small>` : ''}<small>${esc(who(m.by))}, ${esc(fmtDT(m.at))}</small></span><span class="dim mono">ост. ${fmtQty(m.balance)}${m.acct ? `<small>бух. ${fmtQty(m.acctBalance)}</small>` : ''}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Движений пока не было.</p>'}</div>
     </div>`;
   }
   if (d.kind === 'pointCoords') {
