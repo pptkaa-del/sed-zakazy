@@ -1955,26 +1955,51 @@ function receiptXlsx(d) {
   ];
   return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 16, 50, 9, 12, 13, 14, 40] }, { name: 'Реквизиты', rows: info, widths: [30, 60] }]);
 }
+/* the write-off list as an Excel file for 1C: sheet «Товары» — one header row and the materials (1С:Бухгалтерия 8:
+   «Требование-накладная» → «Материалы» → «Загрузить» → «Из файла»; columns are recognized by their headers);
+   «Реквизиты» — what it is for and how to load; «Проверка остатков» — the coloured check against the accounting balances */
 function writeoffXlsx(o) {
   const lines = writeoffLines(o);
-  const st = { acct: [4, 5], short: [8, 9], none: [8, 9] };
   const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : 'не загружались';
-  const rows = [
-    [{ v: `Список для списания — ${/^работа/.test(o.number || '') ? '' : 'заказ '}${o.number || ''} · ${o.title || ''}`, s: 10 }],
-    [`Сформирован: ${fmt(new Date().toISOString())}. Бухгалтерские остатки: ${db.meta.acct ? fmt(db.meta.acct.at) + (db.meta.acct.file ? ' (' + db.meta.acct.file + ')' : '') : 'не загружались'}.`],
+  const job = /^работа/.test(o.number || ''), cp = o.customerId && db.counterparties[o.customerId];
+  const ord = job && o.orderId && db.orders[o.orderId];
+  const wb = o.writeoff, u = wb && users.find(x => x.id === wb.by);
+  // the lines of the saved list when it is saved (that is what was taken off the books), otherwise the current ones
+  const out = wb && Array.isArray(wb.lines) && wb.lines.length ? wb.lines.map(L => { const it = L.stockId && db.stock[L.stockId]; return { name: it ? it.name : L.name, sku: (it && it.sku) || L.sku || '', unit: (it && it.unit) || L.unit || 'шт', qty: Number(L.qty) || 0 }; })
+    : lines.map(L => ({ name: L.name, sku: L.sku || '', unit: L.unit || 'шт', qty: L.need }));
+  const goods = [['№', 'Артикул', 'Номенклатура', 'Единица', 'Количество'].map(v => ({ v, s: 1 })),
+    ...out.map((L, i) => [{ v: i + 1, s: 3 }, { v: L.sku, s: 2 }, { v: L.name, s: 2 }, { v: L.unit, s: 2 }, { v: L.qty, s: 3 }])];
+  const bad = lines.filter(L => L.source !== 'acct');
+  const info = [
+    [{ v: 'Списание материалов', s: 10 }],
     [],
-    [`Список ${o.writeoff ? 'сохранён ' + fmt(o.writeoff.at) : 'ещё не сохранён'}.`],
+    ['Основание', job ? `Работа ${String(o.number || '').replace(/^работа\s*/, '')} · ${o.title || ''}` : `Заказ на производство ${o.number || ''} · ${o.title || ''}`],
+    ...(ord ? [['Заказ на производство', `${ord.number || ''} · ${ord.title || ''}`]] : []),
+    ...(cp || o.customer ? [['Заказчик', cp ? cp.name : o.customer]] : []),
+    ['Список для списания', wb ? `сохранён ${fmt(wb.at)}${u ? ', ' + u.name : ''}` : 'ещё не сохранён — в файле текущие строки'],
+    ['Строк', out.length],
+    ['Бухгалтерские остатки', db.meta.acct ? `из 1С ${fmt(db.meta.acct.at)}${db.meta.acct.file ? ' (' + db.meta.acct.file + ')' : ''}` : 'выгрузка 1С не загружалась'],
+    ...(bad.length ? [['Внимание', `не хватает в бухгалтерских остатках: ${bad.length} — см. лист «Проверка остатков»`]] : []),
+    ['Сформирован', fmt(new Date().toISOString())],
+    [],
+    ['Как загрузить в 1С:Бухгалтерию 8:'],
+    ['1. Производство → Требования-накладные (для монтажа — Склад → Списание товаров) → Создать.'],
+    ['2. Укажите склад и счёт затрат; в комментарии — основание с этого листа.'],
+    ['3. На вкладке «Материалы» («Товары») нажмите «Загрузить» (или «Ещё» → «Загрузить из файла») и выберите этот файл — данные на листе «Товары».'],
+    ['4. Проверьте сопоставление номенклатуры и проведите документ.'],
+  ];
+  const st = { acct: [4, 5], short: [8, 9], none: [8, 9] };
+  const check = [
     ['№', 'Наименование', 'Артикул', 'Ед.', 'Списать', 'Бух. остаток', 'Факт. остаток', 'Состояние', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
     ...lines.map((L, i) => { const [ts, ns] = st[L.source]; return [
       { v: i + 1, s: ns }, { v: L.name, s: ts }, { v: L.sku, s: ts }, { v: L.unit, s: ts }, { v: L.need, s: ns },
       L.inStock ? { v: L.acct, s: ns } : { v: '—', s: ts }, L.inStock ? { v: L.real, s: ns } : { v: '—', s: ts },
       { v: SOURCE_LABEL[L.source], s: ts }, L.shortage ? { v: L.shortage, s: ns } : { v: '', s: ts }, { v: L.products.join(', '), s: ts }]; }),
     [],
-    [{ v: 'Обозначения:', s: 0 }],
     [{ v: 'Хватает бухгалтерского остатка', s: 4 }],
     [{ v: 'Позиции нет в бухгалтерских остатках или её не хватает', s: 8 }],
   ];
-  return xlsxBuffer('Списание', rows, [5, 42, 16, 7, 11, 13, 13, 30, 12, 30]);
+  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 16, 50, 9, 12] }, { name: 'Реквизиты', rows: info, widths: [30, 70] }, { name: 'Проверка остатков', rows: check, widths: [5, 42, 16, 7, 11, 13, 13, 30, 12, 30] }]);
 }
 
 /* ---------- ZIP of invoices to pay (stored, no compression; no dependencies) ---------- */
