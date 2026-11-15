@@ -257,6 +257,7 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .bal.low{color:var(--warn)}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
 .incrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
+.buyst{white-space:nowrap}.buyst small{display:block;font-size:12px}tr.buy-got td{opacity:.6}
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .devcost{display:grid;grid-template-columns:1fr;gap:0;margin:2px 0;font-size:14px}.devcost dt{color:var(--ink-2);font-size:12px;margin-top:4px}.devcost dd{margin:0;white-space:pre-line;overflow:hidden;text-overflow:ellipsis}
@@ -1811,7 +1812,7 @@ function orderDetail(o){
     <p class="hint">Спецификации, чертежи, письма и другие файлы: любой формат, до 50 МБ. Строки из Excel можно вставить в таблицу «Строки для закупки».</p>
   </section>
   <section class="card">
-    <div class="ch"><h3>Строки для закупки <span class="dim">${(comps.length + orderShort(o).length)||''}</span></h3>
+    <div class="ch"><h3>Строки для закупки <span class="dim">${(comps.filter(c => buyState(o, c).st !== 'got').length + orderToBuy(o).length)||''}</span></h3>
       <div class="row-g"><button class="btn sm" data-act="paste" data-id="${o.id}">Вставить из Excel</button><button class="btn sm primary" data-act="addComp" data-id="${o.id}">+ Строка</button></div></div>
     ${orderShortTable(o)}
     ${compTable(o)}
@@ -1949,6 +1950,26 @@ function updProduct(oid, pid, fn){
   return upd('orders', oid, { products });
 }
 
+/* where a position to buy stands: an invoice of the order holds it → «Заказана»; the invoice is paid → «Оплачена, ждёт прихода»;
+   the goods came by the shipping document (receipt by a waybill / УПД) → it leaves the list */
+const nameHit = (a, b) => { a = normName(a); b = normName(b); return !!a && !!b && (a === b || (a.length >= 6 && b.includes(a)) || (b.length >= 6 && a.includes(b))); };
+function buyState(o, line){
+  const it = line.stockId ? S.stock.find(x => x.id === line.stockId) : stockFor(line), num = String(line.invNo || '').trim();
+  const has = L => (L || []).some(x => (it && x.stockId === it.id) || nameHit(x.name, line.name));
+  const inv = invOf(o.id).filter(i => (num && String(i.number || '').trim() === num) || has(i.income ? i.income.lines : i.items));
+  const rc = (S.receipts || []).find(r => r.orderId === o.id && has(r.lines));
+  const got = inv.find(i => i.income);
+  if (got || rc) return { st: 'got', inv: got, rc };
+  const paid = inv.find(i => i.status === 'paid');
+  if (paid) return { st: 'paid', inv: paid };
+  return inv.length ? { st: 'ordered', inv: inv[0] } : { st: 'none' };
+}
+const buyChip = b => b.st === 'ordered' ? `<span class="chip c-info">Заказана</span><small class="dim">счёт № ${esc(b.inv.number)}</small>`
+  : b.st === 'paid' ? `<span class="chip c-warn">Оплачена, ждёт прихода</span><small class="dim">счёт № ${esc(b.inv.number)}${b.inv.paidAt ? ' · оплачен ' + fmtD(b.inv.paidAt) : ''}</small>`
+  : b.st === 'got' ? `<span class="chip c-ok">Получена</span><small class="dim">${b.inv ? `по счёту № ${esc(b.inv.number)}${b.inv.income?.waybill?.number ? ', накладная № ' + esc(b.inv.income.waybill.number) : ''}` : `накладная № ${esc(b.rc.number || '—')}`}</small>`
+  : '<span class="chip c-bad">Не заказана</span>';
+// the shortage list without what has already come by a shipping document
+const orderToBuy = o => orderShort(o).map(x => ({ ...x, buy: buyState(o, x) })).filter(x => x.buy.st !== 'got');
 /* positions the products of an order need but the warehouse does not have (or has not enough of):
    they show up among the order's purchase lines and disappear once the stock covers them */
 function shortOf(comps, k){
@@ -1956,7 +1977,7 @@ function shortOf(comps, k){
   for (const c of comps || []) {
     const it = stockFor(c), key = it ? 'id:' + it.id : 'n:' + normName(c.name);
     if (!String(c.name || '').trim()) continue;
-    const L = need.get(key) || { name: it ? it.name : c.name, unit: (it && it.unit) || c.unit || 'шт', need: 0, have: it ? Math.max(Number(it.qty) || 0, Number(it.acctQty) || 0) : 0, inStock: !!it, products: [] };
+    const L = need.get(key) || { stockId: it ? it.id : null, name: it ? it.name : c.name, unit: (it && it.unit) || c.unit || 'шт', need: 0, have: it ? Math.max(Number(it.qty) || 0, Number(it.acctQty) || 0) : 0, inStock: !!it, products: [] };
     L.need = Math.round((L.need + (Number(c.qty) || 0) * (k(c) || 0)) * 1000) / 1000; need.set(key, L);
     if (c._p && !L.products.includes(c._p)) L.products.push(c._p);
   }
@@ -1964,31 +1985,35 @@ function shortOf(comps, k){
 }
 const orderShort = o => shortOf((o.products || []).flatMap(p => (p.components || []).map(c => ({ ...c, _q: Number(p.qty) || 0, _p: p.name }))), c => c._q);
 function orderShortTable(o){
-  const L = orderShort(o); if (!L.length) return '';
-  return `<div class="shortbox"><b>Нет на складе для изделий заказа · ${L.length}</b><small class="dim">Строки добавлены автоматически и исчезнут, когда позиция поступит на склад в нужном количестве.</small>
-    <div class="tscroll"><table class="comp"><thead><tr><th>Наименование</th><th class="r">Нужно</th><th class="r">На складе</th><th class="r">Не хватает</th><th>Ед.</th><th>Изделия</th></tr></thead><tbody>
-    ${L.map(x => `<tr><td>${esc(x.name)}${x.inStock ? '' : ' <span class="chip c-warn">нет позиции</span>'}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${fmtQty(x.have)}</td><td class="r mono" style="color:var(--bad);font-weight:600">${fmtQty(x.short)}</td><td>${esc(x.unit)}</td><td><small class="dim">${esc(x.products.join(', '))}</small></td></tr>`).join('')}
+  const L = orderToBuy(o); if (!L.length) return '';
+  const n = k => L.filter(x => x.buy.st === k).length;
+  return `<div class="shortbox"><b>Необходимо заказать для производства · ${L.length}</b><small class="dim">Не заказано: ${n('none')} · заказано: ${n('ordered')} · оплачено, ждёт прихода: ${n('paid')}. Позиция отмечается заказанной, когда она есть в счёте заказа, оплаченной — после отметки оплаты счёта, и уходит из списка после прихода по отгрузочному документу (накладная, УПД).</small>
+    <div class="tscroll"><table class="comp"><thead><tr><th>Наименование</th><th class="r">Нужно</th><th class="r">На складе</th><th class="r">Не хватает</th><th>Ед.</th><th>Состояние</th><th>Изделия</th></tr></thead><tbody>
+    ${L.map(x => `<tr class="buy-${x.buy.st}"><td>${esc(x.name)}${x.inStock ? '' : ' <span class="chip c-warn">нет позиции</span>'}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${fmtQty(x.have)}</td><td class="r mono" style="color:var(--bad);font-weight:600">${fmtQty(x.short)}</td><td>${esc(x.unit)}</td><td class="buyst">${buyChip(x.buy)}</td><td><small class="dim">${esc(x.products.join(', '))}</small></td></tr>`).join('')}
     </tbody></table></div></div>`;
 }
 function compTable(o){
-  const comps = o.components || [];
+  const all = o.components || [], st = new Map(all.map(c => [c.id, buyState(o, c)])), gotN = all.filter(c => st.get(c.id).st === 'got').length;
+  const showGot = !!(ui.showGot || {})[o.id], comps = showGot ? all : all.filter(c => st.get(c.id).st !== 'got');
   const invNos = [...new Set(invOf(o.id).map(i => i.number).filter(Boolean))];
-  const rows = comps.map((c,i) => `<tr data-cid="${esc(c.id)}">
+  const rows = comps.map((c,i) => `<tr data-cid="${esc(c.id)}" class="buy-${st.get(c.id).st}">
     <td class="n">${i+1}</td>
     <td><input class="ci" data-f="name" value="${esc(c.name)}" aria-label="Наименование" style="min-width:220px"></td>
     <td><input class="ci num" data-f="qty" value="${esc(c.qty)}" inputmode="decimal" aria-label="Количество" style="width:70px"></td>
     <td><input class="ci" data-f="unit" value="${esc(c.unit)}" aria-label="Единица" style="width:56px"></td>
     <td><input class="ci sup" data-f="supplier" value="${esc(c.supplier)}" placeholder="в наличии" aria-label="Поставщик (пусто — в наличии)" list="sup-${o.id}" style="min-width:150px"></td>
     <td><input class="ci" data-f="invNo" value="${esc(c.invNo)}" aria-label="Номер счёта" list="inv-${o.id}" style="min-width:110px"></td>
+    <td class="buyst">${String(c.supplier || '').trim() || st.get(c.id).st !== 'none' ? buyChip(st.get(c.id)) : '<span class="dim">в наличии</span>'}</td>
     <td><button class="icon" data-act="delComp" data-id="${o.id}|${esc(c.id)}" aria-label="Удалить строку" title="Удалить строку">✕</button></td>
   </tr>`).join('');
   return `<div class="tscroll" data-keep><table class="comp" data-oid="${o.id}">
-    <thead><tr><th>№</th><th>Наименование</th><th class="r">Кол-во</th><th>Ед.</th><th>Поставщик</th><th>№ счёта</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="7" class="emptyrow">Строк нет. Добавьте строку или вставьте таблицу из Excel.</td></tr>'}</tbody>
+    <thead><tr><th>№</th><th>Наименование</th><th class="r">Кол-во</th><th>Ед.</th><th>Поставщик</th><th>№ счёта</th><th>Состояние</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="8" class="emptyrow">${gotN ? 'Все строки получены.' : 'Строк нет. Добавьте строку или вставьте таблицу из Excel.'}</td></tr>`}</tbody>
   </table>
   <datalist id="inv-${o.id}">${invNos.map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist>
   <datalist id="sup-${o.id}">${cpsSorted().map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist></div>
-  ${comps.length ? '<p class="hint">Если поставщик не указан, позиция считается имевшейся в наличии. Номер счёта можно выбрать из счетов заказа или ввести вручную.</p>' : ''}`;
+  ${gotN ? `<button type="button" class="linkish" data-act="showGot" data-id="${o.id}" style="margin-top:6px">${showGot ? 'Скрыть полученные' : `Показать полученные (${gotN})`}</button>` : ''}
+  ${comps.length ? '<p class="hint">Если поставщик не указан, позиция считается имевшейся в наличии. Номер счёта можно выбрать из счетов заказа или ввести вручную. Состояние: «Заказана» — позиция есть в счёте заказа, «Оплачена, ждёт прихода» — счёт оплачен; после прихода по отгрузочному документу строка скрывается.</p>' : ''}`;
 }
 function invRow(i, withPay){
   const [cc, cl] = invChip(i);
@@ -5056,6 +5081,7 @@ async function act(el){
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
     case 'reqNew': ui.reqFiles = []; return openDrawer('reqForm');
+    case 'showGot': ui.showGot = { ...(ui.showGot || {}), [id]: !(ui.showGot || {})[id] }; return render();
     case 'devNew': ui.devAcc = {}; ui.devEditing = null; return openDrawer('devForm');
     case 'devOpen': ui.devEditing = null; return openDrawer('dev', id);
     case 'devEdit': { const x = DEVS.find(z => z.id === id); ui.devAcc = {}; (x?.viewers || []).forEach(u => ui.devAcc[u] = 'view'); (x?.editors || []).forEach(u => ui.devAcc[u] = 'edit'); ui.devEditing = id; return renderDrawer(); }
