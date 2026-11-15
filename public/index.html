@@ -257,6 +257,20 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stk .bal.low{color:var(--warn)}
 .stk .acts{display:flex;gap:6px;justify-content:flex-end}
 .incrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
+.lblwrap{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
+.lbllist{display:flex;flex-direction:column;gap:8px}.lblcard{text-align:left;border:1px solid var(--rule);background:var(--sheet);border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--ink);font:inherit}
+.lblcard b{display:block;font-weight:500}.lblcard small{color:var(--ink-2);font-size:12px}.lblcard.on{border-color:var(--stamp);box-shadow:inset 3px 0 0 var(--stamp)}
+.lbleditor{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,1fr);gap:16px;align-items:start}
+.lblprevbox,.lblform{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.lblstage{display:flex;justify-content:center;padding:22px 10px;border-radius:10px;background:repeating-conic-gradient(var(--mute-soft) 0 25%, var(--sheet) 0 50%) 0 0/16px 16px}
+#lbl-prev{display:flex;flex-direction:column;align-items:center;gap:6px}.lblscale{box-shadow:0 4px 18px rgba(0,0,0,.18);background:#fff;overflow:hidden}
+#lbl-prev .li{cursor:move;outline:1px dashed transparent}#lbl-prev .li:hover{outline-color:rgba(52,70,184,.5)}#lbl-prev .li.sel{outline:1px dashed #3446B8;outline-offset:1px}
+.lblprint{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.lblnext{font-size:16px;padding:12px 18px}.lblcnt{display:flex;flex-direction:column;font-size:12px;color:var(--ink-2)}.lblcnt .in{width:80px}
+.lblwh{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;grid-column:1/-1}.lblwh label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.lblitems{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}.lblitems li{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;border-radius:8px}.lblitems li.on{background:var(--stamp-soft)}
+.lbllog{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+@media (max-width:1100px){.lbleditor{grid-template-columns:1fr}}
+@media (max-width:760px){.lblwrap{grid-template-columns:1fr}.lbllist{flex-direction:row;flex-wrap:wrap}}
 .reqrow{display:grid;grid-template-columns:minmax(0,1fr) 170px 110px;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
 .reqrow:first-child{border-top:0}.reqrow:hover{background:var(--paper)}.reqrow b{font-weight:500}.reqrow small{display:block;color:var(--ink-2);font-size:12px}.reqrow.closed b{color:var(--ink-2)}.reqrow>:last-child{text-align:right}
 @media (max-width:820px){.reqrow{grid-template-columns:1fr auto}.reqrow>:nth-child(1){grid-column:1/-1}.reqrow>:last-child{text-align:left}}
@@ -1117,7 +1131,8 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || [];
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; LABELS = d.labels || [];
+  if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
   if (reqMode()) { const n = reqTodo().length; $('reqBadge').hidden = !n; $('reqBadge').textContent = n; if (ui.drawer?.kind === 'req' && !drawerBusy()) renderDrawer(); }
   { const n = NOTES.filter(x => !x.done && (x.type || 'task') !== 'memo').length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
   if (mode !== 'live') { mode = 'live'; }
@@ -1164,7 +1179,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : vOrders();
+  V.innerHTML = ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : vOrders();
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -1770,7 +1785,7 @@ function orderDetail(o){
       <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
-    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
+    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="labelsFor" data-id="order:${o.id}">🏷 Этикетки</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
   </div>
   <div class="seg otabs" role="tablist" aria-label="Разделы заказа">
     <button role="tab" data-act="orderTab" data-id="main" class="${ui.orderTab !== 'products' ? 'on' : ''}" aria-selected="${ui.orderTab !== 'products'}">Заказ</button>
@@ -2065,6 +2080,7 @@ function vWorkList(){
     <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
     <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => k === 'all' || (k === 'active' ? j.status !== 'done' : (j.status || 'new') === k)).length}</span></button>`).join('')}</div>
+    <a class="btn" href="#labels" title="Конструктор этикеток с серийным номером">🏷 Этикетки</a>
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
@@ -3031,6 +3047,175 @@ function vBackups(){
 /* ---------- «Мои задачи»: a personal to-do list ---------- */
 let NOTES = [];
 /* ---------- «Списание материалов»: every write-off list — of montage works and of production orders ---------- */
+/* ===== «Этикетки»: label designer for production — size in mm, text with fields, serial number, barcode; «Печать следующей» ===== */
+let LABELS = [];
+const LBL_SIZES = [[58, 40], [58, 30], [40, 25], [30, 20], [43, 25], [75, 50], [100, 50], [100, 70], [100, 150]];
+const LBL_FIELDS = [['{serial}', 'серийный номер'], ['{name}', 'изделие / работа'], ['{order}', 'номер заказа'], ['{customer}', 'заказчик'], ['{date}', 'дата печати']];
+const LBL_TYPES = { text: 'Текст', barcode: 'Штрихкод', line: 'Линия', box: 'Рамка' };
+// Code 128: bar/space widths of the 107 symbols (103 data, 3 starts, stop)
+const C128 = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 '
+  + '221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 '
+  + '231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 '
+  + '314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 '
+  + '111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 '
+  + '114131 311141 411131 211412 211214 211232 2331112').split(' ');
+// widths of the whole symbol; digits only (even count) go as set C — half as long; otherwise set B (printable ASCII)
+function code128(text){
+  const s = String(text || '').replace(/[^\x20-\x7e]/g, '?');
+  let start, codes = [];
+  if (/^(\d\d)+$/.test(s) && s.length >= 4) { start = 105; for (let i = 0; i < s.length; i += 2) codes.push(Number(s.substr(i, 2))); }
+  else { start = 104; codes = [...s].map(c => c.charCodeAt(0) - 32); }
+  const check = (start + codes.reduce((a, c, i) => a + c * (i + 1), 0)) % 103;
+  return [start, ...codes, check, 106].map(i => C128[i]).join('');
+}
+function barcodeSvg(text){
+  const w = code128(text); let x = 10, bars = '';
+  for (let i = 0; i < w.length; i++) { const n = Number(w[i]); if (i % 2 === 0) bars += `<rect x="${x}" y="0" width="${n}" height="100"/>`; x += n; }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${x + 10} 100" preserveAspectRatio="none" style="display:block;width:100%;height:100%" shape-rendering="crispEdges"><g fill="#000">${bars}</g></svg>`;
+}
+const lblSerial = (t, n) => (t.serial?.prefix || '') + String(n).padStart(t.serial?.digits || 1, '0') + (t.serial?.suffix || '');
+function lblCtx(t){
+  const r = t.ref, o = r?.type === 'order' ? ord(r.id) : null, j = r?.type === 'job' ? jobOf(r.id) : null;
+  return { name: o ? o.title : j ? j.title : '', order: o ? o.number : j ? '№ ' + jobNo(j) : '', customer: o ? custName(o) : j ? (cpOf(j.customerId)?.name || '') : '' };
+}
+const lblFill = (s, t, n, c) => String(s || '').replace(/\{serial\}/g, lblSerial(t, n)).replace(/\{date\}/g, fmtD(today())).replace(/\{name\}/g, c.name).replace(/\{order\}/g, c.order).replace(/\{customer\}/g, c.customer);
+// the label in millimetres; the same markup goes to the preview and to the printer
+function labelHtml(t, n, sel){
+  const c = lblCtx(t);
+  const items = (t.items || []).map(x => {
+    const pos = `position:absolute;left:${x.x}mm;top:${x.y}mm;width:${x.w}mm;`, mark = sel ? ` data-li="${x.id}" class="li${sel === x.id ? ' sel' : ''}"` : '';
+    if (x.type === 'text') return `<div${mark} style="${pos}font-size:${x.size}pt;font-weight:${x.bold ? 700 : 400};text-align:${x.align};line-height:1.15;white-space:pre-wrap;overflow-wrap:anywhere">${esc(lblFill(x.text, t, n, c))}</div>`;
+    if (x.type === 'barcode') { const v = lblFill(x.text || '{serial}', t, n, c);
+      return `<div${mark} style="${pos}height:${x.h}mm;display:flex;flex-direction:column"><div style="flex:1;min-height:0">${barcodeSvg(v)}</div>${x.bold ? `<div style="font-size:${x.size}pt;text-align:center;line-height:1.1;font-family:monospace">${esc(v)}</div>` : ''}</div>`; }
+    if (x.type === 'line') return `<div${mark} style="${pos}height:${x.h}mm;background:#000"></div>`;
+    return `<div${mark} style="${pos}height:${x.h}mm;border:${Math.max(0.1, x.size / 30)}mm solid #000;box-sizing:border-box"></div>`;
+  }).join('');
+  return `<div class="lbl" style="position:relative;width:${t.w}mm;height:${t.h}mm;overflow:hidden;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif">${items}</div>`;
+}
+// printing: a hidden frame with the page of the label's size
+function printLabels(t, nums){
+  const fr = document.createElement('iframe'); fr.setAttribute('aria-hidden', 'true');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  const d = fr.contentDocument;
+  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)}</title><style>@page{size:${t.w}mm ${t.h}mm;margin:0}html,body{margin:0;padding:0;background:#fff}.lbl{height:${Math.max(1, t.h - 0.4)}mm!important}.lbl+.lbl{page-break-before:always;break-before:page}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${nums.map(n => labelHtml(t, n)).join('')}</body></html>`); d.close();
+  setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch(e) { toast('Не удалось открыть печать: ' + e.message); } setTimeout(() => fr.remove(), 60000); }, 150);
+}
+const lblDraft = () => ui.lblDraft;
+function lblNewTpl(ref){
+  const c = lblCtx({ ref });
+  return { name: c.name ? 'Этикетка · ' + c.name : 'Новая этикетка', w: 58, h: 40, ref: ref || null, serial: { prefix: 'SN-', suffix: '', digits: 6, next: 1 },
+    items: [{ id: uid(), type: 'text', text: c.name ? '{name}' : 'Наименование изделия', x: 2, y: 2, w: 54, h: 8, size: 10, bold: true, align: 'center' },
+      { id: uid(), type: 'barcode', text: '{serial}', x: 4, y: 12, w: 50, h: 16, size: 8, bold: true, align: 'center' },
+      { id: uid(), type: 'text', text: 'Дата: {date}', x: 2, y: 32, w: 54, h: 5, size: 7, bold: false, align: 'center' }] };
+}
+function lblPick(id){ const t = LABELS.find(x => x.id === id); ui.lblId = t ? t.id : null; ui.lblDraft = t ? JSON.parse(JSON.stringify(t)) : null; ui.lblSel = t?.items?.[0]?.id || null; ui.lblDirty = false; }
+function vLabels(){
+  if (ui.lblId && !LABELS.some(x => x.id === ui.lblId)) lblPick(null);
+  if (!ui.lblDraft && LABELS.length) lblPick(LABELS[0].id);
+  const t = lblDraft(), ed = canEdit();
+  const list = `<div class="lbllist">${LABELS.map(x => `<button class="lblcard ${x.id === ui.lblId ? 'on' : ''}" data-act="lblPick" data-id="${x.id}"><b>${esc(x.name)}</b><small>${x.w}×${x.h} мм · след. ${esc(lblSerial(x, x.serial.next))}</small></button>`).join('')}
+    ${ed ? '<button class="btn primary" data-act="lblNew" data-id="">+ Этикетка</button>' : ''}</div>`;
+  if (!t) return `<div class="toolbar"><a class="btn" href="#works">← Работы</a><h3 style="margin:0">Этикетки</h3></div>` + list + `<div class="empty"><h3>Этикеток пока нет</h3>${ed ? 'Создайте этикетку: размер, текст, серийный номер и штрихкод — и печатайте по одной кнопкой «Печать следующей».' : 'Этикетки создаёт руководитель или администратор.'}</div>`;
+  return `<div class="toolbar"><a class="btn" href="#works">← Работы</a><h3 style="margin:0">Этикетки</h3><span class="dim">Серийный номер выдаёт сервер — номера не повторяются, даже если печатают с разных компьютеров.</span></div>
+    <div class="lblwrap">${list}
+    <div class="lbleditor" data-keep>
+      <section class="card lblprevbox"><div class="lblstage" id="lbl-stage"><div id="lbl-prev">${lblPreview()}</div></div>
+        <div class="lblprint">
+          <button class="btn ok lblnext" data-act="lblNext">🖨 Печать следующей · <span class="mono" id="lbl-nextno">${esc(lblSerial(t, t.serial.next))}</span></button>
+          <label class="lblcnt">Штук<input class="in mono" id="lbl-count" type="number" min="1" max="500" value="${esc(ui.lblCount || 1)}"></label>
+          <span class="row-g"><input class="in mono" id="lbl-re" placeholder="№ для повтора" style="width:130px" inputmode="numeric"><button class="btn sm" data-act="lblReprint">Повторить печать</button></span>
+        </div>
+        <small class="dim">Печать идёт на принтер этикеток через окно печати браузера: выберите принтер и размер бумаги <b id="lbl-papersz">${t.w}×${t.h} мм</b>, поля — «нет». Чтобы печатать сразу без окна, запустите Chrome с параметром <span class="mono">--kiosk-printing</span>.</small>
+        ${ui.lblDirty ? '<p class="box" style="margin:0;border-color:var(--warn);background:var(--warn-soft)">Есть несохранённые изменения — перед печатью они сохранятся.</p>' : ''}
+        <h4 class="sub-h">Журнал печати</h4>${lblLog(t)}</section>
+      <section class="card lblform">${ed ? lblForm(t) : '<p class="dim">Менять этикетку может руководитель или администратор.</p>'}</section>
+    </div></div>`;
+}
+// screen pixels per millimetre of the preview: as large as fits the panel
+const lblK = t => Math.min(6, 440 / t.w, 300 / t.h);
+function lblPreview(){
+  const t = lblDraft(); if (!t) return '';
+  const k = lblK(t);
+  return `<div class="lblscale" style="width:${t.w * k}px;height:${t.h * k}px"><div style="transform:scale(${k / (96 / 25.4)});transform-origin:0 0">${labelHtml(t, t.serial.next, ui.lblSel || '-')}</div></div><small class="dim">${t.w}×${t.h} мм · перетаскивайте элементы мышью</small>`;
+}
+const lblLog = t => { const P = (t.prints || []).slice(-12).reverse(); return P.length ? `<ul class="lbllog">${P.map(x => `<li><small class="dim">${esc(fmtDT(x.at))} · ${esc(who(x.by))}</small> ${x.set !== undefined ? `счётчик установлен: следующий ${esc(lblSerial(t, x.set))}` : `${x.reprint ? 'повтор ' : ''}<span class="mono">${esc(lblSerial(t, x.from))}${x.count > 1 ? ' – ' + esc(lblSerial(t, x.from + x.count - 1)) : ''}</span>${x.count > 1 ? ` (${x.count} шт.)` : ''}`}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Ещё не печатали.</p>'; };
+function lblForm(t){
+  const sel = (t.items || []).find(x => x.id === ui.lblSel);
+  const n = (k, v, extra = '') => `<input class="in mono" data-lb="${k}" value="${esc(v)}" inputmode="decimal" ${extra}>`;
+  const refOpts = `<option value="">— без привязки —</option>` + ordersSorted().map(o => `<option value="order:${o.id}" ${t.ref?.type === 'order' && t.ref.id === o.id ? 'selected' : ''}>Заказ ${esc(ordName(o))}</option>`).join('')
+    + S.jobs.filter(j => j.kind === 'prod' || j.kind === 'both').map(j => `<option value="job:${j.id}" ${t.ref?.type === 'job' && t.ref.id === j.id ? 'selected' : ''}>Работа № ${jobNo(j)} · ${esc(j.title)}</option>`).join('');
+  return `<div class="form">
+    <label class="wide">Название<input class="in" data-lb="name" value="${esc(t.name)}"></label>
+    <label class="wide">Заказ или работа (для полей {name}, {order}, {customer})<select class="in" data-lb="ref">${refOpts}</select></label>
+    <label>Размер <small class="dim">(из списка — элементы подстроятся)</small><select class="in" data-lb="size"><option value="">свой</option>${LBL_SIZES.map(([w, h]) => `<option value="${w}x${h}" ${t.w === w && t.h === h ? 'selected' : ''}>${w}×${h} мм</option>`).join('')}</select></label>
+    <span class="lblwh"><label>Ширина, мм${n('w', t.w)}</label><label>Высота, мм${n('h', t.h)}</label></span>
+  </div>
+  <h4 class="sub-h">Серийный номер</h4>
+  <div class="form"><label>Префикс${`<input class="in mono" data-lb="serial.prefix" value="${esc(t.serial.prefix)}" maxlength="30">`}</label><label>Цифр${n('serial.digits', t.serial.digits)}</label>
+    <label>Суффикс<input class="in mono" data-lb="serial.suffix" value="${esc(t.serial.suffix)}" maxlength="30"></label>
+    <label>Следующий номер<span class="row-g"><input class="in mono" id="lbl-setnext" value="${t.serial.next}" inputmode="numeric" style="width:110px"><button type="button" class="btn sm" data-act="lblSetNext">Установить</button></span></label>
+    <small class="wide dim">Сейчас следующим будет <b class="mono">${esc(lblSerial(t, t.serial.next))}</b>. ${/[^\x20-\x7e]/.test(t.serial.prefix + t.serial.suffix) ? '<span class="bad-t">В штрихкоде можно только латиницу и цифры — кириллица в префиксе заменится знаком «?».</span>' : ''}</small></div>
+  <h4 class="sub-h">Элементы</h4>
+  <div class="row-g">${Object.entries(LBL_TYPES).map(([k, l]) => `<button type="button" class="btn sm" data-act="lblAdd" data-id="${k}">+ ${l}</button>`).join('')}<button type="button" class="btn sm" data-act="lblAdd" data-id="serial">+ Серийный номер</button></div>
+  <ul class="lblitems">${(t.items || []).map((x, i) => `<li class="${x.id === ui.lblSel ? 'on' : ''}"><button type="button" class="linkish" data-act="lblSel" data-id="${x.id}">${i + 1}. ${LBL_TYPES[x.type]}${x.type === 'text' || x.type === 'barcode' ? ': ' + esc((x.text || '').slice(0, 30)) : ''}</button>
+      <span class="row-g"><button type="button" class="btn sm ghost" data-act="lblUp" data-id="${x.id}" title="Выше по списку (рисуется раньше)">↑</button><button type="button" class="btn sm ghost" data-act="lblDel" data-id="${x.id}" aria-label="Удалить элемент">✕</button></span></li>`).join('')}</ul>
+  ${sel ? `<div class="box lblsel"><h4>${LBL_TYPES[sel.type]}</h4><div class="form">
+    ${sel.type === 'text' || sel.type === 'barcode' ? `<label class="wide">${sel.type === 'barcode' ? 'Что кодировать' : 'Текст'}<textarea class="in" data-lb="it.text" rows="${sel.type === 'text' ? 2 : 1}">${esc(sel.text)}</textarea><small class="dim">Поля: ${LBL_FIELDS.map(([k, l]) => `<button type="button" class="linkish mono" data-act="lblIns" data-id="${k}" title="${l}">${k}</button>`).join(' ')}</small></label>` : ''}
+    <span class="lblwh"><label>X, мм${n('it.x', sel.x)}</label><label>Y, мм${n('it.y', sel.y)}</label><label>Ширина${n('it.w', sel.w)}</label>${sel.type !== 'text' ? `<label>${sel.type === 'line' ? 'Толщина' : 'Высота'}${n('it.h', sel.h)}</label>` : ''}</span>
+    ${sel.type === 'text' || sel.type === 'barcode' ? `<label>${sel.type === 'barcode' ? 'Размер подписи, пт' : 'Размер шрифта, пт'}${n('it.size', sel.size)}</label>` : ''}
+    ${sel.type === 'box' ? `<label>Толщина рамки${n('it.size', sel.size)}<small class="dim">3 = 0,1 мм</small></label>` : ''}
+    ${sel.type === 'text' ? `<label>Выравнивание<select class="in" data-lb="it.align">${[['left', 'слева'], ['center', 'по центру'], ['right', 'справа']].map(([k, l]) => `<option value="${k}" ${sel.align === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+    ${sel.type === 'text' || sel.type === 'barcode' ? `<label class="wide" style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" data-lb="it.bold" ${sel.bold ? 'checked' : ''}> ${sel.type === 'barcode' ? 'Подпись под штрихкодом' : 'Жирный'}</label>` : ''}
+  </div></div>` : ''}
+  <div class="err" id="lbl-err"></div>
+  <div class="row-g"><button type="button" class="btn primary" data-act="lblSave" ${ui.lblDirty ? '' : 'disabled'}>Сохранить</button>${ui.lblId ? armBtn('lbl:' + ui.lblId, 'Удалить этикетку', 'lblRemove', ui.lblId, 'btn danger') : ''}</div>`;
+}
+// a change in the form: the draft and the preview, without re-rendering the form (the focus stays)
+function lblChange(key, el){
+  const t = lblDraft(); if (!t) return;
+  const sel = (t.items || []).find(x => x.id === ui.lblSel), v = el.type === 'checkbox' ? el.checked : el.value, nv = Number(String(v).replace(',', '.'));
+  if (key === 'size') { if (v) { const [w, h] = v.split('x').map(Number), kx = w / t.w, ky = h / t.h, kf = Math.min(kx, ky);
+      t.items.forEach(x => { x.x = Math.round(x.x * kx * 2) / 2; x.w = Math.round(x.w * kx * 2) / 2; x.y = Math.round(x.y * ky * 2) / 2; if (x.type !== 'line') x.h = Math.round(x.h * ky * 2) / 2; if (x.type !== 'box') x.size = Math.max(4, Math.round(x.size * kf * 2) / 2); });
+      t.w = w; t.h = h; } }
+  else if (key === 'ref') { const [ty, id] = String(v).split(':'); t.ref = ty ? { type: ty, id } : null; }
+  else if (key === 'name') t.name = v;
+  else if (key === 'w' || key === 'h') { if (nv > 0) t[key] = nv; }
+  else if (key.startsWith('serial.')) { const k = key.slice(7); t.serial[k] = k === 'digits' ? Math.max(1, Math.min(12, nv | 0 || 1)) : v; }
+  else if (key.startsWith('it.') && sel) { const k = key.slice(3); sel[k] = ['text', 'align', 'bold'].includes(k) ? v : (Number.isFinite(nv) ? nv : sel[k]); }
+  ui.lblDirty = true; lblRedraw(key === 'size' || key === 'serial.prefix' || key === 'serial.suffix' || key === 'serial.digits');
+}
+function lblRedraw(full){
+  const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview();
+  const t = lblDraft(), nx = $('lbl-nextno'); if (nx && t) nx.textContent = lblSerial(t, t.serial.next);
+  const pz = $('lbl-papersz'); if (pz && t) pz.textContent = `${t.w}×${t.h} мм`;
+  const sb = document.querySelector('[data-act=lblSave]'); if (sb) sb.disabled = !ui.lblDirty;
+  if (full) { const f = document.querySelector('.lblform'); if (f && !f.contains(document.activeElement)) f.innerHTML = lblForm(t); }
+}
+async function lblSave(){
+  const t = lblDraft(); if (!t || !canEdit()) return true;
+  const body = { name: t.name, w: t.w, h: t.h, ref: t.ref, serial: { prefix: t.serial.prefix, suffix: t.serial.suffix, digits: t.serial.digits }, items: t.items };
+  try {
+    const r = ui.lblId ? await api('PUT', '/api/labels/' + ui.lblId, body) : await api('POST', '/api/labels', { ...body, serial: { ...body.serial, next: t.serial.next } });
+    const L = r.label, i = LABELS.findIndex(x => x.id === L.id); if (i >= 0) LABELS[i] = L; else LABELS.push(L);
+    ui.lblId = L.id; ui.lblDraft.serial.next = L.serial.next; ui.lblDirty = false; return true;
+  } catch(e) { const el = $('lbl-err'); if (el) el.textContent = errText(e); else toast(errText(e)); return false; }
+}
+// dragging an element on the preview
+document.addEventListener('pointerdown', e => {
+  const it = e.target.closest('#lbl-prev [data-li]'); if (!it || !canEdit()) return;
+  const t = lblDraft(), x = t.items.find(z => z.id === it.dataset.li); if (!x) return;
+  e.preventDefault();
+  if (ui.lblSel !== x.id) { ui.lblSel = x.id; const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(t); }
+  const k = lblK(t), x0 = e.clientX, y0 = e.clientY, sx = x.x, sy = x.y;
+  let moved = false;
+  const mv = ev => { const dx = (ev.clientX - x0) / k, dy = (ev.clientY - y0) / k; if (!moved && Math.abs(dx) + Math.abs(dy) < 0.3) return; moved = true;
+    x.x = Math.round((sx + dx) * 2) / 2; x.y = Math.round((sy + dy) * 2) / 2; const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); };
+  const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+    if (moved) { ui.lblDirty = true; const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(t); } else lblRedraw(); };
+  document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+});
+
 /* ===== «Управление заявками» ===== */
 let REQS = [], REQ_USERS = [];
 const REQ_ST = { new: 'Новая', work: 'В работе', done: 'Выполнена', cancel: 'Отменена' };
@@ -3909,7 +4094,7 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
-        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
+        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd><button class="btn sm" data-act="labelsFor" data-id="${ord(j.orderId) ? 'order:' + j.orderId : 'job:' + j.id}">🏷 Этикетки</button> ${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
@@ -4777,6 +4962,35 @@ async function act(el){
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
     case 'reqNew': ui.reqFiles = []; return openDrawer('reqForm');
+    case 'labelsFor': { const [ty, rid] = id.split(':'), ex = LABELS.find(x => x.ref?.type === ty && x.ref.id === rid);
+      closeDrawer();
+      if (ex) lblPick(ex.id); else if (canEdit()) { ui.lblId = null; ui.lblDraft = lblNewTpl({ type: ty, id: rid }); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; await lblSave(); }
+      if (location.hash !== '#labels') location.hash = 'labels'; else render(); return; }
+    case 'lblPick': lblPick(id); return render();
+    case 'lblNew': ui.lblId = null; ui.lblDraft = lblNewTpl(null); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; if (await lblSave()) toast('Этикетка создана'); $('view').innerHTML = vLabels(); return;
+    case 'lblSel': ui.lblSel = id; lblRedraw(); { const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(lblDraft()); } return;
+    case 'lblAdd': { const t = lblDraft(), bottom = Math.max(0, ...t.items.filter(x => x.type !== 'box').map(x => x.y + (x.type === 'text' ? x.size * 0.42 * Math.max(1, String(x.text).split('\n').length) : x.h + (x.type === 'barcode' && x.bold ? x.size * 0.4 : 0)))), y = bottom + 5 <= t.h ? Math.round((bottom + 0.5) * 2) / 2 : 1;
+      const x = id === 'serial' ? { type: 'text', text: '{serial}', size: 9, bold: true, h: 5 } : id === 'barcode' ? { type: 'barcode', text: '{serial}', size: 7, bold: true, h: Math.min(15, t.h / 3) } : id === 'line' ? { type: 'line', h: 0.3 } : id === 'box' ? { type: 'box', h: t.h - 2, size: 6 } : { type: 'text', text: 'Текст', size: 9, bold: false, h: 5 };
+      const it = { id: uid(), x: 1, y: id === 'box' ? 1 : y, w: t.w - 2, align: 'center', bold: false, size: 8, text: '', ...x }; t.items.push(it); ui.lblSel = it.id; ui.lblDirty = true;
+      lblRedraw(); { const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(t); } return; }
+    case 'lblDel': { const t = lblDraft(); t.items = t.items.filter(x => x.id !== id); if (ui.lblSel === id) ui.lblSel = t.items[0]?.id || null; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); return; }
+    case 'lblUp': { const t = lblDraft(), i = t.items.findIndex(x => x.id === id); if (i > 0) { [t.items[i - 1], t.items[i]] = [t.items[i], t.items[i - 1]]; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); } return; }
+    case 'lblIns': { const ta = document.querySelector('[data-lb="it.text"]'); if (!ta) return; ta.value += id; lblChange('it.text', ta); ta.focus(); return; }
+    case 'lblSave': if (await lblSave()) { toast('Этикетка сохранена'); $('view').innerHTML = vLabels(); } return;
+    case 'lblRemove': try { await api('DELETE', '/api/labels/' + id); LABELS = LABELS.filter(x => x.id !== id); lblPick(null); render(); toast('Этикетка удалена'); } catch(e) { toast(errText(e)); } return;
+    case 'lblSetNext': { const n = Math.floor(Number($('lbl-setnext')?.value)); if (!(n >= 0)) return toast('Введите номер');
+      if (ui.lblDirty && !(await lblSave())) return;
+      try { const r = await api('PUT', '/api/labels/' + ui.lblId, { ...lblDraft(), serial: { ...lblDraft().serial, setNext: n } }); const i = LABELS.findIndex(x => x.id === ui.lblId); LABELS[i] = r.label; lblPick(ui.lblId); $('view').innerHTML = vLabels(); toast('Следующий номер: ' + lblSerial(r.label, n)); } catch(e) { toast(errText(e)); } return; }
+    case 'lblNext': { const cnt = Math.max(1, Math.min(500, Math.floor(Number($('lbl-count')?.value) || 1))); ui.lblCount = cnt;
+      if (ui.lblDirty && !(await lblSave())) return;
+      try { const r = await api('POST', `/api/labels/${ui.lblId}/next`, { count: cnt }), t = lblDraft();
+        printLabels(t, Array.from({ length: r.count }, (_, i) => r.from + i));
+        const L = LABELS.find(x => x.id === ui.lblId); [L, t].forEach(x => { if (!x) return; x.serial.next = r.next; x.prints = (x.prints || []).concat({ at: new Date().toISOString(), by: me.id, from: r.from, count: r.count }); });
+        $('view').innerHTML = vLabels(); toast(`Отправлено на печать: ${lblSerial(t, r.from)}${r.count > 1 ? ' – ' + lblSerial(t, r.from + r.count - 1) : ''}`); refresh().catch(() => {});
+      } catch(e) { toast(errText(e)); } return; }
+    case 'lblReprint': { const t = lblDraft(), raw = ($('lbl-re')?.value || '').trim(), m = /(\d+)\D*$/.exec(raw.slice((t.serial.prefix || '').length) || raw);
+      const n = m ? Number(m[1]) : NaN; if (!(n >= 0) || n >= t.serial.next) return toast('Этот номер ещё не печатался');
+      try { await api('POST', `/api/labels/${ui.lblId}/reprint`, { n }); printLabels(t, [n]); toast('Повторная печать ' + lblSerial(t, n)); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'reqOpen': ui.reqEdit = null; return openDrawer('req', id);
     case 'reqEdit': { const r = REQS.find(x => x.id === id); ui.reqFiles = (r?.files || []).map(x => ({ ...x })); ui.reqEdit = id; return renderDrawer(); }
     case 'reqF': ui.reqF = id; return render();
@@ -4933,6 +5147,8 @@ document.addEventListener('input', e => {
   if (t.id === 'pick-q') { ui.pickQ = t.value; document.querySelectorAll('.pick li').forEach(li => li.hidden = !pickHit(li.dataset.q, t.value)); return; }
   if (t.id === 'sq') { ui.sq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStock(); const n = $('sq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
+  if (t.dataset.lb) { lblChange(t.dataset.lb, t); return; }
+  if (t.id === 'lbl-count') { ui.lblCount = t.value; return; }
   if (t.id === 'reqq') { ui.reqQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReq(); const n = $('reqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'spq') { ui.spq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaffProj(); const n = $('spq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'stq') { ui.stq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaff(); const n = $('stq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -5124,7 +5340,7 @@ function route(){
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (h === 'users' && me.role === 'admin' ? 'users' : 'req')
     : isWorker() ? (['wwork', 'wdone'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','cps','pay','plan','dt','labels'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
