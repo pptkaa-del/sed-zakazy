@@ -711,6 +711,7 @@ async function api(req, res, url) {
     const SC = labelScans(), fmtAt = at => new Date(at).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' });
     const scanDup = (scan, force) => { const was = scan && SC[scan]; if (!was || force) return null; const u = users.find(x => x.id === was.by), tl = L[was.l];
       return { error: `Значение со сканера «${scan}» уже печаталось ${fmtAt(was.at)}${was.serial ? ' с номером ' + was.serial : ''}${u ? ', ' + u.name : ''}${tl ? ` (этикетка «${tl.name}»)` : ''}`, dupScan: { scan, ...was, label: tl ? tl.name : '' } }; };
+    const dateOf = b => /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : undefined;
     const markScan = (scan, sn) => { if (!scan) return; if (!SC[scan]) SC[scan] = { l: p[2], at: now, by: user.id, serial: sn }; else SC[scan].repeats = (SC[scan].repeats || 0) + 1; if (S[sn] && !S[sn].scan) S[sn].scan = scan; };
     // «Печать следующей»: the next free number(s) — numbers already printed (by hand or before the counter was moved back) are skipped
     if (m === 'POST' && p[3] === 'next') {
@@ -722,8 +723,8 @@ async function api(req, res, url) {
       if (nums.length < count) return fail(res, 409, 'Не удалось подобрать свободные номера — проверьте префикс и счётчик');
       t.serial.next = nums[nums.length - 1] + 1;
       const serials = nums.map(x => serialStr(t, x));
-      markScan(scan, serials[0]);
-      t.prints = (t.prints || []).concat({ at: now, by: user.id, from: nums[0], count, scan: scan || undefined, list: serials.length > 1 && nums[nums.length - 1] - nums[0] + 1 !== count ? serials : undefined, skipped: skipped.length ? skipped.slice(0, 50) : undefined }).slice(-300);
+      markScan(scan, serials[0]); const date = dateOf(b); if (date) serials.forEach(sn => { if (S[sn] && !S[sn].date) S[sn].date = date; });
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, from: nums[0], count, scan: scan || undefined, date, list: serials.length > 1 && nums[nums.length - 1] - nums[0] + 1 !== count ? serials : undefined, skipped: skipped.length ? skipped.slice(0, 50) : undefined }).slice(-300);
       saveDb(); return send(res, 200, { ok: true, from: nums[0], count, nums, serials, skipped, next: t.serial.next, rev: db.rev });
     }
     // a serial number typed by hand: printed if it was never printed before; a repeat only on purpose (force)
@@ -734,17 +735,17 @@ async function api(req, res, url) {
       const was = S[sn];
       if (was && !b.force) { const tl = L[was.l], u = users.find(x => x.id === was.by);
         return send(res, 409, { error: `Номер ${sn} уже печатался ${new Date(was.at).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' })}${u ? ', ' + u.name : ''}${tl ? ` (этикетка «${tl.name}»)` : ''}`, dup: { serial: sn, ...was, label: tl ? tl.name : '' } }); }
-      mark(sn, { manual: true }); markScan(scan, sn);
+      mark(sn, { manual: true }); markScan(scan, sn); const date = dateOf(b); if (date && S[sn] && !S[sn].date) S[sn].date = date;
       t.manual = [sn, ...(t.manual || []).filter(x => x !== sn)].slice(0, 200);
-      t.prints = (t.prints || []).concat({ at: now, by: user.id, manual: sn, scan: scan || undefined, ...(was ? { reprint: true } : {}) }).slice(-300);
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, manual: sn, scan: scan || undefined, date, ...(was ? { reprint: true } : {}) }).slice(-300);
       saveDb(); return send(res, 200, { ok: true, serial: sn, repeat: !!was, rev: db.rev });
     }
     // reprint of a number already printed: only written into the log
     if (m === 'POST' && p[3] === 'reprint') {
       const b = await readJsonBody(req), sn = b.serial !== undefined ? String(b.serial).trim() : serialStr(t, Math.floor(Number(b.n)));
       if (!S[sn]) return fail(res, 400, `Номер ${sn} ещё не печатался`);
-      t.prints = (t.prints || []).concat({ at: now, by: user.id, manual: sn, reprint: true, scan: S[sn].scan || undefined }).slice(-300);
-      saveDb(); return send(res, 200, { ok: true, serial: sn, scan: S[sn].scan || '', rev: db.rev });
+      t.prints = (t.prints || []).concat({ at: now, by: user.id, manual: sn, reprint: true, scan: S[sn].scan || undefined, date: S[sn].date }).slice(-300);
+      saveDb(); return send(res, 200, { ok: true, serial: sn, scan: S[sn].scan || '', date: S[sn].date || '', rev: db.rev });
     }
     if (m === 'DELETE' && p.length === 3) {
       if (!canEdit(user)) return fail(res, 403, 'Удалить этикетку может руководитель или администратор');
