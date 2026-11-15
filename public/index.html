@@ -1176,12 +1176,13 @@ function animateView(el){
   clearTimeout(enterTimer); enterTimer = setTimeout(() => el.classList.remove('enter'), 700);
 }
 /* «Склад»: the warehouse, the write-off lists and the invoices in one tab */
-const STOCK_VIEWS = ['stock', 'wo', 'pay'];
+const STOCK_VIEWS = ['stock', 'inc', 'wo', 'pay'];
 const canWo = () => isHead() || me?.role === 'accountant';
 function stockTabs(){
   const n = S.invoices.filter(i => i.status === 'topay').length;
-  const T = [['stock', 'Склад'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']];
-  return `<nav class="seg stabs" aria-label="Разделы склада">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : ''}</a>`).join('')}</nav>`;
+  const inc = S.invoices.filter(i => incState(i) === 'wait').length;
+  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']];
+  return `<nav class="seg stabs" aria-label="Разделы склада">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : k === 'inc' && inc ? ` <span class="badge" title="Ждут оприходования">${inc}</span>` : ''}</a>`).join('')}</nav>`;
 }
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
@@ -1198,7 +1199,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : '') + (ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : vOrders());
+  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : '') + (ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -1557,6 +1558,10 @@ const lnSum = key => { const t = sum(ui[key] || [], x => num(x.qty) * num(x.pric
 const lnInner = key => (ui[key] || []).length ? linesTable(key) : `<p class="dim" style="margin:0">Строк нет — они подставятся из PDF-счёта или добавьте вручную.</p><div><button type="button" class="btn sm" data-act="addLn" data-id="${key}">+ Строка</button></div>`;
 function drawLines(key){ const box = $('ln-' + key); if (box) box.innerHTML = lnInner(key); }
 const cleanLines = L => (L || []).filter(x => String(x.name || '').trim()).map(x => ({ id:x.id || uid(), name:String(x.name).trim(), sku:x.sku || '', unit:String(x.unit || 'шт').trim() || 'шт', qty:num(x.qty), price:num(x.price), sum:num(x.sum) || Math.round(num(x.qty) * num(x.price) * 100) / 100, stockId:x.stockId || null }));
+function vIncView(){
+  const q = (ui.iq || '').trim().toLowerCase();
+  return `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="iq" type="search" value="${esc(ui.iq || '')}" placeholder="Номер, поставщик, товар" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по приходам"></span></div>` + vIncomes(q);
+}
 function vIncomes(q){
   const hit = (...a) => !q || a.join(' ').toLowerCase().includes(q);
   const L = S.invoices.filter(i => incState(i) && hit(i.number, i.supplier, i.income?.waybill?.number, ...(i.items || []).map(x => x.name)))
@@ -1661,19 +1666,16 @@ const isLow = it => (Number(it.minQty) || 0) > 0 && (Number(it.qty) || 0) <= Num
 function vStock(){
   const q = ui.sq.trim().toLowerCase();
   const hay = it => [it.name, it.sku, it.location, it.note].join(' ').toLowerCase();
-  const low = S.stock.filter(isLow), incWait = S.invoices.filter(i => incState(i) === 'wait').length;
   // «Наличие»: everything, only what is on the accounting balance, only what is actually in the warehouse
   const av = it => ui.sAv === 'acct' ? (Number(it.acctQty) || 0) > 0 : ui.sAv === 'real' ? (Number(it.qty) || 0) > 0 : true;
-  const list = S.stock.filter(it => (ui.sF !== 'low' || isLow(it)) && av(it) && (!q || hay(it).includes(q))).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
+  const list = S.stock.filter(it => av(it) && (!q || hay(it).includes(q))).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
   const A = META.acct;
   const acctBar = `<div class="acctbar"><span>Бухгалтерские остатки (1С): ${A ? `обновлены <b>${esc(fmtDT(A.at))}</b>${A.file ? ` из файла «${esc(A.file)}»` : ''}${A.by ? ', ' + esc(who(A.by)) : ''}` : '<b>ещё не загружались</b>'}</span>${canAcct() ? '<button class="btn sm" data-act="acctImport">Загрузить выгрузку 1С</button>' : ''}</div>`;
   const head = acctBar + `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="sq" type="search" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
-    <div class="seg"><button data-act="sF" data-id="all" class="${ui.sF!=='low'&&ui.sF!=='inc'?'on':''}">Все</button><button data-act="sF" data-id="low" class="${ui.sF==='low'?'on':''}">Мало на складе${low.length ? ` (${low.length})` : ''}</button><button data-act="sF" data-id="inc" class="${ui.sF==='inc'?'on':''}">Приходы${incWait ? ` (${incWait})` : ''}</button></div>
-    ${ui.sF === 'inc' ? '' : `<div class="seg" role="group" aria-label="Наличие">${[['', 'Показывать все'], ['acct', 'Есть на бухгалтерском'], ['real', 'Есть фактически']].map(([k, l]) => `<button data-act="sAv" data-id="${k}" class="${(ui.sAv || '') === k ? 'on' : ''}">${l} <span class="dim">${k === 'acct' ? S.stock.filter(it => (Number(it.acctQty) || 0) > 0).length : k === 'real' ? S.stock.filter(it => (Number(it.qty) || 0) > 0).length : S.stock.length}</span></button>`).join('')}</div>`}
+    ${`<div class="seg" role="group" aria-label="Наличие">${[['', 'Показывать все'], ['acct', 'Есть на бухгалтерском'], ['real', 'Есть фактически']].map(([k, l]) => `<button data-act="sAv" data-id="${k}" class="${(ui.sAv || '') === k ? 'on' : ''}">${l} <span class="dim">${k === 'acct' ? S.stock.filter(it => (Number(it.acctQty) || 0) > 0).length : k === 'real' ? S.stock.filter(it => (Number(it.qty) || 0) > 0).length : S.stock.length}</span></button>`).join('')}</div>`}
     ${canEdit() ? '<button class="btn primary" data-act="newStock">+ Позиция</button>' : ''}
   </div>`;
-  if (ui.sF === 'inc') return head + vIncomes(q);
   if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canAcct() ? 'Загрузите выгрузку остатков из 1С — позиции создадутся сами — или ' : ''}${canEdit() ? 'добавьте позиции вручную: наименование, артикул, единицу, место хранения и минимальный запас. Затем отмечайте приход и расход.' : 'Позиции склада добавляют менеджер или администратор.'}</div>`;
   if (!list.length) return head + `<div class="empty"><h3>Ничего не найдено</h3>Измените поиск или фильтр.</div>`;
   return head + `<section class="card" style="padding:0;overflow:hidden">
@@ -1683,8 +1685,8 @@ function vStock(){
       <div class="mono dim">${esc(it.sku || '—')}</div>
       <div class="dim">${esc(it.location || '—')}</div>
       <div class="bal ${isLow(it) ? 'low' : ''}">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}<small>фактический</small></div>
-      <div class="bal acct">${A ? fmtQty(it.acctQty) + ' ' + esc(it.unit || 'шт') : '—'}<small>бухгалтерский${A && Math.abs((Number(it.acctQty)||0) - (Number(it.qty)||0)) > 1e-9 ? ` · <span class="diff">разница ${((Number(it.qty)||0) - (Number(it.acctQty)||0) > 0 ? '+' : '')}${fmtQty((Number(it.qty)||0) - (Number(it.acctQty)||0))}</span>` : ''}</small></div>
-      <div class="acts">${canMoveStock() ? `<button class="btn sm ok" data-act="stockIn" data-id="${it.id}">+ Приход</button><button class="btn sm" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}</div>
+      <div class="bal acct">${fmtQty(it.acctQty) + ' ' + esc(it.unit || 'шт')}<small>бухгалтерский${Math.abs((Number(it.acctQty)||0) - (Number(it.qty)||0)) > 1e-9 ? ` · <span class="diff">разница ${((Number(it.qty)||0) - (Number(it.acctQty)||0) > 0 ? '+' : '')}${fmtQty((Number(it.qty)||0) - (Number(it.acctQty)||0))}</span>` : ''}</small></div>
+      <div class="acts">${canMoveStock() ? `<button class="btn sm" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}</div>
     </div>`).join('')}
   </section>
   <datalist id="stock-names">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist>`;
@@ -3944,7 +3946,8 @@ function renderDrawer(){
     const mv = (it.moves || []).slice().reverse();
     D.innerHTML = dh(`<span ${edAttr('stock', it.id, 'name')}>${esc(it.name)}</span>`) + `<div class="d-body">
       ${canEdit() ? `<p class="jdesc ${it.note ? '' : 'dim'}" style="margin:0" ${edAttr('stock', it.id, 'note', true)}>${it.note ? esc(it.note) : 'Примечание — дважды щёлкните, чтобы добавить'}</p>` : ''}
-      <dl class="kv"><dt>Остаток</dt><dd><b class="mono ${isLow(it) ? 'warn-t' : ''}" style="font-size:18px">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</b></dd>
+      <dl class="kv"><dt>Фактический остаток</dt><dd><b class="mono ${isLow(it) ? 'warn-t' : ''}" style="font-size:18px">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</b></dd>
+        <dt>Бухгалтерский остаток</dt><dd><b class="mono" style="font-size:18px">${fmtQty(it.acctQty)} ${esc(it.unit || 'шт')}</b></dd>
         <dt>Артикул</dt><dd class="mono">${esc(it.sku || '—')}</dd><dt>Место хранения</dt><dd>${esc(it.location || '—')}</dd>
         <dt>Минимальный запас</dt><dd>${it.minQty ? fmtQty(it.minQty) + ' ' + esc(it.unit || 'шт') : '—'}</dd>${it.note ? `<dt>Примечание</dt><dd>${esc(it.note)}</dd>` : ''}</dl>
       <div class="row-g">${canMoveStock() ? `<button class="btn ok" data-act="stockIn" data-id="${it.id}">+ Приход</button><button class="btn" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}${canEdit() ? `<button class="btn" data-act="editStock" data-id="${it.id}">Изменить</button>` : ''}</div>
@@ -4757,7 +4760,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['pay', 'Склад → Счета'], ['wo', 'Склад → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
+const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['inc', 'Склад → Приходы'], ['pay', 'Склад → Счета'], ['wo', 'Склад → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -5300,6 +5303,7 @@ document.addEventListener('input', e => {
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
   if (t.dataset.lb) { lblChange(t.dataset.lb, t); return; }
   if (t.id === 'lbl-count') { ui.lblCount = t.value; return; }
+  if (t.id === 'iq') { ui.iq = t.value; const pos = t.selectionStart; $('view').innerHTML = stockTabs() + vIncView(); const n = $('iq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'devq') { ui.devQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vDevs(); const n = $('devq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'reqq') { ui.reqQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReq(); const n = $('reqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'spq') { ui.spq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaffProj(); const n = $('spq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -5497,7 +5501,7 @@ function route(){
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (h === 'users' && me.role === 'admin' ? 'users' : 'req')
     : isWorker() ? (['wwork', 'wdone', 'devs'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','cps','pay','plan','dt','labels','devs'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'orgs') loadOrgs();
