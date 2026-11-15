@@ -685,6 +685,8 @@ async function api(req, res, url) {
           w: num(x.w, 0.2, 300, 30), h: num(x.h, 0.2, 300, 8), size: num(x.size, 3, 120, 10), bold: !!x.bold, align: ['left', 'center', 'right'].includes(x.align) ? x.align : 'left',
           // a QR code: what it holds — fields joined by a separator, a typed text, or a typed text with fields
           ...(x.type === 'qr' ? { mode: ['fields', 'text', 'mix'].includes(x.mode) ? x.mode : 'fields', fields: (Array.isArray(x.fields) ? x.fields : []).filter(k => ['serial', 'scan', 'name', 'order', 'customer', 'date'].includes(k)).slice(0, 6),
+            // the elements of the label (by their numbers) whose printed values go into the code
+            ...(Array.isArray(x.els) ? { els: x.els.map(e => String(e).slice(0, 20)).slice(0, 40) } : {}),
             sep: String(x.sep ?? ';').slice(0, 5), ec: ['L', 'M', 'Q', 'H'].includes(x.ec) ? x.ec : 'M' } : {}) })) };
     };
     if (m === 'POST' && !p[2]) {
