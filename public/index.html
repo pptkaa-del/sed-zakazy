@@ -1666,18 +1666,19 @@ const isLow = it => (Number(it.minQty) || 0) > 0 && (Number(it.qty) || 0) <= Num
 function vStock(){
   const q = ui.sq.trim().toLowerCase();
   const hay = it => [it.name, it.sku, it.location, it.note].join(' ').toLowerCase();
-  // «Наличие»: everything, only what is on the accounting balance, only what is actually in the warehouse
-  const av = it => ui.sAv === 'acct' ? (Number(it.acctQty) || 0) > 0 : ui.sAv === 'real' ? (Number(it.qty) || 0) > 0 : true;
+  // «Показать разницу»: only the positions whose actual and accounting quantities differ
+  const differs = it => Math.abs((Number(it.qty) || 0) - (Number(it.acctQty) || 0)) > 1e-9, nDiff = S.stock.filter(differs).length;
+  const av = it => !ui.sDiff || differs(it);
   const list = S.stock.filter(it => av(it) && (!q || hay(it).includes(q))).sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
   const A = META.acct;
   const acctBar = `<div class="acctbar"><span>Бухгалтерские остатки (1С): ${A ? `обновлены <b>${esc(fmtDT(A.at))}</b>${A.file ? ` из файла «${esc(A.file)}»` : ''}${A.by ? ', ' + esc(who(A.by)) : ''}` : '<b>ещё не загружались</b>'}</span>${canAcct() ? '<button class="btn sm" data-act="acctImport">Загрузить выгрузку 1С</button>' : ''}</div>`;
   const head = acctBar + `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="sq" type="search" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
-    ${`<div class="seg" role="group" aria-label="Наличие">${[['', 'Показывать все'], ['acct', 'Есть на бухгалтерском'], ['real', 'Есть фактически']].map(([k, l]) => `<button data-act="sAv" data-id="${k}" class="${(ui.sAv || '') === k ? 'on' : ''}">${l} <span class="dim">${k === 'acct' ? S.stock.filter(it => (Number(it.acctQty) || 0) > 0).length : k === 'real' ? S.stock.filter(it => (Number(it.qty) || 0) > 0).length : S.stock.length}</span></button>`).join('')}</div>`}
+    <button class="btn ${ui.sDiff ? 'primary' : ''}" data-act="sDiff" aria-pressed="${!!ui.sDiff}" title="Позиции, у которых фактический и бухгалтерский остатки различаются">${ui.sDiff ? '✓ ' : ''}Показать разницу <span class="${ui.sDiff ? '' : 'dim'}">${nDiff}</span></button>
     ${canEdit() ? '<button class="btn primary" data-act="newStock">+ Позиция</button>' : ''}
   </div>`;
   if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canAcct() ? 'Загрузите выгрузку остатков из 1С — позиции создадутся сами — или ' : ''}${canEdit() ? 'добавьте позиции вручную: наименование, артикул, единицу, место хранения и минимальный запас. Затем отмечайте приход и расход.' : 'Позиции склада добавляют менеджер или администратор.'}</div>`;
-  if (!list.length) return head + `<div class="empty"><h3>Ничего не найдено</h3>Измените поиск или фильтр.</div>`;
+  if (!list.length) return head + (ui.sDiff && !nDiff ? `<div class="empty"><h3>Расхождений нет</h3>Фактический и бухгалтерский остатки совпадают по всем позициям.</div>` : `<div class="empty"><h3>Ничего не найдено</h3>Измените поиск или фильтр.</div>`);
   return head + `<section class="card" style="padding:0;overflow:hidden">
     <div class="stk head"><span>Наименование</span><span>Артикул</span><span>Место</span><span style="text-align:right">Фактический</span><span style="text-align:right">Бухгалтерский</span><span></span></div>
     ${list.map(it => `<div class="stk click" data-act="viewStock" data-id="${it.id}" role="button" tabindex="0">
@@ -5193,7 +5194,7 @@ async function act(el){
     case 'pastePComp': return openDrawer('pastePComp', id);
     case 'delPFile': { const [oid, pid, fid] = id.split('|'); await guard(updProduct(oid, pid, p => ({ ...p, files: (p.files || []).filter(f => f.id !== fid) }))); return render(); }
     case 'sF': ui.sF = id; return render();
-    case 'sAv': ui.sAv = id; return render();
+    case 'sDiff': ui.sDiff = !ui.sDiff; return render();
     case 'woF': ui.woF = id; return render();
     case 'stDay': ui.stDay = id; return render();
     case 'spG': ui.spG = id; return render();
