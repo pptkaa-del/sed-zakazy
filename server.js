@@ -378,6 +378,7 @@ function fileUsage(){
     for (const t of Object.values(db.labels || {})) for (const x of t.items || []) if (x.img) add(x.img.id, `Этикетка «${t.name}»`);
     for (const r of Object.values(db.requests || {})) for (const f of [...(r.files || []), ...(r.doneFiles || [])]) add(f.id, `Заявка № ${r.no || ''}`);
     for (const d of db.reqDocs || []) if (d.file) add(d.file.id, `Инструкция «${d.title}»`);
+    for (const c of db.checks || []) for (const f of c.files || []) add(f.id, c.kind === 'fuel' ? 'Чек заправки' : `Чек покупки · ${c.seller || ''}`);
     for (const v of Object.values(db.vehicles || {})) for (const d of v.docs || []) if (d.file) add(d.file.id, `Транспорт ${v.name || ''} · ${d.title || ''}`);
     for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
   return used;
@@ -565,8 +566,8 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
-    && !(p[1] === 'devs' || p[1] === 'notes' || (p[1] === 'files' && (Object.values(db.devs || {}).some(d => devEdit(user, d)) || Object.values(db.jobs || {}).some(j => onJob(user, j)))))) return fail(res, 403, 'Недостаточно прав');
+  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+    && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && orgUsers().find(u => u.id === p[2]);
@@ -669,6 +670,11 @@ async function api(req, res, url) {
     // the marks of the manager (sick leave, vacation, late, left early, absence) and the working schedule
     out.staffMarks = (Array.isArray(db.staffMarks) ? db.staffMarks : []).filter(x => HEAD(user) || x.user === user.id);
     out.workCal = workCalOf();
+    // «Загрузить чек»: an employee sees his own receipts, a manager and the accountant see everyone's; the vehicles to choose for a refuelling
+    if (orgType(user) !== 'requests') {
+      out.checks = (Array.isArray(db.checks) ? db.checks : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
+      out.vehBrief = Object.entries(db.vehicles || {}).map(([id, v]) => ({ id, name: v.name, plate: v.plate || '' })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    }
     // «Транспорт»: the vehicles of the company with maintenance and documents, and the spare parts — for managers
     if (HEAD(user) && orgType(user) !== 'requests') {
       out.vehicles = sees(user, 'transport:cars') || sees(user, 'transport:parts') ? Object.entries(db.vehicles || {}).map(([id, v]) => ({ id, ...v })) : [];
@@ -926,6 +932,50 @@ async function api(req, res, url) {
       delete R[p[2]]; saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
     }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Загрузить чек»: a refuelling (photo of the receipt, the vehicle) and a purchase (the work, photo, date, seller, goods with quantity and price, sum) */
+  if (p[1] === 'checks') {
+    if (user.sys || orgType(user) === 'requests') return fail(res, 403, 'Недоступно');
+    if (!Array.isArray(db.checks)) db.checks = [];
+    const C = db.checks, now = new Date().toISOString(), txt = (v, n) => String(v ?? '').trim().slice(0, n), D = /^\d{4}-\d{2}-\d{2}$/;
+    const money = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN; };
+    if (m === 'POST' && !p[2]) {
+      const b = await readJsonBody(req), kind = b.kind === 'fuel' ? 'fuel' : b.kind === 'buy' ? 'buy' : '';
+      if (!kind) return fail(res, 400, 'Выберите: заправка или покупка');
+      const files = (Array.isArray(b.files) ? b.files : []).filter(f => f && db.files[f.id]).slice(0, 10).map(f => ({ id: f.id, name: db.files[f.id].name, type: db.files[f.id].type }));
+      if (!files.length) return fail(res, 400, 'Загрузите фото или картинку чека');
+      const date = D.test(b.date || '') ? b.date : localDate();
+      const x = { id: newId(), kind, by: user.id, at: now, date, files, note: txt(b.note, 1000) };
+      if (kind === 'fuel') {
+        if (!b.vehicleId || !(db.vehicles || {})[b.vehicleId]) return fail(res, 400, 'Выберите, какой транспорт заправлен');
+        const sum = money(b.sum), liters = money(b.liters);
+        if (Number.isNaN(sum) || Number.isNaN(liters)) return fail(res, 400, 'Сумма и литры — числа');
+        Object.assign(x, { vehicleId: b.vehicleId, sum, liters });
+      } else {
+        const job = b.jobId && db.jobs[b.jobId], work = txt(b.work, 200);
+        if (!job && !work) return fail(res, 400, 'Укажите, на какой вид работ покупка');
+        const seller = txt(b.seller, 300); if (!seller) return fail(res, 400, 'Укажите, у кого куплено');
+        const items = [];
+        for (const [i, it] of (Array.isArray(b.items) ? b.items : []).slice(0, 100).entries()) {
+          const name = txt(it && it.name, 300), qty = money(it && it.qty), price = money(it && it.price);
+          if (!name && qty == null && price == null) continue;
+          if (!name) return fail(res, 400, `Строка ${i + 1}: что куплено`);
+          if (qty == null || Number.isNaN(qty) || qty <= 0) return fail(res, 400, `Строка ${i + 1}: количество`);
+          if (price == null || Number.isNaN(price)) return fail(res, 400, `Строка ${i + 1}: цена`);
+          items.push({ name, qty, unit: txt(it.unit, 20), price });
+        }
+        if (!items.length) return fail(res, 400, 'Укажите, что куплено: наименование, количество и цену');
+        const calc = Math.round(items.reduce((a, it) => a + it.qty * it.price, 0) * 100) / 100, sum = money(b.sum);
+        if (Number.isNaN(sum)) return fail(res, 400, 'Сумма — число');
+        Object.assign(x, { jobId: job ? b.jobId : null, work: job ? '' : work, seller, items, sum: sum == null ? calc : sum });
+      }
+      C.push(x); saveDb();
+      return send(res, 200, { ok: true, check: x, rev: db.rev });
+    }
+    const x = p[2] && C.find(e => e.id === p[2]);
+    if (!x || !(x.by === user.id || HEAD(user))) return fail(res, 404, 'Чек не найден — обновите страницу');
+    if (m === 'DELETE') { db.checks = C.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Транспорт» (managers): a vehicle — name, number, VIN, year, mileage, note; its maintenance (date, mileage, what was done)
@@ -1519,7 +1569,7 @@ async function api(req, res, url) {
   }
 
   if (p[1] === 'files' && m === 'POST') {
-    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user) && orgType(user) !== 'requests' && !Object.values(db.devs || {}).some(d => devEdit(user, d)) && !Object.values(db.jobs || {}).some(j => onJob(user, j))) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
+    // every user of an organization uploads files: photos of points, receipts («Загрузить чек»), documents
     let name = 'файл';
     try { name = decodeURIComponent(String(req.headers['x-filename'] || 'файл')); } catch {}
     name = name.replace(/[\\/\r\n"]/g, '_').slice(0, 200) || 'файл';
