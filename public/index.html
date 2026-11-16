@@ -3388,12 +3388,18 @@ function labelHtml(t, n, sel, scan, date){
   return `<div class="lbl" style="position:relative;width:${t.w}mm;height:${t.h}mm;overflow:hidden;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif">${items}</div>`;
 }
 // printing: a hidden frame with the page of the label's size
+// the page sent to the printer: turned by 90° or 270° it is the label's height by its width
+const lblPage = t => [90, 270].includes(Number(t.rot)) ? [t.h, t.w] : [t.w, t.h];
 function printLabels(t, nums, scan, date){
   const fr = document.createElement('iframe'); fr.setAttribute('aria-hidden', 'true');
   fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
   document.body.appendChild(fr);
   const d = fr.contentDocument;
-  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)}</title><style>@page{size:${t.w}mm ${t.h}mm;margin:0}html,body{margin:0;padding:0;background:#fff}.lbl{height:${Math.max(1, t.h - 0.4)}mm!important}.lbl+.lbl{page-break-before:always;break-before:page}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${nums.map(n => labelHtml(t, n, undefined, scan, date ?? ui.lblDate)).join('')}</body></html>`); d.close();
+  const [W, H] = lblPage(t), rot = Number(t.rot) || 0, dx = Number(t.dx) || 0, dy = Number(t.dy) || 0;
+  // the label is turned on the page when it lies across the printer's tape: 90° — clockwise
+  const [tx, ty] = rot === 90 ? [t.h, 0] : rot === 180 ? [t.w, t.h] : rot === 270 ? [0, t.w] : [0, 0];
+  const tf = `translate(${tx + dx}mm,${ty + dy}mm) rotate(${rot}deg)`;
+  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.name)}</title><style>@page{size:${W}mm ${H}mm;margin:0}html,body{margin:0;padding:0;background:#fff}.pg{position:relative;overflow:hidden;width:${W}mm;height:${Math.max(1, H - 0.4)}mm}.pg+.pg{page-break-before:always;break-before:page}.pg>.lbl{position:absolute!important;left:0;top:0;transform-origin:0 0;transform:${tf}}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${nums.map(n => `<div class="pg">${labelHtml(t, n, undefined, scan, date ?? ui.lblDate)}</div>`).join('')}</body></html>`); d.close();
   const imgs = [...d.images], ready = Promise.race([Promise.all(imgs.map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; }))), new Promise(r => setTimeout(r, 8000))]);
   ready.then(() => setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch(e) { toast('Не удалось открыть печать: ' + e.message); } setTimeout(() => fr.remove(), 60000); }, 150));
 }
@@ -3431,7 +3437,7 @@ function vLabels(){
           <button class="btn" data-act="lblManual">🖨 Печать с этим номером</button>
           <small id="lbl-mancheck" class="lblcheck">${lblManCheck(ui.lblMan)}</small></div>
         <datalist id="lbl-mans">${(t.manual || []).map(x => `<option value="${esc(x)}"></option>`).join('')}</datalist>
-        <small class="dim">Печать идёт на принтер этикеток через окно печати браузера: выберите принтер и размер бумаги <b id="lbl-papersz">${t.w}×${t.h} мм</b>, поля — «нет». Чтобы печатать сразу без окна, запустите Chrome с параметром <span class="mono">--kiosk-printing</span>.</small>
+        <small class="dim">Печать идёт на принтер этикеток через окно печати браузера: выберите принтер и размер бумаги <b id="lbl-papersz">${lblPage(t)[0]}×${lblPage(t)[1]} мм</b>, поля — «нет». Чтобы печатать сразу без окна, запустите Chrome с параметром <span class="mono">--kiosk-printing</span>.</small>
         ${ui.lblDirty ? '<p class="box" style="margin:0;border-color:var(--warn);background:var(--warn-soft)">Есть несохранённые изменения — перед печатью они сохранятся.</p>' : ''}
         <h4 class="sub-h">Журнал печати</h4>${lblLog(t)}</section>
       <section class="card lblform">${ed ? lblForm(t) : '<p class="dim">Менять этикетку может руководитель или администратор.</p>'}</section>
@@ -3501,6 +3507,10 @@ function lblForm(t){
     <label>Размер <small class="dim">(из списка — элементы подстроятся)</small><select class="in" data-lb="size"><option value="">свой</option>${LBL_SIZES.map(([w, h]) => `<option value="${w}x${h}" ${t.w === w && t.h === h ? 'selected' : ''}>${w}×${h} мм</option>`).join('')}</select></label>
     <span class="lblwh"><label>Ширина, мм${n('w', t.w)}</label><label>Высота, мм${n('h', t.h)}</label></span>
   </div>
+  <h4 class="sub-h">Как этикетка лежит в принтере</h4>
+  <div class="form"><label>Поворот при печати<select class="in" data-lb="rot">${[[0, 'нет — как на экране'], [90, '90° по часовой'], [180, '180°'], [270, '90° против часовой']].map(([r, l]) => `<option value="${r}" ${(Number(t.rot) || 0) === r ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <span class="lblwh"><label>Сдвиг вправо, мм${n('dx', t.dx || 0)}</label><label>Сдвиг вниз, мм${n('dy', t.dy || 0)}</label></span>
+    <small class="wide dim">Если надпись уходит на соседнюю этикетку или печатается боком — этикетка лежит в принтере поперёк: выберите поворот 90°. На принтер уходит страница <b class="mono" id="lbl-pagesz">${lblPage(t)[0]}×${lblPage(t)[1]} мм</b> — такой же размер бумаги и ориентацию поставьте в настройках принтера. Сдвиг поправляет печать, если она смещена относительно этикетки.</small></div>
   <h4 class="sub-h">Серийный номер</h4>
   <div class="form"><label>Префикс${`<input class="in mono" data-lb="serial.prefix" value="${esc(t.serial.prefix)}" maxlength="30">`}</label><label>Цифр${n('serial.digits', t.serial.digits)}</label>
     <label>Суффикс<input class="in mono" data-lb="serial.suffix" value="${esc(t.serial.suffix)}" maxlength="30"></label>
@@ -3541,6 +3551,8 @@ function lblChange(key, el){
   else if (key === 'ref') { const [ty, id] = String(v).split(':'); t.ref = ty ? { type: ty, id } : null; }
   else if (key === 'name') t.name = v;
   else if (key === 'w' || key === 'h') { if (nv > 0) t[key] = nv; }
+  else if (key === 'rot') t.rot = Number(v) || 0;
+  else if (key === 'dx' || key === 'dy') { t[key] = Number.isFinite(nv) ? Math.max(-30, Math.min(30, nv)) : 0; }
   else if (key.startsWith('serial.')) { const k = key.slice(7); t.serial[k] = k === 'digits' ? Math.max(1, Math.min(12, nv | 0 || 1)) : v; }
   else if (key.startsWith('it.e:') && sel) { const k = key.slice(5), E = qrEls(sel, t).filter(x => x !== k); sel.els = (t.items || []).map(e => e.id).filter(id => id === k ? v : E.includes(id)); }
   else if (key.startsWith('it.f:') && sel) { const k = key.slice(5), F = (sel.fields || []).filter(x => x !== k); sel.fields = v ? QR_FIELDS.map(f => f[0]).filter(f => f === k || F.includes(f)) : F; }
@@ -3552,7 +3564,8 @@ function lblChange(key, el){
 function lblRedraw(full){
   const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview();
   const t = lblDraft(), nx = $('lbl-nextno'); if (nx && t) nx.textContent = lblSerial(t, t.serial.next);
-  const pz = $('lbl-papersz'); if (pz && t) pz.textContent = `${t.w}×${t.h} мм`;
+  { const ps = $('lbl-pagesz'); if (ps && t) ps.textContent = `${lblPage(t)[0]}×${lblPage(t)[1]} мм`; }
+  const pz = $('lbl-papersz'); if (pz && t) pz.textContent = `${lblPage(t)[0]}×${lblPage(t)[1]} мм`;
   const sc = $('lbl-scancheck'); if (sc && t && !sc.querySelector('button')) sc.innerHTML = lblScanCheck(t, ui.lblScan);
   const sbx = $('lbl-scanbox'); if (sbx && t) sbx.hidden = !lblUsesScan(t);
   const sb = document.querySelector('[data-act=lblSave]'); if (sb) sb.disabled = !ui.lblDirty;

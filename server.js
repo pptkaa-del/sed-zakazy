@@ -709,6 +709,8 @@ async function api(req, res, url) {
       const ref = b.ref && ((b.ref.type === 'order' && db.orders[b.ref.id]) || (b.ref.type === 'job' && db.jobs[b.ref.id])) ? { type: b.ref.type, id: b.ref.id } : null;
       const sr = b.serial || {};
       return { name: String(b.name || old.name || 'Этикетка').trim().slice(0, 120) || 'Этикетка', w: num(b.w, 10, 300, 58), h: num(b.h, 10, 300, 40), ref,
+        // printing: the turn of the label on the printer's tape and a shift to hit the label exactly
+        rot: [0, 90, 180, 270].includes(Number(b.rot)) ? Number(b.rot) : 0, dx: num(b.dx, -30, 30, 0), dy: num(b.dy, -30, 30, 0),
         serial: { prefix: String(sr.prefix || '').slice(0, 30), suffix: String(sr.suffix || '').slice(0, 30), digits: num(sr.digits, 1, 12, 6) | 0,
           next: old.serial ? old.serial.next : Math.max(0, Math.floor(Number(sr.next) || 1)) },
         items: (Array.isArray(b.items) ? b.items : []).slice(0, 40).filter(x => x && ['text', 'barcode', 'line', 'box', 'qr', 'image'].includes(x.type) && (x.type !== 'image' || (x.img && db.files[x.img.id]))).map(x => ({
