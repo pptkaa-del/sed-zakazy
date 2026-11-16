@@ -339,7 +339,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgt td:hover{outline:2px solid var(--stamp);outline-offset:-2px}.sgt td.sel{outline:2px solid var(--ink);outline-offset:-2px}.sgdot{color:var(--stamp);font-size:9px}
 .sgt .sgsum{min-width:84px;padding:0 8px;font-weight:400;color:var(--ink);cursor:default;white-space:nowrap}.sgt thead .sgsum{font-size:11px}
 .sgnote{display:block;padding:8px 14px}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
-.smtypes{flex-wrap:wrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.smtypes{flex-wrap:wrap}.mywork{padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}.rswitch{white-space:nowrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
 .otmh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 16px;background:var(--mute-soft);font-size:14px}.otlist{list-style:none;margin:0;padding:0}.otlist li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 16px;border-top:1px solid var(--rule-2);font-size:14px;flex-wrap:wrap}.otlist li:first-child{border-top:0}.otn{color:var(--ink-2);font-size:13px;margin-top:2px;white-space:pre-wrap}.stlist li.otday{background:var(--stamp-soft);border-radius:6px}
@@ -1109,6 +1109,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
     </nav>
+    <button class="btn sm rswitch" id="roleSw" type="button" data-act="roleSw" hidden></button>
     <div class="umenu" id="umenu">
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="upop" id="upop" role="menu" hidden>
@@ -1229,7 +1230,7 @@ const ownInv = i => false;
 const isAccountant = () => me && me.role === 'accountant';
 const unseen = i => i.status === 'topay' && i.file && !i.seenAt;
 let names = {};
-const ui = { view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', jq:'', jF:'active', jW:'', jMode:(() => { try { return localStorage.getItem('sed-jmode') || 'grid'; } catch(e) { return 'grid'; } })(), jFrom:null, jSpan:14, mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', planKind:'', oq:'', scale:'day', drawer:null, armed:null };
+const ui = { asWorker: (() => { try { return sessionStorage.getItem('sed-asw') === '1'; } catch(e) { return false; } })(), view:'orders', orderTab:'main', sq:'', sF:'all', wq:'', wKind:'all', wOrd:'', jq:'', jF:'active', jW:'', jMode:(() => { try { return localStorage.getItem('sed-jmode') || 'grid'; } catch(e) { return 'grid'; } })(), jFrom:null, jSpan:14, mapF:'todo', addPoint:false, point:null, order:null, cp:null, cq:'', drafts:{}, payF:'topay', payOrd:'', planOrd:'', planKind:'', oq:'', scale:'day', drawer:null, armed:null };
 try { const s = JSON.parse(localStorage.getItem('sed2')||'{}'); Object.assign(ui, { scale:s.scale||'day', order:s.order||null }); } catch(e){}
 const remember = () => { try { localStorage.setItem('sed2', JSON.stringify({scale:ui.scale, order:ui.order})); } catch(e){} };
 
@@ -1332,6 +1333,10 @@ async function refresh(){
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
   if (reqMode()) { const n = reqTodo().length; $('reqBadge').hidden = !n; $('reqBadge').textContent = n; if (ui.drawer?.kind === 'req' && !drawerBusy()) renderDrawer(); }
   { const n = NOTES.filter(x => !x.done && (x.type || 'task') !== 'memo').length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
+  { const a = myAssigned(), b = $('roleSw'), canSw = me && !me.sys && !reqMode() && me.role !== 'worker' && me.role !== 'contractor';
+    b.hidden = !canSw || (!actingWorker() && !a.jobs.length && !a.tasks.length);
+    b.textContent = actingWorker() ? '↩ Интерфейс руководителя' : '👷 Интерфейс сотрудника'; b.classList.toggle('primary', actingWorker());
+    b.title = actingWorker() ? 'Вернуться к работе руководителя' : 'Открыть работы, назначенные вам, как у сотрудника'; }
   // an employee gets «Мои задачи» once a task is assigned to him
   { const mine = NOTES.filter(x => x.type === 'shared' && x.assignee === me?.id), open = mine.filter(x => !x.done).length;
     $('mytTab').hidden = !isWorker() || !mine.length; $('mytBadge').hidden = !open; $('mytBadge').textContent = open;
@@ -2442,7 +2447,16 @@ function wlPanel(j){
     <div class="row-g"><button class="btn primary" data-act="wlFull" data-id="${j.id}">Показать всё</button>${isMount(j) && P.length ? `<button class="btn" data-act="jobReport" data-id="${j.id}">Отчёт</button>` : ''}${ord(j.orderId) ? `<button class="btn" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button>` : ''}</div>
   </div>`;
 }
-const isWorker = () => me && !reqMode() && (me.role === 'worker' || me.role === 'contractor');   // «Сотрудник» и «Подрядчик»
+// a manager who has works assigned can open the employee's interface (the button in the header) and come back
+const actingWorker = () => !!(me && ui.asWorker && !me.sys && !reqMode() && me.role !== 'worker' && me.role !== 'contractor');
+const isWorker = () => me && !reqMode() && (me.role === 'worker' || me.role === 'contractor' || actingWorker());   // «Сотрудник» и «Подрядчик»
+// the works of the current user as an employee: the server gives an employee only his works and points, a manager in the employee's interface gets the same here
+const myPlaces = j => (j.places || []).filter(x => x.assignee ? x.assignee === me.id : (j.workers || []).length === 1);
+const wJobs = () => !actingWorker() ? S.jobs : S.jobs.filter(j => (j.workers || []).includes(me.id) || (j.places || []).some(x => x.assignee === me.id)).map(j => ({ ...j, places: myPlaces(j) }));
+// what is assigned to a manager himself: works where he is a worker or the executor of points, and tasks of the plan
+const myAssigned = () => !me || me.sys || reqMode() ? { jobs: [], tasks: [] } : {
+  jobs: S.jobs.filter(j => j.status !== 'done' && ((j.workers || []).includes(me.id) || (j.places || []).some(x => x.assignee === me.id))),
+  tasks: S.tasks.filter(t => !t.done && (t.staff || []).includes(me.id)) };
 const canLead = () => canEdit();
 const JOB_ST = { new:'В планах', wait:'Ожидание старта', work:'В работе', done:'Выполнена' };
 const JOB_CHIP = { new:'c-info', wait:'c-mute', work:'c-warn', done:'c-ok' };
@@ -3041,7 +3055,7 @@ const wEditable = pl => !pl.doneAt || Date.now() - Date.parse(pl.doneAt) < W_EDI
 const wUntil = pl => pl.doneAt ? fmtDT(new Date(Date.parse(pl.doneAt) + W_EDIT_MS).toISOString()) : '';
 function wPoints(done){
   const out = [];
-  S.jobs.filter(j => j.status !== 'done' || done).forEach(j => (j.places || []).forEach(pl => { if (!!pl.doneAt === done) out.push({ j, pl }); }));
+  wJobs().filter(j => j.status !== 'done' || done).forEach(j => (j.places || []).forEach(pl => { if (!!pl.doneAt === done) out.push({ j, pl }); }));
   return out;
 }
 function ensureWMap(){
@@ -3069,7 +3083,7 @@ function wFitMap(){ const m = $('wmap'); if (!m || $('wView').hidden) return; if
 addEventListener('resize', () => { if (!$('wView').hidden) wFitMap(); });
 function renderW(){
   const done = ui.view === 'wdone', all = wPoints(done);
-  const jobs = S.jobs.filter(j => done ? (j.places || []).some(x => x.doneAt) : j.status !== 'done')
+  const jobs = wJobs().filter(j => done ? (j.places || []).some(x => x.doneAt) : j.status !== 'done')
     .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (b.createdAt || '').localeCompare(a.createdAt || ''));
   if (ui.wJob && !jobs.some(j => j.id === ui.wJob)) ui.wJob = null;
   const shown = all.filter(x => !ui.wJob || x.j.id === ui.wJob);
@@ -4289,6 +4303,13 @@ function vWoList(){
       <div>${r.src.writeoff ? `<span class="chip c-ok">Сохранён</span><small class="dim">${esc(fmtDT(r.src.writeoff.at))} · ${esc(who(r.src.writeoff.by))}</small>` : r.bad ? `<span class="chip c-bad">Не хватает: ${r.bad}</span>` : '<span class="chip c-warn">Не сохранён</span>'}</div>
       <div class="row-g"><button class="btn sm" data-act="${r.col === 'jobs' ? 'jobWo' : 'writeoff'}" data-id="${r.id}">Открыть</button><a class="btn sm" href="/api/${r.col}/${r.id}/writeoff.xlsx" data-dl title="Excel для загрузки в 1С: «Требование-накладная» → «Загрузить из файла»">Для 1С</a></div></div>`).join('')}</section>`;
 }
+/* in «Задачи» of a manager: the works and tasks of the plan assigned to him */
+function myWorkBox(){
+  const a = myAssigned(); if (!a.jobs.length && !a.tasks.length) return '';
+  return `<section class="card mywork"><div class="row-g" style="justify-content:space-between"><h3 style="margin:0">Назначено мне</h3><button class="btn sm primary" data-act="roleSw">👷 Открыть в интерфейсе сотрудника</button></div>
+    <ul class="stlist">${a.jobs.map(j => { const m = myPlaces(j), left = m.filter(x => !x.doneAt).length; return `<li><button class="linkish" data-act="openJob" data-id="${j.id}"><b>№ ${jobNo(j)} · ${esc(j.title)}</b></button> <span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span><small class="dim">${[WORK_KIND[j.kind || 'mount'], m.length ? `моих точек ${m.length}, осталось ${left}` : '', j.due && 'срок ' + fmtD(j.due)].filter(Boolean).map(esc).join(' · ')}</small></li>`; }).join('')}
+      ${a.tasks.map(t => `<li><button class="linkish" data-act="editTask" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc(['план-график', KIND[t.kind], jobOf(t.jobId) && '№ ' + jobNo(jobOf(t.jobId)) + ' · ' + jobOf(t.jobId).title, fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small></li>`).join('')}</ul></section>`;
+}
 const NOTE_TABS = [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']];
 const ntype = n => n.type || 'task';
 const isOwnNote = n => ntype(n) === 'task' || ntype(n) === 'memo';
@@ -4296,7 +4317,7 @@ function vNotes(){
   const open = NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k), tab = open.includes(ui.ntab) ? ui.ntab : open[0];
   const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'memo' ? NOTES.filter(n => ntype(n) === 'memo').length : 0;
   const tabs = `<div class="seg ntabs" role="tablist">${NOTE_TABS.filter(([k]) => open.includes(k)).map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
-  return tabs + (tab === 'shared' ? vShared() : tab === 'draw' ? vDraw() : vTasksList());
+  return myWorkBox() + tabs + (tab === 'shared' ? vShared() : tab === 'draw' ? vDraw() : vTasksList());
 }
 const thumbF = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp)$/i.test(f.name || '') ? `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener" class="thumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>` : `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>`;
 /* «Заметки»: text, pictures and drawings */
@@ -6190,6 +6211,8 @@ async function act(el){
     case 'stDay': ui.stDay = id; ui.stMonth = id.slice(0, 7); return render();
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
+    case 'roleSw': { ui.asWorker = !ui.asWorker; try { sessionStorage.setItem('sed-asw', ui.asWorker ? '1' : '0'); } catch(e) {}
+      closeDrawer(); location.hash = ui.asWorker ? '#wwork' : '#' + ((startViews().map(([k]) => k).find(viewOk)) || 'notes'); await start(me); toast(ui.asWorker ? 'Интерфейс сотрудника' : 'Интерфейс руководителя'); return; }
     case 'otHEdit': return openDrawer('otHead', id);
     case 'otHSave': { const x = OVERTIME.find(o => o.id === id), body = { date: $('oh-date').value, from: $('oh-from').value, to: $('oh-to').value, note: $('oh-note').value.trim() };
       try { const r = await api('PUT', '/api/overtime/' + id, body); Object.assign(x, r.entry); render(); openDrawer('staffDay', x.by, x.date); toast('Запись изменена'); refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
