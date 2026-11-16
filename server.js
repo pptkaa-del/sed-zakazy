@@ -561,7 +561,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if (FIELD(user) && !['rev', 'data', 'password', 'jobs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || (p[1] === 'files' && (Object.values(db.devs || {}).some(d => devEdit(user, d)) || Object.values(db.jobs || {}).some(j => onJob(user, j)))))) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -660,6 +660,8 @@ async function api(req, res, url) {
       out.labelScans = Object.fromEntries(Object.entries(SC).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by, v.serial || '']])); }
     out.receipts = FIELD(user) || !sees(user, 'stock:inc') ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
+    // irregular working hours: an employee sees his own entries, a manager sees everyone's
+    out.overtime = (Array.isArray(db.overtime) ? db.overtime : []).filter(x => HEAD(user) || x.by === user.id);
     if (FIELD(user)) out.notes = (db.notes || []).filter(n => n.type === 'shared' && n.assignee === user.id);
     else if (sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && ((n.share || []).includes(user.id) || n.assignee === user.id)));
     return send(res, 200, out);
@@ -912,6 +914,38 @@ async function api(req, res, url) {
       delete R[p[2]]; saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
     }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Ненормированный рабочий день»: an employee enters the date, the start and the end of his working day and a comment;
+     the manager sees the entries in «Сотрудники». The end before the start means the day went past midnight. */
+  if (p[1] === 'overtime') {
+    if (user.sys) return fail(res, 403, 'Недоступно');
+    if (!Array.isArray(db.overtime)) db.overtime = [];
+    const O = db.overtime, T = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const clean = b => {
+      const date = String(b.date || ''), from = String(b.from || ''), to = String(b.to || ''), note = String(b.note || '').trim().slice(0, 1000);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) return 'Укажите дату';
+      if (date > localDate(new Date(Date.now() + 864e5))) return 'Дата не может быть в будущем';
+      if (!T.test(from)) return 'Укажите время начала';
+      if (!T.test(to)) return 'Укажите время окончания';
+      if (from === to) return 'Время начала и окончания совпадают';
+      return { date, from, to, note };
+    };
+    if (m === 'POST' && !p[2]) {
+      const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
+      const x = { id: newId(), by: user.id, ...v, at: new Date().toISOString() };
+      O.push(x); saveDb();
+      return send(res, 200, { ok: true, entry: x, rev: db.rev });
+    }
+    const x = p[2] && O.find(e => e.id === p[2]);
+    if (!x || !(x.by === user.id || HEAD(user))) return fail(res, 404, 'Запись не найдена — обновите страницу');
+    if (m === 'PUT') {
+      if (x.by !== user.id) return fail(res, 403, 'Изменить запись может только сам сотрудник');
+      const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
+      Object.assign(x, v, { updatedAt: new Date().toISOString() }); saveDb();
+      return send(res, 200, { ok: true, entry: x, rev: db.rev });
+    }
+    if (m === 'DELETE') { db.overtime = O.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Инструкции» of a requests organization: everyone reads, the administrator adds and removes */
