@@ -348,6 +348,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .ckitems{display:flex;flex-direction:column;gap:6px}.ckir{display:grid;grid-template-columns:minmax(0,1fr) 80px 64px 110px 100px 34px;gap:6px;align-items:center}.ckih{font-size:12px;color:var(--ink-2)}.ckir b{text-align:right;font-size:13px}
 @media (max-width:640px){.ckir{grid-template-columns:1fr 70px 56px 34px}.ckir>input:first-child{grid-column:1/-1}.ckir>b{display:none}.ckih{display:none}.ckir>input[data-cki$="|price"]{grid-column:1/2}}
 .cklist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}.ckcard{display:flex;gap:12px;padding:12px}.ckph{display:flex;flex-direction:column;gap:6px}.ckph img{width:84px;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--rule)}
+.ckocr{display:block;font-size:13px;color:var(--ink-2)}.ckocr:empty{display:none}
 .ckb{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;font-size:14px}.ckul{margin:2px 0;padding-left:18px;font-size:13px}
 .smtypes{flex-wrap:wrap}.mywork{padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}.rswitch{white-space:nowrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
@@ -4276,7 +4277,9 @@ const ckCalc = () => Math.round(ckItems().reduce((a, it) => a + ckNum(it.qty) * 
 const vehLabel = id => { const v = VEH_BRIEF.find(x => x.id === id); return v ? v.name + (v.plate ? ' · ' + v.plate : '') : 'транспорт удалён'; };
 function ckPhotos(){
   return `<div class="row-g">${(ui.ckFiles || []).map((f, i) => `<span class="tw rqthumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}"><button type="button" class="btn sm ghost" data-act="ckFileDel" data-id="${i}" aria-label="Убрать">✕</button></span>`).join('')}
-    <label class="phdrop" style="flex:1 1 240px"><input type="file" accept="image/*" data-up="ckFile" multiple hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span><b>${(ui.ckFiles || []).length ? 'Добавить ещё фото' : 'Сфотографировать или выбрать чек'}</b><small>Фото или картинка чека</small></span></label></div>`;
+    ${(ui.ckFiles || []).length ? `<button type="button" class="btn sm" data-act="ckOcr" title="Распознать первый чек ещё раз">🔍 Распознать</button>` : ''}
+    <label class="phdrop" style="flex:1 1 240px"><input type="file" accept="image/*" data-up="ckFile" multiple hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span><b>${(ui.ckFiles || []).length ? 'Добавить ещё фото' : 'Сфотографировать или выбрать чек'}</b><small>Фото или картинка чека — поля заполнятся сами</small></span></label></div>
+    <small class="ckocr" id="ck-ocr">${ui.ckOcr || ''}</small>`;
 }
 function vChecks(){
   const tab = ui.ckTab || 'fuel', mine = ckSeeAll() && ui.ckWho !== 'me' ? CHECKS : CHECKS.filter(x => x.by === me.id);
@@ -4315,6 +4318,118 @@ function vChecks(){
         ${ckSeeAll() ? `<small class="dim">${esc(who(x.by))} · загружен ${esc(fmtDT(x.at))}</small>` : `<small class="dim">загружен ${esc(fmtDT(x.at))}</small>`}</div></div>`).join('')}</div>`
       : `<div class="empty">${tab === 'fuel' ? 'Чеков заправки пока нет.' : 'Чеков за покупки пока нет.'}</div>`}`;
   return tabs + form + list;
+}
+/* ===== распознавание чека: QR-код кассового чека (дата и сумма — точно) и текст чека (продавец, строки, итог, литры) ===== */
+let jsqrLib = null;
+const loadJsQR = () => jsqrLib || (jsqrLib = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = '/vendor/jsqr/jsQR.js'; sc.onload = () => res(window.jsQR); sc.onerror = () => { jsqrLib = null; rej(new Error('QR')); }; document.head.appendChild(sc); }));
+// t=20261116T1925&s=4795.00&fn=…&i=…&fp=…&n=1
+function parseFiscalQR(s){
+  const q = Object.fromEntries(String(s || '').split('&').map(p => p.split('=')).filter(p => p.length === 2));
+  const t = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/.exec(q.t || ''), sum = Number(q.s);
+  if (!t || !Number.isFinite(sum)) return null;
+  return { date: `${t[1]}-${t[2]}-${t[3]}`, time: `${t[4]}:${t[5]}`, sum };
+}
+async function receiptQR(file){
+  try {
+    const img = await createImageBitmap(file);
+    const tryCanvas = async k => { const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); const g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height); return c; };
+    if ('BarcodeDetector' in window) { try { const r = await new BarcodeDetector({ formats: ['qr_code'] }).detect(img); for (const x of r) { const f = parseFiscalQR(x.rawValue); if (f) return f; } } catch(e) {} }
+    const jsQR = await loadJsQR();
+    for (const k of [Math.min(1, 1600 / Math.max(img.width, img.height)), Math.min(1, 900 / Math.max(img.width, img.height))]) {
+      const c = await tryCanvas(k), d = c.getContext('2d').getImageData(0, 0, c.width, c.height), r = jsQR(d.data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
+      if (r) { const f = parseFiscalQR(r.data); if (f) return f; }
+    }
+  } catch(e) {}
+  return null;
+}
+const rNum = s => Number(String(s).replace(/\s/g, '').replace(',', '.'));
+/* a receipt is printed in large letters across a narrow tape: it is read best at about 900–1100 px wide
+   (the invoices are enlarged much more — for a receipt that spoils the digits) */
+async function receiptCanvas(file, width){
+  const img = await createImageBitmap(file), k = Math.min(2.5, width / img.width);
+  const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.filter = 'grayscale(1) contrast(1.25)'; g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+/* a receipt text → { seller, date, total, items:[{name, qty, unit, price}], liters } */
+function parseReceiptText(raw){
+  const lines = String(raw || '').replace(/ /g, ' ').replace(/(\d)\s*[,‚.]\s+(\d{2})(?!\d)/g, '$1,$2').replace(/(\d) +[,‚](\d{2})(?!\d)/g, '$1,$2').replace(/‚/g, ',').replace(/(\d) ,(\d)/g, '$1,$2').split(/\n/).map(l => l.replace(/[|_]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const N = '(\\d{1,6}(?:[.,]\\d{1,3})?)', MUL = '\\s*[xх×*\\*]\\s*';
+  const r = { items: [] };
+  // seller: «ООО "…"», «ИП …», «АО …»
+  const sl = lines.find(l => /^(?:ООО|ОАО|ПАО|ЗАО|АО|ИП)(?![а-яёa-z])/i.test(l) || /(?:^|[^а-яё])(?:ООО|ПАО|АО|ИП)\s*["«]/i.test(l));
+  if (sl) r.seller = sl.replace(/\s*ИНН.*$/i, '').replace(/[«»]/g, '"').trim();
+  // date: «16.11.26 19:25», «16.11.2026»
+  for (const l of lines) { const m = /\b(\d{2})[.\/](\d{2})[.\/](\d{2}|\d{4})\b/.exec(l); if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; if (+m[2] >= 1 && +m[2] <= 12 && +m[1] >= 1 && +m[1] <= 31) { r.date = `${y}-${m[2]}-${m[1]}`; break; } } }
+  // total
+  for (const re of [/ИТОГО?\s*(?:К\s+ОПЛАТЕ)?\s*[:=≡]?\s*(\d[\d\s]*[.,]\d{2})/i, /К\s+ОПЛАТЕ\s*[:=]?\s*(\d[\d\s]*[.,]\d{2})/i, /(?:БЕЗНАЛИЧНЫМИ|НАЛИЧНЫМИ|ЭЛЕКТРОННЫМИ)\s*[:=]?\s*(\d[\d\s]*[.,]\d{2})/i]) {
+    const m = lines.map(l => re.exec(l)).find(Boolean); if (m) { r.total = rNum(m[1]); break; }
+  }
+  // goods: «A x B = C», where A·B ≈ C; the name is on the same line before the numbers or on the lines above
+  const isHead = l => /^(?:ООО|ОАО|ПАО|ЗАО|АО|ИП)(?![а-яёa-z])/i.test(l) || /кассов|чек|приход|смена|итог|ндс|сумма|оплат|налич|безнал|инн|фн|фд|фп|рн\s*ккт|кассир|сайт|спасибо|адрес|место|сно|осн|^\W*$/i.test(l);
+  const used = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    // the sum may be on the next line: «50 х 89,90» / «=4495,00» — only a line that starts with a number is joined
+    const win = /^\d/.test(lines[i]) && lines[i + 1] ? [lines[i], lines[i] + ' ' + lines[i + 1]] : [lines[i]];
+    for (const [w, text] of win.entries()) {
+      // «50 х 89,90 =4495,00», «0,500 кг х 420,00 = 210,00»
+      const m = new RegExp(N + '\\s*(?:(кг|шт|л|м|уп|компл)\\.?)?' + MUL + N + '\\s*(?:=|≡|-)?\\s*' + '(\\d[\\d\\s]*[.,]\\d{2})(?!\\d)', 'i').exec(text);
+      if (!m) continue;
+      const [ma, mu, mb, mc] = [m[1], m[2], m[3], m[4]], a = rNum(ma), b = rNum(mb), c = rNum(mc);
+      if (!(a > 0 && b > 0) || Math.abs(a * b - c) > Math.max(0.05, c * 0.002)) continue;
+      // which one is the quantity: a whole number or 3 decimals (litres, kg) — otherwise the smaller one
+      const dec = s => (String(s).split(/[.,]/)[1] || '').length, wa = mu ? 3 : dec(ma), wb = dec(mb);
+      let qty, price;
+      if (wa === 3 || (wa === 0 && wb === 2)) { qty = a; price = b; } else if (wb === 3 || (wb === 0 && wa === 2)) { qty = b; price = a; } else if (a <= b) { qty = a; price = b; } else { qty = b; price = a; }
+      let name = text.slice(0, m.index).replace(/^\d{1,3}[.)]\s*/, '').replace(/[=:]+$/, '').trim();
+      if (!/[a-zа-яё]{3}/i.test(name)) { for (let k = i - 1; k >= Math.max(0, i - 2); k--) { if (used.has(k) || isHead(lines[k]) || /[=≡]\s*\d[\d\s]*[.,]\d{2}\s*$/.test(lines[k])) break; name = lines[k].replace(/^\d{1,3}[.)]\s*/, '') + (name ? ' ' + name : ''); if (/[a-zа-яё]{3}/i.test(name)) break; } }
+      name = name.replace(/\s+\d+[.,]\d{2}$/, '').trim();
+      const um = mu ? [0, mu] : /(?:^|[^а-яё])(л|кг|м|шт|уп|компл)\.?(?![а-яё])/i.exec(text.slice(m.index));
+      const unit = um ? um[1].toLowerCase() : /АИ-?\d{2}|ДТ(?![а-яё])|дизел|бензин|топлив/i.test(name) ? 'л' : 'шт';
+      r.items.push({ name: name || 'Товар', qty: String(qty).replace('.', ','), unit, price: price.toFixed(2).replace('.', ',') });
+      used.add(i); if (w) { used.add(i + 1); i++; }
+      break;
+    }
+  }
+  const fuel = r.items.find(it => /АИ-?\d{2}|ДТ(?![а-яё])|дизел|бензин|топлив/i.test(it.name));
+  if (fuel) r.liters = fuel.qty;
+  else { const m = lines.map(l => /(\d+[.,]\d{1,3})\s*л(?![а-яё])/i.exec(l)).find(Boolean); if (m) r.liters = m[1]; }
+  return r;
+}
+/* recognise a receipt photo and fill the empty fields of the form; the lines stay editable */
+async function ckRecognize(file){
+  const tab = ui.ckTab || 'fuel', st = msg => { ui.ckOcr = msg; const el = $('ck-ocr'); if (el) el.innerHTML = msg; };
+  st('🔍 Ищем QR-код чека…');
+  const qr = await receiptQR(file);
+  let txt = null;
+  try {
+    // two sizes: the second one when the first gave neither goods nor a total
+    for (const w of [850, 1150, 1450]) {
+      st('🔍 Распознаём текст чека…');
+      const r = parseReceiptText(await ocrCanvases([await receiptCanvas(file, w)], m => st('🔍 ' + esc(m))));
+      // the best of the sizes: more goods, a total, goods that add up to the total
+      const score = x => x.items.length * 2 + (x.total != null ? 2 : 0) + (x.total != null && Math.abs(x.items.reduce((a, it) => a + rNum(it.qty) * rNum(it.price), 0) - x.total) < 0.01 ? 5 : 0) + (x.seller ? 1 : 0);
+      if (!txt || score(r) > score(txt)) txt = r;
+      if (txt.items.length && txt.total != null && Math.abs(txt.items.reduce((a, it) => a + rNum(it.qty) * rNum(it.price), 0) - txt.total) < 0.01) break;
+    }
+  } catch(e) { txt = txt || null; }
+  const got = [], R = { ...(txt || { items: [] }) };
+  if (qr) { R.date = qr.date; R.total = qr.sum; }
+  if (R.date && R.date <= today() && !ui.ckDateSet) { ui.ckDate = R.date; got.push('дата'); }
+  if (tab === 'fuel') {
+    if (R.total != null && !ui.ckSum) { ui.ckSum = R.total.toFixed(2).replace('.', ','); got.push('сумма'); }
+    if (R.liters && !ui.ckLiters) { ui.ckLiters = R.liters; got.push('литры'); }
+  } else {
+    if (R.seller && !ui.ckSeller) { ui.ckSeller = R.seller; got.push('продавец'); }
+    const empty = ckItems().every(it => !it.name && !it.price);
+    if (R.items.length && empty) { ui.ckItems = R.items; got.push(`строк: ${R.items.length}`); }
+    const calc = ckCalc();
+    if (R.total != null && !ui.ckSum && Math.abs(R.total - calc) > 0.009) { ui.ckSum = R.total.toFixed(2).replace('.', ','); got.push('сумма'); }
+    else if (R.total != null) got.push('итог');
+  }
+  ui.ckOcr = got.length ? `✓ Распознано${qr ? ' (QR-код и текст)' : ''}: ${got.join(', ')}. <b>Проверьте и при необходимости исправьте.</b>` : 'Не удалось распознать чек — заполните поля вручную.';
+  // the form is redrawn at once, or — while the user types in it — as soon as he leaves the field (his input is not lost)
+  st(ui.ckOcr); render();
 }
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
@@ -6352,8 +6467,9 @@ async function act(el){
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
     case 'vNew': return openDrawer('vehicle', null);
-    case 'ckTab': ui.ckTab = id; ui.ckFiles = []; ui.ckSum = ''; return render();
+    case 'ckTab': ui.ckTab = id; ui.ckFiles = []; ui.ckSum = ''; ui.ckOcr = ''; ui.ckDate = ''; ui.ckDateSet = false; return render();
     case 'ckWho': ui.ckWho = id; return render();
+    case 'ckOcr': { const f = (ui.ckFiles || [])[0]; if (!f) return; try { const blob = await (await fetch('/files/' + f.id)).blob(); ui.ckItems = null; ui.ckSum = ''; ui.ckSeller = ''; ui.ckLiters = ''; ui.ckDate = ''; ui.ckDateSet = false; await ckRecognize(new File([blob], f.name, { type: blob.type || f.type })); } catch(e) { toast(errText(e)); } return; }
     case 'ckFileDel': (ui.ckFiles || []).splice(Number(id), 1); document.activeElement?.blur(); return render();
     case 'ckRowAdd': ckItems().push({ name: '', qty: '1', unit: 'шт', price: '' }); document.activeElement?.blur(); render(); document.querySelector(`[data-cki="${ckItems().length - 1}|name"]`)?.focus(); return;
     case 'ckRowDel': ckItems().splice(Number(id), 1); document.activeElement?.blur(); return render();
@@ -6362,7 +6478,7 @@ async function act(el){
       if (id === 'fuel') { body.vehicleId = $('ck-veh').value; body.liters = $('ck-liters').value; if (!body.vehicleId) return toast('Выберите, какой транспорт заправлен'); }
       else { const j = $('ck-job').value; if (!j) return toast('Выберите, на какой вид работ покупка'); body.jobId = j === '_' ? null : j; body.work = j === '_' ? ($('ck-work')?.value || '') : ''; body.seller = $('ck-seller').value; body.items = ckItems(); }
       try { const r = await api('POST', '/api/checks', body); CHECKS.push(r.check);
-        Object.assign(ui, { ckFiles: [], ckSum: '', ckLiters: '', ckSeller: '', ckWork: '', ckItems: null }); document.activeElement?.blur(); render(); toast('Чек загружен'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+        Object.assign(ui, { ckFiles: [], ckSum: '', ckLiters: '', ckSeller: '', ckWork: '', ckItems: null, ckOcr: '', ckDate: '', ckDateSet: false }); document.activeElement?.blur(); render(); toast('Чек загружен'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'ckDel': try { await api('DELETE', '/api/checks/' + id); CHECKS = CHECKS.filter(x => x.id !== id); render(); toast('Чек удалён'); } catch(e) { toast(errText(e)); } return;
     case 'vOpen': return openDrawer('vehicle', id);
     case 'vSave': { const body = { name: $('v-name').value, plate: $('v-plate').value, vin: $('v-vin').value, year: $('v-year').value.trim(), mileage: $('v-mileage').value.replace(/\s/g, ''), toEvery: $('v-every').value.replace(/\s/g, ''), driver: $('v-driver').value, note: $('v-note').value };
@@ -6504,6 +6620,7 @@ document.addEventListener('input', e => {
   if (['ot-from', 'ot-to', 'ot-date', 'ot-note'].includes(t.id)) { if (!ui.otEdit) ui[{ 'ot-from': 'otFrom', 'ot-to': 'otTo', 'ot-date': 'otDate', 'ot-note': 'otNote' }[t.id]] = t.value; const c = $('ot-calc'); if (c) c.innerHTML = otCalcText($('ot-from').value, $('ot-to').value); return; }
   if (t.dataset && t.dataset.cki) { const [i, k] = t.dataset.cki.split('|'); ckItems()[Number(i)][k] = t.value; const it = ckItems()[Number(i)], c = $('cki-sum-' + i); if (c) c.textContent = ckMoney(ckNum(it.qty) * ckNum(it.price));
     const cc = $('ck-calc'); if (cc) cc.innerHTML = `По строкам: <b>${ckMoney(ckCalc())} ₽</b>. Если сумма чека другая (скидка, доставка) — укажите её.`; const sm = $('ck-sum'); if (sm) sm.placeholder = ckMoney(ckCalc()); return; }
+  if (t.id === 'ck-date') ui.ckDateSet = true;
   if (['ck-veh', 'ck-date', 'ck-liters', 'ck-sum', 'ck-seller', 'ck-work'].includes(t.id)) { ui[{ 'ck-veh': 'ckVeh', 'ck-date': 'ckDate', 'ck-liters': 'ckLiters', 'ck-sum': 'ckSum', 'ck-seller': 'ckSeller', 'ck-work': 'ckWork' }[t.id]] = t.value; return; }
   if (t.id === 'ck-job') { ui.ckJob = t.value; document.activeElement?.blur(); return render(); }
   if (t.id === 'trq') { ui.trq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vTransport(); const n = $('trq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -6659,8 +6776,10 @@ document.addEventListener('change', async e => {
     const keep = reqKeep();
     try { await uploadMany(files, 'reqFiles'); } catch(e) { toast(errText(e)); }
     renderDrawer(); reqRestore(keep); return; }
-  if (t.dataset.up === 'ckFile') { const files = [...t.files]; t.value = ''; if (!files.length) return;
-    try { await uploadMany(files, 'ckFiles'); } catch(e) { toast(errText(e)); } document.activeElement?.blur(); render(); return; }
+  if (t.dataset.up === 'ckFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; const first = !(ui.ckFiles || []).length;
+    try { await uploadMany(files, 'ckFiles'); } catch(e) { toast(errText(e)); } document.activeElement?.blur(); render();
+    if (first && isImageFile(files[0])) ckRecognize(files[0]).catch(() => { ui.ckOcr = 'Не удалось распознать чек — заполните поля вручную.'; render(); });
+    return; }
   if (t.dataset.up === 'vDoc') { const fl = t.files[0]; t.value = ''; if (!fl) return; const vid = t.dataset.id;
     try { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); const r = await api('POST', `/api/vehicles/${vid}/docs`, { file: { id: u.id }, title: $('vd-title')?.value.trim() || fl.name.replace(/\.[^.]+$/, ''), date: $('vd-date')?.value || '' }); trPut(r.vehicle); renderDrawer(); render(); toast('Документ загружен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'rqDoneFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; ui.rqNote = $('rq-note')?.value || '';
