@@ -320,6 +320,8 @@ const orgById = id => orgs.find(o => o.id === id);
 const ORG_TYPES = ['all', 'requests'];
 const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === 'requests' ? 'requests' : 'all'; };
 const REQ_ROLES = ['admin', 'head', 'worker'];
+const STAFF_MARKS = ['sick', 'vacation', 'late', 'early', 'absent'];
+const workCalOf = () => { const c = db.workCal && typeof db.workCal === 'object' ? db.workCal : {}; return { from: c.from || '09:00', to: c.to || '18:00', off: c.off || [], work: c.work || [] }; };
 /* «ФКУ Упрдор»: systems of a request, replaced equipment, monthly report documents */
 const UPR = require('./upr-reports.js');
 const UPR_SYS = Object.keys(UPR.SYSTEMS);
@@ -662,6 +664,9 @@ async function api(req, res, url) {
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
     // irregular working hours: an employee sees his own entries, a manager sees everyone's
     out.overtime = (Array.isArray(db.overtime) ? db.overtime : []).filter(x => HEAD(user) || x.by === user.id);
+    // the marks of the manager (sick leave, vacation, late, left early, absence) and the working schedule
+    out.staffMarks = (Array.isArray(db.staffMarks) ? db.staffMarks : []).filter(x => HEAD(user) || x.user === user.id);
+    out.workCal = workCalOf();
     if (FIELD(user)) out.notes = (db.notes || []).filter(n => n.type === 'shared' && n.assignee === user.id);
     else if (sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && ((n.share || []).includes(user.id) || n.assignee === user.id)));
     return send(res, 200, out);
@@ -915,6 +920,43 @@ async function api(req, res, url) {
       return send(res, 200, { ok: true, rev: db.rev });
     }
     return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* the manager marks an employee: sick leave and vacation (a period), late and left early (a day and a time), absence (a day) */
+  if (p[1] === 'staff-marks') {
+    if (!HEAD(user)) return fail(res, 403, 'Отметки ставит руководитель или администратор');
+    if (!Array.isArray(db.staffMarks)) db.staffMarks = [];
+    const M = db.staffMarks, D = /^\d{4}-\d{2}-\d{2}$/, T = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const clean = b => {
+      const type = String(b.type || '');
+      if (!STAFF_MARKS.includes(type)) return 'Выберите, что отметить';
+      if (!orgUsers().some(u => u.id === b.user && !u.sys)) return 'Сотрудник не найден';
+      const from = String(b.from || ''), range = type === 'sick' || type === 'vacation', to = range ? String(b.to || from) : from;
+      if (!D.test(from) || Number.isNaN(Date.parse(from))) return 'Укажите дату';
+      if (range && (!D.test(to) || to < from)) return 'Дата окончания раньше начала';
+      const time = type === 'late' || type === 'early' ? String(b.time || '') : '';
+      if ((type === 'late' || type === 'early') && !T.test(time)) return type === 'late' ? 'Укажите, во сколько пришёл' : 'Укажите, во сколько ушёл';
+      return { user: b.user, type, from, to, time, note: String(b.note || '').trim().slice(0, 1000) };
+    };
+    if (m === 'POST' && !p[2]) {
+      const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
+      const x = { id: newId(), ...v, by: user.id, at: new Date().toISOString() }; M.push(x); saveDb();
+      return send(res, 200, { ok: true, mark: x, rev: db.rev });
+    }
+    const x = p[2] && M.find(e => e.id === p[2]);
+    if (!x) return fail(res, 404, 'Отметка не найдена — обновите страницу');
+    if (m === 'PUT') { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { updatedAt: new Date().toISOString(), updatedBy: user.id }); saveDb(); return send(res, 200, { ok: true, mark: x, rev: db.rev }); }
+    if (m === 'DELETE') { db.staffMarks = M.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* the working schedule of the organization: the hours of a working day and the exceptions of the calendar */
+  if (p[1] === 'workcal' && m === 'PUT') {
+    if (!HEAD(user)) return fail(res, 403, 'График меняет руководитель или администратор');
+    const b = await readJsonBody(req), T = /^([01]\d|2[0-3]):[0-5]\d$/, D = /^\d{4}-\d{2}-\d{2}$/;
+    if (!T.test(b.from || '') || !T.test(b.to || '') || b.to <= b.from) return fail(res, 400, 'Укажите начало и окончание рабочего дня');
+    const dates = a => [...new Set((Array.isArray(a) ? a : []).filter(d => D.test(d)))].sort().slice(0, 400);
+    const off = dates(b.off), work = dates(b.work).filter(d => !off.includes(d));
+    db.workCal = { from: b.from, to: b.to, off, work }; saveDb();
+    return send(res, 200, { ok: true, workCal: db.workCal, rev: db.rev });
   }
   /* «Ненормированный рабочий день»: an employee enters the date, the start and the end of his working day and a comment;
      the manager sees the entries in «Сотрудники». The end before the start means the day went past midnight. */

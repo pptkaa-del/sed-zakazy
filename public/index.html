@@ -327,6 +327,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .docmain{flex:1;display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit;min-width:0}.docmain b{display:block;font-weight:600}.docmain small{display:block}
 .docico{flex:0 0 48px;height:48px;border-radius:6px;background:var(--stamp-soft);color:var(--stamp);display:grid;place-items:center;font-weight:700;font-size:12px}
 .rqdocs .box{margin-bottom:12px}
+.smtypes{flex-wrap:wrap}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
 .otmh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 16px;background:var(--mute-soft);font-size:14px}.otlist{list-style:none;margin:0;padding:0}.otlist li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 16px;border-top:1px solid var(--rule-2);font-size:14px;flex-wrap:wrap}.otlist li:first-child{border-top:0}.otn{color:var(--ink-2);font-size:13px;margin-top:2px;white-space:pre-wrap}.stlist li.otday{background:var(--stamp-soft);border-radius:6px}
@@ -1312,7 +1313,7 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || [];
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || !can('devs') || (isWorker() && !DEVS.length);
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -3955,17 +3956,17 @@ async function reqApi(method, url, body){
 let OVERTIME = [];
 // minutes of an entry: the end before the start — the day went past midnight
 const otMin = x => { const [a, b] = x.from.split(':').map(Number), [c, d] = x.to.split(':').map(Number); let m = c * 60 + d - (a * 60 + b); if (m <= 0) m += 1440; return m; };
-const otDur = m => `${Math.floor(m / 60)} ч${m % 60 ? ' ' + (m % 60) + ' мин' : ''}`;
+const otDur = m => m < 60 ? `${m} мин` : `${Math.floor(m / 60)} ч${m % 60 ? ' ' + (m % 60) + ' мин' : ''}`;
 const otSpan = x => `${x.from}–${x.to}${otMin(x) && x.to <= x.from ? ' <small class="dim">(до след. дня)</small>' : ''}`;
 const MONTHS_NOM_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const otMonth = ym => `${MONTHS_NOM_RU[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 const otSort = L => L.slice().sort((a, b) => b.date.localeCompare(a.date) || b.from.localeCompare(a.from));
 function vWOver(){
   const ed = ui.otEdit && OVERTIME.find(x => x.id === ui.otEdit), mine = otSort(OVERTIME.filter(x => x.by === me.id));
-  const months = [...new Set(mine.map(x => x.date.slice(0, 7)))];
+  const months = [...new Set([...mine.map(x => x.date.slice(0, 7)), ...STAFF_MARKS.filter(x => x.user === me.id).map(x => x.from.slice(0, 7))])].sort().reverse();
   return `<section class="card otform" style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-width:760px">
       <h3 style="margin:0">${ed ? 'Изменить запись' : 'Ненормированный рабочий день'}</h3>
-      <p class="dim" style="margin:0;font-size:13px">Укажите, когда вы начали и закончили работу. Если работа закончилась после полуночи, время окончания будет на следующий день — это посчитается само.</p>
+      <p class="dim" style="margin:0;font-size:13px">Обычный рабочий день — по будням с ${esc(WORK_CAL.from)} до ${esc(WORK_CAL.to)}, праздники — выходные; его вносить не нужно. Укажите, когда вы начали и закончили работу в день, когда работали сверх графика. Если работа закончилась после полуночи, время окончания будет на следующий день — это посчитается само.</p>
       <div class="otrow" data-keep>
         <label>Дата<input class="in" type="date" id="ot-date" value="${esc(ed ? ed.date : ui.otDate || today())}" max="${today()}"></label>
         <label>Начало<input class="in" type="time" id="ot-from" value="${esc(ed ? ed.from : ui.otFrom || '')}"></label>
@@ -3974,23 +3975,109 @@ function vWOver(){
       <small class="dim" id="ot-calc">${ed ? otCalcText(ed.from, ed.to) : otCalcText(ui.otFrom || '', ui.otTo || '')}</small>
       <div class="row-g"><button class="btn primary" data-act="otSave">${ed ? 'Сохранить' : 'Добавить'}</button>${ed ? '<button class="btn" data-act="otCancel">Отмена</button>' : ''}</div></section>
     ${months.length ? months.map(ym => { const L = mine.filter(x => x.date.startsWith(ym)), tot = L.reduce((a, x) => a + otMin(x), 0);
-      return `<section class="card" style="padding:0;overflow:hidden;max-width:760px;margin-top:14px"><div class="otmh"><b>${otMonth(ym)}</b><span>всего <b>${otDur(tot)}</b> · записей ${L.length}</span></div>
-        <ul class="otlist">${L.map(x => `<li><div><b>${fmtD(x.date)}</b> · ${otSpan(x)} · <b>${otDur(otMin(x))}</b>${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}</div>
+      const ext = L.reduce((a, x) => a + otExtra(x), 0), mk = marksOf(me.id, ym);
+      return `<section class="card" style="padding:0;overflow:hidden;max-width:760px;margin-top:14px"><div class="otmh"><b>${otMonth(ym)}</b><span>всего <b>${otDur(tot)}</b>, сверх графика <b>${otDur(ext)}</b> · записей ${L.length}</span></div>
+        ${mk.length ? `<ul class="stlist" style="padding:8px 16px;margin:0">${mk.map(x => markLine(x)).join('')}</ul>` : ''}
+        <ul class="otlist">${L.map(x => `<li><div><b>${fmtD(x.date)}</b> <small class="dim">${DAY_KIND[dayKind(x.date)]}</small> · ${otSpan(x)} · <b>${otDur(otMin(x))}</b>${otExtra(x) ? ` <small class="dim">сверх графика ${otDur(otExtra(x))}</small>` : ''}${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}</div>
           <div class="row-g"><button class="btn sm" data-act="otEdit" data-id="${x.id}">Изменить</button>${armBtn('otd:' + x.id, 'Удалить', 'otDel', x.id, 'btn sm ghost')}</div></li>`).join('')}</ul></section>`; }).join('')
       : '<div class="empty" style="max-width:760px;margin-top:14px"><h3>Записей пока нет</h3>Добавьте дату, время начала и окончания рабочего дня.</div>'}`;
 }
 function otCalcText(f, t){
   if (!f || !t) return 'Продолжительность посчитается, когда будут указаны начало и окончание.';
   if (f === t) return 'Начало и окончание совпадают.';
-  const m = otMin({ from: f, to: t });
-  return `Продолжительность: <b>${otDur(m)}</b>${t <= f ? ' (окончание на следующий день)' : ''}`;
+  const x = { from: f, to: t, date: $('ot-date')?.value || today() }, m = otMin(x), e = otExtra(x);
+  return `Продолжительность: <b>${otDur(m)}</b>${t <= f ? ' (окончание на следующий день)' : ''} · ${DAY_KIND[dayKind(x.date)]} · сверх графика <b>${otDur(e)}</b>`;
 }
 /* in «Сотрудники»: the manager sees the irregular hours of the month of the chosen day */
 function otStaffBlock(u, day){
-  const ym = day.slice(0, 7), L = otSort(OVERTIME.filter(x => x.by === u.id && x.date.startsWith(ym)));
-  if (!L.length) return '';
-  const tot = L.reduce((a, x) => a + otMin(x), 0);
-  return `<h4 class="sub-h">Ненормированный рабочий день · ${otMonth(ym).toLowerCase()} · всего ${otDur(tot)}</h4><ul class="stlist">${L.map(x => `<li class="${x.date === day ? 'otday' : ''}"><small><b>${fmtD(x.date)}</b> · ${otSpan(x)} · <b>${otDur(otMin(x))}</b>${x.note ? ' · ' + esc(x.note) : ''}</small></li>`).join('')}</ul>`;
+  const ym = day.slice(0, 7), L = otSort(OVERTIME.filter(x => x.by === u.id && x.date.startsWith(ym))), mk = marksOf(u.id, ym);
+  let h = '';
+  if (mk.length) h += `<h4 class="sub-h">Отметки · ${otMonth(ym).toLowerCase()}</h4><ul class="stlist">${mk.map(x => markLine(x, true)).join('')}</ul>`;
+  if (L.length) {
+    const tot = L.reduce((a, x) => a + otMin(x), 0), ext = L.reduce((a, x) => a + otExtra(x), 0);
+    h += `<h4 class="sub-h">Ненормированный рабочий день · ${otMonth(ym).toLowerCase()} · всего ${otDur(tot)}, сверх графика ${otDur(ext)}</h4><ul class="stlist">${L.map(x => `<li class="${x.date === day ? 'otday' : ''}"><small><b>${fmtD(x.date)}</b> <span class="dim">${DAY_KIND[dayKind(x.date)]}</span> · ${otSpan(x)} · <b>${otDur(otMin(x))}</b>${otExtra(x) ? ` · сверх графика <b>${otDur(otExtra(x))}</b>` : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></li>`).join('')}</ul>`;
+  }
+  return h;
+}
+/* ---------- the working schedule: weekdays from 9:00 to 18:00, weekends and public holidays are days off ---------- */
+let STAFF_MARKS = [], WORK_CAL = { from: '09:00', to: '18:00', off: [], work: [] };
+// public holidays of Russia (Labour Code, art. 112); a holiday on a weekend moves to the next working day (except 1–8 January)
+const HOL_FIXED = ['01-01', '01-02', '01-03', '01-04', '01-05', '01-06', '01-07', '01-08', '02-23', '03-08', '05-01', '05-09', '06-12', '11-04'];
+const HOL_NAMES = { '01-01': 'Новогодние каникулы', '01-07': 'Рождество Христово', '02-23': 'День защитника Отечества', '03-08': 'Международный женский день', '05-01': 'Праздник Весны и Труда', '05-09': 'День Победы', '06-12': 'День России', '11-04': 'День народного единства' };
+// transfers of days off by the government decrees (they change every year)
+const HOL_DECREE = { 2026: { off: ['2026-01-09', '2026-12-31'], work: [] } };
+const ymdOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const dayOf = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const calCache = {};
+function holidaysOf(y){
+  if (calCache[y]) return calCache[y];
+  const hol = new Map(HOL_FIXED.map(md => [`${y}-${md}`, HOL_NAMES[md] || 'Новогодние каникулы']));
+  const isWe = d => d.getDay() === 0 || d.getDay() === 6;
+  for (const md of HOL_FIXED.filter(x => !x.startsWith('01-'))) {
+    const d = dayOf(`${y}-${md}`); if (!isWe(d)) continue;
+    const n = new Date(d); do n.setDate(n.getDate() + 1); while (isWe(n) || hol.has(ymdOf(n)));
+    hol.set(ymdOf(n), 'Перенос выходного: ' + HOL_NAMES[md].toLowerCase());
+  }
+  for (const s of (HOL_DECREE[y] || {}).off || []) hol.set(s, 'Перенос выходного');
+  return calCache[y] = hol;
+}
+// 'work' | 'off' (a weekend) | 'hol' (a holiday); the manager's exceptions win
+function dayKind(s){
+  if ((WORK_CAL.work || []).includes(s)) return 'work';
+  if ((WORK_CAL.off || []).includes(s)) return 'hol';
+  const y = Number(s.slice(0, 4)), d = dayOf(s);
+  if (((HOL_DECREE[y] || {}).work || []).includes(s)) return 'work';
+  if (holidaysOf(y).has(s)) return 'hol';
+  return d.getDay() === 0 || d.getDay() === 6 ? 'off' : 'work';
+}
+const DAY_KIND = { work: 'рабочий день', off: 'выходной', hol: 'праздничный день' };
+const hm = s => { const [a, b] = s.split(':').map(Number); return a * 60 + b; };
+// the minutes of an entry outside the schedule: on a working day — before the start and after the end of the day; on a day off — all of it
+function otExtra(x){
+  const a = hm(x.from), dur = otMin(x), b = a + dur;
+  if (dayKind(x.date) !== 'work') return dur;
+  const S = hm(WORK_CAL.from), E = hm(WORK_CAL.to), inside = Math.max(0, Math.min(b, E) - Math.max(a, S));
+  return dur - inside;
+}
+/* the marks of the manager */
+const MARK_T = { sick: 'Больничный', vacation: 'Отпуск', late: 'Опоздание', early: 'Ушёл раньше', absent: 'Невыход на работу' };
+const MARK_C = { sick: 'c-info', vacation: 'c-ok', late: 'c-warn', early: 'c-warn', absent: 'c-bad' };
+const markDays = x => { let n = 0; for (let d = dayOf(x.from); ymdOf(d) <= x.to; d.setDate(d.getDate() + 1)) if (dayKind(ymdOf(d)) === 'work') n++; return n; };
+function markText(x){
+  if (x.type === 'sick' || x.type === 'vacation') { const n = markDays(x); return `${x.from === x.to ? fmtD(x.from) : fmtD(x.from) + ' – ' + fmtD(x.to)} · рабочих дней ${n}`; }
+  if (x.type === 'late') { const m = hm(x.time) - hm(WORK_CAL.from); return `${fmtD(x.from)} · пришёл в ${x.time}${m > 0 ? ' · на ' + otDur(m) : ''}`; }
+  if (x.type === 'early') { const m = hm(WORK_CAL.to) - hm(x.time); return `${fmtD(x.from)} · ушёл в ${x.time}${m > 0 ? ' · на ' + otDur(m) + ' раньше' : ''}`; }
+  return fmtD(x.from);
+}
+const marksOf = (uid, ym) => STAFF_MARKS.filter(x => x.user === uid && x.from.slice(0, 7) <= ym && x.to.slice(0, 7) >= ym).sort((a, b) => b.from.localeCompare(a.from));
+const markOn = (uid, day) => STAFF_MARKS.find(x => x.user === uid && x.from <= day && x.to >= day && ['sick', 'vacation', 'absent'].includes(x.type));
+const markLine = (x, edit) => `<li><span class="chip ${MARK_C[x.type]}">${MARK_T[x.type]}</span> <small>${markText(x)}${x.note ? ' · ' + esc(x.note) : ''}</small>${edit ? ` <button class="linkish" data-act="smEdit" data-id="${x.id}">изменить</button>` : ''}</li>`;
+function markFormHtml(x, uid){
+  const t = ui.smType || x?.type || 'late', range = t === 'sick' || t === 'vacation', u = STAFF.find(s => s.id === (x?.user || uid));
+  return `<div class="d-body"><p style="margin:0"><b>${esc(u ? u.name : '')}</b></p>
+    <div class="seg smtypes" role="group" aria-label="Что отметить">${Object.entries(MARK_T).map(([k, l]) => `<button type="button" data-act="smType" data-id="${k}" class="${t === k ? 'on' : ''}" aria-pressed="${t === k}">${l}</button>`).join('')}</div>
+    <div class="form" data-keep>
+      <label>${range ? 'С' : 'Дата'}<input class="in" type="date" id="sm-from" value="${esc(x?.from || ui.stDay || today())}"></label>
+      ${range ? `<label>По (включительно)<input class="in" type="date" id="sm-to" value="${esc(x?.to || x?.from || ui.stDay || today())}"></label>` : ''}
+      ${t === 'late' ? `<label>Пришёл в<input class="in" type="time" id="sm-time" value="${esc(x?.time || '')}"></label>` : t === 'early' ? `<label>Ушёл в<input class="in" type="time" id="sm-time" value="${esc(x?.time || '')}"></label>` : ''}
+      <label class="wide">Комментарий<input class="in" id="sm-note" maxlength="1000" value="${esc(x?.note || '')}" placeholder="${range ? 'Номер листка нетрудоспособности, приказ…' : 'Причина'}"></label></div>
+    <small class="dim">Рабочий день по графику: ${esc(WORK_CAL.from)}–${esc(WORK_CAL.to)} по будням, праздники — выходные.</small>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="smSave" data-id="${x ? x.id : ''}">${x ? 'Сохранить' : 'Отметить'}</button>${x ? armBtn('smd:' + x.id, 'Удалить отметку', 'smDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
+}
+function workCalHtml(){
+  const y = Number((ui.stDay || today()).slice(0, 4)), H = [...holidaysOf(y)].sort((a, b) => a[0].localeCompare(b[0]));
+  const C = ui.wcDraft || WORK_CAL, ex = [...(C.off || []).map(d => [d, 'hol']), ...(C.work || []).map(d => [d, 'work'])].sort((a, b) => a[0].localeCompare(b[0]));
+  return `<div class="d-body">
+    <div class="box"><h4>Рабочий день</h4><div class="row-g" data-keep><label>Начало<input class="in" type="time" id="wc-from" value="${esc(C.from)}"></label><label>Окончание<input class="in" type="time" id="wc-to" value="${esc(C.to)}"></label></div>
+      <small class="dim">По будням. Суббота и воскресенье — выходные. Время сверх графика в записях «ненормированного дня» считается от этих часов; работа в выходной или праздник — целиком сверх графика.</small></div>
+    <div class="box"><h4>Праздничные дни ${y} года</h4><ul class="calhol">${H.map(([d, n]) => `<li><b>${fmtD(d)}</b> <small class="dim">${['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][dayOf(d).getDay()]} · ${esc(n)}</small></li>`).join('')}</ul>
+      <small class="dim">По Трудовому кодексу (ст. 112) с переносами выходных. Если правительство перенесло дни иначе — добавьте исключения ниже.</small></div>
+    <div class="box"><h4>Исключения</h4>
+      ${ex.length ? `<ul class="calhol">${ex.map(([d, k]) => `<li><b>${fmtD(d)}</b> <span class="chip ${k === 'work' ? 'c-warn' : 'c-ok'}">${k === 'work' ? 'рабочий' : 'выходной'}</span> <button class="linkish" data-act="wcExDel" data-id="${d}">убрать</button></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Нет</p>'}
+      <div class="row-g" data-keep><input class="in" type="date" id="wc-date" style="width:auto"><button class="btn sm" data-act="wcEx" data-id="hol">+ Выходной</button><button class="btn sm" data-act="wcEx" data-id="work">+ Рабочий день</button></div></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="wcSave">Сохранить</button><button class="btn" data-act="close">Закрыть</button></div></div>`;
 }
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 function vStaff(){
@@ -4001,18 +4088,20 @@ function vStaff(){
     const doneAll = S.jobs.flatMap(j => (j.places || []).filter(x => x.doneAt && (x.doneBy === u.id || (!x.doneBy && x.assignee === u.id))).map(x => ({ j, x })));
     const doneDay = doneAll.filter(({ x }) => localDay(x.doneAt) === day);
     const tasks = S.tasks.filter(t => !t.done && (t.staff || []).includes(u.id) && t.end >= day);
-    const otM = OVERTIME.filter(x => x.by === u.id && x.date.startsWith(day.slice(0, 7))).reduce((a, x) => a + otMin(x), 0);
-    return { u, jobs, mine, doneAll, doneDay, tasks, otM, open: jobs.reduce((a, j) => a + mine(j).filter(x => !x.doneAt).length, 0) };
-  }).filter(r => r.jobs.length || r.tasks.length || r.doneAll.length || r.otM || ['worker', 'contractor'].includes(r.u.role))
+    const otM = OVERTIME.filter(x => x.by === u.id && x.date.startsWith(day.slice(0, 7))).reduce((a, x) => a + otExtra(x), 0), mkN = marksOf(u.id, day.slice(0, 7)).length;
+    return { u, jobs, mine, doneAll, doneDay, tasks, otM, mkN, open: jobs.reduce((a, j) => a + mine(j).filter(x => !x.doneAt).length, 0) };
+  }).filter(r => r.jobs.length || r.tasks.length || r.doneAll.length || r.otM || r.mkN || ['worker', 'contractor'].includes(r.u.role))
     .sort((a, b) => b.doneDay.length - a.doneDay.length || b.open - a.open || a.u.name.localeCompare(b.u.name, 'ru'));
   const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="stq" type="search" aria-label="Поиск сотрудника" value="${esc(ui.stq || '')}" style="flex:1 1 200px;max-width:300px"></span>
     <label style="display:flex;gap:8px;align-items:center;font-size:14px">День<input class="in" type="date" id="st-day" value="${day}" max="${today()}" style="width:auto"></label>
     <button class="btn sm" data-act="stDay" data-id="${today()}">Сегодня</button><button class="btn sm" data-act="stDay" data-id="${localDay(Date.now() - 864e5)}">Вчера</button>
+    <button class="btn sm" data-act="workCal">📅 График работы</button><span class="dim">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}</span>
     <span class="dim">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}: <b>${rows.reduce((a, r) => a + r.doneDay.length, 0)}</b></span></div>`;
   if (!rows.length) return head + '<div class="empty"><h3>Сотрудников нет</h3>Добавьте пользователей с ролью «Сотрудник» или «Подрядчик» на вкладке «Пользователи».</div>';
   return head + rows.map(r => `<section class="card staffc">
-    <div class="ch"><div><h3 style="margin:0">${esc(r.u.name)}</h3><small class="dim">${esc(ROLE_NAMES[r.u.role] || '')}</small></div>
-      <div class="stnums"><div><b class="${r.doneDay.length ? 'ok-t' : ''}">${r.doneDay.length}</b><small>сделано за ${day === today() ? 'сегодня' : fmtD(day)}</small></div><div><b>${r.open}</b><small>точек в работе</small></div><div><b>${r.doneAll.length}</b><small>всего сделано</small></div>${r.otM ? `<div><b>${otDur(r.otM)}</b><small>ненорм. день за месяц</small></div>` : ''}</div></div>
+    <div class="ch"><div><h3 style="margin:0">${esc(r.u.name)}</h3><small class="dim">${esc(ROLE_NAMES[r.u.role] || '')}</small>${(() => { const x = markOn(r.u.id, day); return x ? ` <span class="chip ${MARK_C[x.type]}">${x.type === 'sick' ? 'на больничном' : x.type === 'vacation' ? 'в отпуске' : 'не вышел'}</span>` : ''; })()}
+      <div style="margin-top:6px"><button class="btn sm" data-act="smNew" data-id="${r.u.id}">+ Отметка</button></div></div>
+      <div class="stnums"><div><b class="${r.doneDay.length ? 'ok-t' : ''}">${r.doneDay.length}</b><small>сделано за ${day === today() ? 'сегодня' : fmtD(day)}</small></div><div><b>${r.open}</b><small>точек в работе</small></div><div><b>${r.doneAll.length}</b><small>всего сделано</small></div>${r.otM ? `<div><b>${otDur(r.otM)}</b><small>сверх графика за месяц</small></div>` : ''}</div></div>
     ${r.jobs.length ? `<h4 class="sub-h">Назначено</h4><ul class="stlist">${r.jobs.map(j => { const m = r.mine(j), left = m.filter(x => !x.doneAt), cp = cpOf(j.customerId); return `<li><button class="linkish" data-act="openJob" data-id="${j.id}"><b>№ ${jobNo(j)} · ${esc(j.title)}</b></button> <span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>
       <small class="dim">${[cp && cp.name, m.length ? `точек ${m.length}, осталось ${left.length}` : '', j.due && 'срок ' + fmtD(j.due)].filter(Boolean).map(esc).join(' · ')}</small>
       ${left.length ? `<small class="dim">Где: ${left.slice(0, 4).map(x => esc(x.label || (x.lat.toFixed(4) + ', ' + x.lng.toFixed(4)))).join('; ')}${left.length > 4 ? ` и ещё ${left.length - 4}` : ''}</small>` : ''}</li>`; }).join('')}</ul>` : ''}
@@ -4809,6 +4898,8 @@ function renderDrawer(){
       ${r.full ? '<p class="ok-t" style="margin:0">✓ По этой точке всё сделано.</p>' : ''}
     </div>`;
   }
+  if (d.kind === 'staffMark') { const x = STAFF_MARKS.find(m => m.id === d.id); D.innerHTML = dh(x ? 'Изменить отметку' : 'Отметка сотруднику') + markFormHtml(x, d.ctx); return; }
+  if (d.kind === 'workCal') { D.innerHTML = dh('График работы') + workCalHtml(); return; }
   if (d.kind === 'prefs') {
     const th = PREFS.theme || themeGet(), sc = PREFS.scale || 1, field = isWorker() || me.sys;
     const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40', pink:'#C2306E', engineer:'#123A5E', upr:'linear-gradient(180deg,#0B2A57 70%,#fff 70%,#fff 80%,#0D4C92 80%,#0D4C92 90%,#D52B1E 90%)', anime:'linear-gradient(135deg,#FF7EB6,#B48CFF 55%,#7FD3FF)' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком', pink:'Розовая', engineer:'Инженерная', upr:'ФКУ Упрдор', anime:'Аниме' };
@@ -5855,6 +5946,20 @@ async function act(el){
       try { const ed = ui.otEdit, r = await api(ed ? 'PUT' : 'POST', '/api/overtime' + (ed ? '/' + ed : ''), body);
         if (ed) { const i = OVERTIME.findIndex(x => x.id === ed); if (i >= 0) OVERTIME[i] = r.entry; } else OVERTIME.push(r.entry);
         ui.otEdit = null; ui.otFrom = ui.otTo = ui.otNote = ''; ui.otDate = body.date; document.activeElement?.blur(); render(); toast(ed ? 'Запись изменена' : 'Записано: ' + otDur(otMin(r.entry))); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+    case 'smNew': ui.smType = 'late'; return openDrawer('staffMark', null, id);
+    case 'smEdit': ui.smType = null; return openDrawer('staffMark', id);
+    case 'smType': { const keep = { f: $('sm-from')?.value, t: $('sm-to')?.value, n: $('sm-note')?.value }; ui.smType = id; renderDrawer(); if ($('sm-from') && keep.f) $('sm-from').value = keep.f; if ($('sm-to') && (keep.t || keep.f)) $('sm-to').value = keep.t || keep.f; if ($('sm-note')) $('sm-note').value = keep.n || ''; return; }
+    case 'smSave': { const d = ui.drawer, x = STAFF_MARKS.find(m => m.id === id), type = ui.smType || x?.type || 'late';
+      const body = { user: x ? x.user : d.ctx, type, from: $('sm-from').value, to: $('sm-to')?.value || $('sm-from').value, time: $('sm-time')?.value || '', note: $('sm-note').value.trim() };
+      try { const r = await api(x ? 'PUT' : 'POST', '/api/staff-marks' + (x ? '/' + x.id : ''), body);
+        if (x) Object.assign(x, r.mark); else STAFF_MARKS.push(r.mark); closeDrawer(); render(); toast(MARK_T[type] + ': отмечено'); refresh().catch(() => {}); }
+      catch(e) { $('ferr').textContent = errText(e); } return; }
+    case 'smDel': try { await api('DELETE', '/api/staff-marks/' + id); STAFF_MARKS = STAFF_MARKS.filter(m => m.id !== id); closeDrawer(); render(); toast('Отметка удалена'); } catch(e) { toast(errText(e)); } return;
+    case 'workCal': ui.wcDraft = JSON.parse(JSON.stringify(WORK_CAL)); return openDrawer('workCal');
+    case 'wcEx': { const d = $('wc-date')?.value; if (!d) return toast('Выберите дату'); const k = id === 'work' ? 'work' : 'off', o = k === 'work' ? 'off' : 'work';
+      const C = ui.wcDraft; ui.wcDraft = { ...C, from: $('wc-from').value || C.from, to: $('wc-to').value || C.to, [k]: [...new Set([...(C[k] || []), d])].sort(), [o]: (C[o] || []).filter(x => x !== d) }; return renderDrawer(); }
+    case 'wcExDel': { const C = ui.wcDraft; ui.wcDraft = { ...C, from: $('wc-from').value || C.from, to: $('wc-to').value || C.to, off: (C.off || []).filter(x => x !== id), work: (C.work || []).filter(x => x !== id) }; return renderDrawer(); }
+    case 'wcSave': try { const r = await api('PUT', '/api/workcal', { ...ui.wcDraft, from: $('wc-from').value, to: $('wc-to').value }); WORK_CAL = r.workCal; ui.wcDraft = null; closeDrawer(); render(); toast('График сохранён'); refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return;
     case 'otEdit': ui.otEdit = id; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
     case 'otCancel': ui.otEdit = null; return render();
     case 'otDel': try { await api('DELETE', '/api/overtime/' + id); OVERTIME = OVERTIME.filter(x => x.id !== id); if (ui.otEdit === id) ui.otEdit = null; render(); toast('Запись удалена'); } catch(e) { toast(errText(e)); } return;
@@ -6052,6 +6157,7 @@ document.addEventListener('input', e => {
   if (t.id === 'afq') { ui.afq = t.value; const pos = t.selectionStart; $('view').innerHTML = adminTabs() + vAdmFiles(); const n = $('afq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'iq') { ui.iq = t.value; const pos = t.selectionStart; $('view').innerHTML = stockTabs() + vIncView(); const n = $('iq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'devq') { ui.devQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vDevs(); const n = $('devq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'wc-from' || t.id === 'wc-to') return;
   if (['ot-from', 'ot-to', 'ot-date', 'ot-note'].includes(t.id)) { if (!ui.otEdit) ui[{ 'ot-from': 'otFrom', 'ot-to': 'otTo', 'ot-date': 'otDate', 'ot-note': 'otNote' }[t.id]] = t.value; const c = $('ot-calc'); if (c) c.innerHTML = otCalcText($('ot-from').value, $('ot-to').value); return; }
   if (t.id === 'raq') { ui.raQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReqAll(); const n = $('raq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'rq-text' && $('rq-count')) $('rq-count').textContent = t.value.length;
