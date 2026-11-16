@@ -320,6 +320,20 @@ const orgById = id => orgs.find(o => o.id === id);
 const ORG_TYPES = ['all', 'requests'];
 const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === 'requests' ? 'requests' : 'all'; };
 const REQ_ROLES = ['admin', 'head', 'worker'];
+/* «ФКУ Упрдор»: systems of a request, replaced equipment, monthly report documents */
+const UPR = require('./upr-reports.js');
+const UPR_SYS = Object.keys(UPR.SYSTEMS);
+const REPORTS = new Map();
+const reqCfgOf = () => { const c = db.reqCfg && typeof db.reqCfg === 'object' ? db.reqCfg : {}; return { tz: c.tz || 'Europe/Moscow', contract: { ...UPR.DEFAULT_CONTRACT, ...(c.contract || {}), prices: { ...UPR.DEFAULT_CONTRACT.prices, ...((c.contract || {}).prices || {}) } }, tg: c.tg || {}, devToken: c.devToken || '' }; };
+/* a message to the Telegram chat of the organization (when the administrator set it up); never blocks the request */
+function reqNotify(text) {
+  const tg = reqCfgOf().tg; if (!tg.token || !tg.chat) return;
+  const body = JSON.stringify({ chat_id: tg.chat, text: ((tg.prefix ? tg.prefix + ': ' : '') + text).slice(0, 4000) });
+  try {
+    const rq = require('node:https').request({ host: 'api.telegram.org', path: `/bot${encodeURIComponent(tg.token)}/sendMessage`, method: 'POST', timeout: 8000, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, r => r.resume());
+    rq.on('error', e => console.error('Telegram:', e.message)); rq.on('timeout', () => rq.destroy()); rq.end(body);
+  } catch (e) { console.error('Telegram:', e.message); }
+}
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
 const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared', 'draw'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
@@ -359,7 +373,8 @@ function fileUsage(){
     for (const n of db.notes || []) for (const f of n.files || []) add(f.id, n.type === 'shared' ? 'Общая задача' : 'Заметка');
     for (const d of Object.values(db.devs || {})) for (const f of d.files || []) add(f.id, `Разработка № ${d.no || ''} · ${d.name || ''}`);
     for (const t of Object.values(db.labels || {})) for (const x of t.items || []) if (x.img) add(x.img.id, `Этикетка «${t.name}»`);
-    for (const r of Object.values(db.requests || {})) for (const f of r.files || []) add(f.id, `Заявка № ${r.no || ''}`);
+    for (const r of Object.values(db.requests || {})) for (const f of [...(r.files || []), ...(r.doneFiles || [])]) add(f.id, `Заявка № ${r.no || ''}`);
+    for (const d of db.reqDocs || []) if (d.file) add(d.file.id, `Инструкция «${d.title}»`);
     for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
   return used;
 }
@@ -635,6 +650,8 @@ async function api(req, res, url) {
     if (orgType(user) === 'requests') {
       out.requests = Object.entries(db.requests || {}).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r));
       out.reqUsers = orgUsers().filter(u => !u.blocked && !u.sys).map(u => ({ id: u.id, name: u.name, role: u.role }));
+      out.reqDocs = Array.isArray(db.reqDocs) ? db.reqDocs : [];
+      out.devReadings = Array.isArray(db.devReadings) ? db.devReadings.slice(-10).reverse() : [];
     }
     out.devs = sees(user, 'devs') ? Object.entries(db.devs || {}).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d)) : [];
     out.labels = FIELD(user) || !sees(user, 'works:labels') ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
@@ -799,13 +816,17 @@ async function api(req, res, url) {
     const out = (id, r) => ({ ok: true, request: { id, ...r }, rev: db.rev });
     if (m === 'GET' && !p[2]) return send(res, 200, Object.entries(R).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r)));
     if (m === 'POST' && !p[2]) {
-      const b = await readJsonBody(req), title = String(b.title || '').trim().slice(0, 200);
-      if (!title) return fail(res, 400, 'Напишите, что нужно сделать');
+      const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 4000);
+      // the title is the first line of the description when it is not given
+      const title = (String(b.title || '').trim() || text.split('\n')[0]).slice(0, 200);
+      if (!title) return fail(res, 400, 'Опишите проблему');
+      if (b.system !== undefined && b.system !== '' && !UPR_SYS.includes(b.system)) return fail(res, 400, 'Выберите систему');
       if (b.assignee && !okUser(b.assignee)) return fail(res, 400, 'Исполнитель не найден');
       const id = newId(), no = Math.max(0, ...Object.values(R).map(r => r.no || 0)) + 1;
-      R[id] = { no, title, text: String(b.text || '').trim().slice(0, 4000), due: /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : '', urgent: !!b.urgent,
+      R[id] = { no, title, text, system: b.system || '', due: /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : '', urgent: !!b.urgent,
         assignee: b.assignee || null, files: cleanFiles(b.files), status: 'new', by: user.id, at: now, comments: [], history: [{ at: now, by: user.id, act: 'created', to: b.assignee || null }] };
       saveDb();
+      reqNotify(`Новая заявка №${no}${b.system ? ' (' + UPR.SYSTEMS[b.system] + ')' : ''}.\n${text || title}\nЗаявитель: ${user.name}${R[id].files.length ? `\nФото и файлов: ${R[id].files.length}` : ''}`);
       return send(res, 200, out(id, R[id]));
     }
     const r = p[2] && R[p[2]];
@@ -827,13 +848,42 @@ async function api(req, res, url) {
         if (r.status !== 'new') return fail(res, 409, 'Заявка уже в работе или закрыта');
         if (!r.assignee) r.assignee = user.id;
         r.status = 'work'; r.takenAt = now; log('take');
-      } else if (act === 'done') {
-        if (!(executor || boss)) return fail(res, 403, 'Отметить выполнение может исполнитель заявки');
+      } else if (act === 'done' || act === 'reject') {
+        // «Выполнена» or «Отклонена»: what was done (or why it is rejected), the replaced equipment and the photos of the result
+        if (!(executor || boss)) return fail(res, 403, 'Закрыть заявку может исполнитель заявки');
         if (!['new', 'work'].includes(r.status)) return fail(res, 409, 'Заявка уже закрыта');
-        r.status = 'done'; r.doneAt = now; r.doneBy = user.id; r.doneNote = note; log('done');
+        if (note.length < 3) return fail(res, 400, act === 'done' ? 'Опишите, что было сделано' : 'Напишите причину отклонения');
+        let repl = [];
+        if (act === 'done' && Array.isArray(b.repl)) {
+          if (b.repl.length > 15) return fail(res, 400, 'Слишком много замен (не более 15)');
+          for (const [i, x] of b.repl.entries()) {
+            const cat = String(x && x.category || '').trim(), nw = String(x && x.newSerial || '').trim().slice(0, 100), old = String(x && x.oldSerial || '').trim().slice(0, 100), eq = String(x && x.equipment || '').trim().slice(0, 200);
+            if (!UPR.EQUIPMENT.includes(cat)) return fail(res, 400, `Замена № ${i + 1}: выберите оборудование из списка`);
+            if (!nw || !old) return fail(res, 400, `Замена № ${i + 1}: укажите серийные номера нового и старого оборудования`);
+            repl.push({ category: cat, equipment: eq || cat, newSerial: nw, oldSerial: old });
+          }
+        }
+        r.status = act; r.doneAt = now; r.doneBy = user.id; r.doneNote = note; r.repl = repl; r.doneFiles = cleanFiles(b.files); log(act);
+        reqNotify(`Заявка №${r.no} ${act === 'done' ? 'закрыта' : 'отклонена'}${r.system ? ' (' + UPR.SYSTEMS[r.system] + ')' : ''}.\nОтвет исполнителя: ${note.slice(0, 700)}${repl.length ? '\nЗамен оборудования: ' + repl.length : ''}\nИсполнитель: ${user.name}`);
+      } else if (act === 'photos') {
+        // more photos to an open request: its author, executor or a manager
+        if (!(author || executor || boss)) return fail(res, 403, 'Добавить фото может автор или исполнитель заявки');
+        if (!['new', 'work'].includes(r.status)) return fail(res, 409, 'Заявка уже закрыта');
+        const add = cleanFiles(b.files); if (!add.length) return fail(res, 400, 'Выберите фото');
+        r.files = cleanFiles([...(r.files || []), ...add]); log('photos');
+      } else if (act === 'dates') {
+        // the administrator corrects the date of creation and closing
+        if (user.role !== 'admin') return fail(res, 403, 'Только администратор может менять даты');
+        const at = Date.parse(b.at), dn = b.doneAt ? Date.parse(b.doneAt) : null;
+        if (!Number.isFinite(at)) return fail(res, 400, 'Укажите корректную дату создания');
+        const closed = ['done', 'reject', 'cancel'].includes(r.status);
+        if (closed && !Number.isFinite(dn)) return fail(res, 400, 'У закрытой заявки должна быть дата закрытия');
+        if (closed && dn < at) return fail(res, 400, 'Дата закрытия раньше даты создания');
+        r.at = new Date(at).toISOString(); if (closed) { const k = r.status === 'cancel' ? 'cancelAt' : 'doneAt'; r[k] = new Date(dn).toISOString(); }
+        log('dates');
       } else if (act === 'reopen') {
         if (!(author || boss)) return fail(res, 403, 'Вернуть заявку в работу может её автор');
-        if (!['done', 'cancel'].includes(r.status)) return fail(res, 409, 'Заявка не закрыта');
+        if (!['done', 'cancel', 'reject'].includes(r.status)) return fail(res, 409, 'Заявка не закрыта');
         r.status = r.assignee ? 'work' : 'new'; r.doneAt = null; r.doneBy = null; log('reopen');
       } else if (act === 'cancel') {
         if (!(author || boss)) return fail(res, 403, 'Отменить заявку может её автор');
@@ -851,6 +901,7 @@ async function api(req, res, url) {
         if (b.due !== undefined) r.due = /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : '';
         if (b.urgent !== undefined) r.urgent = !!b.urgent;
         if (b.files !== undefined) r.files = cleanFiles(b.files);
+        if (b.system !== undefined) { if (b.system && !UPR_SYS.includes(b.system)) return fail(res, 400, 'Выберите систему'); r.system = b.system || ''; }
         log('edit');
       } else return fail(res, 400, 'Неизвестное действие');
       saveDb();
@@ -862,6 +913,79 @@ async function api(req, res, url) {
       return send(res, 200, { ok: true, rev: db.rev });
     }
     return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Инструкции» of a requests organization: everyone reads, the administrator adds and removes */
+  if (p[1] === 'req-docs') {
+    if (orgType(user) !== 'requests') return fail(res, 403, 'Инструкции есть только в системе «Управление заявками»');
+    if (user.role !== 'admin') return fail(res, 403, 'Инструкции добавляет администратор');
+    if (!Array.isArray(db.reqDocs)) db.reqDocs = [];
+    if (m === 'POST' && !p[2]) {
+      const b = await readJsonBody(req), title = String(b.title || '').trim().slice(0, 200), f = b.file && db.files[b.file.id];
+      if (!title) return fail(res, 400, 'Напишите название');
+      if (!f) return fail(res, 400, 'Выберите файл');
+      const d = { id: newId(), title, file: { id: b.file.id, name: f.name, type: f.type, size: f.size }, at: new Date().toISOString(), by: user.id };
+      db.reqDocs.push(d); saveDb();
+      return send(res, 200, { ok: true, doc: d, rev: db.rev });
+    }
+    if (m === 'DELETE' && p[2]) { db.reqDocs = db.reqDocs.filter(d => d.id !== p[2]); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* settings of a requests organization (the administrator): the contract for the reports, the time zone, Telegram, the key of the devices */
+  if (p[1] === 'req-cfg') {
+    if (orgType(user) !== 'requests' || user.role !== 'admin') return fail(res, 403, 'Настройки меняет администратор');
+    if (m === 'GET') return send(res, 200, reqCfgOf());
+    if (m === 'PUT') {
+      const b = await readJsonBody(req), c = reqCfgOf(), money = v => /^\d{1,9}([.,]\d{1,2})?$/.test(String(v ?? '').trim()) ? String(v).trim().replace(',', '.') : null;
+      if (b.contract) {
+        const k = b.contract, prices = {};
+        for (const s of UPR_SYS) { const v = money(k.prices && k.prices[s]); if (v === null) return fail(res, 400, 'Цена за день: число, например 365.28'); prices[s] = v; }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(k.date || '')) return fail(res, 400, 'Укажите дату контракта');
+        const vat = Number(k.vat); if (!(vat >= 0 && vat <= 100)) return fail(res, 400, 'Ставка НДС от 0 до 100');
+        const prev = k.prevTotal === '' || k.prevTotal == null ? '' : money(k.prevTotal); if (prev === null) return fail(res, 400, 'Оказано до периода: число или пусто');
+        c.contract = { no: String(k.no || '').trim().slice(0, 60), date: k.date, prices, vat, prevTotal: prev };
+      }
+      if (b.tz !== undefined) { try { new Intl.DateTimeFormat('ru', { timeZone: String(b.tz) }); c.tz = String(b.tz); } catch { return fail(res, 400, 'Неизвестный часовой пояс'); } }
+      if (b.tg) c.tg = { token: b.tg.token === undefined ? (c.tg.token || '') : String(b.tg.token).trim().slice(0, 100), chat: String(b.tg.chat || '').trim().slice(0, 40), prefix: String(b.tg.prefix || '').trim().slice(0, 60) };
+      if (b.newDevToken) c.devToken = require('node:crypto').randomBytes(18).toString('base64url');
+      db.reqCfg = c; saveDb();
+      return send(res, 200, { ok: true, cfg: c, rev: db.rev });
+    }
+    if (m === 'POST' && p[2] === 'tg-test') { if (!reqCfgOf().tg.token || !reqCfgOf().tg.chat) return fail(res, 400, 'Укажите токен бота и чат'); reqNotify('Проверка уведомлений: связь с системой заявок работает.'); return send(res, 200, { ok: true }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Отчётная документация»: 7 Word documents for a month — the requests created in the month and the replaced equipment */
+  if (p[1] === 'req-report' && m === 'POST') {
+    if (orgType(user) !== 'requests' || user.role !== 'admin') return fail(res, 403, 'Отчёты формирует администратор');
+    const b = await readJsonBody(req), c = reqCfgOf(), tz = c.tz;
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(b.period || '')) return fail(res, 400, 'Выберите отчётный месяц');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(b.docDate || '') || Number.isNaN(Date.parse(b.docDate))) return fail(res, 400, 'Укажите дату документов');
+    const [y, mo] = b.period.split('-').map(Number), skipped = [];
+    const tickets = [], repl = [];
+    for (const r of Object.values(db.requests || {})) {
+      if (r.status === 'cancel') continue;
+      if (!UPR_SYS.includes(r.system)) { skipped.push(r.no); continue; }
+      const closed = ['done', 'reject'].includes(r.status) && r.doneAt ? UPR.localStamp(r.doneAt, tz) : null;
+      const eq = (r.repl || []).map(x => x.equipment);
+      tickets.push({ number: r.no, system: r.system, description: (r.text || r.title || '').trim(), created: UPR.localStamp(r.at, tz), closed, answer: r.doneNote || '', equipment: eq.join('; '), overdue: !!(r.due && (closed ? closed.slice(0, 10) : UPR.localStamp(new Date().toISOString(), tz).slice(0, 10)) > r.due) });
+      for (const x of r.repl || []) repl.push({ date: closed ? closed.slice(0, 10) : UPR.localStamp(r.doneAt || r.at, tz).slice(0, 10), system: r.system, category: x.category, equipment: x.equipment, ticket: r.no, newSerial: x.newSerial, oldSerial: x.oldSerial });
+    }
+    let out;
+    try {
+      out = UPR.generate({ year: y, month: mo, docDate: b.docDate, contractNo: c.contract.no, contractDate: c.contract.date, prices: c.contract.prices, vat: c.contract.vat,
+        prevTotal: c.contract.prevTotal, penalty: '0', letterNo: String(b.letterNo || '').trim().slice(0, 40) || '___/' + String(y).slice(2) }, tickets, repl);
+    } catch (e) { console.error('Отчёт:', e); return fail(res, 500, 'Не удалось сформировать документы: ' + e.message); }
+    const inPeriod = skipped.filter(no => { const r = Object.values(db.requests).find(x => x.no === no); return r && UPR.localStamp(r.at, tz).slice(0, 7) === b.period; });
+    if (inPeriod.length) out.warnings.unshift(`Без системы, не вошли в отчёт: заявки № ${inPeriod.join(', ')}`);
+    const name = `Отчетная документация ${b.period}.zip`, key = require('node:crypto').randomBytes(12).toString('base64url');
+    // the archive waits 15 minutes for its download by a plain link (the browser keeps the file name)
+    const now = Date.now(); for (const [k, v] of REPORTS) if (v.until < now) REPORTS.delete(k);
+    REPORTS.set(key, { buf: out.zip, name, user: user.id, until: now + 15 * 60e3 });
+    return send(res, 200, { ok: true, url: `/api/req-report/${key}`, name, warnings: out.warnings, totals: out.totals, files: out.files.map(f => f.name) });
+  }
+  if (p[1] === 'req-report' && m === 'GET' && p[2]) {
+    const x = REPORTS.get(p[2]);
+    if (!x || x.user !== user.id || x.until < Date.now()) return fail(res, 404, 'Документы устарели — сформируйте заново');
+    return send(res, 200, x.buf, { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="report.zip"; filename*=UTF-8''${encodeURIComponent(x.name)}` });
   }
   /* «Мои задачи»: a personal to-do list — each administrator sees and changes only his own notes */
   /* «Мои задачи»: personal tasks («task»), notes with drawings and pictures («memo») and shared tasks («shared»):
@@ -1898,7 +2022,7 @@ const publicUser = u => ({ id: u.id, login: u.login, name: u.name, role: u.role,
 const HEX = v => /^#[0-9a-f]{6}$/i.test(String(v || '')) ? String(v).toLowerCase() : null;
 function cleanPrefs(b){
   const o = {};
-  if (['system', 'light', 'dark', 'telecom', 'pink', 'engineer'].includes(b.theme)) o.theme = b.theme;
+  if (['system', 'light', 'dark', 'telecom', 'pink', 'engineer', 'upr'].includes(b.theme)) o.theme = b.theme;
   if ([1, 1.1, 1.2, 1.35].includes(Number(b.scale))) o.scale = Number(b.scale);
   if (['pin', 'dot'].includes(b.marker)) o.marker = b.marker;
   if (['type', 'need', 'person'].includes(b.dtColor)) o.dtColor = b.dtColor;
@@ -2252,6 +2376,27 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+/* the readings of the power monitor: building and server room power (true — «в режиме»), the battery (raw value of the device, 840 and more — full) and the signal;
+   a reading with the same state only refreshes the time of the last one */
+const DEV_POWER = { 1: [false, false], 2: [true, true], 3: [false, true], 4: [true, false] };
+async function devIn(req, res, url, key) {
+  const c = reqCfgOf();
+  if (!c.devToken || key !== c.devToken) return fail(res, 403, 'Неверный ключ устройства');
+  let b = Object.fromEntries(url.searchParams);
+  if (req.method === 'POST') { try { b = { ...b, ...(await readJsonBody(req)) }; } catch { return fail(res, 400, 'Ожидается JSON'); } }
+  else if (req.method !== 'GET') return fail(res, 405, 'Метод не поддерживается');
+  const bool = v => v === undefined || v === '' ? null : ['1', 'true', 'on', 'yes'].includes(String(v).toLowerCase());
+  const num = v => v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
+  const pw = DEV_POWER[Number(b.power)] || [bool(b.building), bool(b.server)];
+  const rd = { building: pw[0], server: pw[1], battery: num(b.battery), signal: num(b.signal) };
+  if (rd.building === null && rd.server === null && rd.battery === null && rd.signal === null) return fail(res, 400, 'Нет данных: power (1–4) или building/server, battery, signal');
+  if (!Array.isArray(db.devReadings)) db.devReadings = [];
+  const L = db.devReadings, last = L[L.length - 1], now = new Date().toISOString(), full = x => x === null ? null : x >= 840;
+  if (last && last.building === rd.building && last.server === rd.server && full(last.battery) === full(rd.battery)) Object.assign(last, rd, { upd: now });
+  else { L.push({ no: (last ? last.no : 0) + 1, ...rd, at: now, upd: now }); if (L.length > 500) L.splice(0, L.length - 500); }
+  saveDb();
+  return send(res, 200, { ok: true });
+}
 function startServer() {
   if (!users.length) {
     const login = process.env.ADMIN_LOGIN, pw = process.env.ADMIN_PASSWORD;
@@ -2261,6 +2406,13 @@ function startServer() {
     const url = new URL(req.url, 'http://localhost');
     try { syncFromDisk(); } catch (e) { console.error(e); }
     try {
+      // a device of a requests organization reports the power of the building and the server room (no session: the key of the organization)
+      if (url.pathname.startsWith('/api/dev-in/')) {
+        const [, , , orgId, key] = url.pathname.split('/');
+        const o = orgById(orgId);
+        if (!o || o.type !== 'requests' || !key) return fail(res, 404, 'Не найдено');
+        return await als.run(orgEntry(orgId), async () => devIn(req, res, url, key));
+      }
       if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/files/')) {
         // every request works inside the data of the signed-in user's organization
         const su = sessionUser(req), org = su && orgById(su.orgId) ? su.orgId : MAIN_ORG;

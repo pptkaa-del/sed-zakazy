@@ -1,7 +1,8 @@
 FROM node:22-alpine
 ENV NODE_ENV=production PORT=3000 DATA_DIR=/data
 WORKDIR /app
-COPY package.json server.js ./
+COPY package.json server.js upr-reports.js ./
+COPY upr-templates ./upr-templates
 COPY public ./public
 RUN mkdir -p /data && chown node:node /data
 USER node
