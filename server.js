@@ -547,7 +547,7 @@ async function api(req, res, url) {
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
   if (FIELD(user) && !['rev', 'data', 'password', 'jobs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
-    && !(p[1] === 'devs' || (p[1] === 'files' && (Object.values(db.devs || {}).some(d => devEdit(user, d)) || Object.values(db.jobs || {}).some(j => onJob(user, j)))))) return fail(res, 403, 'Недостаточно прав');
+    && !(p[1] === 'devs' || p[1] === 'notes' || (p[1] === 'files' && (Object.values(db.devs || {}).some(d => devEdit(user, d)) || Object.values(db.jobs || {}).some(j => onJob(user, j)))))) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && orgUsers().find(u => u.id === p[2]);
@@ -643,7 +643,8 @@ async function api(req, res, url) {
       out.labelScans = Object.fromEntries(Object.entries(SC).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by, v.serial || '']])); }
     out.receipts = FIELD(user) || !sees(user, 'stock:inc') ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
-    if (!FIELD(user) && sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id)));
+    if (FIELD(user)) out.notes = (db.notes || []).filter(n => n.type === 'shared' && n.assignee === user.id);
+    else if (sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && ((n.share || []).includes(user.id) || n.assignee === user.id)));
     return send(res, 200, out);
   }
   // hidden sections: their data is not given and their actions are refused
@@ -864,19 +865,23 @@ async function api(req, res, url) {
   /* «Мои задачи»: personal tasks («task»), notes with drawings and pictures («memo») and shared tasks («shared»):
      a shared task is seen by the users chosen by its author; they can write comments */
   if (p[1] === 'notes') {
-    if (FIELD(user)) return fail(res, 403, '«Мои задачи» недоступны');
     if (!Array.isArray(db.notes)) db.notes = [];
     const N = db.notes;
-    const sees = n => n.by === user.id || (n.type === 'shared' && (n.share || []).includes(user.id));
+    // a shared task is seen by its author, the chosen users and its executor; an employee (field staff) sees only the tasks assigned to him
+    const sees = n => FIELD(user) ? n.type === 'shared' && n.assignee === user.id : n.by === user.id || (n.type === 'shared' && ((n.share || []).includes(user.id) || n.assignee === user.id));
+    const okAssignee = id => !!id && orgUsers().some(u => u.id === id && !u.sys && !u.blocked);
+    const dueOk = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : '';
     const cleanFiles = a => (Array.isArray(a) ? a : []).filter(f => f && db.files[f.id]).slice(0, 30).map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), type: db.files[f.id].type, at: db.files[f.id].at }));
     const cleanShare = a => [...new Set((Array.isArray(a) ? a : []).filter(id => id !== user.id && orgUsers().some(u => u.id === id && !FIELD(u) && !u.sys)))].slice(0, 50);
     if (m === 'GET' && !p[2]) return send(res, 200, N.filter(sees));
     if (m === 'POST' && !p[2]) {
+      if (FIELD(user)) return fail(res, 403, 'Создавать задачи сотрудник не может');
       const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 4000), type = ['task', 'memo', 'shared'].includes(b.type) ? b.type : 'task';
       if (!text && !(b.files || []).length) return fail(res, 400, 'Напишите текст');
-      if (type === 'shared' && !cleanShare(b.share).length) return fail(res, 400, 'Выберите, кто увидит общую задачу');
+      if (b.assignee && !okAssignee(b.assignee)) return fail(res, 400, 'Исполнитель не найден');
+      if (type === 'shared' && !cleanShare(b.share).length && !b.assignee) return fail(res, 400, 'Выберите исполнителя или тех, кто увидит общую задачу');
       const n = { id: newId(), type, text, done: false, urgent: !!b.urgent, at: new Date().toISOString(), by: user.id, files: cleanFiles(b.files) };
-      if (type === 'shared') { n.share = cleanShare(b.share); n.comments = []; }
+      if (type === 'shared') { n.share = cleanShare(b.share); n.comments = []; n.assignee = b.assignee || null; n.due = dueOk(b.due); }
       if (n.urgent) n.urgentAt = n.at;
       N.unshift(n); saveDb();
       return send(res, 200, { ok: true, note: n, rev: db.rev });
@@ -901,7 +906,9 @@ async function api(req, res, url) {
       // urgent: the task goes to the top of the list and is shown in red
       if (b.urgent !== undefined) { n.urgent = !!b.urgent; n.urgentAt = n.urgent ? new Date().toISOString() : null; }
       if (b.files !== undefined) n.files = cleanFiles(b.files);
-      if (b.share !== undefined && n.type === 'shared') { const sh = cleanShare(b.share); if (!sh.length) return fail(res, 400, 'Выберите, кто увидит общую задачу'); n.share = sh; }
+      if (b.assignee !== undefined && n.type === 'shared') { if (b.assignee && !okAssignee(b.assignee)) return fail(res, 400, 'Исполнитель не найден'); n.assignee = b.assignee || null; }
+      if (b.due !== undefined && n.type === 'shared') n.due = dueOk(b.due);
+      if (b.share !== undefined && n.type === 'shared') { const sh = cleanShare(b.share); if (!sh.length && !n.assignee) return fail(res, 400, 'Выберите исполнителя или тех, кто увидит общую задачу'); n.share = sh; }
       if (b.done !== undefined) { n.done = !!b.done; n.doneAt = n.done ? new Date().toISOString() : null; n.doneBy = n.done ? user.id : null; }
       saveDb();
       return send(res, 200, { ok: true, note: n, rev: db.rev });
