@@ -338,7 +338,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared', 'draw'] };
+const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared', 'draw'], transport: ['cars', 'parts'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -378,6 +378,7 @@ function fileUsage(){
     for (const t of Object.values(db.labels || {})) for (const x of t.items || []) if (x.img) add(x.img.id, `Этикетка «${t.name}»`);
     for (const r of Object.values(db.requests || {})) for (const f of [...(r.files || []), ...(r.doneFiles || [])]) add(f.id, `Заявка № ${r.no || ''}`);
     for (const d of db.reqDocs || []) if (d.file) add(d.file.id, `Инструкция «${d.title}»`);
+    for (const v of Object.values(db.vehicles || {})) for (const d of v.docs || []) if (d.file) add(d.file.id, `Транспорт ${v.name || ''} · ${d.title || ''}`);
     for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
   return used;
 }
@@ -668,6 +669,11 @@ async function api(req, res, url) {
     // the marks of the manager (sick leave, vacation, late, left early, absence) and the working schedule
     out.staffMarks = (Array.isArray(db.staffMarks) ? db.staffMarks : []).filter(x => HEAD(user) || x.user === user.id);
     out.workCal = workCalOf();
+    // «Транспорт»: the vehicles of the company with maintenance and documents, and the spare parts — for managers
+    if (HEAD(user) && orgType(user) !== 'requests') {
+      out.vehicles = sees(user, 'transport:cars') || sees(user, 'transport:parts') ? Object.entries(db.vehicles || {}).map(([id, v]) => ({ id, ...v })) : [];
+      out.parts = sees(user, 'transport:parts') ? (Array.isArray(db.parts) ? db.parts : []) : [];
+    }
     if (FIELD(user)) out.notes = (db.notes || []).filter(n => n.type === 'shared' && n.assignee === user.id);
     else if (sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && ((n.share || []).includes(user.id) || n.assignee === user.id)));
     return send(res, 200, out);
@@ -919,6 +925,69 @@ async function api(req, res, url) {
       if (!(boss || (author && r.status === 'new' && !(r.comments || []).length))) return fail(res, 403, 'Удалить можно свою заявку, пока её не взяли в работу, — иначе отмените её');
       delete R[p[2]]; saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Транспорт» (managers): a vehicle — name, number, VIN, year, mileage, note; its maintenance (date, mileage, what was done)
+     and documents (work orders for repairs and so on); spare parts — number, description, link, the vehicle they fit */
+  if (p[1] === 'vehicles' || p[1] === 'parts') {
+    if (!HEAD(user)) return fail(res, 403, 'Транспорт ведёт руководитель или администратор');
+    if (orgType(user) === 'requests') return fail(res, 403, 'Транспорт есть только в системе «Все сервисы»');
+    if (!sees(user, p[1] === 'parts' ? 'transport:parts' : 'transport:cars')) return fail(res, 403, 'Этот раздел для вас закрыт');
+    if (!db.vehicles || typeof db.vehicles !== 'object') db.vehicles = {};
+    if (!Array.isArray(db.parts)) db.parts = [];
+    const V = db.vehicles, now = new Date().toISOString(), txt = (v, n) => String(v ?? '').trim().slice(0, n);
+    const D = /^\d{4}-\d{2}-\d{2}$/, km = v => v === '' || v == null ? null : Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : NaN;
+    const link = v => { const u = txt(v, 1000); return !u || /^https?:\/\/\S+$/i.test(u) ? u : null; };
+    const done = (body = { ok: true }) => { saveDb(); return send(res, 200, { ...body, rev: db.rev }); };
+    if (p[1] === 'parts') {
+      const clean = b => {
+        const number = txt(b.number, 100), name = txt(b.name, 1000), l = link(b.link);
+        if (!number && !name) return 'Укажите номер или описание запчасти';
+        if (l === null) return 'Ссылка должна начинаться с http:// или https://';
+        if (b.vehicleId && !V[b.vehicleId]) return 'Транспорт не найден';
+        return { number, name, link: l, vehicleId: b.vehicleId || null, note: txt(b.note, 500) };
+      };
+      if (m === 'POST' && !p[2]) { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); const x = { id: newId(), ...v, at: now, by: user.id }; db.parts.push(x); return done({ ok: true, part: x }); }
+      const x = p[2] && db.parts.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Запчасть не найдена — обновите страницу');
+      if (m === 'PUT') { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { updatedAt: now, updatedBy: user.id }); return done({ ok: true, part: x }); }
+      if (m === 'DELETE') { db.parts = db.parts.filter(e => e !== x); return done(); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
+    const cleanV = (b, old = {}) => {
+      const name = txt(b.name ?? old.name, 200); if (!name) return 'Укажите транспорт (марка, модель)';
+      const mileage = km(b.mileage ?? old.mileage); if (Number.isNaN(mileage)) return 'Пробег — число километров';
+      const year = b.year === undefined ? old.year || '' : txt(b.year, 4); if (year && !/^\d{4}$/.test(year)) return 'Год выпуска — четыре цифры';
+      const toEvery = km(b.toEvery ?? old.toEvery); if (Number.isNaN(toEvery)) return 'Интервал ТО — число километров';
+      return { name, plate: txt(b.plate ?? old.plate, 20).toUpperCase(), vin: txt(b.vin ?? old.vin, 17).toUpperCase(), year, mileage, toEvery, driver: txt(b.driver ?? old.driver, 200), note: txt(b.note ?? old.note, 2000) };
+    };
+    if (m === 'POST' && !p[2]) { const v = cleanV(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); const id = newId(); V[id] = { ...v, to: [], docs: [], at: now, by: user.id }; return done({ ok: true, vehicle: { id, ...V[id] } }); }
+    const v = p[2] && V[p[2]]; if (!v) return fail(res, 404, 'Транспорт не найден — обновите страницу');
+    const out = () => done({ ok: true, vehicle: { id: p[2], ...v } });
+    if (m === 'PATCH' && p.length === 3) { const c = cleanV(await readJsonBody(req), v); if (typeof c === 'string') return fail(res, 400, c); Object.assign(v, c, { updatedAt: now, updatedBy: user.id }); return out(); }
+    if (m === 'DELETE' && p.length === 3) { delete V[p[2]]; db.parts.forEach(x => { if (x.vehicleId === p[2]) x.vehicleId = null; }); return done(); }
+    if (p[3] === 'to') {
+      v.to = Array.isArray(v.to) ? v.to : [];
+      if (m === 'POST' && !p[4]) {
+        const b = await readJsonBody(req), date = String(b.date || ''), mileage = km(b.mileage);
+        if (!D.test(date)) return fail(res, 400, 'Укажите дату ТО');
+        if (mileage === null || Number.isNaN(mileage)) return fail(res, 400, 'Укажите пробег на ТО');
+        v.to.push({ id: newId(), date, mileage, work: txt(b.work, 2000), cost: txt(b.cost, 30), at: now, by: user.id });
+        v.to.sort((a, c) => a.date.localeCompare(c.date) || a.mileage - c.mileage);
+        if (!(v.mileage >= mileage)) v.mileage = mileage;
+        return out();
+      }
+      if (m === 'DELETE' && p[4]) { v.to = v.to.filter(x => x.id !== p[4]); return out(); }
+    }
+    if (p[3] === 'docs') {
+      v.docs = Array.isArray(v.docs) ? v.docs : [];
+      if (m === 'POST' && !p[4]) {
+        const b = await readJsonBody(req), f = b.file && db.files[b.file.id];
+        if (!f) return fail(res, 400, 'Выберите файл');
+        v.docs.push({ id: newId(), title: txt(b.title, 200) || f.name, date: D.test(b.date || '') ? b.date : '', file: { id: b.file.id, name: f.name, type: f.type, size: f.size }, at: now, by: user.id });
+        return out();
+      }
+      if (m === 'DELETE' && p[4]) { v.docs = v.docs.filter(x => x.id !== p[4]); return out(); }
     }
     return fail(res, 405, 'Метод не поддерживается');
   }
