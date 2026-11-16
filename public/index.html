@@ -259,6 +259,7 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .incrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 150px auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule-2);font-size:14px;cursor:pointer}
 .buyst{white-space:nowrap}.buyst small{display:block;font-size:12px}tr.buy-got td{opacity:.6}
 .stabs{margin:0 0 14px;width:max-content;max-width:100%;flex-wrap:wrap}.stabs a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:7px 14px;border-radius:7px;font-size:15px;color:var(--ink-2)}.stabs a:hover{color:var(--ink)}.stabs a.on{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+table.lines tr.ln-miss td{background:var(--warn-soft)}table.lines tr.ln-miss td:first-child{box-shadow:inset 3px 0 0 var(--warn)}table.lines tr.ln-miss .in{border-color:var(--warn)}.ln-missnote{font-size:13px}.ln-missnote:empty{display:none}
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .devcost{display:grid;grid-template-columns:1fr;gap:0;margin:2px 0;font-size:14px}.devcost dt{color:var(--ink-2);font-size:12px;margin-top:4px}.devcost dd{margin:0;white-space:pre-line;overflow:hidden;text-overflow:ellipsis}
@@ -1564,18 +1565,23 @@ const wbView = w => w ? `<dt>Накладная</dt><dd>№ ${esc(w.number || '�
 // editable table: ui[key] holds the lines; inputs write straight into it, so a re-render keeps what was typed
 const LN_OPTS = { invItems: { price:true }, incLines: { price:true, match:true } };
 const incMatch = l => (l.stockId && S.stock.find(x => x.id === l.stockId)) || (l.sku && S.stock.find(x => x.sku && normName(x.sku) === normName(l.sku))) || stockByName(l.name);
-const matchCell = l => { if (!String(l.name || '').trim()) return ''; const it = incMatch(l); return it ? `<span class="ok-t">→ ${esc(it.name)}</span><small class="dim">сейчас ${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</small>` : '<span class="dim">новая позиция склада</span>'; };
+const matchCell = l => { if (!String(l.name || '').trim()) return ''; const it = incMatch(l); return it ? `<span class="ok-t">→ ${esc(it.name)}</span><small class="dim">сейчас ${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</small>` : '<span class="warn-t">нет на складе — будет новая позиция</span>'; };
+// a line whose name is not among the warehouse positions (by position, article or name) — highlighted
+const lnMissing = x => !!String(x.name || '').trim() && !incMatch(x);
+const lnMissNote = key => { const n = (ui[key] || []).filter(lnMissing).length; return n ? `<span class="warn-t">Нет на складе: ${n} ${n % 10 === 1 && n % 100 !== 11 ? 'строка — подсвечена; при оприходовании станет новой позицией' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'строки' : 'строк') + ' — подсвечены; при оприходовании станут новыми позициями'}. Выберите наименование из подсказки, если позиция есть под другим названием.</span>` : ''; };
+const MISS_TITLE = 'Такого наименования нет на складе';
 function linesTable(key, ro){
   const L = ui[key] || [], o = LN_OPTS[key] || {};
   return `<div class="tscroll"><table class="lines${o.match ? ' wm' : ''}"><colgroup><col style="width:34px"><col><col style="width:100px"><col style="width:76px">${o.price ? '<col style="width:116px">' : ''}${o.match ? '<col style="width:230px">' : ''}${ro ? '' : '<col style="width:44px">'}</colgroup><thead><tr><th>№</th><th>Наименование</th><th class="r">Кол-во</th><th>Ед.</th>${o.price ? '<th class="r">Цена</th>' : ''}${o.match ? '<th>На складе</th>' : ''}${ro ? '' : '<th></th>'}</tr></thead><tbody>
     ${L.map((x, i) => ro ? `<tr><td>${i + 1}</td><td>${esc(x.name)}</td><td class="r mono">${fmtQty(x.qty)}</td><td>${esc(x.unit)}</td>${o.price ? `<td class="r mono">${x.price ? money(x.price) : ''}</td>` : ''}${o.match ? `<td>${x.stockId && S.stock.find(s => s.id === x.stockId) ? `<a href="#stock" data-act="viewStock" data-id="${x.stockId}">${esc(S.stock.find(s => s.id === x.stockId).name)}</a>` : '<span class="dim">—</span>'}</td>` : ''}</tr>`
-      : `<tr><td>${i + 1}</td><td><input class="in" data-ln="${key}|${i}|name" value="${esc(x.name)}" list="stock-names2" aria-label="Наименование"></td>
+      : `<tr data-lr="${i}" class="${lnMissing(x) ? 'ln-miss' : ''}" ${lnMissing(x) ? `title="${MISS_TITLE}"` : ''}><td>${i + 1}</td><td><input class="in" data-ln="${key}|${i}|name" value="${esc(x.name)}" list="stock-names2" aria-label="Наименование"></td>
       <td><input class="in mono r" data-ln="${key}|${i}|qty" value="${esc(x.qty ?? '')}" inputmode="decimal" aria-label="Количество"></td>
       <td><input class="in" data-ln="${key}|${i}|unit" value="${esc(x.unit || 'шт')}" aria-label="Единица" style="width:64px"></td>
       ${o.price ? `<td><input class="in mono r" data-ln="${key}|${i}|price" value="${esc(x.price ?? '')}" inputmode="decimal" aria-label="Цена"></td>` : ''}
       ${o.match ? `<td data-m="${i}">${matchCell(x)}</td>` : ''}
       <td><button type="button" class="btn sm ghost" data-act="delLn" data-id="${key}|${i}" aria-label="Удалить строку">✕</button></td></tr>`).join('')}
   </tbody></table></div>
+  ${ro ? '' : `<div class="ln-missnote" id="lnmiss-${key}">${lnMissNote(key)}</div>`}
   <div class="row-g" style="justify-content:space-between">${ro ? '<span></span>' : `<button type="button" class="btn sm" data-act="addLn" data-id="${key}">+ Строка</button>`}${o.price ? `<span class="dim" id="lnsum-${key}">${lnSum(key)}</span>` : ''}</div>
   <datalist id="stock-names2">${S.stock.map(it => `<option value="${esc(it.name)}"></option>`).join('')}</datalist>`;
 }
@@ -5453,7 +5459,8 @@ document.addEventListener('input', e => {
   if (t.classList.contains('cpu') && ui.cp) { ui.cp.components[Number(t.dataset.i)].unit = t.value; return; }
   if (t.id === 'cat-q') { ui.catQ = t.value; const pos = t.selectionStart; renderDrawer(); const n = $('cat-q'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } return; }
   if (t.id === 'note-new') { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; return; }
-  if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L); } return; }
+  if (t.dataset.ln) { const [k, n, f] = t.dataset.ln.split('|'), L = ui[k]?.[Number(n)]; if (!L) return; L[f] = t.value; if (f === 'qty' || f === 'price') { const e2 = $('lnsum-' + k); if (e2) e2.innerHTML = lnSum(k); } if (f === 'name') { L.stockId = null; const c = document.querySelector(`#ln-${k} [data-m="${n}"]`); if (c) c.innerHTML = matchCell(L);
+    const tr = t.closest('tr'), miss = lnMissing(L); if (tr) { tr.classList.toggle('ln-miss', miss); if (miss) tr.title = MISS_TITLE; else tr.removeAttribute('title'); } const mn = $('lnmiss-' + k); if (mn) mn.innerHTML = lnMissNote(k); } return; }
   if (t.id === 'feat-new') ui.drafts['feat:' + t.dataset.o] = t.value;
   if (t.id === 'feat-new' || t.dataset.feat) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; if (t.id === 'feat-new') return; }
   if (t.id === 'dt-jq') { ui.dtJq = t.value; ui.dtJobs = [...document.querySelectorAll('[name=dtj]:checked')].map(x => x.value); ui.dtWhich = document.querySelector('[name=dtw]:checked')?.value; ui.dtNewOpen = document.querySelector('.dtnew')?.open; ui.dtNewTitle = $('dtn-title')?.value; const pos = t.selectionStart; renderDrawer(); const n = $('dt-jq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
