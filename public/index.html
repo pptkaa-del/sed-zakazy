@@ -338,7 +338,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgt td{height:40px;min-width:30px;cursor:pointer;color:#1F2633;font-weight:700;font-size:11px;line-height:1.1}.sgt td.off:not([style*=background]){background:repeating-linear-gradient(135deg,var(--mute-soft) 0 4px,var(--sheet) 4px 7px)}
 .sgt td:hover{outline:2px solid var(--stamp);outline-offset:-2px}.sgt td.sel{outline:2px solid var(--ink);outline-offset:-2px}.sgdot{color:var(--stamp);font-size:9px}
 .sgt .sgsum{min-width:84px;padding:0 8px;font-weight:400;color:var(--ink);cursor:default;white-space:nowrap}.sgt thead .sgsum{font-size:11px}
-.sgnote{display:block;padding:8px 14px}.sgday{margin:6px 0 10px;font-size:16px}
+.sgnote{display:block;padding:8px 14px}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
 .smtypes{flex-wrap:wrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
@@ -4137,17 +4137,30 @@ function sgCell(u, day){
   const c = [...new Set(cols)], bg = !c.length ? '' : c.length === 1 ? SG_COL[c[0]] : `linear-gradient(135deg,${SG_COL[c[0]]} 50%,${SG_COL[c[1]]} 50%)`;
   return { bg, codes, tip: tip.join('\n'), idle, ext, off: kind !== 'work', dot: idle && !codes.length };
 }
+// minutes as «часы:минуты»: 21:30
+const hmm = m => `${Math.floor(m / 60)}:${pad(m % 60)}`;
+/* penalty minutes of a month: late (from the start of the day), left early (to its end), absence — the whole working day by the schedule */
+function sgPenalty(u, days){
+  const S = hm(WORK_CAL.from), E = hm(WORK_CAL.to); let late = 0, early = 0, abs = 0, absN = 0;
+  for (const d of days) {
+    const mk = STAFF_MARKS.filter(x => x.user === u.id && x.from <= d && x.to >= d);
+    if (mk.some(x => x.type === 'absent') && dayKind(d) === 'work') { abs += E - S; absN++; continue; }
+    for (const x of mk.filter(isTimeMark)) { const a = markIn(x), b = markOut(x); if (a) late += Math.max(0, hm(a) - S); if (b) early += Math.max(0, E - hm(b)); }
+  }
+  const total = late + early + abs;
+  return { total, tip: total ? `опоздания ${hmm(late)}, ушёл раньше ${hmm(early)}, невыходы ${absN} дн. (${hmm(abs)})` : 'нет' };
+}
 function staffGrid(people){
   const ym = ui.stMonth || today().slice(0, 7), [y, m] = ym.split('-').map(Number), n = new Date(y, m, 0).getDate();
   const days = Array.from({ length: n }, (_, i) => `${ym}-${pad(i + 1)}`), wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
   const shift = k => { const d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
-  const rows = people.map(u => { const cells = days.map(d => sgCell(u, d)); return { u, cells, idle: cells.filter(c => c.idle).length, ext: cells.reduce((a, c) => a + c.ext, 0) }; });
+  const rows = people.map(u => { const cells = days.map(d => sgCell(u, d)); return { u, cells, ext: cells.reduce((a, c) => a + c.ext, 0), pen: sgPenalty(u, days) }; });
   return `<section class="card sgwrap"><div class="sghead">
       <div class="row-g"><button class="btn sm" data-act="stMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="stMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="stMonth" data-id="${today().slice(0, 7)}">Текущий</button>` : ''}</div>
       <div class="sglegend">${[['yellow', 'есть назначения'], ['green', 'сверх графика'], ['blue', 'больничный (Б), отпуск (О)'], ['red', 'невыход (Н)'], ['lilac', 'опоздание (Оп) / ушёл раньше (Р)']].map(([k, l]) => `<span><i style="background:${SG_COL[k]}"></i>${l}</span>`).join('')}<span><i class="sgoff"></i>выходной, праздник</span><span><span class="sgdot">●</span> простой (нет назначений)</span></div></div>
-    ${rows.length ? `<div class="sgscroll"><table class="sgt"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum" title="Рабочих дней без назначений">Простой</th><th class="sgsum">Сверх графика</th></tr></thead>
+    ${rows.length ? `<div class="sgscroll"><table class="sgt"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum" title="Работа сверх графика за месяц, часы:минуты">Переработка</th><th class="sgsum" title="Опоздания, ранний уход и невыходы (невыход — рабочий день по графику), часы:минуты">Штрафных</th></tr></thead>
       <tbody>${rows.map(r => `<tr><th class="sgname"><button class="linkish sgu" data-act="stCard" data-id="${r.u.id}" title="Подробно по сотруднику">${esc(r.u.name)}</button><small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${days[i] === (ui.stDay || today()) ? 'sel' : ''}" style="${c.bg ? `background:${c.bg}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.codes.length ? c.codes.join('<br>') : c.dot ? '<span class="sgdot">●</span>' : ''}</td>`).join('')}
-        <td class="sgsum">${r.idle ? `<b>${r.idle}</b> дн` : '—'}</td><td class="sgsum">${r.ext ? `<b>${otDur(r.ext)}</b>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
+        <td class="sgsum ${r.ext ? 'sgplus' : ''}">${r.ext ? `<b>${hmm(r.ext)}</b>` : '—'}</td><td class="sgsum ${r.pen.total ? 'sgminus' : ''}" title="${esc(r.pen.tip)}">${r.pen.total ? `<b>${hmm(r.pen.total)}</b>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
     <small class="dim sgnote">Нажмите на клетку — что было в этот день (отметки, ненормированный день, назначения); на имя — подробно по сотруднику.</small></section>`;
 }
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
