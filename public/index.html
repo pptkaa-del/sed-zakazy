@@ -4093,7 +4093,7 @@ function workCalHtml(){
     <div class="row-g"><button class="btn primary" data-act="wcSave">Сохранить</button><button class="btn" data-act="close">Закрыть</button></div></div>`;
 }
 /* «Сотрудники» — табель за месяц: сотрудники по строкам, дни по столбцам.
-   жёлтый — рабочий день без назначений (простой), зелёный — работа сверх графика, синий — больничный или отпуск,
+   жёлтый — есть назначения, точка — рабочий день без назначений (простой), зелёный — работа сверх графика, синий — больничный или отпуск,
    красный — невыход или опоздание, сиреневый — ушёл раньше; два события в один день — клетка делится по диагонали */
 const SG_COL = { blue: '#C9DEFF', red: '#FFC9C9', lilac: '#E3D0FF', green: '#C6EFD1', yellow: '#FFEFA0' };
 function sgAssigned(u, day){
@@ -4120,12 +4120,14 @@ function sgCell(u, day){
   const ext = ot.reduce((a, x) => a + otExtra(x), 0), dur = ot.reduce((a, x) => a + otMin(x), 0);
   if (ot.length) { cols.push('green'); codes.push('+' + (ext >= 60 ? Math.round(ext / 6) / 10 + 'ч' : ext + 'м')); }
   const idle = kind === 'work' && !as.length && !mk.some(x => ['sick', 'vacation', 'absent'].includes(x.type));
-  if (idle) { cols.push('yellow'); tip.push('простой: нет назначений'); }
+  // yellow — the day has assignments; a dot — idle (a working day without assignments)
+  if (as.length && !cols.length) cols.push('yellow');
+  if (idle) tip.push('простой: нет назначений');
   mk.forEach(x => tip.push(MARK_T[x.type] + (x.time ? ' ' + x.time : '') + (x.note ? ' — ' + x.note : '')));
   if (ot.length) tip.push(`ненорм. день: ${ot.map(x => x.from + '–' + x.to).join(', ')} (${otDur(dur)}, сверх графика ${otDur(ext)})`);
   as.slice(0, 6).forEach(a => tip.push(a)); if (as.length > 6) tip.push(`и ещё ${as.length - 6}`);
   const c = [...new Set(cols)], bg = !c.length ? '' : c.length === 1 ? SG_COL[c[0]] : `linear-gradient(135deg,${SG_COL[c[0]]} 50%,${SG_COL[c[1]]} 50%)`;
-  return { bg, codes, tip: tip.join('\n'), idle, ext, off: kind !== 'work', dot: as.length && !codes.length };
+  return { bg, codes, tip: tip.join('\n'), idle, ext, off: kind !== 'work', dot: idle && !codes.length };
 }
 function staffGrid(people){
   const ym = ui.stMonth || today().slice(0, 7), [y, m] = ym.split('-').map(Number), n = new Date(y, m, 0).getDate();
@@ -4134,7 +4136,7 @@ function staffGrid(people){
   const rows = people.map(u => { const cells = days.map(d => sgCell(u, d)); return { u, cells, idle: cells.filter(c => c.idle).length, ext: cells.reduce((a, c) => a + c.ext, 0) }; });
   return `<section class="card sgwrap"><div class="sghead">
       <div class="row-g"><button class="btn sm" data-act="stMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="stMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="stMonth" data-id="${today().slice(0, 7)}">Текущий</button>` : ''}</div>
-      <div class="sglegend">${[['yellow', 'простой (нет назначений)'], ['green', 'сверх графика'], ['blue', 'больничный (Б), отпуск (О)'], ['red', 'невыход (Н), опоздание (Оп)'], ['lilac', 'ушёл раньше (Р)']].map(([k, l]) => `<span><i style="background:${SG_COL[k]}"></i>${l}</span>`).join('')}<span><i class="sgoff"></i>выходной, праздник</span><span>● есть назначения</span></div></div>
+      <div class="sglegend">${[['yellow', 'есть назначения'], ['green', 'сверх графика'], ['blue', 'больничный (Б), отпуск (О)'], ['red', 'невыход (Н), опоздание (Оп)'], ['lilac', 'ушёл раньше (Р)']].map(([k, l]) => `<span><i style="background:${SG_COL[k]}"></i>${l}</span>`).join('')}<span><i class="sgoff"></i>выходной, праздник</span><span><span class="sgdot">●</span> простой (нет назначений)</span></div></div>
     ${rows.length ? `<div class="sgscroll"><table class="sgt"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum" title="Рабочих дней без назначений">Простой</th><th class="sgsum">Сверх графика</th></tr></thead>
       <tbody>${rows.map(r => `<tr><th class="sgname"><button class="linkish sgu" data-act="stCard" data-id="${r.u.id}" title="Подробно по сотруднику">${esc(r.u.name)}</button><small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${days[i] === (ui.stDay || today()) ? 'sel' : ''}" style="${c.bg ? `background:${c.bg}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.codes.length ? c.codes.join('<br>') : c.dot ? '<span class="sgdot">●</span>' : ''}</td>`).join('')}
         <td class="sgsum">${r.idle ? `<b>${r.idle}</b> дн` : '—'}</td><td class="sgsum">${r.ext ? `<b>${otDur(r.ext)}</b>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
