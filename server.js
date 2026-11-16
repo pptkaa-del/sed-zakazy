@@ -982,9 +982,10 @@ async function api(req, res, url) {
     const x = p[2] && O.find(e => e.id === p[2]);
     if (!x || !(x.by === user.id || HEAD(user))) return fail(res, 404, 'Запись не найдена — обновите страницу');
     if (m === 'PUT') {
-      if (x.by !== user.id) return fail(res, 403, 'Изменить запись может только сам сотрудник');
+      // the employee himself or a manager (the manager corrects what was entered)
+      if (x.by !== user.id && !HEAD(user)) return fail(res, 403, 'Изменить запись может сотрудник или руководитель');
       const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
-      Object.assign(x, v, { updatedAt: new Date().toISOString() }); saveDb();
+      Object.assign(x, v, { updatedAt: new Date().toISOString(), ...(x.by !== user.id ? { updatedBy: user.id } : {}) }); saveDb();
       return send(res, 200, { ok: true, entry: x, rev: db.rev });
     }
     if (m === 'DELETE') { db.overtime = O.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }

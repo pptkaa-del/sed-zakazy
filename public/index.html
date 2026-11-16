@@ -339,7 +339,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgt td:hover{outline:2px solid var(--stamp);outline-offset:-2px}.sgt td.sel{outline:2px solid var(--ink);outline-offset:-2px}.sgdot{color:var(--stamp);font-size:9px}
 .sgt .sgsum{min-width:84px;padding:0 8px;font-weight:400;color:var(--ink);cursor:default;white-space:nowrap}.sgt thead .sgsum{font-size:11px}
 .sgnote{display:block;padding:8px 14px}.sgday{margin:6px 0 10px;font-size:16px}
-.smtypes{flex-wrap:wrap}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.smtypes{flex-wrap:wrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
 .otmh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 16px;background:var(--mute-soft);font-size:14px}.otlist{list-style:none;margin:0;padding:0}.otlist li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 16px;border-top:1px solid var(--rule-2);font-size:14px;flex-wrap:wrap}.otlist li:first-child{border-top:0}.otn{color:var(--ink-2);font-size:13px;margin-top:2px;white-space:pre-wrap}.stlist li.otday{background:var(--stamp-soft);border-radius:6px}
@@ -4133,14 +4133,13 @@ function staffGrid(people){
       <div class="row-g"><button class="btn sm" data-act="stMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="stMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="stMonth" data-id="${today().slice(0, 7)}">Текущий</button>` : ''}</div>
       <div class="sglegend">${[['yellow', 'простой (нет назначений)'], ['green', 'сверх графика'], ['blue', 'больничный (Б), отпуск (О)'], ['red', 'невыход (Н), опоздание (Оп)'], ['lilac', 'ушёл раньше (Р)']].map(([k, l]) => `<span><i style="background:${SG_COL[k]}"></i>${l}</span>`).join('')}<span><i class="sgoff"></i>выходной, праздник</span><span>● есть назначения</span></div></div>
     ${rows.length ? `<div class="sgscroll"><table class="sgt"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum" title="Рабочих дней без назначений">Простой</th><th class="sgsum">Сверх графика</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><th class="sgname">${esc(r.u.name)}<small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${days[i] === (ui.stDay || today()) ? 'sel' : ''}" style="${c.bg ? `background:${c.bg}` : ''}" title="${esc(c.tip)}" data-act="stDay" data-id="${days[i]}" role="button" tabindex="0">${c.codes.length ? c.codes.join('<br>') : c.dot ? '<span class="sgdot">●</span>' : ''}</td>`).join('')}
+      <tbody>${rows.map(r => `<tr><th class="sgname"><button class="linkish sgu" data-act="stCard" data-id="${r.u.id}" title="Подробно по сотруднику">${esc(r.u.name)}</button><small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${days[i] === (ui.stDay || today()) ? 'sel' : ''}" style="${c.bg ? `background:${c.bg}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.codes.length ? c.codes.join('<br>') : c.dot ? '<span class="sgdot">●</span>' : ''}</td>`).join('')}
         <td class="sgsum">${r.idle ? `<b>${r.idle}</b> дн` : '—'}</td><td class="sgsum">${r.ext ? `<b>${otDur(r.ext)}</b>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
-    <small class="dim sgnote">Наведите на клетку — подробности; нажмите — ниже откроется этот день по каждому сотруднику.</small></section>`;
+    <small class="dim sgnote">Нажмите на клетку — что было в этот день (отметки, ненормированный день, назначения); на имя — подробно по сотруднику.</small></section>`;
 }
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
-function vStaff(){
-  const day = ui.stDay || today(), q = (ui.stq || '').trim().toLowerCase();
-  const rows = STAFF.filter(u => !q || u.name.toLowerCase().includes(q)).map(u => {
+// a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
+function staffRow(u, day){
     const jobs = S.jobs.filter(j => j.status !== 'done' && ((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id)));
     const mine = j => (j.places || []).filter(x => x.assignee === u.id);
     const doneAll = S.jobs.flatMap(j => (j.places || []).filter(x => x.doneAt && (x.doneBy === u.id || (!x.doneBy && x.assignee === u.id))).map(x => ({ j, x })));
@@ -4148,16 +4147,9 @@ function vStaff(){
     const tasks = S.tasks.filter(t => !t.done && (t.staff || []).includes(u.id) && t.end >= day);
     const otM = OVERTIME.filter(x => x.by === u.id && x.date.startsWith(day.slice(0, 7))).reduce((a, x) => a + otExtra(x), 0), mkN = marksOf(u.id, day.slice(0, 7)).length;
     return { u, jobs, mine, doneAll, doneDay, tasks, otM, mkN, open: jobs.reduce((a, j) => a + mine(j).filter(x => !x.doneAt).length, 0) };
-  }).filter(r => r.jobs.length || r.tasks.length || r.doneAll.length || r.otM || r.mkN || ['worker', 'contractor'].includes(r.u.role))
-    .sort((a, b) => b.doneDay.length - a.doneDay.length || b.open - a.open || a.u.name.localeCompare(b.u.name, 'ru'));
-  const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="stq" type="search" aria-label="Поиск сотрудника" value="${esc(ui.stq || '')}" style="flex:1 1 200px;max-width:300px"></span>
-    <label style="display:flex;gap:8px;align-items:center;font-size:14px">День<input class="in" type="date" id="st-day" value="${day}" max="${today()}" style="width:auto"></label>
-    <button class="btn sm" data-act="stDay" data-id="${today()}">Сегодня</button><button class="btn sm" data-act="stDay" data-id="${localDay(Date.now() - 864e5)}">Вчера</button>
-    <button class="btn sm" data-act="workCal">📅 График работы</button><span class="dim">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}</span>
-    <span class="dim">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}: <b>${rows.reduce((a, r) => a + r.doneDay.length, 0)}</b></span></div>`;
-  if (!rows.length) return head + '<div class="empty"><h3>Сотрудников нет</h3>Добавьте пользователей с ролью «Сотрудник» или «Подрядчик» на вкладке «Пользователи».</div>';
-  const people = rows.map(r => r.u).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  return head + staffGrid(people) + `<h3 class="sgday">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}: подробно по сотрудникам</h3>` + rows.map(r => `<section class="card staffc">
+}
+// the card of an employee — opened by a click on his name in the table
+const staffCardHtml = (r, day) => `<section class="card staffc">
     <div class="ch"><div><h3 style="margin:0">${esc(r.u.name)}</h3><small class="dim">${esc(ROLE_NAMES[r.u.role] || '')}</small>${(() => { const x = markOn(r.u.id, day); return x ? ` <span class="chip ${MARK_C[x.type]}">${x.type === 'sick' ? 'на больничном' : x.type === 'vacation' ? 'в отпуске' : 'не вышел'}</span>` : ''; })()}
       <div style="margin-top:6px"><button class="btn sm" data-act="smNew" data-id="${r.u.id}">+ Отметка</button></div></div>
       <div class="stnums"><div><b class="${r.doneDay.length ? 'ok-t' : ''}">${r.doneDay.length}</b><small>сделано за ${day === today() ? 'сегодня' : fmtD(day)}</small></div><div><b>${r.open}</b><small>точек в работе</small></div><div><b>${r.doneAll.length}</b><small>всего сделано</small></div>${r.otM ? `<div><b>${otDur(r.otM)}</b><small>сверх графика за месяц</small></div>` : ''}</div></div>
@@ -4167,7 +4159,47 @@ function vStaff(){
     ${r.tasks.length ? `<h4 class="sub-h">В план-графике</h4><ul class="stlist">${r.tasks.map(t => `<li><button class="linkish" data-act="editTask" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([KIND[t.kind], jobOf(t.jobId) && '№ ' + jobNo(jobOf(t.jobId)) + ' · ' + jobOf(t.jobId).title, fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small></li>`).join('')}</ul>` : ''}
     ${r.doneDay.length ? `<h4 class="sub-h">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}</h4><ul class="stlist">${r.doneDay.sort((a, b) => b.x.doneAt.localeCompare(a.x.doneAt)).map(({ j, x }) => `<li><small><b>${esc(fmtDT(x.doneAt).slice(-5))}</b> · ${esc(x.label || 'точка')} · ${esc(j.title)}${x.notWorking ? ' · <span style="color:var(--bad)">не работает</span>' : ''}</small></li>`).join('')}</ul>` : ''}
     ${otStaffBlock(r.u, day)}
-  </section>`).join('');
+  </section>`;
+function vStaff(){
+  const day = ui.stDay || today(), q = (ui.stq || '').trim().toLowerCase();
+  const rows = STAFF.filter(u => !q || u.name.toLowerCase().includes(q)).map(u => staffRow(u, day))
+    .filter(r => r.jobs.length || r.tasks.length || r.doneAll.length || r.otM || r.mkN || ['worker', 'contractor'].includes(r.u.role));
+  const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="stq" type="search" aria-label="Поиск сотрудника" value="${esc(ui.stq || '')}" style="flex:1 1 200px;max-width:300px"></span>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px">День<input class="in" type="date" id="st-day" value="${day}" max="${today()}" style="width:auto"></label>
+    <button class="btn sm" data-act="stDay" data-id="${today()}">Сегодня</button><button class="btn sm" data-act="stDay" data-id="${localDay(Date.now() - 864e5)}">Вчера</button>
+    <button class="btn sm" data-act="workCal">📅 График работы</button><span class="dim">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}</span>
+    <span class="dim">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}: <b>${rows.reduce((a, r) => a + r.doneDay.length, 0)}</b></span></div>`;
+  if (!rows.length) return head + '<div class="empty"><h3>Сотрудников нет</h3>Добавьте пользователей с ролью «Сотрудник» или «Подрядчик» на вкладке «Пользователи».</div>';
+  return head + staffGrid(rows.map(r => r.u).sort((a, b) => a.name.localeCompare(b.name, 'ru')));
+}
+/* a cell of the table: the marks and the irregular hours of the day with «Изменить», and what was assigned */
+function staffDayHtml(uid, day){
+  const u = STAFF.find(x => x.id === uid); if (!u) return '<div class="d-body"><p>Сотрудник не найден</p></div>';
+  const kind = dayKind(day), mk = STAFF_MARKS.filter(x => x.user === uid && x.from <= day && x.to >= day), ot = OVERTIME.filter(x => x.by === uid && x.date === day).sort((a, b) => a.from.localeCompare(b.from));
+  const tasks = S.tasks.filter(t => (t.staff || []).includes(uid) && t.start <= day && t.end >= day), n = dnum(day), tn = dnum(today());
+  const jobs = S.jobs.filter(j => ((j.workers || []).includes(uid) || (j.places || []).some(x => x.assignee === uid)) && (() => { const [a, b] = jobSpan(j), end = j.status !== 'done' && b < tn ? tn : b; return n >= a && n <= end; })());
+  const did = S.jobs.flatMap(j => (j.places || []).filter(x => x.doneAt && localDay(x.doneAt) === day && (x.doneBy === uid || (!x.doneBy && x.assignee === uid))).map(x => ({ j, x })));
+  const idle = kind === 'work' && !tasks.length && !jobs.length && !did.length && !mk.some(x => ['sick', 'vacation', 'absent'].includes(x.type));
+  return `<div class="d-body">
+    <p style="margin:0"><b>${fmtD(day)}</b> · ${['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][dayOf(day).getDay()]} · ${DAY_KIND[kind]}${kind === 'work' ? ` (по графику ${esc(WORK_CAL.from)}–${esc(WORK_CAL.to)})` : ''}</p>
+    ${idle ? '<div class="box sgidle">Простой: в этот рабочий день у сотрудника нет назначений.</div>' : ''}
+    ${mk.length ? `<div class="box"><h4>Отметки</h4>${mk.map(x => `<div class="sdrow"><div><span class="chip ${MARK_C[x.type]}">${MARK_T[x.type]}</span> <small>${markText(x)}</small>${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}</div><button class="btn sm" data-act="smEdit" data-id="${x.id}">Изменить</button></div>`).join('')}</div>` : ''}
+    ${ot.length ? `<div class="box"><h4>Ненормированный рабочий день</h4>${ot.map(x => `<div class="sdrow"><div><b>${otSpan(x)}</b> · ${otDur(otMin(x))}${otExtra(x) ? ` · сверх графика <b>${otDur(otExtra(x))}</b>` : ''}${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}<small class="dim">внесено ${esc(fmtDT(x.at))}${x.updatedAt ? ', изменено ' + esc(fmtDT(x.updatedAt)) : ''}</small></div><button class="btn sm" data-act="otHEdit" data-id="${x.id}">Изменить</button></div>`).join('')}</div>` : ''}
+    ${tasks.length || jobs.length || did.length ? `<div class="box"><h4>Назначено</h4><ul class="stlist">
+      ${tasks.map(t => `<li><button class="linkish" data-act="editTask" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([KIND[t.kind], jobOf(t.jobId) && '№ ' + jobNo(jobOf(t.jobId)) + ' · ' + jobOf(t.jobId).title, fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small></li>`).join('')}
+      ${jobs.map(j => { const m = (j.places || []).filter(x => x.assignee === uid); return `<li><button class="linkish" data-act="openJob" data-id="${j.id}"><b>№ ${jobNo(j)} · ${esc(j.title)}</b></button> <span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span><small class="dim">${[m.length ? `точек ${m.length}, осталось ${m.filter(x => !x.doneAt).length}` : '', j.due && 'срок ' + fmtD(j.due)].filter(Boolean).join(' · ')}</small></li>`; }).join('')}
+      ${did.length ? `<li><small><b>Сделано точек: ${did.length}</b> — ${did.map(({ j, x }) => esc((x.label || 'точка') + ' · ' + j.title)).join('; ')}</small></li>` : ''}</ul></div>` : ''}
+    ${!mk.length && !ot.length && !tasks.length && !jobs.length && !did.length && !idle ? '<p class="dim" style="margin:0">В этот день ничего нет.</p>' : ''}
+    <div class="row-g"><button class="btn" data-act="smNew" data-id="${uid}" data-day="${day}">+ Отметка на этот день</button><button class="btn" data-act="stCard" data-id="${uid}">Карточка сотрудника</button><button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+/* the manager corrects an entry of the irregular working day */
+function otHeadHtml(x){
+  const u = STAFF.find(s => s.id === x.by);
+  return `<div class="d-body"><p style="margin:0"><b>${esc(u ? u.name : '')}</b></p>
+    <div class="form" data-keep><label>Дата<input class="in" type="date" id="oh-date" value="${esc(x.date)}"></label><label>Начало<input class="in" type="time" id="oh-from" value="${esc(x.from)}"></label>
+      <label>Окончание<input class="in" type="time" id="oh-to" value="${esc(x.to)}"></label><label class="wide">Комментарий<input class="in" id="oh-note" maxlength="1000" value="${esc(x.note || '')}"></label></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="otHSave" data-id="${x.id}">Сохранить</button>${armBtn('ohd:' + x.id, 'Удалить запись', 'otHDel', x.id, 'btn danger')}<button class="btn" data-act="stCell" data-id="${x.by}|${x.date}">Назад</button></div></div>`;
 }
 /* ---------- «По проектам»: what each employee is assigned in every work (project) and how much he did there ---------- */
 const SP_PERIODS = [['all', 'Всё время'], ['month', 'Этот месяц'], ['week', '7 дней'], ['day', 'Сегодня']];
@@ -4958,6 +4990,9 @@ function renderDrawer(){
     </div>`;
   }
   if (d.kind === 'staffMark') { const x = STAFF_MARKS.find(m => m.id === d.id); D.innerHTML = dh(x ? 'Изменить отметку' : 'Отметка сотруднику') + markFormHtml(x, d.ctx); return; }
+  if (d.kind === 'staffDay') { const u = STAFF.find(x => x.id === d.id); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + staffDayHtml(d.id, d.ctx); return; }
+  if (d.kind === 'staffCard') { const u = STAFF.find(x => x.id === d.id), day = ui.stDay || today(); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + (u ? `<div class="d-body staffd">${staffCardHtml(staffRow(u, day), day)}<div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>` : ''); return; }
+  if (d.kind === 'otHead') { const x = OVERTIME.find(o => o.id === d.id); D.innerHTML = dh('Ненормированный день') + (x ? otHeadHtml(x) : '<div class="d-body"><p>Запись удалена</p></div>'); return; }
   if (d.kind === 'workCal') { D.innerHTML = dh('График работы') + workCalHtml(); return; }
   if (d.kind === 'prefs') {
     const th = PREFS.theme || themeGet(), sc = PREFS.scale || 1, field = isWorker() || me.sys;
@@ -6005,15 +6040,15 @@ async function act(el){
       try { const ed = ui.otEdit, r = await api(ed ? 'PUT' : 'POST', '/api/overtime' + (ed ? '/' + ed : ''), body);
         if (ed) { const i = OVERTIME.findIndex(x => x.id === ed); if (i >= 0) OVERTIME[i] = r.entry; } else OVERTIME.push(r.entry);
         ui.otEdit = null; ui.otFrom = ui.otTo = ui.otNote = ''; ui.otDate = body.date; document.activeElement?.blur(); render(); toast(ed ? 'Запись изменена' : 'Записано: ' + otDur(otMin(r.entry))); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
-    case 'smNew': ui.smType = 'late'; return openDrawer('staffMark', null, id);
+    case 'smNew': ui.smType = 'late'; if (el.dataset.day) ui.stDay = el.dataset.day; return openDrawer('staffMark', null, id);
     case 'smEdit': ui.smType = null; return openDrawer('staffMark', id);
     case 'smType': { const keep = { f: $('sm-from')?.value, t: $('sm-to')?.value, n: $('sm-note')?.value }; ui.smType = id; renderDrawer(); if ($('sm-from') && keep.f) $('sm-from').value = keep.f; if ($('sm-to') && (keep.t || keep.f)) $('sm-to').value = keep.t || keep.f; if ($('sm-note')) $('sm-note').value = keep.n || ''; return; }
     case 'smSave': { const d = ui.drawer, x = STAFF_MARKS.find(m => m.id === id), type = ui.smType || x?.type || 'late';
       const body = { user: x ? x.user : d.ctx, type, from: $('sm-from').value, to: $('sm-to')?.value || $('sm-from').value, time: $('sm-time')?.value || '', note: $('sm-note').value.trim() };
       try { const r = await api(x ? 'PUT' : 'POST', '/api/staff-marks' + (x ? '/' + x.id : ''), body);
-        if (x) Object.assign(x, r.mark); else STAFF_MARKS.push(r.mark); closeDrawer(); render(); toast(MARK_T[type] + ': отмечено'); refresh().catch(() => {}); }
+        if (x) Object.assign(x, r.mark); else STAFF_MARKS.push(r.mark); render(); openDrawer('staffDay', r.mark.user, ui.stDay && ui.stDay >= r.mark.from && ui.stDay <= r.mark.to ? ui.stDay : r.mark.from); toast(MARK_T[type] + ': отмечено'); refresh().catch(() => {}); }
       catch(e) { $('ferr').textContent = errText(e); } return; }
-    case 'smDel': try { await api('DELETE', '/api/staff-marks/' + id); STAFF_MARKS = STAFF_MARKS.filter(m => m.id !== id); closeDrawer(); render(); toast('Отметка удалена'); } catch(e) { toast(errText(e)); } return;
+    case 'smDel': { const x = STAFF_MARKS.find(m => m.id === id); try { await api('DELETE', '/api/staff-marks/' + id); STAFF_MARKS = STAFF_MARKS.filter(m => m.id !== id); render(); if (x) openDrawer('staffDay', x.user, ui.stDay || x.from); else closeDrawer(); toast('Отметка удалена'); } catch(e) { toast(errText(e)); } return; }
     case 'workCal': ui.wcDraft = JSON.parse(JSON.stringify(WORK_CAL)); return openDrawer('workCal');
     case 'wcEx': { const d = $('wc-date')?.value; if (!d) return toast('Выберите дату'); const k = id === 'work' ? 'work' : 'off', o = k === 'work' ? 'off' : 'work';
       const C = ui.wcDraft; ui.wcDraft = { ...C, from: $('wc-from').value || C.from, to: $('wc-to').value || C.to, [k]: [...new Set([...(C[k] || []), d])].sort(), [o]: (C[o] || []).filter(x => x !== d) }; return renderDrawer(); }
@@ -6100,7 +6135,13 @@ async function act(el){
     case 'sF': ui.sF = id; return render();
     case 'sDiff': ui.sDiff = !ui.sDiff; return render();
     case 'woF': ui.woF = id; return render();
-    case 'stDay': ui.stDay = id; if (id.slice(0, 7) !== (ui.stMonth || today().slice(0, 7)) && el.closest('.toolbar')) ui.stMonth = id.slice(0, 7); render(); if (el.closest('.sgt')) document.querySelector('.sgday')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
+    case 'stDay': ui.stDay = id; ui.stMonth = id.slice(0, 7); return render();
+    case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
+    case 'stCard': return openDrawer('staffCard', id);
+    case 'otHEdit': return openDrawer('otHead', id);
+    case 'otHSave': { const x = OVERTIME.find(o => o.id === id), body = { date: $('oh-date').value, from: $('oh-from').value, to: $('oh-to').value, note: $('oh-note').value.trim() };
+      try { const r = await api('PUT', '/api/overtime/' + id, body); Object.assign(x, r.entry); render(); openDrawer('staffDay', x.by, x.date); toast('Запись изменена'); refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
+    case 'otHDel': { const x = OVERTIME.find(o => o.id === id); try { await api('DELETE', '/api/overtime/' + id); OVERTIME = OVERTIME.filter(o => o.id !== id); render(); openDrawer('staffDay', x.by, x.date); toast('Запись удалена'); } catch(e) { toast(errText(e)); } return; }
     case 'stMonth': ui.stMonth = id; return render();
     case 'spG': ui.spG = id; return render();
     case 'spP': ui.spP = id; return render();
