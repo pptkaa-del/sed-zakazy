@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Управление предприятием</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<script>try{var t=localStorage.getItem('sed-theme');if(['light','dark','telecom','pink','engineer','upr'].indexOf(t)>=0)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<script>try{var t=localStorage.getItem('sed-theme');if(['light','dark','telecom','pink','engineer','upr','anime'].indexOf(t)>=0)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&family=Montserrat:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=PT+Sans:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&family=Montserrat:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=PT+Sans:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap">
 <style>
 /* Layout: header with three workspaces (Заказы · Бухгалтерия · План-график); orders = project tree + order sheet; accounting = grouped payables; plan = Gantt. */
 :root{
@@ -23,7 +23,7 @@
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-theme="telecom"]):not([data-theme="pink"]):not([data-theme="engineer"]):not([data-theme="upr"]){
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-theme="telecom"]):not([data-theme="pink"]):not([data-theme="engineer"]):not([data-theme="upr"]):not([data-theme="anime"]){
   --paper:#11151B; --sheet:#181E26; --ink:#E6EAF0; --ink-2:#9AA5B4; --rule:#2C343F; --rule-2:#222932;
   --stamp:#8C9BFF; --stamp-soft:#252C55; --stamp-ink:#0E1220; --work:#4FD1C5; --work-soft:#173634;
   --ok:#5CCB92; --ok-soft:#173327; --warn:#F0AE55; --warn-soft:#3A2A14; --bad:#FF7B7B; --bad-soft:#3E1C1F;
@@ -610,6 +610,55 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 @media (prefers-reduced-motion:reduce){:root[data-theme="pink"] h1::before{animation:none}}
 @media (max-width:900px){:root[data-theme="pink"] header.top{background-position:right -40px top 2px,0 0;background-size:220px 62px,auto}}
 @media (max-width:600px){:root[data-theme="pink"] header.top{background-image:linear-gradient(115deg,rgba(255,255,255,.94),rgba(255,240,246,.85) 60%,rgba(194,48,110,.12));background-size:auto;background-position:0 0;background-repeat:no-repeat}}
+
+/* ===== Тема «Аниме»: пастельное небо, лепестки сакуры, комиксные контуры и тени, округлый шрифт ===== */
+:root[data-theme="anime"]{
+  --paper:#FFF4FA; --sheet:#FFFFFF; --ink:#2B1D4E; --ink-2:#6E5A92; --rule:#E9D8F5; --rule-2:#F4EAFB;
+  --stamp:#FF4F9A; --stamp-soft:#FFE0EE; --stamp-ink:#FFFFFF; --work:#7A5CFF; --work-soft:#ECE5FF;
+  --ok:#1F9D6B; --ok-soft:#DDF7EC; --warn:#D9822B; --warn-soft:#FFF0D9; --bad:#E5334B; --bad-soft:#FFE1E6;
+  --info:#2E8BE6; --info-soft:#DDEFFF; --mute:#8A7BA6; --mute-soft:#F3ECFA;
+  --shadow:4px 4px 0 #2B1D4E; --tile-filter:saturate(1.15) hue-rotate(-8deg);
+  --f-display:"M PLUS Rounded 1c","Nunito",system-ui,sans-serif; --f-body:"M PLUS Rounded 1c","Nunito",system-ui,sans-serif;
+  color-scheme:light;
+}
+:root[data-theme="anime"]{background:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27%3E%3Ccircle cx=%273%27 cy=%273%27 r=%271.2%27 fill=%27%23B48CFF%27 opacity=%27.18%27/%3E%3C/svg%3E") 0 0/12px 12px,linear-gradient(180deg,#CDEBFF 0%,#FFE6F2 45%,#FFF4FA 100%) fixed}
+:root[data-theme="anime"] body{min-height:100vh;background:transparent}
+/* лепестки сакуры медленно летят по всей странице, не мешая нажимать */
+:root[data-theme="anime"] body::before,:root[data-theme="anime"] body::after{content:"";position:fixed;inset:-260px 0 0;pointer-events:none;z-index:-1;background:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27260%27 height=%27260%27 viewBox=%270 0 260 260%27%3E%3Cg transform=%27translate%2830 40%29 rotate%2820%29%27%3E%3Cpath d=%27M0 -7 C5 -7 8 -2 6 3 C4 7 1 8 0 6 C-1 8 -4 7 -6 3 C-8 -2 -5 -7 0 -7Z%27 fill=%27%23FF8FC2%27 opacity=%270.55%27/%3E%3C/g%3E%3Cg transform=%27translate%28150 20%29 rotate%28-35%29 scale%28.8%29%27%3E%3Cpath d=%27M0 -7 C5 -7 8 -2 6 3 C4 7 1 8 0 6 C-1 8 -4 7 -6 3 C-8 -2 -5 -7 0 -7Z%27 fill=%27%23FFB3D5%27 opacity=%270.6%27/%3E%3C/g%3E%3Cg transform=%27translate%28210 120%29 rotate%2860%29 scale%281.1%29%27%3E%3Cpath d=%27M0 -7 C5 -7 8 -2 6 3 C4 7 1 8 0 6 C-1 8 -4 7 -6 3 C-8 -2 -5 -7 0 -7Z%27 fill=%27%23FF8FC2%27 opacity=%270.5%27/%3E%3C/g%3E%3Cg transform=%27translate%2890 150%29 rotate%28-10%29 scale%28.7%29%27%3E%3Cpath d=%27M0 -7 C5 -7 8 -2 6 3 C4 7 1 8 0 6 C-1 8 -4 7 -6 3 C-8 -2 -5 -7 0 -7Z%27 fill=%27%23FFC9E1%27 opacity=%270.7%27/%3E%3C/g%3E%3Cg transform=%27translate%2840 220%29 rotate%2880%29 scale%28.9%29%27%3E%3Cpath d=%27M0 -7 C5 -7 8 -2 6 3 C4 7 1 8 0 6 C-1 8 -4 7 -6 3 C-8 -2 -5 -7 0 -7Z%27 fill=%27%23FF9FCB%27 opacity=%270.55%27/%3E%3C/g%3E%3Cg transform=%27translate%28190 230%29 rotate%28-60%29 scale%28.6%29%27%3E%3Cpath d=%27M0 -7 C5 -7 8 -2 6 3 C4 7 1 8 0 6 C-1 8 -4 7 -6 3 C-8 -2 -5 -7 0 -7Z%27 fill=%27%23FFB3D5%27 opacity=%270.6%27/%3E%3C/g%3E%3C/svg%3E") 0 0/260px 260px;animation:animePetals 28s linear infinite}
+:root[data-theme="anime"] body::after{background-size:380px 380px;opacity:.6;animation-duration:44s;animation-direction:normal;background-position:120px 60px}
+@keyframes animePetals{from{transform:translate3d(0,0,0)}to{transform:translate3d(-260px,260px,0)}}
+@media (prefers-reduced-motion:reduce){:root[data-theme="anime"] body::before,:root[data-theme="anime"] body::after{animation:none}}
+:root[data-theme="anime"] header.top{background:linear-gradient(120deg,#FF7EB6 0%,#B48CFF 55%,#7FD3FF 100%);border-bottom:3px solid #2B1D4E;color:#fff}
+:root[data-theme="anime"] h1{color:#fff;font-weight:800;letter-spacing:.01em;text-shadow:2px 2px 0 #2B1D4E,-1px -1px 0 #2B1D4E,1px -1px 0 #2B1D4E,-1px 1px 0 #2B1D4E}
+:root[data-theme="anime"] h1::before{content:"";display:inline-block;width:22px;height:22px;margin-right:8px;vertical-align:-3px;background:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M12 0 L14.6 9.4 L24 12 L14.6 14.6 L12 24 L9.4 14.6 L0 12 L9.4 9.4Z%27 fill=%27%23FFD84D%27 stroke=%27%232B1D4E%27 stroke-width=%271.2%27/%3E%3C/svg%3E") no-repeat center/contain;animation:animeTwinkle 2.4s ease-in-out infinite}
+@keyframes animeTwinkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(.75) rotate(45deg)}}
+@media (prefers-reduced-motion:reduce){:root[data-theme="anime"] h1::before{animation:none}}
+:root[data-theme="anime"] header.top .sub{color:#fff;font-weight:700;opacity:.95}
+:root[data-theme="anime"] nav.views{background:rgba(255,255,255,.85);border:2px solid #2B1D4E;border-radius:16px;box-shadow:3px 3px 0 #2B1D4E}
+:root[data-theme="anime"] nav.views a{border-radius:12px;color:#2B1D4E;font-weight:700}
+:root[data-theme="anime"] nav.views a:hover{background:#FFE0EE}
+:root[data-theme="anime"] nav.views a.on{background:#FF4F9A;color:#fff;box-shadow:none;border:2px solid #2B1D4E}
+:root[data-theme="anime"] nav.views .badge{background:#FFD84D;color:#2B1D4E;border:1.5px solid #2B1D4E}
+:root[data-theme="anime"] .ubtn{background:#fff;border:2px solid #2B1D4E;box-shadow:2px 2px 0 #2B1D4E}
+:root[data-theme="anime"] .avatar{background:#7A5CFF;color:#fff;border:2px solid #2B1D4E}
+:root[data-theme="anime"] .btn{border:2px solid #2B1D4E;border-radius:12px;font-weight:700;box-shadow:2px 2px 0 #2B1D4E;transition:transform .08s,box-shadow .08s}
+:root[data-theme="anime"] .btn:active{transform:translate(2px,2px);box-shadow:0 0 0 #2B1D4E}
+:root[data-theme="anime"] .btn.primary{background:linear-gradient(135deg,#FF6FAE,#FF4F9A);color:#fff}
+:root[data-theme="anime"] .btn.ok{background:#4FD1A0;color:#173A2D}
+:root[data-theme="anime"] .btn.ghost{box-shadow:none;border-color:transparent}
+:root[data-theme="anime"] .in{border:2px solid #2B1D4E;border-radius:12px}
+:root[data-theme="anime"] .in:focus{box-shadow:0 0 0 3px #FFB3D5;outline:none}
+:root[data-theme="anime"] .card,:root[data-theme="anime"] .box,:root[data-theme="anime"] .empty,:root[data-theme="anime"] .stat,:root[data-theme="anime"] .pgroup,:root[data-theme="anime"] .wgroup,:root[data-theme="anime"] .pproj,:root[data-theme="anime"] .gantt,:root[data-theme="anime"] .plist{border:2px solid #2B1D4E;border-radius:18px;box-shadow:4px 4px 0 #2B1D4E;background:#fff}
+:root[data-theme="anime"] .empty{border-style:dashed}
+:root[data-theme="anime"] h3,:root[data-theme="anime"] h4,:root[data-theme="anime"] .d-head h2{color:#2B1D4E;font-weight:800}
+:root[data-theme="anime"] .chip{border-radius:999px;border:1.5px solid currentColor;font-weight:700}
+:root[data-theme="anime"] .seg{border-radius:14px}
+:root[data-theme="anime"] .seg button.on,:root[data-theme="anime"] .seg a.on{background:#7A5CFF;color:#fff;box-shadow:2px 2px 0 #2B1D4E}
+:root[data-theme="anime"] table.jt th,:root[data-theme="anime"] .comp th,:root[data-theme="anime"] .urow.head,:root[data-theme="anime"] .g-head .g-lab,:root[data-theme="anime"] .g-head .g-track{background:#ECE5FF;color:#2B1D4E;font-weight:800}
+:root[data-theme="anime"] .tile{background:linear-gradient(140deg,#FF7EB6,#B48CFF);border:2px solid #2B1D4E;color:#fff;box-shadow:4px 4px 0 #2B1D4E}
+:root[data-theme="anime"] .tile span,:root[data-theme="anime"] .tile small{color:rgba(255,255,255,.9)}:root[data-theme="anime"] .tile b{color:#fff}
+:root[data-theme="anime"] .drawer{border-left:3px solid #2B1D4E;border-top-left-radius:22px;border-bottom-left-radius:22px}
+:root[data-theme="anime"] #toast,:root[data-theme="anime"] .toast{border:2px solid #2B1D4E;border-radius:16px;box-shadow:3px 3px 0 #2B1D4E}
 
 /* ===== Theme «Инженерная»: чертёж-«синька» — тёмно-синий, миллиметровая сетка, моноширинный шрифт, прямые углы ===== */
 :root[data-theme="engineer"]{
@@ -4715,7 +4764,7 @@ function renderDrawer(){
   }
   if (d.kind === 'prefs') {
     const th = PREFS.theme || themeGet(), sc = PREFS.scale || 1, field = isWorker() || me.sys;
-    const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40', pink:'#C2306E', engineer:'#123A5E', upr:'linear-gradient(180deg,#0B2A57 70%,#fff 70%,#fff 80%,#0D4C92 80%,#0D4C92 90%,#D52B1E 90%)' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком', pink:'Розовая', engineer:'Инженерная', upr:'ФКУ Упрдор' };
+    const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40', pink:'#C2306E', engineer:'#123A5E', upr:'linear-gradient(180deg,#0B2A57 70%,#fff 70%,#fff 80%,#0D4C92 80%,#0D4C92 90%,#D52B1E 90%)', anime:'linear-gradient(135deg,#FF7EB6,#B48CFF 55%,#7FD3FF)' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком', pink:'Розовая', engineer:'Инженерная', upr:'ФКУ Упрдор', anime:'Аниме' };
     const col = (k, l) => { const v = k.startsWith('n_') ? NEED_COLOR[k.slice(2)] : DT_COLOR[k]; return `<label class="pcol"><input type="color" data-pcolor="${k}" value="${v}"><span>${esc(l)}</span></label>`; };
     D.innerHTML = dh('Настройки') + `<div class="d-body">
       <p class="dim" style="margin:0">Настройки ваши личные: они сохраняются в вашей учётной записи и действуют на любом устройстве.</p>
@@ -5307,7 +5356,7 @@ async function onSubmit(e){
 }
 
 /* ---------- theme ---------- */
-const THEMES = ['system', 'light', 'dark', 'telecom', 'pink', 'engineer', 'upr'];
+const THEMES = ['system', 'light', 'dark', 'telecom', 'pink', 'engineer', 'upr', 'anime'];
 function themeGet(){ try { const t = localStorage.getItem('sed-theme'); return THEMES.includes(t) ? t : 'system'; } catch(e) { return 'system'; } }
 function themeSet(t){
   try { if (t === 'system') localStorage.removeItem('sed-theme'); else localStorage.setItem('sed-theme', t); } catch(e){}
