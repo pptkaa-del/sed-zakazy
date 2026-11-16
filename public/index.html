@@ -339,6 +339,11 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgt td:hover{outline:2px solid var(--stamp);outline-offset:-2px}.sgt td.sel{outline:2px solid var(--ink);outline-offset:-2px}.sgdot{color:var(--stamp);font-size:9px}
 .sgt .sgsum{min-width:84px;padding:0 8px;font-weight:400;color:var(--ink);cursor:default;white-space:nowrap}.sgt thead .sgsum{font-size:11px}
 .sgnote{display:block;padding:8px 14px}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vcard{text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;font:inherit;color:inherit}.vcard:hover{border-color:var(--stamp)}
+.vtop{display:flex;gap:10px;justify-content:space-between;align-items:center}.vtop b{font-size:16px}.plate{font:600 13px var(--f-mono,monospace);border:1.5px solid var(--ink);border-radius:4px;padding:1px 6px;background:var(--sheet);white-space:nowrap}
+.vcard .kv{margin:0}.vrow{align-items:flex-end}.vrow>label:not(.btn){display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.vlist{list-style:none;margin:0;padding:0}.vlist li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--rule-2);font-size:14px}.vlist li:first-child{border-top:0}
+.ptform{padding:14px 16px;display:flex;flex-direction:column;gap:10px}.ptrow{display:grid;grid-template-columns:180px minmax(0,1fr) 220px minmax(0,1fr);gap:10px}.ptrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+@media (max-width:900px){.ptrow{grid-template-columns:1fr 1fr}.ptrow .ptdesc{grid-column:1/-1}}
 .smtypes{flex-wrap:wrap}.mywork{padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}.rswitch{white-space:nowrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
@@ -1103,6 +1108,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#map" data-v="map">Карта</a>
       <a href="#dt" data-v="dt">Карта объектов</a>
       <a href="#devs" data-v="devs" id="devsTab">Разработки</a>
+      <a href="#transport" data-v="transport" id="trTab" hidden>Транспорт</a>
       <a href="#notes" data-v="notes" id="notesTab" hidden>Задачи <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#mytasks" data-v="mytasks" id="mytTab" hidden>Мои задачи <span class="badge" id="mytBadge" hidden></span></a>
       <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
@@ -1327,7 +1333,7 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || !can('devs') || (isWorker() && !DEVS.length);
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -1373,11 +1379,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Склад', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Задачи', [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
-const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes' };
+const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts' };
 const viewOk = v => !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
 // the checkbox tree of the organization and user forms: checked — shown; what the organization hides is not offered to its users
 function secTree(hide, orgHide){
@@ -1436,7 +1442,7 @@ function stockTabs(){
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
   pending = false;
-  const navV = STOCK_VIEWS.includes(ui.view) ? 'stock' : ADMIN_VIEWS.includes(ui.view) ? 'users' : ui.view;
+  const navV = STOCK_VIEWS.includes(ui.view) ? 'stock' : ADMIN_VIEWS.includes(ui.view) ? 'users' : TR_VIEWS.includes(ui.view) ? 'transport' : ui.view;
   document.querySelectorAll('#views a').forEach(a => a.classList.toggle('on', a.dataset.v === navV));
   const n = S.invoices.filter(i => i.status === 'topay').length;
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
@@ -1448,7 +1454,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -4177,6 +4183,82 @@ function staffGrid(people){
         <td class="sgsum ${r.ext ? 'sgplus' : ''}">${r.ext ? `<b>${hmm(r.ext)}</b>` : '—'}</td><td class="sgsum ${r.pen.total ? 'sgminus' : ''}" title="${esc(r.pen.tip)}">${r.pen.total ? `<b>${hmm(r.pen.total)}</b>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
     <small class="dim sgnote">Нажмите на клетку — что было в этот день (отметки, ненормированный день, назначения); на имя — подробно по сотруднику.</small></section>`;
 }
+/* ===== «Транспорт» (руководители): машины компании, ТО по дате и пробегу, документы; «Запчасти» — номер, описание, ссылка ===== */
+let VEHICLES = [], PARTS = [];
+const TR_VIEWS = ['transport', 'tparts'];
+const trPut = v => { const i = VEHICLES.findIndex(x => x.id === v.id); if (i >= 0) VEHICLES[i] = v; else VEHICLES.push(v); };
+const trTabs = () => `<nav class="seg stabs" aria-label="Транспорт">${[['transport', 'Транспорт', 'transport:cars'], ['tparts', 'Запчасти', 'transport:parts']].filter(([, , k]) => can(k)).map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'tparts' && PARTS.length ? ` <span class="dim">${PARTS.length}</span>` : ''}</a>`).join('')}</nav>`;
+const kmF = n => n == null || n === '' ? '—' : Number(n).toLocaleString('ru-RU') + ' км';
+const lastTo = v => (v.to || []).slice().sort((a, b) => b.date.localeCompare(a.date) || b.mileage - a.mileage)[0];
+// the next maintenance by the interval: the mileage of the last one plus the interval
+function toNext(v){
+  const l = lastTo(v); if (!v.toEvery || !l) return null;
+  const at = l.mileage + v.toEvery, left = v.mileage != null ? at - v.mileage : null;
+  return { at, left };
+}
+const vName = v => v ? `${v.name}${v.plate ? ' · ' + v.plate : ''}` : '';
+function vTransport(){
+  const q = (ui.trq || '').trim().toLowerCase();
+  const L = VEHICLES.filter(v => !q || [v.name, v.plate, v.vin, v.driver, v.note].join(' ').toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="trq" type="search" placeholder="Марка, номер, VIN, водитель" aria-label="Поиск транспорта" value="${esc(ui.trq || '')}" style="flex:1 1 220px;max-width:340px"></span>
+    <button class="btn primary" data-act="vNew">+ Транспорт</button></div>`;
+  if (!VEHICLES.length) return head + '<div class="empty"><h3>Транспорта пока нет</h3>Добавьте машину компании: марка и модель, госномер, пробег. Потом записывайте ТО и прикладывайте заказ-наряды.</div>';
+  if (!L.length) return head + '<div class="empty">Ничего не найдено</div>';
+  return head + `<div class="vgrid">${L.map(v => { const l = lastTo(v), nx = toNext(v), np = PARTS.filter(x => x.vehicleId === v.id).length;
+    return `<button class="card vcard" data-act="vOpen" data-id="${v.id}"><div class="vtop"><b>${esc(v.name)}</b>${v.plate ? `<span class="plate">${esc(v.plate)}</span>` : ''}</div>
+      <dl class="kv"><dt>Пробег</dt><dd>${kmF(v.mileage)}</dd>
+        <dt>Последнее ТО</dt><dd>${l ? `${fmtD(l.date)} · ${kmF(l.mileage)}` : '<span class="dim">не было</span>'}</dd>
+        ${nx ? `<dt>Следующее ТО</dt><dd class="${nx.left != null && nx.left <= 0 ? 'bad-t' : nx.left != null && nx.left <= 1000 ? 'warn-t' : ''}">на ${kmF(nx.at)}${nx.left != null ? (nx.left <= 0 ? ` · пора (перепробег ${kmF(-nx.left)})` : ` · через ${kmF(nx.left)}`) : ''}</dd>` : ''}
+        ${v.driver ? `<dt>Водитель</dt><dd>${esc(v.driver)}</dd>` : ''}</dl>
+      <small class="dim">ТО: ${(v.to || []).length} · документов: ${(v.docs || []).length} · запчастей: ${np}</small></button>`; }).join('')}</div>`;
+}
+function vehicleHtml(v){
+  const tos = (v.to || []).slice().sort((a, b) => b.date.localeCompare(a.date) || b.mileage - a.mileage), docs = (v.docs || []).slice().sort((a, b) => (b.date || b.at).localeCompare(a.date || a.at));
+  const parts = PARTS.filter(x => x.vehicleId === v.id), nx = toNext(v);
+  return `<div class="d-body">
+    <div class="box"><h4>Транспорт</h4><div class="form" data-keep>
+      <label class="wide">Марка и модель<input class="in" id="v-name" value="${esc(v?.name || '')}" maxlength="200" placeholder="Например: ГАЗель Next"></label>
+      <label>Госномер<input class="in mono" id="v-plate" value="${esc(v?.plate || '')}" maxlength="20" placeholder="А123ВС777"></label>
+      <label>VIN<input class="in mono" id="v-vin" value="${esc(v?.vin || '')}" maxlength="17"></label>
+      <label>Год выпуска<input class="in mono" id="v-year" value="${esc(v?.year || '')}" maxlength="4" inputmode="numeric"></label>
+      <label>Пробег сейчас, км<input class="in mono" id="v-mileage" value="${esc(v?.mileage ?? '')}" inputmode="numeric"></label>
+      <label>ТО каждые, км<input class="in mono" id="v-every" value="${esc(v?.toEvery ?? '')}" inputmode="numeric" placeholder="например, 15000"></label>
+      <label>Водитель<input class="in" id="v-driver" value="${esc(v?.driver || '')}" maxlength="200"></label>
+      <label class="wide">Примечание<textarea class="in" id="v-note" rows="2" maxlength="2000">${esc(v?.note || '')}</textarea></label></div>
+      <div class="row-g"><button class="btn primary" data-act="vSave" data-id="${v?.id || ''}">${v?.id ? 'Сохранить' : 'Добавить транспорт'}</button>${v?.id ? armBtn('vdel:' + v.id, 'Удалить транспорт', 'vDel', v.id, 'btn danger') : ''}</div></div>
+    ${v?.id ? `
+    <div class="box"><h4>Техническое обслуживание${nx ? ` <span class="dim">· следующее на ${kmF(nx.at)}</span>` : ''}</h4>
+      <div class="row-g vrow" data-keep><label>Дата<input class="in" type="date" id="to-date" value="${today()}"></label><label>Пробег, км<input class="in mono" id="to-km" value="${esc(v.mileage ?? '')}" inputmode="numeric" style="width:130px"></label>
+        <label style="flex:1 1 220px">Что сделано<input class="in" id="to-work" maxlength="2000" placeholder="Замена масла и фильтров…"></label><label>Сумма, ₽<input class="in mono" id="to-cost" maxlength="30" style="width:110px" inputmode="decimal"></label>
+        <button class="btn" data-act="toAdd" data-id="${v.id}" style="align-self:flex-end">+ ТО</button></div>
+      ${tos.length ? `<ul class="vlist">${tos.map(t => `<li><div><b>${fmtD(t.date)}</b> · ${kmF(t.mileage)}${t.cost ? ` · ${esc(t.cost)} ₽` : ''}${t.work ? `<div class="otn">${esc(t.work)}</div>` : ''}</div>${armBtn('tod:' + t.id, '✕', 'toDel', v.id + '|' + t.id, 'btn sm ghost')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">ТО ещё не записывали.</p>'}</div>
+    <div class="box"><h4>Документы <span class="dim">· заказ-наряды, акты, страховка</span></h4>
+      <div class="row-g vrow" data-keep><label style="flex:1 1 200px">Название<input class="in" id="vd-title" maxlength="200" placeholder="Заказ-наряд на ремонт"></label><label>Дата<input class="in" type="date" id="vd-date"></label>
+        <label class="btn" style="align-self:flex-end">📎 Загрузить файл<input type="file" data-up="vDoc" data-id="${v.id}" hidden></label></div>
+      ${docs.length ? `<ul class="vlist">${docs.map(d => `<li><div><a href="/files/${esc(d.file.id)}" target="_blank" rel="noopener"><b>${esc(d.title)}</b></a> <small class="dim">${d.date ? fmtD(d.date) + ' · ' : ''}${esc(d.file.name)} · ${fmtSize(d.file.size || 0)}</small></div>${armBtn('vdd:' + d.id, '✕', 'vDocDel', v.id + '|' + d.id, 'btn sm ghost')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документов нет.</p>'}</div>
+    <div class="box"><h4>Запчасти <span class="dim">· ${parts.length}</span></h4>${parts.length ? `<ul class="vlist">${parts.map(x => `<li><div><b class="mono">${esc(x.number || '—')}</b> ${esc(x.name)}${x.link ? ` · <a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">🔗 ссылка</a>` : ''}</div></li>`).join('')}</ul>` : ''}
+      <button class="btn sm" data-act="ptFor" data-id="${v.id}">+ Запчасть для этой машины</button></div>` : ''}
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+function vParts(){
+  const ed = ui.ptEdit && PARTS.find(x => x.id === ui.ptEdit), q = (ui.ptq || '').trim().toLowerCase(), fv = ui.ptVeh || '';
+  const L = PARTS.filter(x => (!fv || (fv === '_' ? !x.vehicleId : x.vehicleId === fv)) && (!q || [x.number, x.name, x.link, x.note, vName(VEHICLES.find(v => v.id === x.vehicleId))].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => (a.number || a.name).localeCompare(b.number || b.name, 'ru'));
+  const vopt = sel => `<option value="">— для любого / общая —</option>${VEHICLES.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(v => `<option value="${v.id}" ${sel === v.id ? 'selected' : ''}>${esc(vName(v))}</option>`).join('')}`;
+  return `<section class="card ptform"><h3 style="margin:0">${ed ? 'Изменить запчасть' : 'Новая запчасть'}</h3>
+      <div class="ptrow" data-keep><label>Номер (артикул)<input class="in mono" id="pt-num" maxlength="100" value="${esc(ed ? ed.number : ui.ptNum || '')}" placeholder="например, 0 986 452 041"></label>
+        <label class="ptdesc">Описание<input class="in" id="pt-name" maxlength="1000" value="${esc(ed ? ed.name : ui.ptName || '')}" placeholder="Масляный фильтр"></label>
+        <label>Транспорт<select class="in" id="pt-veh">${vopt(ed ? ed.vehicleId || '' : ui.ptFor || '')}</select></label>
+        <label class="ptdesc">Ссылка<input class="in" id="pt-link" maxlength="1000" inputmode="url" value="${esc(ed ? ed.link : ui.ptLink || '')}" placeholder="https://… магазин или каталог"></label></div>
+      <div class="row-g"><button class="btn primary" data-act="ptSave">${ed ? 'Сохранить' : 'Добавить'}</button>${ed ? `<button class="btn" data-act="ptCancel">Отмена</button>${armBtn('ptd:' + ed.id, 'Удалить', 'ptDel', ed.id, 'btn danger')}` : ''}</div></section>
+    <div class="toolbar" style="margin-top:14px"><span data-keep style="display:contents"><input class="in" id="ptq" type="search" placeholder="Номер, описание, ссылка" aria-label="Поиск запчасти" value="${esc(ui.ptq || '')}" style="flex:1 1 220px;max-width:340px"></span>
+      <select class="f" id="pt-fv" aria-label="Транспорт"><option value="">Все машины</option>${VEHICLES.map(v => `<option value="${v.id}" ${fv === v.id ? 'selected' : ''}>${esc(vName(v))}</option>`).join('')}<option value="_" ${fv === '_' ? 'selected' : ''}>Общие</option></select></div>
+    ${L.length ? `<section class="card" style="padding:0;overflow:hidden"><table class="jt"><thead><tr><th>Номер</th><th>Описание</th><th>Транспорт</th><th>Ссылка</th><th></th></tr></thead><tbody>
+      ${L.map(x => `<tr><td data-l="Номер" class="mono"><b>${esc(x.number || '—')}</b></td><td data-l="Описание">${esc(x.name || '—')}</td><td data-l="Транспорт">${x.vehicleId ? esc(vName(VEHICLES.find(v => v.id === x.vehicleId))) : '<span class="dim">общая</span>'}</td>
+        <td data-l="Ссылка">${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" title="${esc(x.link)}">🔗 ${esc(jlHost(x.link))}</a>` : '—'}</td><td class="jt-a"><button class="btn sm" data-act="ptEdit" data-id="${x.id}">Изменить</button></td></tr>`).join('')}</tbody></table></section>`
+      : `<div class="empty">${PARTS.length ? 'Ничего не найдено' : 'Запчастей пока нет. Добавьте номер, описание и ссылку.'}</div>`}`;
+}
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
 function staffRow(u, day){
@@ -5062,6 +5144,7 @@ function renderDrawer(){
     </div>`;
   }
   if (d.kind === 'staffMark') { const x = STAFF_MARKS.find(m => m.id === d.id); D.innerHTML = dh(x ? 'Изменить отметку' : 'Отметка сотруднику') + markFormHtml(x, d.ctx); return; }
+  if (d.kind === 'vehicle') { const v = VEHICLES.find(x => x.id === d.id); D.innerHTML = dh(v ? esc(vName(v)) : 'Новый транспорт') + vehicleHtml(v || {}); return; }
   if (d.kind === 'staffDay') { const u = STAFF.find(x => x.id === d.id); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + staffDayHtml(d.id, d.ctx); return; }
   if (d.kind === 'staffCard') { const u = STAFF.find(x => x.id === d.id), day = ui.stDay || today(); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + (u ? `<div class="d-body staffd">${staffCardHtml(staffRow(u, day), day)}<div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>` : ''); return; }
   if (d.kind === 'otHead') { const x = OVERTIME.find(o => o.id === d.id); D.innerHTML = dh('Ненормированный день') + (x ? otHeadHtml(x) : '<div class="d-body"><p>Запись удалена</p></div>'); return; }
@@ -6211,6 +6294,21 @@ async function act(el){
     case 'stDay': ui.stDay = id; ui.stMonth = id.slice(0, 7); return render();
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
+    case 'vNew': return openDrawer('vehicle', null);
+    case 'vOpen': return openDrawer('vehicle', id);
+    case 'vSave': { const body = { name: $('v-name').value, plate: $('v-plate').value, vin: $('v-vin').value, year: $('v-year').value.trim(), mileage: $('v-mileage').value.replace(/\s/g, ''), toEvery: $('v-every').value.replace(/\s/g, ''), driver: $('v-driver').value, note: $('v-note').value };
+      try { const r = await api(id ? 'PATCH' : 'POST', '/api/vehicles' + (id ? '/' + id : ''), body); trPut(r.vehicle); render(); if (id) { renderDrawer(); toast('Сохранено'); } else { openDrawer('vehicle', r.vehicle.id); toast('Транспорт добавлен'); } refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
+    case 'vDel': try { await api('DELETE', '/api/vehicles/' + id); VEHICLES = VEHICLES.filter(v => v.id !== id); PARTS.forEach(x => { if (x.vehicleId === id) x.vehicleId = null; }); closeDrawer(); render(); toast('Транспорт удалён'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return;
+    case 'toAdd': try { const r = await api('POST', `/api/vehicles/${id}/to`, { date: $('to-date').value, mileage: $('to-km').value.replace(/\s/g, ''), work: $('to-work').value, cost: $('to-cost').value }); trPut(r.vehicle); renderDrawer(); render(); toast('ТО записано'); } catch(e) { $('ferr').textContent = errText(e); } return;
+    case 'toDel': { const [vid, tid] = id.split('|'); try { const r = await api('DELETE', `/api/vehicles/${vid}/to/${tid}`); trPut(r.vehicle); renderDrawer(); render(); } catch(e) { toast(errText(e)); } return; }
+    case 'vDocDel': { const [vid, did] = id.split('|'); try { const r = await api('DELETE', `/api/vehicles/${vid}/docs/${did}`); trPut(r.vehicle); renderDrawer(); render(); } catch(e) { toast(errText(e)); } return; }
+    case 'ptFor': ui.ptFor = id; ui.ptEdit = null; closeDrawer(); location.hash = '#tparts'; return;
+    case 'ptEdit': ui.ptEdit = id; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return;
+    case 'ptCancel': ui.ptEdit = null; return render();
+    case 'ptSave': { const ed = ui.ptEdit, body = { number: $('pt-num').value, name: $('pt-name').value, vehicleId: $('pt-veh').value || null, link: $('pt-link').value.trim() };
+      try { const r = await api(ed ? 'PUT' : 'POST', '/api/parts' + (ed ? '/' + ed : ''), body); if (ed) Object.assign(PARTS.find(x => x.id === ed), r.part); else PARTS.push(r.part);
+        ui.ptEdit = null; ui.ptNum = ui.ptName = ui.ptLink = ''; document.activeElement?.blur(); render(); toast(ed ? 'Запчасть изменена' : 'Запчасть добавлена'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+    case 'ptDel': try { await api('DELETE', '/api/parts/' + id); PARTS = PARTS.filter(x => x.id !== id); ui.ptEdit = null; render(); toast('Запчасть удалена'); } catch(e) { toast(errText(e)); } return;
     case 'roleSw': { ui.asWorker = !ui.asWorker; try { sessionStorage.setItem('sed-asw', ui.asWorker ? '1' : '0'); } catch(e) {}
       closeDrawer(); location.hash = ui.asWorker ? '#wwork' : '#' + ((startViews().map(([k]) => k).find(viewOk)) || 'notes'); await start(me); toast(ui.asWorker ? 'Интерфейс сотрудника' : 'Интерфейс руководителя'); return; }
     case 'otHEdit': return openDrawer('otHead', id);
@@ -6335,6 +6433,11 @@ document.addEventListener('input', e => {
   if (t.id === 'devq') { ui.devQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vDevs(); const n = $('devq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wc-from' || t.id === 'wc-to') return;
   if (['ot-from', 'ot-to', 'ot-date', 'ot-note'].includes(t.id)) { if (!ui.otEdit) ui[{ 'ot-from': 'otFrom', 'ot-to': 'otTo', 'ot-date': 'otDate', 'ot-note': 'otNote' }[t.id]] = t.value; const c = $('ot-calc'); if (c) c.innerHTML = otCalcText($('ot-from').value, $('ot-to').value); return; }
+  if (t.id === 'trq') { ui.trq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vTransport(); const n = $('trq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'ptq') { ui.ptq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vParts(); const n = $('ptq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'pt-fv') { ui.ptVeh = t.value; return render(); }
+  if (['pt-num', 'pt-name', 'pt-link'].includes(t.id) && !ui.ptEdit) { ui[{ 'pt-num': 'ptNum', 'pt-name': 'ptName', 'pt-link': 'ptLink' }[t.id]] = t.value; return; }
+  if (t.id === 'pt-veh' && !ui.ptEdit) { ui.ptFor = t.value; return; }
   if (t.id === 'raq') { ui.raQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReqAll(); const n = $('raq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'rq-text' && $('rq-count')) $('rq-count').textContent = t.value.length;
   if (t.id === 'rq-note') ui.rqNote = t.value;
@@ -6483,6 +6586,8 @@ document.addEventListener('change', async e => {
     const keep = reqKeep();
     try { await uploadMany(files, 'reqFiles'); } catch(e) { toast(errText(e)); }
     renderDrawer(); reqRestore(keep); return; }
+  if (t.dataset.up === 'vDoc') { const fl = t.files[0]; t.value = ''; if (!fl) return; const vid = t.dataset.id;
+    try { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); const r = await api('POST', `/api/vehicles/${vid}/docs`, { file: { id: u.id }, title: $('vd-title')?.value.trim() || fl.name.replace(/\.[^.]+$/, ''), date: $('vd-date')?.value || '' }); trPut(r.vehicle); renderDrawer(); render(); toast('Документ загружен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'rqDoneFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; ui.rqNote = $('rq-note')?.value || '';
     try { await uploadMany(files, 'rqDoneFiles'); } catch(e) { toast(errText(e)); } renderDrawer(); return; }
   if (t.dataset.up === 'reqAddPh') { const files = [...t.files]; t.value = ''; if (!files.length) return; const rid = t.dataset.id;
@@ -6564,7 +6669,7 @@ function route(){
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (['reqall', 'reqdev', 'reqdocs'].includes(h) || (['users', 'admFiles', 'reqrep', 'reqset'].includes(h) && me.role === 'admin') ? h : 'req')
     : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
     const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
@@ -6629,7 +6734,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
