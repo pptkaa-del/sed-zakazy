@@ -265,6 +265,14 @@ table.lines tr.ln-miss td{background:var(--warn-soft)}table.lines tr.ln-miss td:
 .jl-b{display:flex;flex-direction:column;gap:4px;min-width:0}.jl-t{white-space:pre-wrap;overflow-wrap:anywhere}.jl.done .jl-t{text-decoration:line-through;color:var(--ink-2)}.jl-acts{display:flex;gap:2px;align-items:center}
 .jl-links{display:flex;flex-wrap:wrap;gap:6px}.jl-link{display:inline-flex;gap:6px;align-items:center;padding:2px 8px;border-radius:999px;background:var(--info-soft);font-size:13px;max-width:100%}.jl-link a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
 .jl-done summary{margin-top:6px;font-size:13px}.jlist .note-add textarea{min-height:38px}
+.wtable{padding:0;overflow:hidden}.wjr{display:grid;grid-template-columns:minmax(0,1.5fr) 130px minmax(0,1.3fr) minmax(0,1.3fr) 110px 120px;gap:14px;align-items:start;padding:12px 16px;border-top:1px solid var(--rule-2)}
+.wjr.whead{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px;border-top:0;align-items:center}
+.wjr.click{cursor:pointer}.wjr.click:hover,.wjr.open{background:var(--paper)}.wl-name{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.wl-name b{font-weight:600}.wl-name small,.wl-dates small,.wl-list small{display:block;color:var(--ink-2);font-size:12px}
+.wl-dates b{font-weight:500;display:block}.wl-dates.bad-t small{color:var(--bad)}.wl-list{display:flex;flex-direction:column;gap:2px;font-size:13px;min-width:0}.wl-item{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wl-arr{color:var(--ink-2);font-size:12px}
+.wpanel{padding:14px 18px 16px;background:var(--paper);border-top:1px dashed var(--rule);display:flex;flex-direction:column;gap:14px}.wp-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.wp-col{display:flex;flex-direction:column;gap:12px}
+.wpanel h5{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}.wp-desc{margin:0;white-space:pre-wrap}.wl-ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}.wl-th{display:flex;margin-top:4px}.wl-th img{width:64px;height:48px}
+@media (max-width:900px){.wjr{grid-template-columns:1fr 1fr}.wjr.whead{display:none}.wjr>.wl-name{grid-column:1/-1}.wjr [data-l]::before{content:attr(data-l);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2)}.wp-grid{grid-template-columns:1fr}}
+aside.drawer.whole{inset:0;width:100%;max-width:none;height:100%;height:100dvh;border-radius:0;z-index:3000}.scrim.whole{z-index:2999}aside.drawer.whole .d-body{max-width:1100px;width:100%;margin:0 auto}
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .devcost{display:grid;grid-template-columns:1fr;gap:0;margin:2px 0;font-size:14px}.devcost dt{color:var(--ink-2);font-size:12px;margin-top:4px}.devcost dd{margin:0;white-space:pre-line;overflow:hidden;text-overflow:ellipsis}
@@ -2241,14 +2249,42 @@ function vWorkList(){
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
-  return head + `<section class="card" style="padding:0;overflow:hidden">${L.map(j => { const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), ppl = [...new Set(P.map(x => x.assignee).filter(Boolean))];
-    return `<div class="wrk click" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">
-      <div><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span></div>
-      <div class="wrk-t"><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}${(j.docs || []).length ? ` · документов: ${j.docs.length}` : ''}${(j.todo || []).length ? ` · <span title="Что нужно сделать: сделано из всего">☑ ${j.todo.filter(x => x.done).length}/${j.todo.length}</span>` : ''}${(j.buy || []).length ? ` · <span title="Что нужно купить: куплено из всего">🛒 ${j.buy.filter(x => x.done).length}/${j.buy.length}</span>` : ''}</small></div>
-      <div class="${overdue(j) ? 'bad-t' : ''}"><small class="lbl">Срок</small>${j.due ? fmtD(j.due) : '<span class="dim">—</span>'}</div>
-      <div>${isMount(j) ? (P.length ? `<small class="lbl">Точки</small>${c} / ${P.length}<span class="wbar"><i style="width:${Math.round(c / P.length * 100)}%"></i></span>` : '<span class="dim">точек нет</span>') : ''}</div>
-      <div class="wrk-p">${ppl.slice(0, 3).map(id => `<span class="wchip">${esc(who(id))}</span>`).join(' ')}${ppl.length > 3 ? ` <span class="dim">+${ppl.length - 3}</span>` : ''}</div>
-      <div class="wrk-st"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${isMount(j) && P.length ? `<button class="btn sm" data-act="jobReport" data-id="${j.id}">Отчёт</button>` : ''}</div></div>`; }).join('')}</section>`;
+  return head + `<section class="card wtable"><div class="wjr whead"><span>Работа</span><span>Сроки</span><span>Что нужно сделать</span><span>Что нужно купить</span><span>Точки</span><span>Статус</span></div>
+    ${L.map(j => wlRow(j) + (ui.wlOpen === j.id ? wlPanel(j) : '')).join('')}</section>`;
+}
+/* a row of the works table: the name, the dates, what to do and to buy in short, the points */
+const wlBrief = (L, word) => { const open = (L || []).filter(x => !x.done), all = (L || []).length;
+  if (!all) return '<span class="dim">—</span>';
+  return `${open.slice(0, 2).map(x => `<span class="wl-item">• ${esc((x.text || ((x.links || [])[0] ? jlHost(x.links[0].url) : 'без текста')).slice(0, 48))}${(x.links || []).length ? ' 🔗' : ''}${(x.files || []).length ? ' 🖼' : ''}</span>`).join('')}${open.length > 2 ? `<span class="dim">ещё ${open.length - 2}</span>` : ''}${!open.length ? `<span class="ok-t">всё ${word}</span>` : ''}<small class="dim">${word} ${all - open.length} из ${all}</small>`; };
+function wlRow(j){
+  const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), od = overdue(j);
+  const left = j.due && j.status !== 'done' ? Math.round((Date.parse(j.due) - Date.parse(today())) / 864e5) : null;
+  return `<div class="wjr click ${ui.wlOpen === j.id ? 'open' : ''}" data-act="wlToggle" data-id="${j.id}" role="button" tabindex="0" aria-expanded="${ui.wlOpen === j.id}">
+    <div class="wl-name"><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}</small></div>
+    <div class="wl-dates ${od ? 'bad-t' : ''}" data-l="Сроки">${j.start ? `<small>начало ${fmtD(j.start)}</small>` : ''}${j.due ? `<b>до ${fmtD(j.due)}</b><small>${od ? 'просрочено на ' + (-left) + ' дн.' : left !== null ? (left === 0 ? 'сегодня' : 'осталось ' + left + ' дн.') : ''}</small>` : '<span class="dim">срок не указан</span>'}</div>
+    <div class="wl-list" data-l="Сделать">${wlBrief(j.todo, 'сделано')}</div>
+    <div class="wl-list" data-l="Купить">${wlBrief(j.buy, 'куплено')}</div>
+    <div data-l="Точки">${isMount(j) && P.length ? `<b>${c} / ${P.length}</b><span class="wbar"><i style="width:${Math.round(c / P.length * 100)}%"></i></span>` : '<span class="dim">—</span>'}</div>
+    <div class="wrk-st"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span><span class="wl-arr" aria-hidden="true">${ui.wlOpen === j.id ? '▴' : '▾'}</span></div></div>`;
+}
+/* the drop-down under a row: everything important in short, «Показать всё» opens the whole card on the full screen */
+function wlPanel(j){
+  const P = j.places || [], cp = cpOf(j.customerId), T = S.tasks.filter(t => t.jobId === j.id && !t.done).sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  const byP = {}; P.forEach(x => { const k = x.assignee || ''; (byP[k] = byP[k] || { t: 0, c: 0 }).t++; if (x.doneAt) byP[k].c++; });
+  const items = (L, k) => { const open = (L || []).filter(x => !x.done); return open.length ? `<ul class="wl-ul">${open.map(x => `<li>${esc(x.text || '')}${(x.links || []).map(l => ` <a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" class="jl-link">🔗 ${esc(jlHost(l.url))}</a>`).join('')}${(x.files || []).length ? `<span class="thumbs wl-th">${x.files.map(thumbF).join('')}</span>` : ''}</li>`).join('')}</ul>` : `<p class="dim" style="margin:0">${(L || []).length ? (k === 'buy' ? 'Всё куплено.' : 'Всё сделано.') : 'Пусто.'}</p>`; };
+  return `<div class="wpanel">
+    <div class="wp-grid">
+      <div class="wp-col">
+        ${j.description ? `<div><h5>Описание</h5><p class="wp-desc">${esc(j.description)}</p></div>` : ''}
+        <div><h5>Участники</h5>${jobPeople(j).length ? jobPeople(j).map(id => `<span class="wchip">${esc(who(id))}${id === j.leaderId ? ' (рук.)' : ''}</span>`).join(' ') : '<span class="dim">никто не назначен</span>'}</div>
+        ${T.length ? `<div><h5>План-график</h5><ul class="wl-ul">${T.slice(0, 4).map(t => `<li>${esc(t.title)} <small class="dim">${fmtD(t.start)} – ${fmtD(t.end)}</small></li>`).join('')}${T.length > 4 ? `<li class="dim">ещё ${T.length - 4}</li>` : ''}</ul></div>` : ''}
+        ${isMount(j) && P.length ? `<div><h5>Точки по исполнителям</h5><ul class="wl-ul">${Object.entries(byP).map(([k, v]) => `<li>${k ? esc(who(k)) : '<span class="dim">не назначены</span>'} — ${v.c} из ${v.t}</li>`).join('')}</ul></div>` : ''}
+        <div><h5>Документы</h5>${(j.docs || []).length ? `${j.docs.length} · ${j.docs.slice(0, 3).map(f => `<a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a>`).join(', ')}${j.docs.length > 3 ? ' …' : ''}` : '<span class="dim">нет</span>'}</div>
+      </div>
+      <div class="wp-col"><div><h5>Что нужно сделать</h5>${items(j.todo, 'todo')}</div><div><h5>Что нужно купить</h5>${items(j.buy, 'buy')}</div></div>
+    </div>
+    <div class="row-g"><button class="btn primary" data-act="wlFull" data-id="${j.id}">Показать всё</button>${isMount(j) && P.length ? `<button class="btn" data-act="jobReport" data-id="${j.id}">Отчёт</button>` : ''}${ord(j.orderId) ? `<button class="btn" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button>` : ''}</div>
+  </div>`;
 }
 const isWorker = () => me && !reqMode() && (me.role === 'worker' || me.role === 'contractor');   // «Сотрудник» и «Подрядчик»
 const canLead = () => canEdit();
@@ -4004,7 +4040,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = kind === 'job' && ctx === 'full'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incEdo = false; ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
@@ -5253,6 +5289,8 @@ async function act(el){
     case 'newJobAt': { const [wid, day] = id.split('|'); return openDrawer('jobForm', null, { worker: wid, date: day }); }
     case 'editJob': ui.jPhotoEdit = null; ui.jfKind = null; return openDrawer('jobForm', id);
     case 'openJob': ui.jPhotoEdit = null; return openDrawer('job', id);
+    case 'wlToggle': ui.wlOpen = ui.wlOpen === id ? null : id; return render();
+    case 'wlFull': ui.jPhotoEdit = null; return openDrawer('job', id, 'full');
     case 'openPlace': return openDrawer('place', id);
     case 'phEdit': ui.jPhotoEdit = id; ui.jPhotoRows = [...(jobOf(id)?.photoSpec || [])]; if (!ui.jPhotoRows.length) ui.jPhotoRows = ['']; renderDrawer(); setTimeout(() => document.querySelector('[data-ph]')?.focus(), 30); return;
     case 'phCancel': ui.jPhotoEdit = null; return renderDrawer();
