@@ -4097,9 +4097,11 @@ function workCalHtml(){
    красный — невыход или опоздание, сиреневый — ушёл раньше; два события в один день — клетка делится по диагонали */
 const SG_COL = { blue: '#C9DEFF', red: '#FFC9C9', lilac: '#E3D0FF', green: '#C6EFD1', yellow: '#FFEFA0' };
 function sgAssigned(u, day){
-  const n = dnum(day), tn = dnum(today()), out = [];
-  for (const t of S.tasks) if ((t.staff || []).includes(u.id) && t.start <= day && t.end >= day) out.push('план-график: ' + t.title);
+  const n = dnum(day), tn = dnum(today()), out = [], off = dayKind(day) !== 'work';
+  // on a day off only a task «including weekends» counts; a work without such a task does not make the weekend busy
+  for (const t of S.tasks) if ((t.staff || []).includes(u.id) && t.start <= day && t.end >= day && (!off || taskWe(t))) out.push('план-график: ' + t.title);
   for (const j of S.jobs) {
+    if (off) continue;
     if (!((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id))) continue;
     const [s, e] = jobSpan(j), end = j.status !== 'done' && e < tn ? tn : e;
     if (n >= s && n <= end) out.push(`работа № ${jobNo(j)} · ${j.title}`);
@@ -4177,8 +4179,8 @@ function vStaff(){
 function staffDayHtml(uid, day){
   const u = STAFF.find(x => x.id === uid); if (!u) return '<div class="d-body"><p>Сотрудник не найден</p></div>';
   const kind = dayKind(day), mk = STAFF_MARKS.filter(x => x.user === uid && x.from <= day && x.to >= day), ot = OVERTIME.filter(x => x.by === uid && x.date === day).sort((a, b) => a.from.localeCompare(b.from));
-  const tasks = S.tasks.filter(t => (t.staff || []).includes(uid) && t.start <= day && t.end >= day), n = dnum(day), tn = dnum(today());
-  const jobs = S.jobs.filter(j => ((j.workers || []).includes(uid) || (j.places || []).some(x => x.assignee === uid)) && (() => { const [a, b] = jobSpan(j), end = j.status !== 'done' && b < tn ? tn : b; return n >= a && n <= end; })());
+  const tasks = S.tasks.filter(t => (t.staff || []).includes(uid) && t.start <= day && t.end >= day && (kind === 'work' || taskWe(t))), n = dnum(day), tn = dnum(today());
+  const jobs = kind !== 'work' ? [] : S.jobs.filter(j => ((j.workers || []).includes(uid) || (j.places || []).some(x => x.assignee === uid)) && (() => { const [a, b] = jobSpan(j), end = j.status !== 'done' && b < tn ? tn : b; return n >= a && n <= end; })());
   const did = S.jobs.flatMap(j => (j.places || []).filter(x => x.doneAt && localDay(x.doneAt) === day && (x.doneBy === uid || (!x.doneBy && x.assignee === uid))).map(x => ({ j, x })));
   const idle = kind === 'work' && !tasks.length && !jobs.length && !did.length && !mk.some(x => ['sick', 'vacation', 'absent'].includes(x.type));
   return `<div class="d-body">
