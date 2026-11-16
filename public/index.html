@@ -3440,7 +3440,8 @@ function vLabels(){
 // screen pixels per millimetre of the preview: as large as fits the panel
 const lblK = t => Math.min(6, 440 / t.w, 300 / t.h);
 // the label uses the value from the scanner
-const lblUsesScan = t => (t.items || []).some(x => x.type === 'qr' ? (x.mode === 'fields' ? (x.fields || []).includes('scan') : x.mode === 'mix' && /\{scan\}/.test(x.text || '')) : /\{scan\}/.test(x.text || ''));
+// a QR made of the label's elements uses the scan only through those elements (a deleted element is no longer there); an old QR keeps its list of fields
+const lblUsesScan = t => (t.items || []).some(x => x.type === 'qr' ? (x.mode === 'fields' ? !Array.isArray(x.els) && (x.fields || []).includes('scan') : x.mode === 'mix' && /\{scan\}/.test(x.text || '')) : qrSrc(x) && /\{scan\}/.test(x.text || ''));
 const scanInfo = v => { const x = LABEL_SCAN[v]; if (!x) return null; const t = LABELS.find(l => l.id === x[0]); return `${fmtDT(x[1])}${x[3] ? ' с номером ' + x[3] : ''}${x[2] ? ', ' + who(x[2]) : ''}${t ? ` · этикетка «${t.name}»` : ''}`; };
 function lblScanCheck(t, v){
   v = String(v || '').trim();
