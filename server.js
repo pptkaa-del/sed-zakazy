@@ -320,7 +320,8 @@ const orgById = id => orgs.find(o => o.id === id);
 const ORG_TYPES = ['all', 'requests'];
 const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === 'requests' ? 'requests' : 'all'; };
 const REQ_ROLES = ['admin', 'head', 'worker'];
-const STAFF_MARKS = ['sick', 'vacation', 'late', 'early', 'absent'];
+// «time» — late and/or left early in one mark (the old «late» and «early» are still read)
+const STAFF_MARKS = ['sick', 'vacation', 'time', 'late', 'early', 'absent'];
 const workCalOf = () => { const c = db.workCal && typeof db.workCal === 'object' ? db.workCal : {}; return { from: c.from || '09:00', to: c.to || '18:00', off: c.off || [], work: c.work || [] }; };
 /* «ФКУ Упрдор»: systems of a request, replaced equipment, monthly report documents */
 const UPR = require('./upr-reports.js');
@@ -935,7 +936,13 @@ async function api(req, res, url) {
       if (range && (!D.test(to) || to < from)) return 'Дата окончания раньше начала';
       const time = type === 'late' || type === 'early' ? String(b.time || '') : '';
       if ((type === 'late' || type === 'early') && !T.test(time)) return type === 'late' ? 'Укажите, во сколько пришёл' : 'Укажите, во сколько ушёл';
-      return { user: b.user, type, from, to, time, note: String(b.note || '').trim().slice(0, 1000) };
+      const tin = type === 'time' ? String(b.tin || '') : '', tout = type === 'time' ? String(b.tout || '') : '';
+      if (type === 'time') {
+        if (!tin && !tout) return 'Укажите, во сколько пришёл или во сколько ушёл';
+        if ((tin && !T.test(tin)) || (tout && !T.test(tout))) return 'Неверное время';
+        if (tin && tout && tout <= tin) return 'Время ухода раньше времени прихода';
+      }
+      return { user: b.user, type, from, to, time, tin, tout, note: String(b.note || '').trim().slice(0, 1000) };
     };
     if (m === 'POST' && !p[2]) {
       const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
