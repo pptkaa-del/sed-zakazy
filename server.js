@@ -1115,6 +1115,59 @@ async function api(req, res, url) {
     return send(res, 200, db.meta.acct);
   }
 
+  /* «Администрирование» → «Начальные остатки»: a table from 1C; the quantity becomes both the actual and the accounting balance */
+  if (p[1] === 'stock-initial' && m === 'POST') {
+    if (user.role !== 'admin') return fail(res, 403, 'Загружать начальные остатки может только администратор');
+    const b = await readJsonBody(req);
+    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 20000) : [];
+    const agg = new Map();
+    for (const r of rows) {
+      const name = String(r.name || '').trim(), sku = String(r.sku || '').trim(), qty = Number(r.qty);
+      if (!name || !Number.isFinite(qty) || qty < 0) continue;
+      const key = sku ? 'a:' + normName(sku) : 'n:' + normName(name);
+      const cur = agg.get(key) || { name, sku, unit: String(r.unit || '').trim(), qty: 0 };
+      cur.qty = r3(cur.qty + qty); agg.set(key, cur);
+    }
+    if (!agg.size) return fail(res, 400, 'В файле не найдено строк с наименованием и количеством');
+    const items = Object.entries(db.stock);
+    const bySku = new Map(items.filter(([, it]) => it.sku).map(([id, it]) => [normName(it.sku), id]));
+    const byName = new Map(items.map(([id, it]) => [normName(it.name), id]));
+    const now = new Date().toISOString(), file = String(b.file || '').slice(0, 200), seen = new Set();
+    let matched = 0, created = 0;
+    for (const r of agg.values()) {
+      let id = (r.sku && bySku.get(normName(r.sku))) || byName.get(normName(r.name));
+      if (!id) { id = newId(); created++; db.stock[id] = { name: r.name, sku: r.sku, unit: r.unit || 'шт', location: '', minQty: 0, note: 'Добавлено из начальных остатков 1С', qty: 0, moves: [], acctQty: 0, createdAt: now, createdBy: user.id }; }
+      else if (!seen.has(id)) matched++;
+      const it = db.stock[id], q = seen.has(id) ? r3((Number(it.qty) || 0) + r.qty) : r.qty;
+      it.qty = q; it.acctQty = q; seen.add(id);
+      it.moves = Array.isArray(it.moves) ? it.moves : [];
+      it.moves.push({ id: newId(), type: 'init', qty: r.qty, acct: true, acctBalance: q, balance: q, note: 'Начальный остаток из 1С' + (file ? ' (' + file + ')' : ''), by: user.id, at: now });
+      it.updatedAt = now; it.updatedBy = user.id;
+    }
+    db.meta.initial = { at: now, by: user.id, file, rows: agg.size, matched, created };
+    saveDb();
+    return send(res, 200, db.meta.initial);
+  }
+  /* «Администрирование» → «Файлы»: every uploaded file of the organization and where it is used */
+  if (p[1] === 'admin-files' && m === 'GET') {
+    if (user.role !== 'admin') return fail(res, 403, 'Список файлов видит только администратор');
+    const used = new Map(), add = (id, what) => { if (!id || !db.files[id]) return; const L = used.get(id) || []; if (L.length < 5 && !L.includes(what)) L.push(what); used.set(id, L); };
+    for (const i of Object.values(db.invoices || {})) { add(i.file && i.file.id, `Счёт № ${i.number || '—'}`); add(i.receipt && i.receipt.id, `Чек к счёту № ${i.number || '—'}`); const w = i.income && i.income.waybill; if (w) add(w.file && w.file.id, `Накладная № ${w.number || '—'} (счёт № ${i.number || '—'})`); }
+    for (const r of Object.values(db.receipts || {})) add(r.file && r.file.id, `Накладная № ${r.number || '—'}`);
+    for (const j of Object.values(db.jobs || {})) {
+      for (const f of j.docs || []) add(f.id, `Работа № ${j.no || ''} · ${j.title || ''}`);
+      for (const pl of j.places || []) for (const v of Object.values(pl.photos || {})) for (const f of [].concat(v || [])) add(f && (f.id || f), `Фото точки · работа № ${j.no || ''}`);
+    }
+    for (const o of Object.values(db.orders || {})) { for (const f of o.specs || []) add(f.id, `Заказ ${o.number || ''}`); for (const p2 of o.products || []) for (const f of p2.files || []) add(f.id, `Изделие ${p2.name || ''} · заказ ${o.number || ''}`); }
+    for (const n of db.notes || []) for (const f of n.files || []) add(f.id, n.type === 'shared' ? 'Общая задача' : 'Заметка');
+    for (const d of Object.values(db.devs || {})) for (const f of d.files || []) add(f.id, `Разработка № ${d.no || ''} · ${d.name || ''}`);
+    for (const t of Object.values(db.labels || {})) for (const x of t.items || []) if (x.img) add(x.img.id, `Этикетка «${t.name}»`);
+    for (const r of Object.values(db.requests || {})) for (const f of r.files || []) add(f.id, `Заявка № ${r.no || ''}`);
+    for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
+    const list = Object.entries(db.files).map(([id, f]) => ({ id, name: f.name, type: f.type, size: f.size || 0, at: f.at || null, by: f.by || null, used: used.get(id) || [] }))
+      .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+    return send(res, 200, list);
+  }
   /* saving the write-off list: only when every line is covered by the accounting balances */
   if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff' && m === 'POST') {
     if (!canEdit(user)) return fail(res, 403, 'Сохранить список для списания может администратор или руководитель');

@@ -940,7 +940,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#dt" data-v="dt">Карта объектов</a>
       <a href="#devs" data-v="devs" id="devsTab">Разработки</a>
       <a href="#notes" data-v="notes" id="notesTab" hidden>Мои задачи <span class="badge" id="noteBadge" hidden></span></a>
-      <a href="#users" data-v="users" id="usersTab" hidden>Пользователи</a>
+      <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
     </nav>
@@ -1214,6 +1214,39 @@ function secTree(hide, orgHide){
 const secHide = root => [...root.querySelectorAll('[data-sec]')].filter(i => !i.checked).map(i => i.dataset.sec);
 /* «Склад»: the warehouse, the write-off lists and the invoices in one tab */
 const STOCK_VIEWS = ['stock', 'inc', 'wo', 'pay'];
+/* «Администрирование» (the administrator): users, the initial balances from 1C, the files of the organization */
+const ADMIN_VIEWS = ['users', 'admInit', 'admFiles'];
+function adminTabs(){
+  const T = [['users', 'Пользователи'], ...(reqMode() ? [] : [['admInit', 'Начальные остатки']]), ['admFiles', 'Файлы']];
+  return `<nav class="seg stabs" aria-label="Разделы администрирования">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
+}
+function vAdmInit(){
+  const I = META.initial;
+  return `<section class="card" style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;max-width:860px">
+    <h3 style="margin:0">Начальные остатки склада из 1С</h3>
+    <p style="margin:0">Загрузите таблицу остатков из 1С (отчёт «Остатки товаров», ОСВ по счёту 10/41 и т. п., сохранённый в Excel или CSV). Количество из файла станет <b>и фактическим, и бухгалтерским</b> остатком позиции; позиции, которых нет на складе, будут созданы. В истории каждой позиции появится запись «Начальный остаток из 1С». Позиции, которых нет в файле, не меняются.</p>
+    <p class="dim" style="margin:0;font-size:13px">Обычно это делается один раз — при начале работы в программе. Чтобы потом обновлять только бухгалтерские остатки, используйте «Склад → Загрузить выгрузку 1С».</p>
+    <div class="row-g"><button class="btn primary" data-act="initImport">Загрузить начальные остатки из 1С</button></div>
+    ${I ? `<p class="box" style="margin:0">Последняя загрузка: <b>${esc(fmtDT(I.at))}</b>${I.by ? ', ' + esc(who(I.by)) : ''}${I.file ? `, файл «${esc(I.file)}»` : ''} — строк ${I.rows}, найдено на складе ${I.matched}, создано ${I.created}.</p>` : '<p class="dim" style="margin:0">Начальные остатки ещё не загружались.</p>'}
+  </section>`;
+}
+async function loadAdmFiles(){ try { ui.admFiles = await api('GET', '/api/admin-files'); } catch(e) { toast(errText(e)); ui.admFiles = []; } if (ui.view === 'admFiles') render(); }
+function vAdmFiles(){
+  const L = ui.admFiles; if (!L) { loadAdmFiles(); return '<div class="empty"><h3>Загружаем список файлов…</h3></div>'; }
+  const q = (ui.afq || '').trim().toLowerCase(), F = ui.afF || 'all';
+  const kind = f => /^image\//.test(f.type) ? 'Картинка' : /pdf/.test(f.type) ? 'PDF' : /sheet|excel|csv/.test(f.type) || /\.(xlsx?|csv)$/i.test(f.name) ? 'Таблица' : /word|document/.test(f.type) || /\.docx?$/i.test(f.name) ? 'Документ' : (f.name.split('.').pop() || '').toUpperCase() || 'Файл';
+  const R = L.filter(f => (F === 'all' || (F === 'unused' ? !f.used.length : f.used.length)) && (!q || [f.name, who(f.by), ...f.used].join(' ').toLowerCase().includes(q)));
+  const total = L.reduce((a, f) => a + (f.size || 0), 0), unused = L.filter(f => !f.used.length);
+  return `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="afq" type="search" value="${esc(ui.afq || '')}" placeholder="Имя файла, кто загрузил, где используется" style="flex:1 1 240px;max-width:380px" aria-label="Поиск файла"></span>
+      <div class="seg">${[['all', 'Все'], ['used', 'Используются'], ['unused', 'Не используются']].map(([k, l]) => `<button data-act="afF" data-id="${k}" class="${F === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <button class="btn sm" data-act="afReload">Обновить</button>
+      <span class="dim">Файлов: <b>${L.length}</b>, объём <b>${fmtSize(total)}</b>${unused.length ? ` · не используются: ${unused.length} (${fmtSize(unused.reduce((a, f) => a + (f.size || 0), 0))})` : ''}</span></div>
+    ${R.length ? `<section class="card" style="padding:0;overflow:auto"><table class="jt"><thead><tr><th>Файл</th><th>Тип</th><th class="jt-a">Размер</th><th>Загрузил</th><th>Когда</th><th>Где используется</th></tr></thead><tbody>
+      ${R.map(f => `<tr><td class="jt-t"><a href="/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a></td><td data-l="Тип">${esc(kind(f))}</td><td class="jt-a" data-l="Размер">${fmtSize(f.size || 0)}</td>
+        <td data-l="Загрузил">${f.by ? esc(who(f.by)) : '<span class="dim">—</span>'}</td><td data-l="Когда">${f.at ? esc(fmtDT(f.at)) : '<span class="dim">—</span>'}</td>
+        <td data-l="Где">${f.used.length ? f.used.map(esc).join('<br>') : '<span class="dim">не используется</span>'}</td></tr>`).join('')}
+    </tbody></table></section>` : `<div class="empty"><h3>${L.length ? 'Ничего не найдено' : 'Файлов пока нет'}</h3>${L.length ? 'Измените поиск или фильтр.' : 'Здесь появятся все файлы, загруженные в организацию: счета, накладные, документы работ, фото, картинки этикеток.'}</div>`}`;
+}
 const canWo = () => isHead() || me?.role === 'accountant';
 function stockTabs(){
   const n = S.invoices.filter(i => i.status === 'topay').length;
@@ -1224,7 +1257,7 @@ function stockTabs(){
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
   pending = false;
-  const navV = STOCK_VIEWS.includes(ui.view) ? 'stock' : ui.view;
+  const navV = STOCK_VIEWS.includes(ui.view) ? 'stock' : ADMIN_VIEWS.includes(ui.view) ? 'users' : ui.view;
   document.querySelectorAll('#views a').forEach(a => a.classList.toggle('on', a.dataset.v === navV));
   const n = S.invoices.filter(i => i.status === 'topay').length;
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
@@ -1236,7 +1269,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : '') + (ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -3980,13 +4013,13 @@ function renderDrawer(){
         <label>Количество (остаток)<select class="in" id="acct-c-qty">${opts(A.cols.qty)}</select></label>
         <label>Артикул<select class="in" id="acct-c-sku">${opts(A.cols.sku)}</select></label>
         <label>Единица<select class="in" id="acct-c-unit">${opts(A.cols.unit)}</select></label></div>
-        <p class="parsed ${rows.length ? '' : 'warn'}" style="margin:0">${rows.length ? `Найдено строк с остатками: <b>${rows.length}</b>. Есть на складе: <b>${matched}</b>, новых: <b>${rows.length - matched}</b>. Позиции склада, которых нет в файле, получат бухгалтерский остаток 0.` : 'Не нашлось строк, где есть и наименование, и количество. Проверьте выбор колонок.'}</p>
+        <p class="parsed ${rows.length ? '' : 'warn'}" style="margin:0">${rows.length ? `Найдено строк с остатками: <b>${rows.length}</b>. Есть на складе: <b>${matched}</b>, новых: <b>${rows.length - matched}</b>. ${d.ctx === 'initial' ? 'Позиции склада, которых нет в файле, не изменятся.' : 'Позиции склада, которых нет в файле, получат бухгалтерский остаток 0.'}` : 'Не нашлось строк, где есть и наименование, и количество. Проверьте выбор колонок.'}</p>
         ${rows.length ? `<div class="tscroll"><table class="prev"><thead><tr><th>Наименование</th><th>Артикул</th><th>Ед.</th><th style="text-align:right">Количество</th><th>Склад</th></tr></thead><tbody>${rows.slice(0, 12).map(r => `<tr><td>${esc(r.name)}</td><td class="mono">${esc(r.sku)}</td><td>${esc(r.unit)}</td><td style="text-align:right" class="mono">${fmtQty(r.qty)}</td><td>${acctMatch(r) ? '<span class="ok-t">есть</span>' : '<span class="dim">новая</span>'}</td></tr>`).join('')}</tbody></table></div>${rows.length > 12 ? `<small class="dim">…и ещё ${rows.length - 12}</small>` : ''}` : ''}
-        <label class="chk" style="flex-direction:row;display:flex;gap:8px;font-size:14px"><input type="checkbox" id="acct-create" ${A.create !== false ? 'checked' : ''}> Добавить на склад позиции, которых там нет</label>`;
+        ${d.ctx === 'initial' ? '<p class="dim" style="margin:0;font-size:13px">Позиции, которых нет на складе, будут созданы. Количество станет и фактическим, и бухгалтерским остатком.</p>' : `<label class="chk" style="flex-direction:row;display:flex;gap:8px;font-size:14px"><input type="checkbox" id="acct-create" ${A.create !== false ? 'checked' : ''}> Добавить на склад позиции, которых там нет</label>`}`;
     }
-    D.innerHTML = dh('Бухгалтерские остатки из 1С') + `<form class="d-body" data-form="acctImport">${body}
+    D.innerHTML = dh(d.ctx === 'initial' ? 'Начальные остатки склада из 1С' : 'Бухгалтерские остатки из 1С') + `<form class="d-body" data-form="acctImport">${body}
       <div class="err" id="ferr"></div>
-      <div class="row-g"><button class="btn primary" type="submit" ${A && A.aoa ? '' : 'disabled'}>Загрузить остатки</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
+      <div class="row-g"><button class="btn primary" type="submit" ${A && A.aoa ? '' : 'disabled'}>${d.ctx === 'initial' ? 'Загрузить начальные остатки' : 'Загрузить остатки'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'pickStock') {
     const [poid, ppid] = String(d.id || '').split('|'), pp = prodOf(poid, ppid);
@@ -4135,7 +4168,7 @@ function renderDrawer(){
         <dt>Минимальный запас</dt><dd>${it.minQty ? fmtQty(it.minQty) + ' ' + esc(it.unit || 'шт') : '—'}</dd>${it.note ? `<dt>Примечание</dt><dd>${esc(it.note)}</dd>` : ''}</dl>
       <div class="row-g">${canMoveStock() ? `<button class="btn ok" data-act="stockIn" data-id="${it.id}">+ Приход</button><button class="btn" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}${canEdit() ? `<button class="btn" data-act="editStock" data-id="${it.id}">Изменить</button>` : ''}</div>
       <div><h4 class="sub-h" style="margin:4px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)">Движение</h4>
-      ${mv.length ? `<ul class="mvs">${mv.map(m => `<li><span class="q ${m.type === 'wo' ? 'out' : m.type}">${m.type === 'in' || (m.type === 'wo' && m.qty < 0) ? '+' : '−'}${fmtQty(Math.abs(m.qty))}</span><span>${m.type === 'in' ? 'Приход' + (m.acct ? ' <small class="dim" style="display:inline">· в фактический и бухгалтерский</small>' : '') : m.type === 'wo' ? 'Списание <small class="dim" style="display:inline">· из бухгалтерского</small>' : 'Расход <small class="dim" style="display:inline">· из фактического</small>'}${ord(m.orderId) ? ' · ' + esc(ordName(ord(m.orderId))) : ''}${m.note ? `<small>${esc(m.note)}</small>` : ''}<small>${esc(who(m.by))}, ${esc(fmtDT(m.at))}</small></span><span class="dim mono">ост. ${fmtQty(m.balance)}${m.acct ? `<small>бух. ${fmtQty(m.acctBalance)}</small>` : ''}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Движений пока не было.</p>'}</div>
+      ${mv.length ? `<ul class="mvs">${mv.map(m => `<li><span class="q ${m.type === 'wo' ? 'out' : m.type === 'init' ? 'in' : m.type}">${m.type === 'in' || m.type === 'init' || (m.type === 'wo' && m.qty < 0) ? '+' : '−'}${fmtQty(Math.abs(m.qty))}</span><span>${m.type === 'init' ? 'Начальный остаток <small class="dim" style="display:inline">· фактический и бухгалтерский</small>' : m.type === 'in' ? 'Приход' + (m.acct ? ' <small class="dim" style="display:inline">· в фактический и бухгалтерский</small>' : '') : m.type === 'wo' ? 'Списание <small class="dim" style="display:inline">· из бухгалтерского</small>' : 'Расход <small class="dim" style="display:inline">· из фактического</small>'}${ord(m.orderId) ? ' · ' + esc(ordName(ord(m.orderId))) : ''}${m.note ? `<small>${esc(m.note)}</small>` : ''}<small>${esc(who(m.by))}, ${esc(fmtDT(m.at))}</small></span><span class="dim mono">ост. ${fmtQty(m.balance)}${m.acct ? `<small>бух. ${fmtQty(m.acctBalance)}</small>` : ''}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Движений пока не было.</p>'}</div>
     </div>`;
   }
   if (d.kind === 'pointCoords') {
@@ -4620,6 +4653,8 @@ async function onSubmit(e){
       const rows = acctRows(A.aoa, A.hdr, A.cols);
       if (!rows.length) return fail('Не нашлось строк с наименованием и количеством. Проверьте выбор колонок.');
       fail('Загружаем…');
+      if (d.ctx === 'initial') { const r = await api('POST', '/api/stock-initial', { file: A.file, rows }); ui.acct = null; await refresh(); closeDrawer(); render();
+        return toast(`Начальные остатки загружены: строк ${r.rows}, найдено на складе ${r.matched}, создано ${r.created}`); }
       const r = await api('POST', '/api/stock-acct', { file: A.file, rows, createMissing: $('acct-create')?.checked });
       ui.acct = null; await refresh(); closeDrawer();
       toast(`Бухгалтерские остатки обновлены: сопоставлено ${r.matched}${r.created ? ', добавлено ' + r.created : ''}${r.skipped ? ', пропущено ' + r.skipped : ''}`);
@@ -5243,6 +5278,9 @@ async function act(el){
     case 'logout': await api('POST','/api/logout').catch(() => {}); return showLogin();
     case 'password': return openDrawer('password');
     case 'userNew': return openDrawer('userForm');
+    case 'initImport': ui.acct = null; return openDrawer('acctImport', null, 'initial');
+    case 'afF': ui.afF = id; return render();
+    case 'afReload': ui.admFiles = null; return render();
     case 'userEdit': return openDrawer('userForm', id);
     case 'userBlock': {
       const u = (ui.usersList || []).find(x => x.id === id); if (!u) return;
@@ -5510,6 +5548,7 @@ document.addEventListener('input', e => {
   if (t.id === 'lbl-date') { ui.lblDate = t.value && t.value !== today() ? t.value : ''; lblDateNote(); return; }
   if (t.id === 'lbl-scan') { ui.lblScan = t.value.trim(); const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-scancheck'); if (c) c.innerHTML = lblScanCheck(lblDraft(), ui.lblScan); return; }
   if (t.id === 'lbl-man') { ui.lblMan = t.value.trim(); const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-mancheck'); if (c) c.innerHTML = lblManCheck(ui.lblMan); return; }
+  if (t.id === 'afq') { ui.afq = t.value; const pos = t.selectionStart; $('view').innerHTML = adminTabs() + vAdmFiles(); const n = $('afq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'iq') { ui.iq = t.value; const pos = t.selectionStart; $('view').innerHTML = stockTabs() + vIncView(); const n = $('iq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'devq') { ui.devQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vDevs(); const n = $('devq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'reqq') { ui.reqQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReq(); const n = $('reqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -5722,9 +5761,9 @@ document.addEventListener('change', async e => {
 function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
-    : reqMode() ? (h === 'users' && me.role === 'admin' ? 'users' : 'req')
+    : reqMode() ? (['users', 'admFiles'].includes(h) && me.role === 'admin' ? h : 'req')
     : isWorker() ? (['wwork', 'wdone', 'devs'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (h === 'users' && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
     const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
@@ -5733,6 +5772,7 @@ function route(){
   }
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
+  if (ui.view === 'admFiles') ui.admFiles = null;
   if (ui.view === 'orgs') loadOrgs();
   if (ui.view === 'dt' && !DT.loaded) loadDt();
   render();
