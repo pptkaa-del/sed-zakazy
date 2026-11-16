@@ -448,7 +448,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .staffc .ch{align-items:flex-start}.spbar{height:4px;border-radius:2px;background:var(--rule-2);margin-top:6px;min-width:60px;overflow:hidden}.spbar i{display:block;height:100%;background:var(--ok)}.stnums{display:flex;gap:18px}.stnums div{text-align:right}.stnums b{display:block;font-size:22px;font-family:var(--f-mono)}.stnums small{font-size:12px;color:var(--ink-2)}.stlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.stlist small{display:block}
 [data-ed]{cursor:text;border-radius:4px}[data-ed]:hover{box-shadow:0 0 0 1px var(--rule)}[data-ed].editing{box-shadow:none}.ed-in{font:inherit;width:100%;min-width:160px}
 .ntabs{margin-bottom:14px}.memo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.memo{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--rule);border-radius:12px;background:var(--sheet)}.memo-t{white-space:pre-wrap;overflow-wrap:anywhere}.memo small{display:block}.memo.done .memo-t{text-decoration:line-through;color:var(--ink-2)}
-.shnew{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}.sh-h{display:flex;gap:10px;align-items:flex-start}.sh-h .memo-t{flex:1}.sh-c{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--rule-2);padding-top:8px}.cmt1 div{white-space:pre-wrap}.shedit{display:inline-block}.shedit .tstaff{margin-top:4px}
+.shnew{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}.sh-h{display:flex;gap:10px;align-items:flex-start}.sh-h .memo-t{flex:1}.sh-c{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--rule-2);padding-top:8px}.cmt1 div{white-space:pre-wrap}.shedit{display:inline-block}.shedit .tstaff{margin-top:4px}.sh-as .fl{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--ink-2)}.sh-meta{display:flex;gap:6px;flex-wrap:wrap}.sh-meta:empty{display:none}.sh-meta .chip{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--rule-2)}.sh-meta .chip.mine{background:var(--accent,#1f6feb);color:#fff}.sh-meta .chip.late{background:#d92d20;color:#fff}.memo.shared.late{border-left:3px solid #d92d20}.memo.shared.tome{border-left:3px solid var(--accent,#1f6feb)}
 .drawbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}.dcolors{display:flex;gap:4px}.dcol{width:28px;height:28px;border-radius:50%;border:2px solid var(--rule);background:var(--c);cursor:pointer}.dcol.on{box-shadow:0 0 0 3px var(--stamp)}
 .drawwrap{border:1px solid var(--rule);border-radius:12px;overflow:hidden;background:#fff}#drawc{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
 .shortbox{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:var(--warn-soft)}.shortbox small{display:block}
@@ -951,7 +951,8 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#map" data-v="map">Карта</a>
       <a href="#dt" data-v="dt">Карта объектов</a>
       <a href="#devs" data-v="devs" id="devsTab">Разработки</a>
-      <a href="#notes" data-v="notes" id="notesTab" hidden>Мои задачи <span class="badge" id="noteBadge" hidden></span></a>
+      <a href="#notes" data-v="notes" id="notesTab" hidden>Задачи <span class="badge" id="noteBadge" hidden></span></a>
+      <a href="#mytasks" data-v="mytasks" id="mytTab" hidden>Мои задачи <span class="badge" id="mytBadge" hidden></span></a>
       <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
@@ -1179,6 +1180,10 @@ async function refresh(){
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
   if (reqMode()) { const n = reqTodo().length; $('reqBadge').hidden = !n; $('reqBadge').textContent = n; if (ui.drawer?.kind === 'req' && !drawerBusy()) renderDrawer(); }
   { const n = NOTES.filter(x => !x.done && (x.type || 'task') !== 'memo').length; $('noteBadge').hidden = !n; $('noteBadge').textContent = n; }
+  // an employee gets «Мои задачи» once a task is assigned to him
+  { const mine = NOTES.filter(x => x.type === 'shared' && x.assignee === me?.id), open = mine.filter(x => !x.done).length;
+    $('mytTab').hidden = !isWorker() || !mine.length; $('mytBadge').hidden = !open; $('mytBadge').textContent = open;
+    if (isWorker() && ui.view === 'mytasks' && !mine.length) { location.hash = '#wwork'; } }
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
   render();
@@ -1286,7 +1291,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -3785,22 +3790,46 @@ function vMemos(){
       <div class="row-g"><button class="btn sm" data-act="memoDraw" data-id="${esc(n.id)}">✎ Нарисовать</button><label class="btn sm">Прикрепить картинку<input type="file" accept="image/*" data-up="noteFile" data-id="${esc(n.id)}" multiple hidden></label><button class="btn sm ghost" data-act="noteDel" data-id="${esc(n.id)}">Удалить</button></div></li>`).join('')}</ul>`
       : '<div class="empty"><h3>Заметок пока нет</h3>Напишите заметку в поле выше.</div>'}</div>`;
 }
-/* «Общие задачи»: chosen users see the task and write comments */
+/* «Общие задачи»: chosen users see the task and write comments; an executor (any user) and a due date */
+const dueTxt = n => n.due ? n.due.split('-').reverse().join('.') : '';
+const shLate = n => !n.done && n.due && n.due < today();
+function shAssign(n){
+  const all = STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const opts = sel => `<option value="">— не назначен —</option>${all.map(u => `<option value="${u.id}" ${sel === u.id ? 'selected' : ''}>${esc(u.name)}${u.id === me.id ? ' (я)' : ''} · ${esc(ROLE_NAMES[u.role] || '')}</option>`).join('')}`;
+  if (!n) return `<div class="row-g sh-as"><label class="fl">Исполнитель<select class="f" id="sh-as" aria-label="Исполнитель">${opts(ui.shAs || '')}</select></label><label class="fl">Срок<input class="f" type="date" id="sh-due" value="${esc(ui.shDue || '')}" aria-label="Срок выполнения"></label></div>`;
+  return `<div class="row-g sh-as" data-keep><label class="fl">Исполнитель<select class="f" data-shas="${esc(n.id)}" aria-label="Исполнитель">${opts(n.assignee || '')}</select></label><label class="fl">Срок<input class="f" type="date" data-shdue="${esc(n.id)}" value="${esc(n.due || '')}" aria-label="Срок выполнения"></label></div>`;
+}
+const shMeta = n => `${n.assignee ? `<span class="chip ${n.assignee === me.id ? 'mine' : ''}">Исполнитель: ${esc(who(n.assignee))}${n.assignee === me.id ? ' — вам' : ''}</span>` : ''}${n.due ? `<span class="chip ${shLate(n) ? 'late' : ''}">Срок: ${esc(dueTxt(n))}${shLate(n) ? ' — просрочено' : ''}</span>` : ''}`;
+function shComments(n, own){
+  return `<div class="sh-c">${(n.comments || []).map(c => `<div class="cmt1"><b>${esc(who(c.by))}</b> <small class="dim">${esc(fmtDT(c.at))}</small>${c.by === me.id || own ? ` <button class="linkish" data-act="shCmtDel" data-id="${esc(n.id)}|${esc(c.id)}">удалить</button>` : ''}<div>${esc(c.text)}</div></div>`).join('')}
+        <div class="row-g" data-keep><input class="in" id="shc-${esc(n.id)}" placeholder="Комментарий" style="flex:1 1 220px"><button class="btn sm" data-act="shCmt" data-id="${esc(n.id)}">Отправить</button></div></div>`;
+}
+/* «Мои задачи» of an employee: the shared tasks assigned to him */
+function vMyTasks(){
+  const L = NOTES.filter(n => n.type === 'shared' && n.assignee === me.id).sort((a, b) => (a.done - b.done) || String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(b.at).localeCompare(String(a.at)));
+  return `<div class="notes"><h2 style="margin:0 0 12px">Мои задачи</h2>${L.length ? `<ul class="memo-list">${L.map(n => `<li class="memo shared ${n.done ? 'done' : ''} ${shLate(n) ? 'late' : ''}">
+      <div class="sh-h"><label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label><div class="memo-t">${esc(n.text)}</div></div>
+      <div class="sh-meta">${shMeta(n)}</div>
+      ${(n.files || []).length ? `<div class="thumbs">${n.files.map(f => `<span class="tw">${thumbF(f)}</span>`).join('')}</div>` : ''}
+      <small class="dim">Поставил: ${esc(who(n.by))} · ${esc(fmtDT(n.at))}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))}` : ''}</small>
+      ${shComments(n, false)}</li>`).join('')}</ul>` : '<div class="empty"><h3>Задач нет</h3>Здесь появятся задачи, которые вам назначат.</div>'}</div>`;
+}
 function vShared(){
   const others = STAFF.filter(u => u.id !== me.id && !['worker', 'contractor'].includes(u.role)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   const L = NOTES.filter(n => ntype(n) === 'shared').sort((a, b) => (a.done - b.done) || String(b.at).localeCompare(String(a.at)));
   const pick = (name, sel) => others.map(u => `<label class="chk"><input type="checkbox" name="${name}" value="${u.id}" ${sel.includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('');
   return `<div class="notes">
     <div class="box shnew" data-keep><textarea class="in" id="sh-new" rows="2" maxlength="4000" aria-label="Новая общая задача" placeholder="Что нужно сделать">${esc(ui.shText || '')}</textarea>
-      <span style="font-size:13px;color:var(--ink-2)">Кто видит и может комментировать</span><div class="tstaff">${pick('sh-users', ui.shUsers || []) || '<span class="dim">Других пользователей нет</span>'}</div>
+      ${shAssign()}
+      <span style="font-size:13px;color:var(--ink-2)">Кто ещё видит и может комментировать</span><div class="tstaff">${pick('sh-users', ui.shUsers || []) || '<span class="dim">Других пользователей нет</span>'}</div>
       <div class="row-g"><button class="btn primary" data-act="sharedAdd">Создать общую задачу</button></div></div>
-    ${L.length ? `<ul class="memo-list">${L.map(n => { const own = n.by === me.id; return `<li class="memo shared ${n.done ? 'done' : ''}">
+    ${L.length ? `<ul class="memo-list">${L.map(n => { const own = n.by === me.id; return `<li class="memo shared ${n.done ? 'done' : ''} ${shLate(n) ? 'late' : ''} ${n.assignee === me.id ? 'tome' : ''}">
       <div class="sh-h"><label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label><div class="memo-t" ${own ? edAttr('notes', n.id, 'text', true) : ''}>${esc(n.text)}</div>${own ? `<button class="btn ghost sm" data-act="noteDel" data-id="${esc(n.id)}" aria-label="Удалить">✕</button>` : ''}</div>
       <small class="dim">Автор: ${esc(who(n.by))} · ${esc(fmtDT(n.at))}${n.done && n.doneAt ? ` · выполнено ${esc(fmtDT(n.doneAt))} (${esc(who(n.doneBy))})` : ''}</small>
-      <small class="dim">Видят: ${(n.share || []).map(id => esc(who(id))).join(', ')}${own ? ` <details class="shedit"><summary class="linkish">изменить</summary><div class="tstaff" data-shfor="${esc(n.id)}">${pick('sh-edit-' + n.id, n.share || [])}</div></details>` : ''}</small>
-      <div class="sh-c">${(n.comments || []).map(c => `<div class="cmt1"><b>${esc(who(c.by))}</b> <small class="dim">${esc(fmtDT(c.at))}</small>${c.by === me.id || own ? ` <button class="linkish" data-act="shCmtDel" data-id="${esc(n.id)}|${esc(c.id)}">удалить</button>` : ''}<div>${esc(c.text)}</div></div>`).join('')}
-        <div class="row-g" data-keep><input class="in" id="shc-${esc(n.id)}" placeholder="Комментарий" style="flex:1 1 220px"><button class="btn sm" data-act="shCmt" data-id="${esc(n.id)}">Отправить</button></div></div></li>`; }).join('')}</ul>`
-      : '<div class="empty"><h3>Общих задач пока нет</h3>Создайте задачу и выберите, кто её увидит.</div>'}</div>`;
+      ${own ? shAssign(n) : ''}<div class="sh-meta">${own ? (shLate(n) ? '<span class="chip late">Просрочено</span>' : '') : shMeta(n)}</div>
+      <small class="dim">Видят: ${(n.share || []).map(id => esc(who(id))).join(', ') || '—'}${own ? ` <details class="shedit"><summary class="linkish">изменить</summary><div class="tstaff" data-shfor="${esc(n.id)}">${pick('sh-edit-' + n.id, n.share || [])}</div></details>` : ''}</small>
+      ${shComments(n, own)}</li>`; }).join('')}</ul>`
+      : '<div class="empty"><h3>Общих задач пока нет</h3>Создайте задачу, назначьте исполнителя и срок.</div>'}</div>`;
 }
 /* «Рисовалка»: draw, insert a picture, attach the drawing to a note or a task */
 const DRAW = { img: null, undo: [], color: '#111111', width: 4, eraser: false };
@@ -5080,7 +5109,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['inc', 'Склад → Приходы'], ['pay', 'Склад → Счета'], ['wo', 'Склад → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
+const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['inc', 'Склад → Приходы'], ['pay', 'Склад → Счета'], ['wo', 'Склад → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -5263,9 +5292,9 @@ async function act(el){
     case 'memoDraw': ui.drawTarget = id; DRAW.img = null; DRAW.undo = []; ui.ntab = 'draw'; return render();
     case 'memoFileDel': { const [nid, fid] = id.split('|'), n = NOTES.find(x => x.id === nid); if (!n) return;
       try { const r = await api('PATCH', '/api/notes/' + nid, { files: (n.files || []).filter(f => f.id !== fid) }); Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
-    case 'sharedAdd': { const text = ($('sh-new')?.value || '').trim(), share = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value);
-      if (!text) return toast('Напишите, что нужно сделать'); if (!share.length) return toast('Отметьте, кто увидит задачу');
-      try { const r = await api('POST', '/api/notes', { type: 'shared', text, share }); NOTES.unshift(r.note); ui.shUsers = []; ui.shText = ''; $('sh-new').value = ''; document.activeElement?.blur(); render(); toast('Общая задача создана'); } catch(e) { toast(errText(e)); } return; }
+    case 'sharedAdd': { const text = ($('sh-new')?.value || '').trim(), share = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value), assignee = $('sh-as')?.value || '', due = $('sh-due')?.value || '';
+      if (!text) return toast('Напишите, что нужно сделать'); if (!share.length && !assignee) return toast('Выберите исполнителя или отметьте, кто увидит задачу');
+      try { const r = await api('POST', '/api/notes', { type: 'shared', text, share, assignee, due }); NOTES.unshift(r.note); ui.shUsers = []; ui.shText = ''; ui.shAs = ''; ui.shDue = ''; $('sh-new').value = ''; document.activeElement?.blur(); render(); toast('Общая задача создана'); } catch(e) { toast(errText(e)); } return; }
     case 'shCmt': { const inp = $('shc-' + id), text = (inp?.value || '').trim(); if (!text) return;
       try { const r = await api('POST', `/api/notes/${id}/comments`, { text }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); inp.value = ''; document.activeElement?.blur(); render(); } catch(e) { toast(errText(e)); } return; }
     case 'shCmtDel': { const [nid, cid] = id.split('|'); try { const r = await api('DELETE', `/api/notes/${nid}/comments/${cid}`); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
@@ -5714,6 +5743,10 @@ document.addEventListener('change', async e => {
   if (t.id === 'dr-w') { DRAW.width = Number(t.value) || 4; return; }
   if (t.id === 'dr-img') { const f = t.files[0]; if (f) $('drawc')?._image?.(f); t.value = ''; return; }
   if (t.id === 'dr-target') { ui.drawTarget = t.value || null; return; }
+  if (t.id === 'sh-as') { ui.shAs = t.value; return; }
+  if (t.id === 'sh-due') { ui.shDue = t.value; return; }
+  if (t.dataset.shas !== undefined || t.dataset.shdue !== undefined) { const nid = t.dataset.shas || t.dataset.shdue, body = t.dataset.shas ? { assignee: t.value || null } : { due: t.value || '' };
+    try { const r = await api('PATCH', '/api/notes/' + nid, body); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); toast(t.dataset.shas ? 'Исполнитель назначен' : 'Срок изменён'); render(); } catch(err) { toast(errText(err)); } return; }
   if (t.name === 'sh-users') { ui.shUsers = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value); return; }
   if (t.name && t.name.startsWith('sh-edit-')) { const nid = t.name.slice(8), share = [...document.querySelectorAll(`input[name="${t.name}"]:checked`)].map(x => x.value); if (!share.length) { t.checked = true; return toast('Хотя бы один участник'); }
     try { const r = await api('PATCH', '/api/notes/' + nid, { share }); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); toast('Участники изменены'); } catch(err) { toast(errText(err)); } return; }
@@ -5881,7 +5914,7 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (['users', 'admFiles'].includes(h) && me.role === 'admin' ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs'].includes(h) ? h : 'wwork')
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks'].includes(h) ? h : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
@@ -5946,7 +5979,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(v === 'req' || (v === 'users' && u.role === 'admin')) : v === 'req' ? true : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(v === 'req' || (v === 'users' && u.role === 'admin')) : v === 'req' ? true : isWorker() ? !['wwork', 'wdone'].includes(v) : ['wwork', 'wdone', 'mytasks', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp'].includes(v) && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
