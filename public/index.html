@@ -594,6 +594,13 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 :root[data-theme="upr"] .d-head{background:#0B2A57;color:#fff}:root[data-theme="upr"] .d-head h2{color:#fff}:root[data-theme="upr"] .d-head .btn{color:#fff;border-color:rgba(255,255,255,.35);background:transparent}
 :root[data-theme="upr"] .sysopt input:checked+span{background:#0D4C92;color:#fff;border-color:#0D4C92}
 
+/* в системе заявок с темой «ФКУ Упрдор» вместо названия — логотип Росавтодора и подпись «Система управления заявками» */
+:root[data-theme="upr"] body.reqmode #happ{font-size:0;letter-spacing:0;gap:0}
+:root[data-theme="upr"] body.reqmode #happ::before{flex:0 0 auto;width:250px;height:66px;padding:5px 10px;box-sizing:border-box;border-radius:4px;background:#fff url("/img/rosavtodor.png") no-repeat center/contain;background-origin:content-box;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+:root[data-theme="upr"] body.reqmode #hsub{font-size:0;margin-top:6px}
+:root[data-theme="upr"] body.reqmode #hsub::after{content:"Система управления заявками";font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff}
+@media (max-width:600px){:root[data-theme="upr"] body.reqmode #happ::before{width:180px;height:48px;padding:3px 7px}:root[data-theme="upr"] body.reqmode #hsub::after{font-size:12px}}
+
 /* ===== Theme «Инженерная»: чертёж-«синька» — тёмно-синий, миллиметровая сетка, моноширинный шрифт, прямые углы ===== */
 :root[data-theme="engineer"]{
   --paper:#0E2741; --sheet:#12304F; --ink:#E4F1FF; --ink-2:#93B4D4; --rule:#2B5378; --rule-2:#1C4063;
@@ -6219,6 +6226,7 @@ async function start(u){
   $('orgsTab').hidden = !u.sys; ui.orgsList = null;
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
   $('happ').textContent = reqMode() ? 'Управление заявками' : 'Управление предприятием';
+  document.body.classList.toggle('reqmode', reqMode());
   $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
   $('orgwarn').hidden = !u.orgWarn; $('orgwarn').textContent = u.orgWarn ? '⚠ ' + u.orgWarn + ' Для продления обратитесь к администратору системы.' : '';
   $('blockscr').hidden = true;
