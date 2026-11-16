@@ -3425,7 +3425,7 @@ function vLabels(){
         <div class="lblman lbldate"><label>Дата на этикетке<input class="in" type="date" id="lbl-date" value="${esc(ui.lblDate || today())}"></label>
           <button type="button" class="btn sm" data-act="lblDateToday" ${ui.lblDate ? '' : 'disabled'}>Сегодня</button>
           <small class="lblcheck" id="lbl-datenote">${ui.lblDate ? `<span class="warn-t">На этикетке будет ${esc(fmtD(ui.lblDate))}, а не сегодняшняя дата.</span>` : 'Поле {date} — сегодняшняя дата; выберите другую, если нужно.'}</small></div>
-        <div class="lblman lblscan"><label>Поле со сканера<input class="in mono" id="lbl-scan" value="${esc(ui.lblScan || '')}" placeholder="щёлкните и отсканируйте" maxlength="200" autocomplete="off" spellcheck="false"></label>
+        <div class="lblman lblscan" id="lbl-scanbox" ${lblUsesScan(t) ? '' : 'hidden'}><label>Поле со сканера<input class="in mono" id="lbl-scan" value="${esc(ui.lblScan || '')}" placeholder="щёлкните и отсканируйте" maxlength="200" autocomplete="off" spellcheck="false"></label>
           <small id="lbl-scancheck" class="lblcheck">${lblScanCheck(t, ui.lblScan)}</small></div>
         <div class="lblman"><label>Свой серийный номер<input class="in mono" id="lbl-man" list="lbl-mans" value="${esc(ui.lblMan || '')}" placeholder="например, ${esc(lblSerial(t, t.serial.next + 100))}" maxlength="60" autocomplete="off"></label>
           <button class="btn" data-act="lblManual">🖨 Печать с этим номером</button>
@@ -3468,6 +3468,8 @@ async function svgToPng(file){
     return new File([blob], file.name.replace(/\.svg$/i, '') + '.png', { type: 'image/png' });
   } finally { URL.revokeObjectURL(url); }
 }
+// without {scan} on the label the scanner is not waited for: the label goes to print at once
+const lblScanVal = t => lblUsesScan(t) ? (ui.lblScan || '').trim() : '';
 function lblScanReady(t, scan, cnt){
   if (lblUsesScan(t) && !scan) { toast('Отсканируйте код в «Поле со сканера»'); $('lbl-scan')?.focus(); return false; }
   if (scan && cnt > 1) { toast('Со значением со сканера печатается одна этикетка — поставьте «Штук: 1»'); return false; }
@@ -3551,6 +3553,7 @@ function lblRedraw(full){
   const t = lblDraft(), nx = $('lbl-nextno'); if (nx && t) nx.textContent = lblSerial(t, t.serial.next);
   const pz = $('lbl-papersz'); if (pz && t) pz.textContent = `${t.w}×${t.h} мм`;
   const sc = $('lbl-scancheck'); if (sc && t && !sc.querySelector('button')) sc.innerHTML = lblScanCheck(t, ui.lblScan);
+  const sbx = $('lbl-scanbox'); if (sbx && t) sbx.hidden = !lblUsesScan(t);
   const sb = document.querySelector('[data-act=lblSave]'); if (sb) sb.disabled = !ui.lblDirty;
   if (full) { const f = document.querySelector('.lblform'); if (f && (!f.contains(document.activeElement) || /^(SELECT|INPUT)$/.test(document.activeElement.tagName) && document.activeElement.type !== 'text')) f.innerHTML = lblForm(t); }
 }
@@ -5504,7 +5507,7 @@ async function act(el){
       if (ui.lblDirty && !(await lblSave())) return;
       try { const r = await api('PUT', '/api/labels/' + ui.lblId, { ...lblDraft(), serial: { ...lblDraft().serial, setNext: n } }); const i = LABELS.findIndex(x => x.id === ui.lblId); LABELS[i] = r.label; lblPick(ui.lblId); $('view').innerHTML = vLabels(); toast('Следующий номер: ' + lblSerial(r.label, n)); } catch(e) { toast(errText(e)); } return; }
     case 'lblNext': case 'lblNextForce': { const cnt = Math.max(1, Math.min(500, Math.floor(Number($('lbl-count')?.value) || 1))); ui.lblCount = cnt;
-      const scan = (ui.lblScan || '').trim(); if (!lblScanReady(lblDraft(), scan, cnt)) return;
+      const scan = lblScanVal(lblDraft()); if (!lblScanReady(lblDraft(), scan, cnt)) return;
       if (ui.lblDirty && !(await lblSave())) return;
       try { const r = await api('POST', `/api/labels/${ui.lblId}/next`, { count: cnt, scan, date: ui.lblDate || undefined, force: a === 'lblNextForce' }), t = lblDraft();
         printLabels(t, r.nums, scan); lblScanDone(scan, r.serials[0]);
@@ -5518,7 +5521,7 @@ async function act(el){
       if (!LABEL_SN[sn]) return toast(`Номер ${sn} ещё не печатался`);
       try { const r = await api('POST', `/api/labels/${ui.lblId}/reprint`, { serial: sn }); printLabels(t, [sn], r.scan, r.date || ''); toast('Повторная печать ' + sn + (r.scan ? ' · скан ' + r.scan : '') + (r.date ? ' · дата ' + fmtD(r.date) : '')); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'lblManual': case 'lblManualForce': { const t = lblDraft(), sn = ($('lbl-man')?.value || '').trim(); if (!sn) return toast('Введите серийный номер');
-      const scan = (ui.lblScan || '').trim(); if (!lblScanReady(t, scan, 1)) return;
+      const scan = lblScanVal(t); if (!lblScanReady(t, scan, 1)) return;
       if (ui.lblDirty && !(await lblSave())) return;
       try { const r = await api('POST', `/api/labels/${ui.lblId}/manual`, { serial: sn, scan, date: ui.lblDate || undefined, force: a === 'lblManualForce' });
         printLabels(t, [sn], scan); lblScanDone(scan, sn); LABEL_SN[sn] = LABEL_SN[sn] || [ui.lblId, new Date().toISOString(), me.id];
