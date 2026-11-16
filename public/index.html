@@ -1241,14 +1241,19 @@ function vAdmFiles(){
   const kind = f => /^image\//.test(f.type) ? 'Картинка' : /pdf/.test(f.type) ? 'PDF' : /sheet|excel|csv/.test(f.type) || /\.(xlsx?|csv)$/i.test(f.name) ? 'Таблица' : /word|document/.test(f.type) || /\.docx?$/i.test(f.name) ? 'Документ' : (f.name.split('.').pop() || '').toUpperCase() || 'Файл';
   const R = L.filter(f => (F === 'all' || (F === 'unused' ? !f.used.length : f.used.length)) && (!q || [f.name, who(f.by), ...f.used].join(' ').toLowerCase().includes(q)));
   const total = L.reduce((a, f) => a + (f.size || 0), 0), unused = L.filter(f => !f.used.length);
+  // «удалить все неиспользуемые» leaves files younger than a day: they may be in a form that is not saved yet
+  const old = unused.filter(f => !f.at || Date.now() - Date.parse(f.at) > 864e5), oldSize = old.reduce((a, f) => a + (f.size || 0), 0);
   return `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="afq" type="search" value="${esc(ui.afq || '')}" placeholder="Имя файла, кто загрузил, где используется" style="flex:1 1 240px;max-width:380px" aria-label="Поиск файла"></span>
       <div class="seg">${[['all', 'Все'], ['used', 'Используются'], ['unused', 'Не используются']].map(([k, l]) => `<button data-act="afF" data-id="${k}" class="${F === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <button class="btn sm" data-act="afReload">Обновить</button>
+      ${old.length ? armBtn('afAll', `Удалить неиспользуемые (${old.length}, ${fmtSize(oldSize)})`, 'afDelUnused', '', 'btn sm danger') : ''}
       <span class="dim">Файлов: <b>${L.length}</b>, объём <b>${fmtSize(total)}</b>${unused.length ? ` · не используются: ${unused.length} (${fmtSize(unused.reduce((a, f) => a + (f.size || 0), 0))})` : ''}</span></div>
-    ${R.length ? `<section class="card" style="padding:0;overflow:auto"><table class="jt"><thead><tr><th>Файл</th><th>Тип</th><th class="jt-a">Размер</th><th>Загрузил</th><th>Когда</th><th>Где используется</th></tr></thead><tbody>
+    <p class="dim" style="margin:-4px 0 12px;font-size:13px">Удалить можно только файл, который нигде не используется, — сервер проверяет это ещё раз перед удалением. Общая кнопка не трогает файлы, загруженные за последние сутки: их могли только что прикрепить к форме, которую ещё не сохранили. Удалённый файл остаётся только в резервных копиях.</p>
+    ${R.length ? `<section class="card" style="padding:0;overflow:auto"><table class="jt"><thead><tr><th>Файл</th><th>Тип</th><th class="jt-a">Размер</th><th>Загрузил</th><th>Когда</th><th>Где используется</th><th></th></tr></thead><tbody>
       ${R.map(f => `<tr><td class="jt-t"><a href="/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a></td><td data-l="Тип">${esc(kind(f))}</td><td class="jt-a" data-l="Размер">${fmtSize(f.size || 0)}</td>
         <td data-l="Загрузил">${f.by ? esc(who(f.by)) : '<span class="dim">—</span>'}</td><td data-l="Когда">${f.at ? esc(fmtDT(f.at)) : '<span class="dim">—</span>'}</td>
-        <td data-l="Где">${f.used.length ? f.used.map(esc).join('<br>') : '<span class="dim">не используется</span>'}</td></tr>`).join('')}
+        <td data-l="Где">${f.used.length ? f.used.map(esc).join('<br>') : '<span class="dim">не используется</span>'}</td>
+        <td class="jt-a">${f.used.length ? '' : armBtn('af:' + f.id, 'Удалить', 'afDel', f.id, 'btn sm')}</td></tr>`).join('')}
     </tbody></table></section>` : `<div class="empty"><h3>${L.length ? 'Ничего не найдено' : 'Файлов пока нет'}</h3>${L.length ? 'Измените поиск или фильтр.' : 'Здесь появятся все файлы, загруженные в организацию: счета, накладные, документы работ, фото, картинки этикеток.'}</div>`}`;
 }
 const canWo = () => isHead() || me?.role === 'accountant';
@@ -5339,6 +5344,8 @@ async function act(el){
     case 'initImport': ui.acct = null; return openDrawer('acctImport', null, 'initial');
     case 'afF': ui.afF = id; return render();
     case 'afReload': ui.admFiles = null; return render();
+    case 'afDel': try { const r = await api('DELETE', '/api/admin-files/' + id); ui.admFiles = (ui.admFiles || []).filter(f => f.id !== id); render(); toast(`Файл удалён, освобождено ${fmtSize(r.size)}`); } catch(e) { toast(errText(e)); ui.admFiles = null; render(); } return;
+    case 'afDelUnused': try { const r = await api('POST', '/api/admin-files/delete-unused'); ui.admFiles = null; render(); toast(r.deleted ? `Удалено файлов: ${r.deleted}, освобождено ${fmtSize(r.size)}${r.young ? `. Загруженные за последние сутки (${r.young}) оставлены` : ''}` : 'Удалять нечего'); } catch(e) { toast(errText(e)); } return;
     case 'userEdit': return openDrawer('userForm', id);
     case 'userBlock': {
       const u = (ui.usersList || []).find(x => x.id === id); if (!u) return;

@@ -345,6 +345,24 @@ function labelScans(){
   if (!db.labelScans || typeof db.labelScans !== 'object') db.labelScans = {};
   return db.labelScans;
 }
+/* where every file of the organization is used: file id → up to five places */
+function fileUsage(){
+  const used = new Map(), add = (id, what) => { if (!id || !db.files[id]) return; const L = used.get(id) || []; if (L.length < 5 && !L.includes(what)) L.push(what); used.set(id, L); };
+    for (const i of Object.values(db.invoices || {})) { add(i.file && i.file.id, `Счёт № ${i.number || '—'}`); add(i.receipt && i.receipt.id, `Чек к счёту № ${i.number || '—'}`); const w = i.income && i.income.waybill; if (w) add(w.file && w.file.id, `Накладная № ${w.number || '—'} (счёт № ${i.number || '—'})`); }
+    for (const r of Object.values(db.receipts || {})) add(r.file && r.file.id, `Накладная № ${r.number || '—'}`);
+    for (const j of Object.values(db.jobs || {})) {
+      for (const f of j.docs || []) add(f.id, `Работа № ${j.no || ''} · ${j.title || ''}`);
+      for (const x of j.buy || []) for (const f of x.files || []) add(f.id, `Купить · работа № ${j.no || ''}`);
+      for (const pl of j.places || []) for (const v of Object.values(pl.photos || {})) for (const f of [].concat(v || [])) add(f && (f.id || f), `Фото точки · работа № ${j.no || ''}`);
+    }
+    for (const o of Object.values(db.orders || {})) { for (const f of o.specs || []) add(f.id, `Заказ ${o.number || ''}`); for (const p2 of o.products || []) for (const f of p2.files || []) add(f.id, `Изделие ${p2.name || ''} · заказ ${o.number || ''}`); }
+    for (const n of db.notes || []) for (const f of n.files || []) add(f.id, n.type === 'shared' ? 'Общая задача' : 'Заметка');
+    for (const d of Object.values(db.devs || {})) for (const f of d.files || []) add(f.id, `Разработка № ${d.no || ''} · ${d.name || ''}`);
+    for (const t of Object.values(db.labels || {})) for (const x of t.items || []) if (x.img) add(x.img.id, `Этикетка «${t.name}»`);
+    for (const r of Object.values(db.requests || {})) for (const f of r.files || []) add(f.id, `Заявка № ${r.no || ''}`);
+    for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
+  return used;
+}
 /* «Потенциальные разработки»: the author and the administrator manage a development; the author chooses who sees it
    and who may add data to it (fields, documents, links, comments) */
 const devManage = (u, d) => d.by === u.id || u.role === 'admin';
@@ -1148,26 +1166,30 @@ async function api(req, res, url) {
     saveDb();
     return send(res, 200, db.meta.initial);
   }
-  /* «Администрирование» → «Файлы»: every uploaded file of the organization and where it is used */
-  if (p[1] === 'admin-files' && m === 'GET') {
-    if (user.role !== 'admin') return fail(res, 403, 'Список файлов видит только администратор');
-    const used = new Map(), add = (id, what) => { if (!id || !db.files[id]) return; const L = used.get(id) || []; if (L.length < 5 && !L.includes(what)) L.push(what); used.set(id, L); };
-    for (const i of Object.values(db.invoices || {})) { add(i.file && i.file.id, `Счёт № ${i.number || '—'}`); add(i.receipt && i.receipt.id, `Чек к счёту № ${i.number || '—'}`); const w = i.income && i.income.waybill; if (w) add(w.file && w.file.id, `Накладная № ${w.number || '—'} (счёт № ${i.number || '—'})`); }
-    for (const r of Object.values(db.receipts || {})) add(r.file && r.file.id, `Накладная № ${r.number || '—'}`);
-    for (const j of Object.values(db.jobs || {})) {
-      for (const f of j.docs || []) add(f.id, `Работа № ${j.no || ''} · ${j.title || ''}`);
-      for (const x of j.buy || []) for (const f of x.files || []) add(f.id, `Купить · работа № ${j.no || ''}`);
-      for (const pl of j.places || []) for (const v of Object.values(pl.photos || {})) for (const f of [].concat(v || [])) add(f && (f.id || f), `Фото точки · работа № ${j.no || ''}`);
+  /* «Администрирование» → «Файлы»: every uploaded file of the organization and where it is used; unused files may be deleted */
+  if (p[1] === 'admin-files') {
+    if (user.role !== 'admin') return fail(res, 403, 'Файлами управляет только администратор');
+    const used = fileUsage();
+    if (m === 'GET' && p.length === 2) {
+      const list = Object.entries(db.files).map(([id, f]) => ({ id, name: f.name, type: f.type, size: f.size || 0, at: f.at || null, by: f.by || null, used: used.get(id) || [] }))
+        .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+      return send(res, 200, list);
     }
-    for (const o of Object.values(db.orders || {})) { for (const f of o.specs || []) add(f.id, `Заказ ${o.number || ''}`); for (const p2 of o.products || []) for (const f of p2.files || []) add(f.id, `Изделие ${p2.name || ''} · заказ ${o.number || ''}`); }
-    for (const n of db.notes || []) for (const f of n.files || []) add(f.id, n.type === 'shared' ? 'Общая задача' : 'Заметка');
-    for (const d of Object.values(db.devs || {})) for (const f of d.files || []) add(f.id, `Разработка № ${d.no || ''} · ${d.name || ''}`);
-    for (const t of Object.values(db.labels || {})) for (const x of t.items || []) if (x.img) add(x.img.id, `Этикетка «${t.name}»`);
-    for (const r of Object.values(db.requests || {})) for (const f of r.files || []) add(f.id, `Заявка № ${r.no || ''}`);
-    for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
-    const list = Object.entries(db.files).map(([id, f]) => ({ id, name: f.name, type: f.type, size: f.size || 0, at: f.at || null, by: f.by || null, used: used.get(id) || [] }))
-      .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
-    return send(res, 200, list);
+    // the server checks again that a file is used nowhere; «all unused» leaves files younger than a day (they may be in a form not saved yet)
+    const drop = id => { delete db.files[id]; try { fs.unlinkSync(path.join(filesDir(), id)); } catch {} };
+    if (m === 'DELETE' && p[2] && p.length === 3) {
+      if (!db.files[p[2]]) return fail(res, 404, 'Файл не найден — обновите список');
+      if (used.has(p[2])) return fail(res, 409, 'Файл используется: ' + used.get(p[2]).join(', ') + '. Удалить можно только неиспользуемый файл');
+      const size = db.files[p[2]].size || 0; drop(p[2]); saveDb();
+      return send(res, 200, { ok: true, deleted: 1, size, rev: db.rev });
+    }
+    if (m === 'POST' && p[2] === 'delete-unused') {
+      const day = Date.now() - 864e5; let n = 0, size = 0, young = 0;
+      for (const [id, f] of Object.entries(db.files)) { if (used.has(id)) continue; if (f.at && Date.parse(f.at) > day) { young++; continue; } size += f.size || 0; drop(id); n++; }
+      if (n) saveDb();
+      return send(res, 200, { ok: true, deleted: n, size, young, rev: db.rev });
+    }
+    return fail(res, 405, 'Метод не поддерживается');
   }
   /* saving the write-off list: only when every line is covered by the accounting balances */
   if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff' && m === 'POST') {
