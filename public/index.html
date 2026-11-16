@@ -261,6 +261,10 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .stabs{margin:0 0 14px;width:max-content;max-width:100%;flex-wrap:wrap}.stabs a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:7px 14px;border-radius:7px;font-size:15px;color:var(--ink-2)}.stabs a:hover{color:var(--ink)}.stabs a.on{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 table.lines tr.ln-miss td{background:var(--warn-soft)}table.lines tr.ln-miss td:first-child{box-shadow:inset 3px 0 0 var(--warn)}table.lines tr.ln-miss .in{border-color:var(--warn)}.ln-missnote{font-size:13px}.ln-missnote:empty{display:none}
 .in.sup-miss{border-color:var(--warn);background:var(--warn-soft);box-shadow:0 0 0 1px var(--warn)}.sup-note{display:block;font-size:12px;color:var(--warn);margin-top:3px}.sup-note:empty{display:none}
+.jlist{gap:10px}.jl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.jl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:start;padding:8px 0;border-top:1px solid var(--rule-2)}.jl:first-child{border-top:0}
+.jl-b{display:flex;flex-direction:column;gap:4px;min-width:0}.jl-t{white-space:pre-wrap;overflow-wrap:anywhere}.jl.done .jl-t{text-decoration:line-through;color:var(--ink-2)}.jl-acts{display:flex;gap:2px;align-items:center}
+.jl-links{display:flex;flex-wrap:wrap;gap:6px}.jl-link{display:inline-flex;gap:6px;align-items:center;padding:2px 8px;border-radius:999px;background:var(--info-soft);font-size:13px;max-width:100%}.jl-link a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
+.jl-done summary{margin-top:6px;font-size:13px}.jlist .note-add textarea{min-height:38px}
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .devcost{display:grid;grid-template-columns:1fr;gap:0;margin:2px 0;font-size:14px}.devcost dt{color:var(--ink-2);font-size:12px;margin-top:4px}.devcost dd{margin:0;white-space:pre-line;overflow:hidden;text-overflow:ellipsis}
@@ -2235,7 +2239,7 @@ function vWorkList(){
   return head + `<section class="card" style="padding:0;overflow:hidden">${L.map(j => { const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), ppl = [...new Set(P.map(x => x.assignee).filter(Boolean))];
     return `<div class="wrk click" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">
       <div><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span></div>
-      <div class="wrk-t"><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}${(j.docs || []).length ? ` · документов: ${j.docs.length}` : ''}</small></div>
+      <div class="wrk-t"><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}${(j.docs || []).length ? ` · документов: ${j.docs.length}` : ''}${(j.todo || []).length ? ` · <span title="Что нужно сделать: сделано из всего">☑ ${j.todo.filter(x => x.done).length}/${j.todo.length}</span>` : ''}${(j.buy || []).length ? ` · <span title="Что нужно купить: куплено из всего">🛒 ${j.buy.filter(x => x.done).length}/${j.buy.length}</span>` : ''}</small></div>
       <div class="${overdue(j) ? 'bad-t' : ''}"><small class="lbl">Срок</small>${j.due ? fmtD(j.due) : '<span class="dim">—</span>'}</div>
       <div>${isMount(j) ? (P.length ? `<small class="lbl">Точки</small>${c} / ${P.length}<span class="wbar"><i style="width:${Math.round(c / P.length * 100)}%"></i></span>` : '<span class="dim">точек нет</span>') : ''}</div>
       <div class="wrk-p">${ppl.slice(0, 3).map(id => `<span class="wchip">${esc(who(id))}</span>`).join(' ')}${ppl.length > 3 ? ` <span class="dim">+${ppl.length - 3}</span>` : ''}</div>
@@ -3857,6 +3861,58 @@ function vUsers(){
     <div class="roles">${Object.entries(roleNames()).map(([k,n]) => `<div><b>${n}</b><span class="dim">${roleInfo(k)}</span></div>`).join('')}</div>`;
 }
 
+/* ===== Lists of a work: «Что нужно сделать» and «Что нужно купить» (links to sites and pictures) ===== */
+const JOB_LISTS = { todo: ['Что нужно сделать', 'Что нужно сделать — Enter, чтобы добавить', 'сделано'], buy: ['Что нужно купить', 'Что купить — можно вставить ссылку на сайт', 'куплено'] };
+const jlMay = j => mayEditJob(j) || onJob(j);
+const jlHost = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch(e) { return u; } };
+function jobListBox(j, k){
+  const L = j[k] || [], open = L.filter(x => !x.done), done = L.filter(x => x.done), may = jlMay(j), [title, ph, doneWord] = JOB_LISTS[k];
+  const item = x => `<li class="jl ${x.done ? 'done' : ''}">
+    <label class="note-cb"><input type="checkbox" data-jl="${j.id}|${k}|${x.id}" ${x.done ? 'checked' : ''} ${may ? '' : 'disabled'} aria-label="${doneWord}"></label>
+    <div class="jl-b">${ui.jlEdit === x.id ? `<span data-keep style="display:contents"><textarea class="in" id="jl-ed" data-jl-ed="${j.id}|${k}|${x.id}" rows="2" maxlength="2000">${esc(x.text)}</textarea></span><small class="dim">Enter — сохранить, Esc — отменить</small>`
+        : `<div class="jl-t" ${may ? `data-jledit="${x.id}" title="Дважды щёлкните, чтобы изменить"` : ''}>${x.text ? esc(x.text) : '<span class="dim">без текста</span>'}</div>`}
+      ${(x.links || []).length ? `<div class="jl-links">${x.links.map((l, i) => `<span class="jl-link"><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" title="${esc(l.url)}">🔗 ${esc(l.title && l.title !== l.url ? l.title : jlHost(l.url))}</a>${may ? `<button class="linkish" data-act="jlLinkDel" data-id="${j.id}|${x.id}|${i}" aria-label="Убрать ссылку">✕</button>` : ''}</span>`).join('')}</div>` : ''}
+      ${(x.files || []).length ? `<div class="thumbs">${x.files.map(f => `<span class="tw">${thumbF(f)}${may ? `<button class="btn sm ghost" data-act="jlFileDel" data-id="${j.id}|${x.id}|${f.id}" aria-label="Убрать картинку">✕</button>` : ''}</span>`).join('')}</div>` : ''}
+      ${ui.jlLink === x.id ? `<div class="row-g" data-keep><input class="in" id="jl-url" placeholder="https://… ссылка на сайт" inputmode="url" style="flex:1 1 220px"><button class="btn sm" data-act="jlLinkAdd" data-id="${j.id}|${x.id}">Добавить</button><button class="btn sm ghost" data-act="jlLinkOpen" data-id="">Отмена</button></div>` : ''}
+      <small class="dim">${esc(who(x.by))} · ${esc(fmtDT(x.at))}${x.done && x.doneAt ? ` · ${doneWord} ${esc(fmtDT(x.doneAt))}${x.doneBy && x.doneBy !== x.by ? ', ' + esc(who(x.doneBy)) : ''}` : ''}</small></div>
+    ${may ? `<div class="jl-acts">${k === 'buy' ? `<button class="btn ghost sm" data-act="jlLinkOpen" data-id="${x.id}" title="Добавить ссылку на сайт" aria-label="Добавить ссылку">🔗</button><label class="btn ghost sm" title="Прикрепить картинку" aria-label="Прикрепить картинку">📎<input type="file" accept="image/*" data-up="jlFile" data-id="${j.id}|${x.id}" multiple hidden></label>` : ''}<button class="btn ghost sm" data-act="jlDel" data-id="${j.id}|${k}|${x.id}" aria-label="Удалить" title="Удалить">✕</button></div>` : ''}
+  </li>`;
+  return `<div class="box jlist"><h4>${title}${L.length ? ` <span class="dim">· ${doneWord} ${done.length} из ${L.length}</span>` : ''}</h4>
+    ${may ? `<div class="note-add" data-keep><textarea id="jl-new-${k}" rows="1" data-jlnew="${j.id}|${k}" maxlength="2000" placeholder="${ph}" aria-label="${title}"></textarea><button class="btn primary sm" type="button" data-act="jlAdd" data-id="${j.id}|${k}">Добавить</button></div>` : ''}
+    ${open.length ? `<ul class="jl-list">${open.map(item).join('')}</ul>` : `<p class="dim" style="margin:0">${L.length ? 'Всё ' + doneWord + '.' : 'Пока пусто.'}</p>`}
+    ${done.length ? `<details class="jl-done" ${ui.jlDoneOpen ? 'open' : ''}><summary class="linkish">${doneWord[0].toUpperCase() + doneWord.slice(1)} · ${done.length}</summary><ul class="jl-list">${done.map(item).join('')}</ul></details>` : ''}
+  </div>`;
+}
+async function jlApi(jid, k, method, itemId, body){
+  const r = await api(method, `/api/jobs/${jid}/list/${k}${itemId ? '/' + itemId : ''}`, body);
+  const j = jobOf(jid); if (j) j[k] = r.list;
+  refresh().catch(() => {});
+  return r;
+}
+// «Добавить»: links pasted into the text of a purchase become its links
+async function jlAdd(jid, k){
+  const ta = $('jl-new-' + k); let text = (ta?.value || '').trim(); if (!text) { ta?.focus(); return toast('Напишите, что нужно'); }
+  const links = k === 'buy' ? [...text.matchAll(/https?:\/\/[^\s<>"]+/gi)].map(m => ({ url: m[0].replace(/[),.;]+$/, ''), title: '' })) : [];
+  if (links.length) text = text.replace(/https?:\/\/[^\s<>"]+/gi, ' ').replace(/\s+/g, ' ').trim();
+  if (!text && links.length) text = jlHost(links[0].url);
+  try { await jlApi(jid, k, 'POST', '', { text, links }); ta.value = ''; ta.style.height = ''; renderDrawer(); $('jl-new-' + k)?.focus(); } catch(e) { toast(errText(e)); }
+}
+async function jlSaveEdit(save){
+  const ta = $('jl-ed'); if (!ta) { ui.jlEdit = null; return; }
+  const [jid, k, id] = ta.dataset.jlEd.split('|'), it = (jobOf(jid)?.[k] || []).find(x => x.id === id), v = ta.value.trim();
+  ui.jlEdit = null;
+  if (save && it && v !== it.text) { try { await jlApi(jid, k, 'PATCH', id, { text: v }); } catch(e) { toast(errText(e)); } }
+  renderDrawer();
+}
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.jlnew && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const [jid, k] = t.dataset.jlnew.split('|'); jlAdd(jid, k); }
+  if (t.id === 'jl-ed') { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); jlSaveEdit(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); jlSaveEdit(false); } }
+  if (t.id === 'jl-url' && e.key === 'Enter') { e.preventDefault(); document.querySelector('[data-act=jlLinkAdd]')?.click(); }
+}, true);
+document.addEventListener('focusout', e => { if (e.target.id === 'jl-ed') setTimeout(() => { if ($('jl-ed') && document.activeElement?.id !== 'jl-ed') jlSaveEdit(true); }, 0); });
+document.addEventListener('dblclick', e => { const el = e.target.closest('[data-jledit]'); if (!el) return; ui.jlEdit = el.dataset.jledit; renderDrawer(); const ta = $('jl-ed'); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } });
+
 /* ===== Plan view ===== */
 /* who takes part in a work: its manager, workers, executors of its points and employees of its plan tasks */
 const jobPeople = j => { const ids = [j.leaderId, ...(j.workers || []), ...(j.places || []).map(x => x.assignee), ...S.tasks.filter(t => t.jobId === j.id).flatMap(t => t.staff || [])].filter(Boolean); return [...new Set(ids)]; };
@@ -4446,6 +4502,8 @@ function renderDrawer(){
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
       ${j.description || canEdit() ? `<p class="jdesc ${j.description ? '' : 'dim'}" ${edAttr('jobs', j.id, 'description', true)}>${j.description ? esc(j.description) : 'Описание — дважды щёлкните, чтобы добавить'}</p>` : ''}
+      ${jobListBox(j, 'todo')}
+      ${jobListBox(j, 'buy')}
       <div class="box"><h4>Документы${(j.docs || []).length ? ' · ' + j.docs.length : ''}</h4>
         ${(j.docs || []).length ? `<ul class="files">${j.docs.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at || '').slice(0, 10))}</small>${ed ? armBtn('jdoc:' + f.id, '✕', 'jobDocDel', j.id + '|' + f.id, 'icon') : ''}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документов нет.</p>'}
         ${ed ? `<div class="row-g"><label class="btn sm">Загрузить документы<input type="file" data-up="jobDoc" data-id="${j.id}" accept="${ACCEPT}" multiple hidden></label></div>` : ''}</div>
@@ -5323,6 +5381,17 @@ async function act(el){
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
     case 'reqNew': ui.reqFiles = []; return openDrawer('reqForm');
+    case 'jlAdd': { const [jid, k] = id.split('|'); return jlAdd(jid, k); }
+    case 'jlDel': { const [jid, k, iid] = id.split('|'); try { await jlApi(jid, k, 'DELETE', iid); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    case 'jlLinkOpen': ui.jlLink = id || null; renderDrawer(); $('jl-url')?.focus(); return;
+    case 'jlLinkAdd': { const [jid, iid] = id.split('|'), it = (jobOf(jid)?.buy || []).find(x => x.id === iid); let url = ($('jl-url')?.value || '').trim();
+      if (!url) return toast('Вставьте ссылку'); if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      if (!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(url)) return toast('Похоже, это не ссылка');
+      try { await jlApi(jid, 'buy', 'PATCH', iid, { links: [...(it.links || []), { url, title: '' }] }); ui.jlLink = null; renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    case 'jlLinkDel': { const [jid, iid, n] = id.split('|'), it = (jobOf(jid)?.buy || []).find(x => x.id === iid);
+      try { await jlApi(jid, 'buy', 'PATCH', iid, { links: (it.links || []).filter((_, i) => i !== Number(n)) }); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    case 'jlFileDel': { const [jid, iid, fid] = id.split('|'), it = (jobOf(jid)?.buy || []).find(x => x.id === iid);
+      try { await jlApi(jid, 'buy', 'PATCH', iid, { files: (it.files || []).filter(f => f.id !== fid) }); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
     case 'showGot': ui.showGot = { ...(ui.showGot || {}), [id]: !(ui.showGot || {})[id] }; return render();
     case 'devNew': ui.devAcc = {}; ui.devEditing = null; return openDrawer('devForm');
     case 'devOpen': ui.devEditing = null; return openDrawer('dev', id);
@@ -5643,6 +5712,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
   if (t.dataset.sec && !t.dataset.top) { t.closest('.secg')?.querySelectorAll('[data-top]').forEach(x => { x.disabled = !t.checked; }); return; }
   if (t.name === 'o-type') { const b = $('o-secs'); if (b) b.hidden = t.value === 'requests'; return; }
+  if (t.dataset.jl) { const [jid, k, iid] = t.dataset.jl.split('|'); try { await jlApi(jid, k, 'PATCH', iid, { done: t.checked }); renderDrawer(); } catch(e) { toast(errText(e)); t.checked = !t.checked; } return; }
   if (t.dataset.dacc) { ui.devAcc = ui.devAcc || {}; if (t.value) ui.devAcc[t.dataset.dacc] = t.value; else delete ui.devAcc[t.dataset.dacc]; return; }
   if (t.id === 'rq-assign') { const rid = ui.drawer?.id; try { await reqApi('PATCH', '/api/requests/' + rid, { action: 'assign', assignee: t.value || null }); renderDrawer(); render(); toast(t.value ? 'Исполнитель назначен' : 'Исполнитель снят'); } catch(e) { toast(errText(e)); renderDrawer(); } return; }
   if (t.id === 'planWho') { ui.planWho = t.value; return render(); }
@@ -5664,6 +5734,10 @@ document.addEventListener('change', async e => {
     if (f === 'qty') t.value = c[f];
     return guard(upd('orders', o.id, { components:comps }));
   }
+  if (t.dataset.up === 'jlFile') { const files = [...t.files], [jid, iid] = t.dataset.id.split('|'); t.value = ''; if (!files.length) return;
+    try { const it = (jobOf(jid)?.buy || []).find(x => x.id === iid), add = []; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); add.push({ id: u.id, name: u.name }); }
+      await jlApi(jid, 'buy', 'PATCH', iid, { files: [...(it.files || []), ...add] }); renderDrawer(); toast(add.length > 1 ? `Картинок прикреплено: ${add.length}` : 'Картинка прикреплена'); } catch(e) { toast(errText(e)); }
+    return; }
   if (t.dataset.up === 'lblImg') { let fl = t.files[0]; const rid = t.dataset.id; t.value = ''; if (!fl) return;
     if (!/^image\//.test(fl.type)) return toast('Нужна картинка: PNG, JPG, GIF, WEBP или SVG');
     try { toast('Загружаем картинку…');

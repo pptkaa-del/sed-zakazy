@@ -529,7 +529,7 @@ async function api(req, res, url) {
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
   if (FIELD(user) && !['rev', 'data', 'password', 'jobs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
-    && !(p[1] === 'devs' || (p[1] === 'files' && Object.values(db.devs || {}).some(d => devEdit(user, d))))) return fail(res, 403, 'Недостаточно прав');
+    && !(p[1] === 'devs' || (p[1] === 'files' && (Object.values(db.devs || {}).some(d => devEdit(user, d)) || Object.values(db.jobs || {}).some(j => onJob(user, j)))))) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
     const target = p[2] && orgUsers().find(u => u.id === p[2]);
@@ -1156,6 +1156,7 @@ async function api(req, res, url) {
     for (const r of Object.values(db.receipts || {})) add(r.file && r.file.id, `Накладная № ${r.number || '—'}`);
     for (const j of Object.values(db.jobs || {})) {
       for (const f of j.docs || []) add(f.id, `Работа № ${j.no || ''} · ${j.title || ''}`);
+      for (const x of j.buy || []) for (const f of x.files || []) add(f.id, `Купить · работа № ${j.no || ''}`);
       for (const pl of j.places || []) for (const v of Object.values(pl.photos || {})) for (const f of [].concat(v || [])) add(f && (f.id || f), `Фото точки · работа № ${j.no || ''}`);
     }
     for (const o of Object.values(db.orders || {})) { for (const f of o.specs || []) add(f.id, `Заказ ${o.number || ''}`); for (const p2 of o.products || []) for (const f of p2.files || []) add(f.id, `Изделие ${p2.name || ''} · заказ ${o.number || ''}`); }
@@ -1210,7 +1211,7 @@ async function api(req, res, url) {
   }
 
   if (p[1] === 'files' && m === 'POST') {
-    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user) && orgType(user) !== 'requests' && !Object.values(db.devs || {}).some(d => devEdit(user, d))) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
+    if (!canEdit(user) && !canPay(user) && !canAddInvoice(user) && orgType(user) !== 'requests' && !Object.values(db.devs || {}).some(d => devEdit(user, d)) && !Object.values(db.jobs || {}).some(j => onJob(user, j))) return fail(res, 403, 'Недостаточно прав для загрузки файлов');
     let name = 'файл';
     try { name = decodeURIComponent(String(req.headers['x-filename'] || 'файл')); } catch {}
     name = name.replace(/[\\/\r\n"]/g, '_').slice(0, 200) || 'файл';
@@ -1326,6 +1327,35 @@ async function api(req, res, url) {
   }
 
   /* a worker's report at a point of a job: the photos the job asks for, extra photos and a comment */
+  /* lists of a work: «Что нужно сделать» (todo) and «Что нужно купить» (buy, with links and pictures);
+     each item is changed on its own, so two people adding to a list do not overwrite each other */
+  if (p[1] === 'jobs' && p[3] === 'list' && ['todo', 'buy'].includes(p[4])) {
+    const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
+    if (!(mayEditJob(user, j) || onJob(user, j))) return fail(res, 403, 'Список работы меняют руководитель, администратор и участники работы');
+    const k = p[4], now = new Date().toISOString(), L = j[k] = Array.isArray(j[k]) ? j[k] : [];
+    const links = a => (Array.isArray(a) ? a : []).slice(0, 20).map(l => ({ url: String(l && l.url || '').trim().slice(0, 1000), title: String(l && l.title || '').trim().slice(0, 200) }))
+      .filter(l => /^https?:\/\/\S+$/i.test(l.url)).map(l => ({ ...l, title: l.title || l.url }));
+    const files = a => (Array.isArray(a) ? a : []).filter(f => f && db.files[f.id]).slice(0, 20).map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), type: db.files[f.id].type }));
+    const out = () => { j.updatedAt = now; j.updatedBy = user.id; saveDb(); return send(res, 200, { ok: true, list: L, rev: db.rev }); };
+    if (m === 'POST' && p.length === 5) {
+      const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 2000);
+      if (!text && !(b.links || []).length && !(b.files || []).length) return fail(res, 400, 'Напишите, что нужно');
+      L.push({ id: newId(), text, done: false, at: now, by: user.id, ...(k === 'buy' ? { links: links(b.links), files: files(b.files) } : {}) });
+      return out();
+    }
+    const it = p[5] && L.find(x => x.id === p[5]); if (!it) return fail(res, 404, 'Пункт не найден — обновите страницу');
+    if (m === 'PATCH') {
+      const b = await readJsonBody(req);
+      if (b.text !== undefined) { const t = String(b.text).trim().slice(0, 2000); if (!t && !(it.links || []).length && !(it.files || []).length) return fail(res, 400, 'Пустой пункт — удалите его'); it.text = t; }
+      if (b.done !== undefined) { it.done = !!b.done; it.doneAt = it.done ? now : null; it.doneBy = it.done ? user.id : null; }
+      if (k === 'buy' && b.links !== undefined) it.links = links(b.links);
+      if (k === 'buy' && b.files !== undefined) it.files = files(b.files);
+      it.editedAt = now; it.editedBy = user.id;
+      return out();
+    }
+    if (m === 'DELETE') { L.splice(L.indexOf(it), 1); return out(); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'jobs' && p[3] === 'places' && p[4]) {
     const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
     const pl = (j.places || []).find(x => x.id === p[4]); if (!pl) return fail(res, 404, 'Точка не найдена');
