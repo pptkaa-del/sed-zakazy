@@ -344,6 +344,11 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .vcard .kv{margin:0}.vrow{align-items:flex-end}.vrow>label:not(.btn){display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.vlist{list-style:none;margin:0;padding:0}.vlist li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--rule-2);font-size:14px}.vlist li:first-child{border-top:0}
 .ptform{padding:14px 16px;display:flex;flex-direction:column;gap:10px}.ptrow{display:grid;grid-template-columns:180px minmax(0,1fr) 220px minmax(0,1fr);gap:10px}.ptrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:900px){.ptrow{grid-template-columns:1fr 1fr}.ptrow .ptdesc{grid-column:1/-1}}
+.ckform{padding:14px 16px;display:flex;flex-direction:column;gap:12px;max-width:860px;margin-top:12px}.ckform h3{margin:0}
+.ckitems{display:flex;flex-direction:column;gap:6px}.ckir{display:grid;grid-template-columns:minmax(0,1fr) 80px 64px 110px 100px 34px;gap:6px;align-items:center}.ckih{font-size:12px;color:var(--ink-2)}.ckir b{text-align:right;font-size:13px}
+@media (max-width:640px){.ckir{grid-template-columns:1fr 70px 56px 34px}.ckir>input:first-child{grid-column:1/-1}.ckir>b{display:none}.ckih{display:none}.ckir>input[data-cki$="|price"]{grid-column:1/2}}
+.cklist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}.ckcard{display:flex;gap:12px;padding:12px}.ckph{display:flex;flex-direction:column;gap:6px}.ckph img{width:84px;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--rule)}
+.ckb{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;font-size:14px}.ckul{margin:2px 0;padding-left:18px;font-size:13px}
 .smtypes{flex-wrap:wrap}.mywork{padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}.rswitch{white-space:nowrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
@@ -1098,6 +1103,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wwork" data-v="wwork" id="wworkTab" hidden>В работе <span class="badge" id="wBadge" hidden></span></a>
       <a href="#wdone" data-v="wdone" id="wdoneTab" hidden>Выполненные</a>
       <a href="#wover" data-v="wover" hidden>Ненорм. день</a>
+      <a href="#checks" data-v="checks" hidden>Загрузить чек</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
       <a href="#stock" data-v="stock">Склад <span class="badge" id="payBadge" hidden title="Счета к оплате"></span></a>
@@ -1333,7 +1339,7 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || !can('devs') || (isWorker() && !DEVS.length);
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -1454,7 +1460,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (STOCK_VIEWS.includes(ui.view) ? stockTabs() : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -4236,6 +4242,7 @@ function vehicleHtml(v){
       <div class="row-g vrow" data-keep><label style="flex:1 1 200px">Название<input class="in" id="vd-title" maxlength="200" placeholder="Заказ-наряд на ремонт"></label><label>Дата<input class="in" type="date" id="vd-date"></label>
         <label class="btn" style="align-self:flex-end">📎 Загрузить файл<input type="file" data-up="vDoc" data-id="${v.id}" hidden></label></div>
       ${docs.length ? `<ul class="vlist">${docs.map(d => `<li><div><a href="/files/${esc(d.file.id)}" target="_blank" rel="noopener"><b>${esc(d.title)}</b></a> <small class="dim">${d.date ? fmtD(d.date) + ' · ' : ''}${esc(d.file.name)} · ${fmtSize(d.file.size || 0)}</small></div>${armBtn('vdd:' + d.id, '✕', 'vDocDel', v.id + '|' + d.id, 'btn sm ghost')}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документов нет.</p>'}</div>
+    ${(() => { const F = CHECKS.filter(x => x.kind === 'fuel' && x.vehicleId === v.id).sort((a, b) => b.date.localeCompare(a.date)); return F.length ? `<div class="box"><h4>Заправки <span class="dim">· ${F.length} · ${ckMoney(F.reduce((a, x) => a + (x.sum || 0), 0))} ₽</span></h4><ul class="vlist">${F.slice(0, 20).map(x => `<li><div><b>${fmtD(x.date)}</b>${x.liters ? ` · ${String(x.liters).replace('.', ',')} л` : ''}${x.sum != null ? ` · ${ckMoney(x.sum)} ₽` : ''} <small class="dim">${esc(who(x.by))}</small></div>${(x.files || []).map(f => `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener">🧾 чек</a>`).join(' ')}</li>`).join('')}</ul></div>` : ''; })()}
     <div class="box"><h4>Запчасти <span class="dim">· ${parts.length}</span></h4>${parts.length ? `<ul class="vlist">${parts.map(x => `<li><div><b class="mono">${esc(x.number || '—')}</b> ${esc(x.name)}${x.link ? ` · <a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">🔗 ссылка</a>` : ''}</div></li>`).join('')}</ul>` : ''}
       <button class="btn sm" data-act="ptFor" data-id="${v.id}">+ Запчасть для этой машины</button></div>` : ''}
     <div class="err" id="ferr"></div>
@@ -4258,6 +4265,56 @@ function vParts(){
       ${L.map(x => `<tr><td data-l="Номер" class="mono"><b>${esc(x.number || '—')}</b></td><td data-l="Описание">${esc(x.name || '—')}</td><td data-l="Транспорт">${x.vehicleId ? esc(vName(VEHICLES.find(v => v.id === x.vehicleId))) : '<span class="dim">общая</span>'}</td>
         <td data-l="Ссылка">${x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer" title="${esc(x.link)}">🔗 ${esc(jlHost(x.link))}</a>` : '—'}</td><td class="jt-a"><button class="btn sm" data-act="ptEdit" data-id="${x.id}">Изменить</button></td></tr>`).join('')}</tbody></table></section>`
       : `<div class="empty">${PARTS.length ? 'Ничего не найдено' : 'Запчастей пока нет. Добавьте номер, описание и ссылку.'}</div>`}`;
+}
+/* ===== «Загрузить чек»: 1) заправка — фото чека и транспорт; 2) чек за покупку — вид работ, фото, дата, у кого, что куплено (кол-во, цена), сумма ===== */
+let CHECKS = [], VEH_BRIEF = [];
+const ckMoney = v => v == null || v === '' ? '' : Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const ckNum = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+const ckSeeAll = () => isHead() || me?.role === 'accountant';
+const ckItems = () => ui.ckItems && ui.ckItems.length ? ui.ckItems : (ui.ckItems = [{ name: '', qty: '1', unit: 'шт', price: '' }]);
+const ckCalc = () => Math.round(ckItems().reduce((a, it) => a + ckNum(it.qty) * ckNum(it.price), 0) * 100) / 100;
+const vehLabel = id => { const v = VEH_BRIEF.find(x => x.id === id); return v ? v.name + (v.plate ? ' · ' + v.plate : '') : 'транспорт удалён'; };
+function ckPhotos(){
+  return `<div class="row-g">${(ui.ckFiles || []).map((f, i) => `<span class="tw rqthumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}"><button type="button" class="btn sm ghost" data-act="ckFileDel" data-id="${i}" aria-label="Убрать">✕</button></span>`).join('')}
+    <label class="phdrop" style="flex:1 1 240px"><input type="file" accept="image/*" data-up="ckFile" multiple hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span><b>${(ui.ckFiles || []).length ? 'Добавить ещё фото' : 'Сфотографировать или выбрать чек'}</b><small>Фото или картинка чека</small></span></label></div>`;
+}
+function vChecks(){
+  const tab = ui.ckTab || 'fuel', mine = ckSeeAll() && ui.ckWho !== 'me' ? CHECKS : CHECKS.filter(x => x.by === me.id);
+  const tabs = `<div class="seg ntabs" role="tablist"><button role="tab" data-act="ckTab" data-id="fuel" class="${tab === 'fuel' ? 'on' : ''}">⛽ Заправка</button><button role="tab" data-act="ckTab" data-id="buy" class="${tab === 'buy' ? 'on' : ''}">🧾 Чек за покупку</button></div>`;
+  const jobs = S.jobs.filter(j => j.status !== 'done').sort((a, b) => jobNo(b) - jobNo(a));
+  const form = tab === 'fuel' ? `<section class="card ckform" data-keep>
+      <h3>Заправка</h3>${ckPhotos()}
+      <div class="form"><label class="wide"><span>Какой транспорт заправлен <em class="req-star">*</em></span><select class="in" id="ck-veh"><option value="">— выберите —</option>${VEH_BRIEF.map(v => `<option value="${v.id}" ${ui.ckVeh === v.id ? 'selected' : ''}>${esc(v.name + (v.plate ? ' · ' + v.plate : ''))}</option>`).join('')}</select>
+          ${VEH_BRIEF.length ? '' : '<small class="dim">Транспорт ещё не добавлен — его заводит руководитель во вкладке «Транспорт».</small>'}</label>
+        <label>Дата<input class="in" type="date" id="ck-date" value="${esc(ui.ckDate || today())}" max="${today()}"></label>
+        <label>Литров<input class="in mono" id="ck-liters" inputmode="decimal" value="${esc(ui.ckLiters || '')}"></label>
+        <label>Сумма, ₽<input class="in mono" id="ck-sum" inputmode="decimal" value="${esc(ui.ckSum || '')}"></label></div>
+      <div class="row-g"><button class="btn primary" data-act="ckSave" data-id="fuel">Загрузить чек</button></div></section>`
+    : `<section class="card ckform" data-keep>
+      <h3>Чек за покупку</h3>
+      <div class="form"><label class="wide"><span>На какой вид работ <em class="req-star">*</em></span><select class="in" id="ck-job"><option value="">— выберите работу —</option>${jobs.map(j => `<option value="${j.id}" ${ui.ckJob === j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title + ' · ' + (WORK_KIND[j.kind || 'mount'] || ''))}</option>`).join('')}<option value="_" ${ui.ckJob === '_' ? 'selected' : ''}>Другое…</option></select></label>
+        ${ui.ckJob === '_' ? `<label class="wide">Вид работ<input class="in" id="ck-work" maxlength="200" value="${esc(ui.ckWork || '')}" placeholder="Например: хозяйственные нужды офиса"></label>` : ''}</div>
+      ${ckPhotos()}
+      <div class="form"><label>Дата покупки<input class="in" type="date" id="ck-date" value="${esc(ui.ckDate || today())}" max="${today()}"></label>
+        <label><span>У кого куплено <em class="req-star">*</em></span><input class="in" id="ck-seller" maxlength="300" value="${esc(ui.ckSeller || '')}" placeholder="Магазин, поставщик"></label></div>
+      <div class="ckitems"><div class="ckir ckih"><span>Что куплено</span><span>Кол-во</span><span>Ед.</span><span>Цена, ₽</span><span>Сумма</span><span></span></div>
+        ${ckItems().map((it, i) => `<div class="ckir"><input class="in" data-cki="${i}|name" value="${esc(it.name)}" placeholder="Наименование" aria-label="Что куплено"><input class="in mono" data-cki="${i}|qty" value="${esc(it.qty)}" inputmode="decimal" placeholder="Кол-во" aria-label="Количество"><input class="in" data-cki="${i}|unit" value="${esc(it.unit)}" placeholder="ед." aria-label="Единица"><input class="in mono" data-cki="${i}|price" value="${esc(it.price)}" inputmode="decimal" placeholder="Цена, ₽" aria-label="Цена"><b class="mono" id="cki-sum-${i}">${ckMoney(ckNum(it.qty) * ckNum(it.price))}</b><button type="button" class="btn sm ghost" data-act="ckRowDel" data-id="${i}" aria-label="Убрать строку">✕</button></div>`).join('')}
+        <button type="button" class="btn sm" data-act="ckRowAdd">+ Строка</button></div>
+      <div class="form"><label>Сумма чека, ₽<input class="in mono" id="ck-sum" inputmode="decimal" value="${esc(ui.ckSum || '')}" placeholder="${ckMoney(ckCalc())}"></label><small class="wide dim" id="ck-calc">По строкам: <b>${ckMoney(ckCalc())} ₽</b>. Если сумма чека другая (скидка, доставка) — укажите её.</small></div>
+      <div class="row-g"><button class="btn primary" data-act="ckSave" data-id="buy">Загрузить чек</button></div></section>`;
+  const L = mine.filter(x => x.kind === tab).sort((a, b) => b.date.localeCompare(a.date) || b.at.localeCompare(a.at));
+  const total = L.reduce((a, x) => a + (x.sum || 0), 0);
+  const list = `<div class="toolbar" style="margin-top:16px"><h3 style="margin:0">${ckSeeAll() && ui.ckWho !== 'me' ? 'Все чеки' : 'Мои чеки'} <span class="dim">${L.length}${total ? ' · ' + ckMoney(total) + ' ₽' : ''}</span></h3>
+      ${ckSeeAll() ? `<div class="seg"><button data-act="ckWho" data-id="all" class="${ui.ckWho !== 'me' ? 'on' : ''}">Все</button><button data-act="ckWho" data-id="me" class="${ui.ckWho === 'me' ? 'on' : ''}">Мои</button></div>` : ''}</div>
+    ${L.length ? `<div class="cklist">${L.map(x => `<div class="card ckcard">
+      <div class="ckph">${(x.files || []).map(f => `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener"><img src="/files/${esc(f.id)}" alt="Чек" loading="lazy"></a>`).join('')}</div>
+      <div class="ckb"><div class="row-g" style="justify-content:space-between"><b>${fmtD(x.date)}${x.sum != null ? ' · ' + ckMoney(x.sum) + ' ₽' : ''}</b>${x.by === me.id || isHead() ? armBtn('ckd:' + x.id, '✕', 'ckDel', x.id, 'btn sm ghost') : ''}</div>
+        ${x.kind === 'fuel' ? `<div>⛽ ${esc(vehLabel(x.vehicleId))}${x.liters ? ` · ${String(x.liters).replace('.', ',')} л` : ''}</div>`
+          : `<div>${x.jobId ? esc(jobOf(x.jobId) ? '№ ' + jobNo(jobOf(x.jobId)) + ' · ' + jobOf(x.jobId).title : 'работа удалена') : esc(x.work)}</div><small class="dim">Куплено у: ${esc(x.seller)}</small>
+            <ul class="ckul">${(x.items || []).map(it => `<li>${esc(it.name)} — ${String(it.qty).replace('.', ',')} ${esc(it.unit || '')} × ${ckMoney(it.price)} = <b>${ckMoney(it.qty * it.price)}</b></li>`).join('')}</ul>`}
+        ${ckSeeAll() ? `<small class="dim">${esc(who(x.by))} · загружен ${esc(fmtDT(x.at))}</small>` : `<small class="dim">загружен ${esc(fmtDT(x.at))}</small>`}</div></div>`).join('')}</div>`
+      : `<div class="empty">${tab === 'fuel' ? 'Чеков заправки пока нет.' : 'Чеков за покупки пока нет.'}</div>`}`;
+  return tabs + form + list;
 }
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
@@ -6295,6 +6352,18 @@ async function act(el){
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
     case 'vNew': return openDrawer('vehicle', null);
+    case 'ckTab': ui.ckTab = id; ui.ckFiles = []; ui.ckSum = ''; return render();
+    case 'ckWho': ui.ckWho = id; return render();
+    case 'ckFileDel': (ui.ckFiles || []).splice(Number(id), 1); document.activeElement?.blur(); return render();
+    case 'ckRowAdd': ckItems().push({ name: '', qty: '1', unit: 'шт', price: '' }); document.activeElement?.blur(); render(); document.querySelector(`[data-cki="${ckItems().length - 1}|name"]`)?.focus(); return;
+    case 'ckRowDel': ckItems().splice(Number(id), 1); document.activeElement?.blur(); return render();
+    case 'ckSave': { const body = { kind: id, files: ui.ckFiles || [], date: $('ck-date').value, sum: $('ck-sum').value };
+      if (!body.files.length) return toast('Загрузите фото или картинку чека');
+      if (id === 'fuel') { body.vehicleId = $('ck-veh').value; body.liters = $('ck-liters').value; if (!body.vehicleId) return toast('Выберите, какой транспорт заправлен'); }
+      else { const j = $('ck-job').value; if (!j) return toast('Выберите, на какой вид работ покупка'); body.jobId = j === '_' ? null : j; body.work = j === '_' ? ($('ck-work')?.value || '') : ''; body.seller = $('ck-seller').value; body.items = ckItems(); }
+      try { const r = await api('POST', '/api/checks', body); CHECKS.push(r.check);
+        Object.assign(ui, { ckFiles: [], ckSum: '', ckLiters: '', ckSeller: '', ckWork: '', ckItems: null }); document.activeElement?.blur(); render(); toast('Чек загружен'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+    case 'ckDel': try { await api('DELETE', '/api/checks/' + id); CHECKS = CHECKS.filter(x => x.id !== id); render(); toast('Чек удалён'); } catch(e) { toast(errText(e)); } return;
     case 'vOpen': return openDrawer('vehicle', id);
     case 'vSave': { const body = { name: $('v-name').value, plate: $('v-plate').value, vin: $('v-vin').value, year: $('v-year').value.trim(), mileage: $('v-mileage').value.replace(/\s/g, ''), toEvery: $('v-every').value.replace(/\s/g, ''), driver: $('v-driver').value, note: $('v-note').value };
       try { const r = await api(id ? 'PATCH' : 'POST', '/api/vehicles' + (id ? '/' + id : ''), body); trPut(r.vehicle); render(); if (id) { renderDrawer(); toast('Сохранено'); } else { openDrawer('vehicle', r.vehicle.id); toast('Транспорт добавлен'); } refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
@@ -6433,6 +6502,10 @@ document.addEventListener('input', e => {
   if (t.id === 'devq') { ui.devQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vDevs(); const n = $('devq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wc-from' || t.id === 'wc-to') return;
   if (['ot-from', 'ot-to', 'ot-date', 'ot-note'].includes(t.id)) { if (!ui.otEdit) ui[{ 'ot-from': 'otFrom', 'ot-to': 'otTo', 'ot-date': 'otDate', 'ot-note': 'otNote' }[t.id]] = t.value; const c = $('ot-calc'); if (c) c.innerHTML = otCalcText($('ot-from').value, $('ot-to').value); return; }
+  if (t.dataset && t.dataset.cki) { const [i, k] = t.dataset.cki.split('|'); ckItems()[Number(i)][k] = t.value; const it = ckItems()[Number(i)], c = $('cki-sum-' + i); if (c) c.textContent = ckMoney(ckNum(it.qty) * ckNum(it.price));
+    const cc = $('ck-calc'); if (cc) cc.innerHTML = `По строкам: <b>${ckMoney(ckCalc())} ₽</b>. Если сумма чека другая (скидка, доставка) — укажите её.`; const sm = $('ck-sum'); if (sm) sm.placeholder = ckMoney(ckCalc()); return; }
+  if (['ck-veh', 'ck-date', 'ck-liters', 'ck-sum', 'ck-seller', 'ck-work'].includes(t.id)) { ui[{ 'ck-veh': 'ckVeh', 'ck-date': 'ckDate', 'ck-liters': 'ckLiters', 'ck-sum': 'ckSum', 'ck-seller': 'ckSeller', 'ck-work': 'ckWork' }[t.id]] = t.value; return; }
+  if (t.id === 'ck-job') { ui.ckJob = t.value; document.activeElement?.blur(); return render(); }
   if (t.id === 'trq') { ui.trq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vTransport(); const n = $('trq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'ptq') { ui.ptq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vParts(); const n = $('ptq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'pt-fv') { ui.ptVeh = t.value; return render(); }
@@ -6586,6 +6659,8 @@ document.addEventListener('change', async e => {
     const keep = reqKeep();
     try { await uploadMany(files, 'reqFiles'); } catch(e) { toast(errText(e)); }
     renderDrawer(); reqRestore(keep); return; }
+  if (t.dataset.up === 'ckFile') { const files = [...t.files]; t.value = ''; if (!files.length) return;
+    try { await uploadMany(files, 'ckFiles'); } catch(e) { toast(errText(e)); } document.activeElement?.blur(); render(); return; }
   if (t.dataset.up === 'vDoc') { const fl = t.files[0]; t.value = ''; if (!fl) return; const vid = t.dataset.id;
     try { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); const r = await api('POST', `/api/vehicles/${vid}/docs`, { file: { id: u.id }, title: $('vd-title')?.value.trim() || fl.name.replace(/\.[^.]+$/, ''), date: $('vd-date')?.value || '' }); trPut(r.vehicle); renderDrawer(); render(); toast('Документ загружен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'rqDoneFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; ui.rqNote = $('rq-note')?.value || '';
@@ -6668,8 +6743,8 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (['reqall', 'reqdev', 'reqdocs'].includes(h) || (['users', 'admFiles', 'reqrep', 'reqset'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks'].includes(h) ? h : 'wwork')
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
     const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
@@ -6734,7 +6809,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()); });
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null;
   $('loginView').hidden = true; $('app').hidden = false;
