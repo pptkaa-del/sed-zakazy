@@ -1275,17 +1275,35 @@ async function imageCanvas(file){
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('Формат изображения не поддерживается браузером — сохраните его как JPG или PNG')); im.src = url; });
-    const long = Math.max(img.naturalWidth, img.naturalHeight), k = long > 2600 ? 2600 / long : long < 1600 ? 1600 / long : 1;
+    // small print is read far better when enlarged: about 3000 px on the long side (no more than 3 times)
+    const long = Math.max(img.naturalWidth, img.naturalHeight), k = long > 3600 ? 3600 / long : long < 3000 ? Math.min(3, 3000 / long) : 1;
     const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
     const g = c.getContext('2d'); g.filter = 'grayscale(1) contrast(1.2)'; g.drawImage(img, 0, 0, c.width, c.height);
     return c;
   } finally { URL.revokeObjectURL(url); }
 }
+/* the rules of tables (ТОРГ-12, М-15, УПД…) are read as «|», «[», «]» and spoil the rows: long horizontal and vertical runs
+   of dark pixels are painted white before the recognition; letters are much shorter than a rule */
+function removeRules(c){
+  const g = c.getContext('2d'), W = c.width, H = c.height, im = g.getImageData(0, 0, W, H), d = im.data;
+  const dark = new Uint8Array(W * H);
+  for (let i = 0, p = 0; i < dark.length; i++, p += 4) dark[i] = (d[p] * 0.3 + d[p + 1] * 0.59 + d[p + 2] * 0.11) < 160 ? 1 : 0;
+  const kill = new Uint8Array(W * H), minH = Math.max(40, Math.round(W * 0.04)), minV = Math.max(30, Math.round(H * 0.025));
+  for (let y = 0; y < H; y++) { let x = 0; while (x < W) { if (!dark[y * W + x]) { x++; continue; } let e = x; while (e < W && dark[y * W + e]) e++; if (e - x >= minH) for (let k = x; k < e; k++) kill[y * W + k] = 1; x = e; } }
+  for (let x = 0; x < W; x++) { let y = 0; while (y < H) { if (!dark[y * W + x]) { y++; continue; } let e = y; while (e < H && dark[e * W + x]) e++; if (e - y >= minV) for (let k = y; k < e; k++) kill[k * W + x] = 1; y = e; } }
+  let n = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!kill[y * W + x]) continue; n++;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy < 0 || xx < 0 || yy >= H || xx >= W) continue; const p = (yy * W + xx) * 4; d[p] = d[p + 1] = d[p + 2] = 255; }
+  }
+  if (n) g.putImageData(im, 0, 0);
+  return c;
+}
 async function pdfCanvases(file, max = 3){
   const lib = await loadPdfJs();
   const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported:false }).promise, out = [];
   for (let n = 1; n <= Math.min(doc.numPages, max); n++) {
-    const page = await doc.getPage(n), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(3, 2400 / Math.max(vp0.width, vp0.height)) });
+    const page = await doc.getPage(n), vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(4, 3000 / Math.max(vp0.width, vp0.height)) });
     const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: g, viewport: vp }).promise; out.push(c);
@@ -1303,7 +1321,7 @@ async function ocrCanvases(canvases, onProgress){
   for (let i = 0; i < canvases.length; i++) {
     tessProgress = m => { if (!onProgress) return; if (m.status === 'recognizing text') onProgress(`Распознаём текст${canvases.length > 1 ? `, страница ${i + 1} из ${canvases.length}` : ''}… ${Math.round(m.progress * 100)}%`);
       else if (/load|initializ/i.test(m.status)) onProgress('Загружаем модуль распознавания (первый раз — около 10 МБ)…'); };
-    const { data } = await w.recognize(canvases[i]);
+    const { data } = await w.recognize(removeRules(canvases[i]));
     text += data.text + '\n';
   }
   tessProgress = null;
@@ -1467,6 +1485,8 @@ function parseWaybillText(raw){
   const md = (m && m[2] && /(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(m[2])) || /от\s+(\d{1,2})[.\s/](\d{1,2})[.\s/](\d{4})/i.exec(near) || /от\s+[«"]?(\d{1,2})[»"]?\s+([а-я]+)\s+(\d{4})/i.exec(near);
   if (md) { const mon = /^\d+$/.test(md[2]) ? Number(md[2]) : MONTHS_GEN.findIndex(x => md[2].toLowerCase().startsWith(x.slice(0, 3))) + 1;
     if (mon >= 1 && mon <= 12) r.date = `${md[3]}-${String(mon).padStart(2, '0')}-${String(md[1]).padStart(2, '0')}`; }
+  if (!r.date) { const di = t.search(/Дата/i), dm = di >= 0 && /(\d{2})[.\/](\d{2})[.\/](\d{4})/.exec(t.slice(di, di + 900));
+    if (dm && Number(dm[2]) >= 1 && Number(dm[2]) <= 12) r.date = `${dm[3]}-${dm[2]}-${dm[1]}`; }
   // on a waybill the shipper («Грузоотправитель») is the supplier's side too: an invoice reader counts it as the buyer's
   if (!r.supplier) {
     const L = t.split('\n'), ORG = /((?:ООО|ОАО|ЗАО|ПАО|АО|ИП|ГУП|МУП)\s+[«"]?[^,\n«»"]{2,80}[»"]?)/;
@@ -1480,7 +1500,10 @@ function parseWaybillText(raw){
 /* goods rows of a waybill: somewhere in the row stand «unit [code] quantity price sum» with quantity × price = sum;
    ТОРГ-12 and УПД carry extra columns (codes, VAT, sum with VAT, country) around them */
 function parseWaybillItems(raw){
-  const lines = String(raw || '').replace(/ /g, ' ').split('\n').map(x => x.replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
+  // remains of table rules («|», «[», «]», «_», «———») are dropped from the rows
+  const lines = String(raw || '').replace(/ /g, ' ').split('\n').map(x => x.replace(/[|\[\]_©]+/g, ' ').replace(/—{2,}|-{3,}/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
+  // a nomenclature number (ЦУ-00000053, 000000008) stands between the name and the unit: it is the article
+  const isNom = w => /^(?:[A-Za-zА-Яа-яЁё0-9]{1,4}-)?\d{5,}$/.test(w);
   const isUnit = w => /^(?:пог\.?м|п\.?м|[A-Za-zА-Яа-яЁё]{1,6}\.?[23²³]?)$/.test(w) && !/^(?:без|ндс|руб|коп|от|и|в|на|по)$/i.test(w);
   const row = l => {
     const T = l.split(' ');
@@ -1494,21 +1517,23 @@ function parseWaybillItems(raw){
     let best = null;
     for (const q of nums) {
       if (!(q.v > 0)) continue;
-      // the unit stands right before the quantity or before the unit code
-      let u = q.k - 1; if (u >= 0 && /^\d{2,4}$/.test(T[u]) && u - 1 >= 0 && isUnit(T[u - 1])) u = u - 1;
+      // the unit stands right before the quantity or before the unit code; forms like М-15 have two quantity
+      // columns («надлежит отпустить», «отпущено») — the one right before the price is taken, the other is passed
+      let u = q.k - 1, skip = 0; while (skip < 2 && u >= 0 && /^\d+(?:[.,]\d+)?$/.test(T[u]) && !(u - 1 >= 0 && isUnit(T[u - 1]) && /^\d{2,4}$/.test(T[u]))) { u--; skip++; }
+      if (u >= 0 && /^\d{2,4}$/.test(T[u]) && u - 1 >= 0 && isUnit(T[u - 1])) u = u - 1;
       if (u < 0 || !isUnit(T[u])) { if (!(u - 1 >= 0 && isUnit(T[u - 1]) && /^\d{2,4}$/.test(T[u]))) continue; u = u - 1; }
       for (const p of nums.filter(x => x.k === q.e + 1 && x.dec)) for (const s of nums.filter(x => x.k === p.e + 1 && x.dec)) {
         if (!(s.v > 0) || Math.abs(q.v * p.v - s.v) > Math.max(1, s.v * 0.01)) continue;
         let a = 0; if (/^\d{1,3}[.)]?$/.test(T[0])) a = 1;
-        let z = u; while (z > a && /^(?:\d{2,4}|--?|—|-)$/.test(T[z - 1])) z--;   // unit code and dashes before the unit
-        const c = { name: T.slice(a, z).join(' ').trim(), qty: q.v, unit: T[u].replace(/\.$/, ''), price: p.v, sum: s.v, idx: a ? T[0] : '' };
+        let z = u, sku = ''; while (z > a && (/^(?:\d{2,4}|--?|—|-)$/.test(T[z - 1]) || isNom(T[z - 1]))) { if (isNom(T[z - 1]) && !sku) sku = T[z - 1]; z--; }   // codes, the nomenclature number and dashes before the unit
+        const c = { name: T.slice(a, z).join(' ').trim(), sku, qty: q.v, unit: T[u].replace(/\.$/, '').toLowerCase(), price: p.v, sum: s.v, idx: a ? T[0] : '' };
         if (!best) best = c;
       }
       if (best) break;
     }
     return best;
   };
-  const hdr = lines.findIndex(l => /(товар|наименован)/i.test(l) && /(кол|цена|сумма|стоимост)/i.test(l));
+  const hdr = lines.findIndex(l => /(товар|наименован|материальн)/i.test(l) && /(кол|цена|сумма|стоимост)/i.test(l));
   const out = []; let prev = null, pend = '';
   for (const l of lines.slice(hdr + 1)) {
     if (/^(итого|всего|в том числе|без налога|сумма ндс|товарная накладная имеет|всего отпущено)/i.test(l)) { if (out.length) break; prev = null; pend = ''; continue; }
@@ -1553,7 +1578,7 @@ async function waybillFile(file){
   if (r.number) { ui.incWb.number = r.number; got.push('№ ' + esc(r.number)); }
   if (r.date) { ui.incWb.date = r.date; got.push('от ' + fmtD(r.date)); }
   if (r.supplier) { const cp = (r.inn && S.counterparties.find(c => c.inn === r.inn)) || cpByName(r.supplier); ui.incWb.supplier = cp ? cp.name : r.supplier; ui.incWb.inn = r.inn || (cp && cp.inn) || ''; got.push('поставщик ' + esc(ui.incWb.supplier)); }
-  if (r.items.length) { ui.incLines = r.items.map(x => ({ id: uid(), name: x.name, qty: x.qty, unit: x.unit, price: x.price, sum: x.sum })); got.push('строк товаров: ' + r.items.length); }
+  if (r.items.length) { ui.incLines = r.items.map(x => ({ id: uid(), name: x.name, sku: x.sku || '', qty: x.qty, unit: x.unit, price: x.price, sum: x.sum })); got.push('строк товаров: ' + r.items.length); }
   if (!r.items.length) return done((got.length ? 'Нашли: ' + got.join(', ') + '. ' : '') + 'Строки товаров не распознаны — введите их вручную.' + (ocr ? OCR_NOTE : ''), true);
   done('✓ Из накладной подставлены: ' + got.join(', ') + '. Проверьте строки и количество перед оприходованием.' + (r.number ? '' : ' Номер не найден — введите вручную.') + (ocr ? OCR_NOTE : ''), !r.number || ocr);
 }
