@@ -260,6 +260,7 @@ table.comp{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
 .buyst{white-space:nowrap}.buyst small{display:block;font-size:12px}tr.buy-got td{opacity:.6}
 .stabs{margin:0 0 14px;width:max-content;max-width:100%;flex-wrap:wrap}.stabs a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:7px 14px;border-radius:7px;font-size:15px;color:var(--ink-2)}.stabs a:hover{color:var(--ink)}.stabs a.on{background:var(--sheet);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 table.lines tr.ln-miss td{background:var(--warn-soft)}table.lines tr.ln-miss td:first-child{box-shadow:inset 3px 0 0 var(--warn)}table.lines tr.ln-miss .in{border-color:var(--warn)}.ln-missnote{font-size:13px}.ln-missnote:empty{display:none}
+.in.sup-miss{border-color:var(--warn);background:var(--warn-soft);box-shadow:0 0 0 1px var(--warn)}.sup-note{display:block;font-size:12px;color:var(--warn);margin-top:3px}.sup-note:empty{display:none}
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .devcost{display:grid;grid-template-columns:1fr;gap:0;margin:2px 0;font-size:14px}.devcost dt{color:var(--ink-2);font-size:12px;margin-top:4px}.devcost dd{margin:0;white-space:pre-line;overflow:hidden;text-overflow:ellipsis}
@@ -1072,6 +1073,16 @@ const inv = id => S.invoices.find(i => i.id === id);
 const ordersSorted = () => S.orders.slice().sort((a,b) => (b.number||'').localeCompare(a.number||'','ru',{numeric:true}));
 const cpOf = id => S.counterparties.find(c => c.id === id);
 const cpsSorted = () => S.counterparties.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'','ru'));
+// a supplier among the counterparties: by INN, then by the name (quotes, «ё» and spaces do not matter)
+const cpFind = (name, inn) => (inn && S.counterparties.find(c => c.inn && c.inn === inn)) || (String(name || '').trim() ? S.counterparties.find(c => normName(c.name) === normName(name)) : null);
+function supMark(id, inn){
+  const el = $(id); if (!el) return;
+  const v = el.value.trim(), miss = !!v && !cpFind(v, inn);
+  el.classList.toggle('sup-miss', miss);
+  let n = $(id + '-note'); if (!n) { n = document.createElement('small'); n.id = id + '-note'; n.className = 'sup-note'; el.insertAdjacentElement('afterend', n); }
+  n.textContent = miss ? 'Нет в контрагентах — будет добавлен при сохранении' : '';
+}
+const supMarkAll = () => { supMark('f-sup', $('f-sup')?.value.trim() === ui.supAuto ? ui.invInn : ''); supMark('wb-sup', $('wb-sup')?.value.trim() === (ui.incWb?.supplier || '') ? ui.incWb?.inn : ''); };
 const cpByName = n => { const k = String(n||'').trim().toLowerCase(); return k ? S.counterparties.find(c => (c.name||'').trim().toLowerCase() === k) : null; };
 const contactsOf = c => Array.isArray(c?.contacts) && c.contacts.length ? c.contacts
   : (c && (c.person || c.phone || c.email) ? [{ id:'legacy', name:c.person || '', phone:c.phone || '', email:c.email || '' }] : []);
@@ -1462,7 +1473,7 @@ async function parseInvoiceFile(file){
   if (r.supplier && (!val2('f-sup') || val2('f-sup') === ui.supAuto)) {
     const cp = (r.inn && S.counterparties.find(c => c.inn === r.inn)) || cpByName(r.supplier);
     $('f-sup').value = cp ? cp.name : r.supplier; ui.invInn = r.inn || ''; ui.supAuto = $('f-sup').value;
-    got.push('поставщик ' + esc($('f-sup').value) + (cp ? '' : ' (новый — добавится в контрагенты)'));
+    got.push('поставщик ' + esc($('f-sup').value) + (cp ? '' : ' (новый — добавится в контрагенты)')); supMark('f-sup', ui.invInn);
   }
   if (r.items.length && !ui.invItems.some(x => x.name)) {
     ui.invItems = r.items.map(x => ({ id:uid(), ...x })); drawLines('invItems');
@@ -3909,7 +3920,7 @@ function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() &
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){ if (mini) { try { mini.remove(); } catch(e){} mini = null; } ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const renderDrawerBase = renderDrawer;
-renderDrawer = function(){ renderDrawerBase(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
+renderDrawer = function(){ renderDrawerBase(); supMarkAll(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
 const opt = (obj, sel) => Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?'selected':''}>${v}</option>`).join('');
 const orderOpts = sel => ordersSorted().map(o => `<option value="${o.id}" ${o.id===sel?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('');
@@ -5495,6 +5506,7 @@ document.addEventListener('input', e => {
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
   if (t.dataset.lb) { lblChange(t.dataset.lb, t); return; }
   if (t.id === 'lbl-count') { ui.lblCount = t.value; return; }
+  if (t.id === 'f-sup' || t.id === 'wb-sup') { if (t.id === 'wb-sup' && ui.incWb) { const v = t.value.trim(); if (v !== ui.incWb.supplier) ui.incWb.inn = ''; ui.incWb.supplier = v; } supMarkAll(); return; }
   if (t.id === 'lbl-date') { ui.lblDate = t.value && t.value !== today() ? t.value : ''; lblDateNote(); return; }
   if (t.id === 'lbl-scan') { ui.lblScan = t.value.trim(); const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-scancheck'); if (c) c.innerHTML = lblScanCheck(lblDraft(), ui.lblScan); return; }
   if (t.id === 'lbl-man') { ui.lblMan = t.value.trim(); const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-mancheck'); if (c) c.innerHTML = lblManCheck(ui.lblMan); return; }

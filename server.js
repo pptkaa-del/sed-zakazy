@@ -1256,6 +1256,7 @@ async function api(req, res, url) {
       const orderId = b.orderId && db.orders[b.orderId] ? b.orderId : null, id = newId();
       const r = postIncome(lines, waybillLabel(wb), { orderId, receiptId: id }, user);
       db.receipts[id] = { ...wb, orderId, lines: r.out, at: r.at, by: user.id };
+      if (wb.supplier) { const sup = ensureSupplier(wb.supplier, wb.inn, user, `Добавлен по накладной № ${wb.number || '—'}`); if (sup.id) db.receipts[id].supplierId = sup.id; }
       saveDb();
       return send(res, 200, { ok: true, id, lines: r.out.length, created: r.created, rev: db.rev });
     }
