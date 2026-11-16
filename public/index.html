@@ -500,6 +500,7 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 .jplan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}.jplan li{display:flex;gap:10px;align-items:flex-start;padding:6px;border-radius:8px}.jplan li.click{cursor:pointer}.jplan li.click:hover{background:var(--paper)}.jplan .dot{margin-top:6px;flex:none}.jplan small{display:block}
 .bar.prod{background:#7B5BD6}.bar.mount{background:#E07B00}
 .bar.done{opacity:.45}
+.bar.nowe{background:transparent!important;box-shadow:none;padding:0;overflow:visible}.bar.nowe i{position:absolute;top:0;bottom:0;border-radius:5px;background:inherit}.bar.nowe.prod i{background:#7B5BD6}.bar.nowe.mount i{background:#E07B00}.bar.nowe.contr i{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 5px,transparent 5px 10px)}.bar.nowe.late i{box-shadow:0 0 0 2px var(--bad)}.bar.nowe i{font-style:normal;padding:0 6px;line-height:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box}
 .bar.late{box-shadow:0 0 0 2px var(--bad)}
 .g-today{position:absolute;top:0;bottom:0;width:2px;background:var(--bad);opacity:.7;z-index:1;pointer-events:none}
 .g-dl{position:absolute;top:4px;bottom:4px;width:0;border-left:2px dashed var(--warn);pointer-events:none}
@@ -4484,6 +4485,18 @@ document.addEventListener('dblclick', e => { const el = e.target.closest('[data-
 const jobPeople = j => { const ids = [j.leaderId, ...(j.workers || []), ...(j.places || []).map(x => x.assignee), ...S.tasks.filter(t => t.jobId === j.id).flatMap(t => t.staff || [])].filter(Boolean); return [...new Set(ids)]; };
 const peopleTxt = j => jobPeople(j).map(id => who(id) + (id === j.leaderId ? ' (рук.)' : '')).join(', ');
 const planJobs = () => S.jobs.slice().sort((a, b) => (a.status === 'done') - (b.status === 'done') || (b.no || 0) - (a.no || 0));
+/* a task of the plan: with the weekends or only working days (a task made before the setting works with weekends) */
+const taskWe = t => t.weekends !== false;
+const taskDays = (t, from, to) => { let n = 0; for (let d = from; d <= to; d++) if (taskWe(t) || dayKind(dstr(d)) === 'work') n++; return n; };
+const dnPlural = n => n % 10 === 1 && n % 100 !== 11 ? 'день' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'дня' : 'дней';
+// «до 25.11.2026 · осталось 7 дней» for a task in progress, «заложено 10 дней» for one not started yet
+function taskTerm(t){
+  const s = dnum(t.start), e = Math.max(s, dnum(t.end)), tn = dnum(today()), wd = taskWe(t) ? '' : ' раб.';
+  if (t.done) return `выполнено · до ${fmtD(t.end)}`;
+  if (e < tn) { const n = tn - e; return `до ${fmtD(t.end)} · <span class="bad-t">просрочено на ${n} ${dnPlural(n)}</span>`; }
+  if (s <= tn) { const n = taskDays(t, tn, e); return `до ${fmtD(t.end)} · осталось ${n}${wd} ${dnPlural(n)}`; }
+  const n = taskDays(t, s, e); return `с ${fmtD(t.start)} до ${fmtD(t.end)} · заложено ${n}${wd} ${dnPlural(n)}`;
+}
 function vPlan(){
   if (ui.planOrd && ui.planOrd !== '_' && !jobOf(ui.planOrd)) ui.planOrd = '';
   if (ui.planWho && !STAFF.some(u => u.id === ui.planWho)) ui.planWho = '';
@@ -4518,11 +4531,24 @@ function vPlan(){
     const s = dnum(t.start), e = Math.max(s, dnum(t.end)), w = (e - s + 1) * DW;
     const late = !t.done && e < tn;
     const text = (t.done?'✓ ':'') + t.title + (crewShort(t) ? ' · ' + crewShort(t) : '');
+    if (!taskWe(t)) {
+      // only the working days are filled: runs of consecutive working days
+      const runs = []; let run = null;
+      for (let d = s; d <= e + 1; d++) {
+        const wk = d <= e && dayKind(dstr(d)) === 'work';
+        if (wk && run === null) run = d;
+        if (!wk && run !== null) { runs.push([run - s, d - run]); run = null; }
+      }
+      // the title goes into the longest run of working days
+      const big = runs.reduce((a, r, i) => r[1] > runs[a][1] ? i : a, 0);
+      const segs = runs.map(([a, n], i) => `<i style="left:${a * DW}px;width:${n * DW}px">${i === big && n * DW > 50 ? esc(text) : ''}</i>`).join('');
+      return `<button class="bar nowe ${t.kind} ${t.done?'done':''} ${late?'late':''} ${brigadesOf(t)?'contr':''}" style="left:${(s-lo)*DW}px;width:${w}px" data-act="editTask" data-id="${t.id}" title="${esc(tip(t) + ' · без выходных')}">${segs || '<i style="left:0;width:100%;opacity:.35"></i>'}</button>`;
+    }
     return `<button class="bar ${t.kind} ${t.done?'done':''} ${late?'late':''} ${brigadesOf(t)?'contr':''}" style="left:${(s-lo)*DW}px;width:${w}px" data-act="editTask" data-id="${t.id}" title="${esc(tip(t))}">${w > 70 ? esc(text) : ''}</button>`;
   };
   const staffOf = t => (t.staff || []).map(id => who(id)).join(', ');
   const meta = t => [KIND[t.kind], crew(t), t.resp, staffOf(t) && '👤 ' + staffOf(t)].filter(Boolean).map(esc).join(' · ');
-  const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}<small>${meta(t)}</small></div>${track(bar(t))}</div>`;
+  const taskRow = t => `<div class="g-row g-task"><div class="g-lab" data-act="editTask" data-id="${t.id}" role="button" tabindex="0">${t.done?'✓ ':''}${esc(t.title)}${exTag(t)}<small>${taskTerm(t)}</small></div>${track(bar(t))}</div>`;
   const byStart = (a,b) => a.start.localeCompare(b.start);
   let rows = '';
   // grouped by work (the work's deadline is the dashed line), then old tasks tied to orders, then tasks without a work
@@ -4531,8 +4557,8 @@ function vPlan(){
     const dl = j.due && dnum(j.due) >= lo && dnum(j.due) <= hi ? `<i class="g-dl" style="left:${(dnum(j.due)-lo)*DW + DW - 1}px" title="Срок окончания работ ${fmtD(j.due)}"></i>` : '';
     const cp = cpOf(j.customerId)?.name, ppl = peopleTxt(j);
     const js = Math.min(...jt.map(t => dnum(t.start))), je = Math.max(...jt.map(t => Math.max(dnum(t.start), dnum(t.end)))), jw = (je - js + 1) * DW;
-    const span = `<button class="g-span" style="left:${(js-lo)*DW}px;width:${jw}px" data-act="openJob" data-id="${j.id}" title="${esc('Участвуют: ' + (ppl || 'никто не назначен'))}">${jw > 60 ? esc(ppl ? '👥 ' + ppl : 'никто не назначен') : ''}</button>`;
-    rows += `<div class="g-row g-proj"><div class="g-lab" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">№ ${jobNo(j)} · ${esc(j.title)}<small>${esc(WORK_KIND[j.kind || 'mount'])}${cp ? ' · ' + esc(cp) : ''}${j.due ? ' · срок ' + fmtD(j.due) : ''}</small><small class="g-ppl">👥 ${ppl ? esc(ppl) : '<span class="dim">никто не назначен</span>'}</small></div>${track(span, dl)}</div>` + jt.map(taskRow).join('');
+    const span = `<button class="g-span" style="left:${(js-lo)*DW}px;width:${jw}px" data-act="openJob" data-id="${j.id}" title="${esc('№ ' + jobNo(j) + ' · ' + j.title + (j.due ? ' · срок ' + fmtD(j.due) : ''))}"></button>`;
+    rows += `<div class="g-row g-proj"><div class="g-lab" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">№ ${jobNo(j)} · ${esc(j.title)}<small>${esc(WORK_KIND[j.kind || 'mount'])}</small></div>${track(span, dl)}</div>` + jt.map(taskRow).join('');
   });
   const rest = tasks.filter(t => !jobOf(t.jobId));
   ordersSorted().slice().reverse().forEach(o => {
@@ -4548,7 +4574,7 @@ function vPlan(){
   for (let d = lo; d <= hi; d++) { per.push(0); con.push(0); }
   tasks.forEach(t => {
     const s = Math.max(lo, dnum(t.start)), e = Math.min(hi, Math.max(dnum(t.start), dnum(t.end)));
-    for (let d = s; d <= e; d++) { per[d-lo] += Number(t.people) || 0; con[d-lo] += brigadesOf(t); }
+    for (let d = s; d <= e; d++) { if (!taskWe(t) && dayKind(dstr(d)) !== 'work') continue; per[d-lo] += Number(t.people) || 0; con[d-lo] += brigadesOf(t); }
   });
   const cells = (arr, cls) => {
     let h = '';
@@ -5202,6 +5228,7 @@ function renderDrawer(){
       <label>Окончание<input class="in" type="date" id="t-end" value="${esc(t?.end || dstr(dnum(st)+7))}" required></label>
       <label>Своих людей, чел.<input class="in mono" type="number" id="t-people" min="0" max="999" step="1" inputmode="numeric" value="${esc(t?.people || '')}"></label>
       <label>Подрядчиков<input class="in mono" type="number" id="t-brig" min="0" max="99" step="1" inputmode="numeric" value="${esc(t ? (brigadesOf(t) || '') : '')}"></label>
+      <label class="wide chk"><input type="checkbox" id="t-we" ${t ? (taskWe(t) ? 'checked' : '') : ''}> В том числе выходные дни <small class="dim">— без отметки выходные и праздники в графике не заполняются и не считаются</small></label>
       <label class="wide chk"><input type="checkbox" id="t-done" ${t?.done?'checked':''}> Выполнено</label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${t?'Сохранить':'Добавить в график'}</button><button class="btn" type="button" data-act="close">Отмена</button>${t?armBtn('task','Удалить','delTask',t.id):''}</div></form>`;
@@ -5545,7 +5572,7 @@ async function onSubmit(e){
       if (en < s) return fail('Окончание не может быть раньше начала.');
       const brigades = val('t-brig') === '' ? 0 : Math.round(num(val('t-brig')));
       if (brigades < 0 || brigades > 99) return fail('Подрядчиков — от 0 до 99.');
-      const data = { jobId, kind:tk, staff:[...document.querySelectorAll('input[name=t-staff]:checked')].map(x => x.value), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked,
+      const data = { jobId, kind:tk, staff:[...document.querySelectorAll('input[name=t-staff]:checked')].map(x => x.value), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked, weekends:$('t-we').checked,
         people, brigades, contractors: brigades > 0, contractorsNote: '' };
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
       ui.tJob = undefined; ui.tKind = undefined;
