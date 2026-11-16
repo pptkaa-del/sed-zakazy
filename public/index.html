@@ -327,6 +327,18 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .docmain{flex:1;display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit;min-width:0}.docmain b{display:block;font-weight:600}.docmain small{display:block}
 .docico{flex:0 0 48px;height:48px;border-radius:6px;background:var(--stamp-soft);color:var(--stamp);display:grid;place-items:center;font-weight:700;font-size:12px}
 .rqdocs .box{margin-bottom:12px}
+.sgwrap{padding:0;overflow:hidden;margin-bottom:14px}.sghead{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:12px 14px}.sghead b{min-width:120px;text-align:center}
+.sglegend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2)}.sglegend span{display:inline-flex;gap:5px;align-items:center}.sglegend i{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.12);display:inline-block}
+.sgoff{background:repeating-linear-gradient(135deg,var(--mute-soft) 0 4px,var(--sheet) 4px 7px)}
+.sgscroll{overflow:auto;max-width:100%}.sgt{border-collapse:separate;border-spacing:0;font-size:12px;width:max-content;min-width:100%}
+.sgt th,.sgt td{border-right:1px solid var(--rule-2);border-bottom:1px solid var(--rule-2);text-align:center;padding:0}
+.sgt thead th{font-weight:600;padding:4px 0;min-width:30px;background:var(--sheet);position:sticky;top:0;z-index:1}.sgt thead th small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}
+.sgt thead th.off{color:var(--bad)}.sgt thead th.tod{box-shadow:inset 0 -3px 0 var(--stamp)}
+.sgt .sgname{position:sticky;left:0;z-index:2;background:var(--sheet);text-align:left;padding:6px 10px;min-width:150px;max-width:190px;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sgt .sgname small{display:block;font-weight:400;color:var(--ink-2);font-size:11px}
+.sgt td{height:40px;min-width:30px;cursor:pointer;color:#1F2633;font-weight:700;font-size:11px;line-height:1.1}.sgt td.off:not([style*=background]){background:repeating-linear-gradient(135deg,var(--mute-soft) 0 4px,var(--sheet) 4px 7px)}
+.sgt td:hover{outline:2px solid var(--stamp);outline-offset:-2px}.sgt td.sel{outline:2px solid var(--ink);outline-offset:-2px}.sgdot{color:var(--stamp);font-size:9px}
+.sgt .sgsum{min-width:84px;padding:0 8px;font-weight:400;color:var(--ink);cursor:default;white-space:nowrap}.sgt thead .sgsum{font-size:11px}
+.sgnote{display:block;padding:8px 14px}.sgday{margin:6px 0 10px;font-size:16px}
 .smtypes{flex-wrap:wrap}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
@@ -4079,6 +4091,52 @@ function workCalHtml(){
     <div class="err" id="ferr"></div>
     <div class="row-g"><button class="btn primary" data-act="wcSave">Сохранить</button><button class="btn" data-act="close">Закрыть</button></div></div>`;
 }
+/* «Сотрудники» — табель за месяц: сотрудники по строкам, дни по столбцам.
+   жёлтый — рабочий день без назначений (простой), зелёный — работа сверх графика, синий — больничный или отпуск,
+   красный — невыход или опоздание, сиреневый — ушёл раньше; два события в один день — клетка делится по диагонали */
+const SG_COL = { blue: '#C9DEFF', red: '#FFC9C9', lilac: '#E3D0FF', green: '#C6EFD1', yellow: '#FFEFA0' };
+function sgAssigned(u, day){
+  const n = dnum(day), tn = dnum(today()), out = [];
+  for (const t of S.tasks) if ((t.staff || []).includes(u.id) && t.start <= day && t.end >= day) out.push('план-график: ' + t.title);
+  for (const j of S.jobs) {
+    if (!((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id))) continue;
+    const [s, e] = jobSpan(j), end = j.status !== 'done' && e < tn ? tn : e;
+    if (n >= s && n <= end) out.push(`работа № ${jobNo(j)} · ${j.title}`);
+  }
+  const did = S.jobs.reduce((a, j) => a + (j.places || []).filter(x => x.doneAt && localDay(x.doneAt) === day && (x.doneBy === u.id || (!x.doneBy && x.assignee === u.id))).length, 0);
+  if (did) out.push(`сделано точек: ${did}`);
+  return out;
+}
+function sgCell(u, day){
+  const kind = dayKind(day), as = sgAssigned(u, day), ot = OVERTIME.filter(x => x.by === u.id && x.date === day);
+  const mk = STAFF_MARKS.filter(x => x.user === u.id && x.from <= day && x.to >= day);
+  const has = t => mk.find(x => x.type === t), cols = [], codes = [], tip = [`${fmtD(day)} — ${DAY_KIND[kind]}`];
+  if (has('sick')) { cols.push('blue'); codes.push('Б'); } if (has('vacation')) { cols.push('blue'); codes.push('О'); }
+  if (has('absent')) { cols.push('red'); codes.push('Н'); } if (has('late')) { cols.push('red'); codes.push('Оп'); }
+  if (has('early')) { cols.push('lilac'); codes.push('Р'); }
+  const ext = ot.reduce((a, x) => a + otExtra(x), 0), dur = ot.reduce((a, x) => a + otMin(x), 0);
+  if (ot.length) { cols.push('green'); codes.push('+' + (ext >= 60 ? Math.round(ext / 6) / 10 + 'ч' : ext + 'м')); }
+  const idle = kind === 'work' && !as.length && !mk.some(x => ['sick', 'vacation', 'absent'].includes(x.type));
+  if (idle) { cols.push('yellow'); tip.push('простой: нет назначений'); }
+  mk.forEach(x => tip.push(MARK_T[x.type] + (x.time ? ' ' + x.time : '') + (x.note ? ' — ' + x.note : '')));
+  if (ot.length) tip.push(`ненорм. день: ${ot.map(x => x.from + '–' + x.to).join(', ')} (${otDur(dur)}, сверх графика ${otDur(ext)})`);
+  as.slice(0, 6).forEach(a => tip.push(a)); if (as.length > 6) tip.push(`и ещё ${as.length - 6}`);
+  const c = [...new Set(cols)], bg = !c.length ? '' : c.length === 1 ? SG_COL[c[0]] : `linear-gradient(135deg,${SG_COL[c[0]]} 50%,${SG_COL[c[1]]} 50%)`;
+  return { bg, codes, tip: tip.join('\n'), idle, ext, off: kind !== 'work', dot: as.length && !codes.length };
+}
+function staffGrid(people){
+  const ym = ui.stMonth || today().slice(0, 7), [y, m] = ym.split('-').map(Number), n = new Date(y, m, 0).getDate();
+  const days = Array.from({ length: n }, (_, i) => `${ym}-${pad(i + 1)}`), wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  const shift = k => { const d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const rows = people.map(u => { const cells = days.map(d => sgCell(u, d)); return { u, cells, idle: cells.filter(c => c.idle).length, ext: cells.reduce((a, c) => a + c.ext, 0) }; });
+  return `<section class="card sgwrap"><div class="sghead">
+      <div class="row-g"><button class="btn sm" data-act="stMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="stMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="stMonth" data-id="${today().slice(0, 7)}">Текущий</button>` : ''}</div>
+      <div class="sglegend">${[['yellow', 'простой (нет назначений)'], ['green', 'сверх графика'], ['blue', 'больничный (Б), отпуск (О)'], ['red', 'невыход (Н), опоздание (Оп)'], ['lilac', 'ушёл раньше (Р)']].map(([k, l]) => `<span><i style="background:${SG_COL[k]}"></i>${l}</span>`).join('')}<span><i class="sgoff"></i>выходной, праздник</span><span>● есть назначения</span></div></div>
+    ${rows.length ? `<div class="sgscroll"><table class="sgt"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum" title="Рабочих дней без назначений">Простой</th><th class="sgsum">Сверх графика</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><th class="sgname">${esc(r.u.name)}<small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${days[i] === (ui.stDay || today()) ? 'sel' : ''}" style="${c.bg ? `background:${c.bg}` : ''}" title="${esc(c.tip)}" data-act="stDay" data-id="${days[i]}" role="button" tabindex="0">${c.codes.length ? c.codes.join('<br>') : c.dot ? '<span class="sgdot">●</span>' : ''}</td>`).join('')}
+        <td class="sgsum">${r.idle ? `<b>${r.idle}</b> дн` : '—'}</td><td class="sgsum">${r.ext ? `<b>${otDur(r.ext)}</b>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
+    <small class="dim sgnote">Наведите на клетку — подробности; нажмите — ниже откроется этот день по каждому сотруднику.</small></section>`;
+}
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 function vStaff(){
   const day = ui.stDay || today(), q = (ui.stq || '').trim().toLowerCase();
@@ -4098,7 +4156,8 @@ function vStaff(){
     <button class="btn sm" data-act="workCal">📅 График работы</button><span class="dim">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}</span>
     <span class="dim">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}: <b>${rows.reduce((a, r) => a + r.doneDay.length, 0)}</b></span></div>`;
   if (!rows.length) return head + '<div class="empty"><h3>Сотрудников нет</h3>Добавьте пользователей с ролью «Сотрудник» или «Подрядчик» на вкладке «Пользователи».</div>';
-  return head + rows.map(r => `<section class="card staffc">
+  const people = rows.map(r => r.u).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  return head + staffGrid(people) + `<h3 class="sgday">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}: подробно по сотрудникам</h3>` + rows.map(r => `<section class="card staffc">
     <div class="ch"><div><h3 style="margin:0">${esc(r.u.name)}</h3><small class="dim">${esc(ROLE_NAMES[r.u.role] || '')}</small>${(() => { const x = markOn(r.u.id, day); return x ? ` <span class="chip ${MARK_C[x.type]}">${x.type === 'sick' ? 'на больничном' : x.type === 'vacation' ? 'в отпуске' : 'не вышел'}</span>` : ''; })()}
       <div style="margin-top:6px"><button class="btn sm" data-act="smNew" data-id="${r.u.id}">+ Отметка</button></div></div>
       <div class="stnums"><div><b class="${r.doneDay.length ? 'ok-t' : ''}">${r.doneDay.length}</b><small>сделано за ${day === today() ? 'сегодня' : fmtD(day)}</small></div><div><b>${r.open}</b><small>точек в работе</small></div><div><b>${r.doneAll.length}</b><small>всего сделано</small></div>${r.otM ? `<div><b>${otDur(r.otM)}</b><small>сверх графика за месяц</small></div>` : ''}</div></div>
@@ -6041,7 +6100,8 @@ async function act(el){
     case 'sF': ui.sF = id; return render();
     case 'sDiff': ui.sDiff = !ui.sDiff; return render();
     case 'woF': ui.woF = id; return render();
-    case 'stDay': ui.stDay = id; return render();
+    case 'stDay': ui.stDay = id; if (id.slice(0, 7) !== (ui.stMonth || today().slice(0, 7)) && el.closest('.toolbar')) ui.stMonth = id.slice(0, 7); render(); if (el.closest('.sgt')) document.querySelector('.sgday')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
+    case 'stMonth': ui.stMonth = id; return render();
     case 'spG': ui.spG = id; return render();
     case 'spP': ui.spP = id; return render();
     case 'spAll': ui.spAll = !!id; return render();
@@ -6208,7 +6268,7 @@ document.addEventListener('change', async e => {
   if (t.classList.contains('wo-name')) { const it = stockByName(t.value); if (!it) { toast('Нет такой позиции на складе — выберите из списка'); return renderDrawer(); }
     t.dataset.keys.split('\n').forEach(k => { if (k === 'id:' + it.id) delete ui.woMap[k]; else ui.woMap[k] = it.id; }); return renderDrawer(); }
   if (t.dataset.ndcolor) { try { await api('PATCH', '/api/dt/needs/' + t.dataset.ndcolor, { color: t.value }); await refresh(); renderDt(); } catch(err) { toast(errText(err)); } return; }
-  if (t.id === 'st-day') { ui.stDay = t.value || today(); return render(); }
+  if (t.id === 'st-day') { ui.stDay = t.value || today(); ui.stMonth = ui.stDay.slice(0, 7); return render(); }
   if (t.id === 'dr-w') { DRAW.width = Number(t.value) || 4; return; }
   if (t.id === 'dr-img') { const f = t.files[0]; if (f) $('drawc')?._image?.(f); t.value = ''; return; }
   if (t.id === 'dr-target') { ui.drawTarget = t.value || null; return; }
