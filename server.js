@@ -356,6 +356,8 @@ const hiddenFor = u => { const o = u && orgById(u.orgId); return [...new Set([..
 const sees = (u, key) => { const H = hiddenFor(u), top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a request is seen by its author, its executor, the administrator and the manager
 const reqSees = (u, r) => HEAD(u) || r.by === u.id || r.assignee === u.id;
+/* the equipment of a requests organization: the administrator keeps the list; an item is general (everyone) or fixed to chosen users */
+const eqSees = (u, e) => HEAD(u) || !(e.owners || []).length || (e.owners || []).includes(u.id);
 /* serial numbers of labels: the text of a number and the index of every number already printed in the organization */
 const serialStr = (t, n) => (t.serial.prefix || '') + String(n).padStart(t.serial.digits || 1, '0') + (t.serial.suffix || '');
 function labelSerials(){
@@ -669,6 +671,10 @@ async function api(req, res, url) {
       out.requests = Object.entries(db.requests || {}).map(([id, r]) => ({ id, ...r })).filter(r => reqSees(user, r));
       out.reqUsers = orgUsers().filter(u => !u.blocked && !u.sys).map(u => ({ id: u.id, name: u.name, role: u.role }));
       out.reqDocs = Array.isArray(db.reqDocs) ? db.reqDocs : [];
+      // the equipment the user sees, with the history of its problems (from all requests: what happened and what was done)
+      const RQ = Object.values(db.requests || {});
+      out.reqEquip = (Array.isArray(db.reqEquip) ? db.reqEquip : []).filter(e => eqSees(user, e)).map(e => ({ ...e,
+        hist: RQ.filter(r => r.eqId === e.id).sort((a, b) => String(b.at).localeCompare(String(a.at))).map(r => ({ no: r.no, at: r.at, title: r.title, text: r.text, status: r.status, by: r.by, assignee: r.assignee || null, takenAt: r.takenAt || null, doneAt: r.doneAt || null, doneBy: r.doneBy || null, doneNote: r.doneNote || '', repl: r.repl || [] })) }));
       out.devReadings = Array.isArray(db.devReadings) ? db.devReadings.slice(-10).reverse() : [];
     }
     out.devs = sees(user, 'devs') ? Object.entries(db.devs || {}).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d)) : [];
@@ -862,11 +868,13 @@ async function api(req, res, url) {
       if (!title) return fail(res, 400, 'Опишите проблему');
       if (b.system !== undefined && b.system !== '' && !UPR_SYS.includes(b.system)) return fail(res, 400, 'Выберите систему');
       if (b.assignee && !okUser(b.assignee)) return fail(res, 400, 'Исполнитель не найден');
+      const eq = b.eqId ? (db.reqEquip || []).find(e => e.id === b.eqId) : null;
+      if (b.eqId && (!eq || !eqSees(user, eq))) return fail(res, 400, 'Оборудование не найдено');
       const id = newId(), no = Math.max(0, ...Object.values(R).map(r => r.no || 0)) + 1;
-      R[id] = { no, title, text, system: b.system || '', due: /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : '', urgent: !!b.urgent,
+      R[id] = { no, title, text, eqId: eq ? eq.id : null, system: b.system || (eq && eq.system) || '', due: /^\d{4}-\d{2}-\d{2}$/.test(b.due || '') ? b.due : '', urgent: !!b.urgent,
         assignee: b.assignee || null, files: cleanFiles(b.files), status: 'new', by: user.id, at: now, comments: [], history: [{ at: now, by: user.id, act: 'created', to: b.assignee || null }] };
       saveDb();
-      reqNotify(`Новая заявка №${no}${b.system ? ' (' + UPR.SYSTEMS[b.system] + ')' : ''}.\n${text || title}\nЗаявитель: ${user.name}${R[id].files.length ? `\nФото и файлов: ${R[id].files.length}` : ''}`);
+      reqNotify(`Новая заявка №${no}${eq ? ' · ' + eq.name + (eq.invNo ? ' (инв. ' + eq.invNo + ')' : '') : ''}${R[id].system ? ' (' + UPR.SYSTEMS[R[id].system] + ')' : ''}.\n${title}${text && text !== title ? '\n' + text : ''}\nЗаявитель: ${user.name}${R[id].files.length ? `\nФото и файлов: ${R[id].files.length}` : ''}`);
       return send(res, 200, out(id, R[id]));
     }
     const r = p[2] && R[p[2]];
@@ -942,6 +950,7 @@ async function api(req, res, url) {
         if (b.urgent !== undefined) r.urgent = !!b.urgent;
         if (b.files !== undefined) r.files = cleanFiles(b.files);
         if (b.system !== undefined) { if (b.system && !UPR_SYS.includes(b.system)) return fail(res, 400, 'Выберите систему'); r.system = b.system || ''; }
+        if (b.eqId !== undefined) { const eq = b.eqId ? (db.reqEquip || []).find(e => e.id === b.eqId) : null; if (b.eqId && !eq) return fail(res, 400, 'Оборудование не найдено'); r.eqId = eq ? eq.id : null; }
         log('edit');
       } else return fail(res, 400, 'Неизвестное действие');
       saveDb();
@@ -1263,6 +1272,26 @@ async function api(req, res, url) {
       return send(res, 200, { ok: true, entry: x, rev: db.rev });
     }
     if (m === 'DELETE') { db.overtime = O.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Оборудование» of a requests organization: the administrator (and a manager) adds, changes and removes */
+  if (p[1] === 'req-equip') {
+    if (orgType(user) !== 'requests') return fail(res, 403, 'Оборудование есть только в системе «Управление заявками»');
+    if (!HEAD(user)) return fail(res, 403, 'Список оборудования ведёт администратор');
+    if (!Array.isArray(db.reqEquip)) db.reqEquip = [];
+    const E = db.reqEquip, now = new Date().toISOString(), txt = (v, n) => String(v ?? '').trim().slice(0, n);
+    const clean = b => {
+      const name = txt(b.name, 200); if (!name) return 'Напишите название оборудования';
+      const invNo = txt(b.invNo, 60);
+      if (invNo && E.some(e => e.invNo && e.invNo.toLowerCase() === invNo.toLowerCase() && e.id !== b._id)) return 'Такой инвентарный номер уже есть';
+      if (b.system && !UPR_SYS.includes(b.system)) return 'Неизвестная система';
+      const owners = [...new Set((Array.isArray(b.owners) ? b.owners : []).filter(id => orgUsers().some(u => u.id === id && !u.sys)))];
+      return { name, invNo, place: txt(b.place, 200), system: b.system || '', owners, note: txt(b.note, 1000) };
+    };
+    if (m === 'POST' && !p[2]) { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); const x = { id: newId(), ...v, at: now, by: user.id }; E.push(x); saveDb(); return send(res, 200, { ok: true, eq: x, rev: db.rev }); }
+    const x = p[2] && E.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Оборудование не найдено — обновите страницу');
+    if (m === 'PUT') { const v = clean({ ...(await readJsonBody(req)), _id: x.id }); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { updatedAt: now }); saveDb(); return send(res, 200, { ok: true, eq: x, rev: db.rev }); }
+    if (m === 'DELETE') { db.reqEquip = E.filter(e => e !== x); for (const r of Object.values(db.requests || {})) if (r.eqId === x.id) { r.eqName = x.name + (x.invNo ? ' (инв. ' + x.invNo + ')' : ''); r.eqId = null; } saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Инструкции» of a requests organization: everyone reads, the administrator adds and removes */
