@@ -350,6 +350,12 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .cklist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}.ckcard{display:flex;gap:12px;padding:12px}.ckph{display:flex;flex-direction:column;gap:6px}.ckph img{width:84px;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--rule)}
 .ckocr{display:block;font-size:13px;color:var(--ink-2)}.ckocr:empty{display:none}
 .ckb{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;font-size:14px}.ckul{margin:2px 0;padding-left:18px;font-size:13px}
+.refgroup{margin-bottom:18px}.refgroup h3{margin:0 0 8px;font-size:16px}.refgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.refcard{padding:12px 14px;display:flex;flex-direction:column;gap:8px}.reftext{white-space:pre-wrap;font-size:14px;max-height:7.5em;overflow:hidden;position:relative}.reftext.open{max-height:none}
+.reffiles{display:flex;flex-direction:column;gap:4px}.reffile{display:flex;gap:8px;align-items:center;text-align:left;border:1px solid var(--rule);background:var(--paper);border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit;color:inherit}.reffile:hover{border-color:var(--stamp)}.reffile span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reffile small{color:var(--ink-2);font-size:12px}
+.rfv{display:flex;flex-direction:column;gap:10px;align-items:center;min-height:200px;flex:none}.rfvimg{max-width:100%;height:auto;border-radius:6px}.rfvpage{width:100%;max-width:1100px;height:auto;box-shadow:0 1px 6px rgba(0,0,0,.18);background:#fff}
+.rfvsheet{overflow:auto;max-width:100%;align-self:stretch}.rfvsheet table,.rfvtbl{border-collapse:collapse;font-size:13px}.rfvsheet td,.rfvtbl td{border:1px solid var(--rule);padding:4px 8px;vertical-align:top;white-space:pre-wrap}
+.rfvdoc{align-self:stretch;max-width:900px;margin:0 auto;background:#fff;color:#111;padding:24px 28px;border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.12)}.rfvdoc p{margin:0 0 8px;white-space:pre-wrap}.rfvtext{align-self:stretch;white-space:pre-wrap;font-size:13px;background:var(--paper);padding:12px;border-radius:6px}
 .smtypes{flex-wrap:wrap}.mywork{padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}.rswitch{white-space:nowrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
@@ -1117,6 +1123,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#transport" data-v="transport" id="trTab" hidden>Транспорт</a>
       <a href="#notes" data-v="notes" id="notesTab" hidden>Задачи <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#mytasks" data-v="mytasks" id="mytTab" hidden>Мои задачи <span class="badge" id="mytBadge" hidden></span></a>
+      <a href="#refs" data-v="refs" id="refsTab" hidden>Справочники</a>
       <a href="#checks" data-v="checks" hidden>Загрузить чек</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
@@ -1340,7 +1347,7 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -1386,11 +1393,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Склад', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Задачи', [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Задачи', [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники']];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
-const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts' };
+const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs' };
 const viewOk = v => !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
 // the checkbox tree of the organization and user forms: checked — shown; what the organization hides is not offered to its users
 function secTree(hide, orgHide){
@@ -1466,7 +1473,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -4487,6 +4494,102 @@ function staffPerf(people){
         <td class="sgsum"><b>${r.total}</b>${r.workDays ? `<small class="dim"> · ${Math.round(r.total / r.workDays * 10) / 10} в день</small>` : ''}</td><td class="sgsum ${r.below ? 'sgminus' : ''}">${r.planned ? `<b>${r.below}</b> из ${r.planned} дн.` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
     <small class="dim sgnote">В клетке — сделано точек, после косой черты — минимум дня (наибольший «Минимум точек в день» среди работ, назначенных сотруднику). Нажмите на клетку — что было в этот день.</small></section>`;
 }
+/* ===== «Справочники»: файлы и текст по проектам, по своим разделам и «Общая информация»; руководитель ведёт, остальные читают ===== */
+let REFS = [];
+const refGroupKey = r => r.scope?.type === 'job' ? 'j:' + r.scope.jobId : r.scope?.type === 'other' ? 'o:' + r.scope.name.toLowerCase() : 'common';
+const refGroupName = r => r.scope?.type === 'job' ? (jobOf(r.scope.jobId) ? `№ ${jobNo(jobOf(r.scope.jobId))} · ${jobOf(r.scope.jobId).title}` : r.scope.name) : r.scope?.type === 'other' ? r.scope.name : 'Общая информация';
+const fileIco = f => { const e = ((f.name || '').split('.').pop() || '').toLowerCase(); return /^image\//.test(f.type || '') ? '🖼' : e === 'pdf' ? '📕' : /^(xlsx?|csv|ods)$/.test(e) ? '📊' : /^(docx?|odt|rtf)$/.test(e) ? '📄' : '📎'; };
+function vRefs(){
+  const q = (ui.rfq || '').trim().toLowerCase(), head = isHead();
+  const L = REFS.filter(r => !q || [r.title, r.text, refGroupName(r), ...(r.files || []).map(f => f.name)].join(' ').toLowerCase().includes(q));
+  const groups = new Map();
+  for (const r of L) { const k = refGroupKey(r); if (!groups.has(k)) groups.set(k, { name: refGroupName(r), common: k === 'common', job: r.scope?.type === 'job', items: [] }); groups.get(k).items.push(r); }
+  const G = [...groups.values()].sort((a, b) => (b.common - a.common) || (b.job - a.job) || a.name.localeCompare(b.name, 'ru'));
+  const bar = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="rfq" type="search" placeholder="Название, текст, файл" aria-label="Поиск по справочникам" value="${esc(ui.rfq || '')}" style="flex:1 1 220px;max-width:360px"></span>
+    ${head ? '<button class="btn primary" data-act="refNew">+ Справочник</button>' : ''}</div>`;
+  if (!REFS.length) return bar + `<div class="empty"><h3>Справочников пока нет</h3>${head ? 'Добавьте файлы (инструкции, схемы, таблицы) или текст и укажите, к какому проекту они относятся.' : 'Здесь появятся справочные материалы от руководителя.'}</div>`;
+  if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
+  return bar + G.map(g => `<section class="refgroup"><h3>${g.common ? '📚' : g.job ? '🏗' : '📁'} ${esc(g.name)} <span class="dim">${g.items.length}</span></h3><div class="refgrid">
+    ${g.items.sort((a, b) => a.title.localeCompare(b.title, 'ru')).map(r => `<article class="card refcard">
+      <div class="row-g" style="justify-content:space-between;align-items:flex-start"><b>${esc(r.title)}</b>${head ? `<button class="btn sm" data-act="refEdit" data-id="${r.id}">Изменить</button>` : ''}</div>
+      ${r.text ? `<div class="reftext ${ui.refOpen === r.id ? 'open' : ''}">${esc(r.text)}</div>${r.text.length > 280 ? `<button class="linkish" data-act="refMore" data-id="${r.id}">${ui.refOpen === r.id ? 'Свернуть' : 'Показать полностью'}</button>` : ''}` : ''}
+      ${(r.files || []).length ? `<div class="reffiles">${r.files.map(f => `<button class="reffile" data-act="refView" data-id="${r.id}|${f.id}" title="Открыть">${fileIco(f)} <span>${esc(f.name)}</span><small>${fmtSize(f.size || 0)}</small></button>`).join('')}</div>` : ''}
+      ${head ? `<small class="dim">${r.restricted ? `🔒 видят: ${(r.viewers || []).map(id => esc(who(id))).join(', ')}` : 'видят все'} · ${esc(who(r.by))}, ${esc(fmtDT(r.updatedAt || r.at))}</small>` : `<small class="dim">${esc(fmtDT(r.updatedAt || r.at))}</small>`}
+    </article>`).join('')}</div></section>`).join('');
+}
+function refFormHtml(r){
+  const d = ui.refDraft, sc = d.scope.type, staff = STAFF.filter(u => u.id !== me.id).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const jobs = S.jobs.slice().sort((a, b) => jobNo(b) - jobNo(a));
+  return `<div class="d-body"><div class="form" data-keep>
+      <label class="wide"><span>Название <em class="req-star">*</em></span><input class="in" id="rf-title" maxlength="300" value="${esc(d.title)}" placeholder="Например: Схема подключения камер, Регламент доступа на объект"></label>
+      <div class="wide"><span class="flab">Относится к</span><div class="seg" role="radiogroup">${[['job', '🏗 Проекту'], ['other', '📁 Другое — вписать'], ['common', '📚 Общая информация']].map(([k, l]) => `<button type="button" data-act="rfScope" data-id="${k}" class="${sc === k ? 'on' : ''}" aria-pressed="${sc === k}">${l}</button>`).join('')}</div></div>
+      ${sc === 'job' ? `<label class="wide">Проект<select class="in" id="rf-job"><option value="">— выберите работу —</option>${jobs.map(j => `<option value="${j.id}" ${d.scope.jobId === j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}${j.status === 'done' ? ' (выполнена)' : ''}</option>`).join('')}</select></label>`
+        : sc === 'other' ? `<label class="wide">К чему относится<input class="in" id="rf-other" maxlength="200" list="rf-others" value="${esc(d.scope.name || '')}" placeholder="Например: Охрана труда, Транспорт, Поставщики"><datalist id="rf-others">${[...new Set(REFS.filter(x => x.scope?.type === 'other').map(x => x.scope.name))].map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist></label>` : ''}
+      <label class="wide">Текст<textarea class="in" id="rf-text" rows="6" maxlength="20000" placeholder="Справочная информация: контакты, порядок действий, коды доступа к шкафам…">${esc(d.text)}</textarea></label>
+      <div class="wide"><span class="flab">Файлы</span><div class="row-g">${d.files.map((f, i) => `<span class="chip c-mute">${fileIco(f)} ${esc(f.name)} <button type="button" class="linkish" data-act="rfFileDel" data-id="${i}" aria-label="Убрать файл">✕</button></span>`).join('')}<label class="btn sm">📎 Загрузить файлы<input type="file" data-up="rfFile" multiple hidden></label></div>
+        <small class="dim">PDF, картинки, Word, Excel, текст — откроются прямо в программе, без скачивания.</small></div>
+      <label class="wide chk"><input type="checkbox" id="rf-restr" ${d.restricted ? 'checked' : ''}> Видят не все — только выбранные сотрудники</label>
+      ${d.restricted ? `<div class="wide"><div class="tstaff">${staff.map(u => `<label class="chk"><input type="checkbox" name="rf-v" value="${u.id}" ${d.viewers.includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('') || '<span class="dim">Других пользователей нет</span>'}</div><small class="dim">Руководители и администраторы видят все справочники.</small></div>` : ''}
+    </div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="refSave" data-id="${r ? r.id : ''}">${r ? 'Сохранить' : 'Добавить справочник'}</button>${r ? armBtn('rfd:' + r.id, 'Удалить', 'refDel', r.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
+}
+const refKeep = () => { const d = ui.refDraft; if (!d || !$('rf-title')) return; d.title = $('rf-title').value; d.text = $('rf-text').value; if ($('rf-job')) d.scope.jobId = $('rf-job').value; if ($('rf-other')) d.scope.name = $('rf-other').value; d.restricted = $('rf-restr').checked; if (d.restricted) d.viewers = [...document.querySelectorAll('input[name=rf-v]:checked')].map(x => x.value); };
+/* viewing a file inside the program: pictures, PDF (pdf.js), Excel (SheetJS), Word (the text of the document), text */
+async function refViewFill(f){
+  const box = $('rfv'); if (!box) return;
+  const ext = ((f.name || '').split('.').pop() || '').toLowerCase(), url = '/files/' + f.id;
+  try {
+    if (/^image\//.test(f.type || '') || /^(png|jpe?g|gif|webp|bmp|svg)$/.test(ext)) { box.innerHTML = `<img src="${esc(url)}" alt="${esc(f.name)}" class="rfvimg">`; return; }
+    const blob = await (await fetch(url)).blob();
+    if (ext === 'pdf' || /pdf/.test(f.type || '')) {
+      box.innerHTML = '<p class="dim">Открываем PDF…</p>';
+      const lib = await loadPdfJs(), doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
+      box.innerHTML = `<small class="dim">Страниц: ${doc.numPages}</small>`;
+      for (let n = 1; n <= Math.min(doc.numPages, 200); n++) {
+        if (!$('rfv')) return;
+        const page = await doc.getPage(n), vp0 = page.getViewport({ scale: 1 }), w = Math.min(1100, box.clientWidth || 800), vp = page.getViewport({ scale: w / vp0.width * (window.devicePixelRatio || 1) });
+        const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; c.className = 'rfvpage';
+        await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; box.appendChild(c);
+      }
+      return;
+    }
+    if (/^(xlsx?|xlsm|ods|csv)$/.test(ext)) {
+      const X = await loadSheetJS(), wb = X.read(new Uint8Array(await blob.arrayBuffer()), { type: 'array' });
+      box.innerHTML = wb.SheetNames.map(n => `<h4>${esc(n)}</h4><div class="rfvsheet">${X.utils.sheet_to_html(wb.Sheets[n], { header: '', footer: '' }).replace(/<\/?(html|head|body|meta)[^>]*>/g, '')}</div>`).join('');
+      return;
+    }
+    if (ext === 'docx') { box.innerHTML = `<div class="rfvdoc">${await docxHtml(blob)}</div>`; return; }
+    if (/^text\//.test(f.type || '') || /^(txt|md|log|json|xml)$/.test(ext)) { box.innerHTML = `<pre class="rfvtext">${esc(await blob.text())}</pre>`; return; }
+    box.innerHTML = `<p>Этот формат (${esc(ext.toUpperCase() || 'файл')}) нельзя показать в программе.</p><a class="btn" href="${esc(url)}" download="${esc(f.name)}">Скачать «${esc(f.name)}»</a>`;
+  } catch(e) { box.innerHTML = `<p class="bad-t">Не удалось открыть файл: ${esc(e.message || e)}</p><a class="btn" href="${esc(url)}" download="${esc(f.name)}">Скачать</a>`; }
+}
+/* a .docx is a ZIP: word/document.xml holds paragraphs (w:p) and tables (w:tbl) — they are shown as text and tables */
+async function docxHtml(blob){
+  const buf = new Uint8Array(await blob.arrayBuffer()), dv = new DataView(buf.buffer);
+  let e = buf.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('файл повреждён');
+  let o = dv.getUint32(e + 16, true), xml = null;
+  for (let i = 0, n = dv.getUint16(e + 10, true); i < n; i++) {
+    const method = dv.getUint16(o + 10, true), size = dv.getUint32(o + 20, true), nl = dv.getUint16(o + 28, true), xl = dv.getUint16(o + 30, true), cl = dv.getUint16(o + 32, true), lo = dv.getUint32(o + 42, true);
+    const name = new TextDecoder().decode(buf.slice(o + 46, o + 46 + nl));
+    if (name === 'word/document.xml') {
+      const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true), raw = buf.slice(start, start + size);
+      const data = method === 0 ? raw : new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+      xml = new TextDecoder().decode(data); break;
+    }
+    o += 46 + nl + xl + cl;
+  }
+  if (!xml) throw new Error('в файле нет текста документа');
+  const doc = new DOMParser().parseFromString(xml, 'application/xml'), W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const pText = p => [...p.getElementsByTagNameNS(W, '*')].map(n => n.localName === 't' ? n.textContent : n.localName === 'tab' ? '\t' : n.localName === 'br' ? '\n' : '').join('');
+  const out = [], body = doc.getElementsByTagNameNS(W, 'body')[0];
+  for (const n of [...(body ? body.children : [])]) {
+    if (n.localName === 'p') { const t = pText(n), st = n.getElementsByTagNameNS(W, 'pStyle')[0]?.getAttributeNS(W, 'val') || '', b = /^(Heading|Заголовок|Title)/i.test(st); out.push(t.trim() ? `<${b ? 'h4' : 'p'}>${esc(t)}</${b ? 'h4' : 'p'}>` : ''); }
+    else if (n.localName === 'tbl') out.push(`<table class="rfvtbl">${[...n.getElementsByTagNameNS(W, 'tr')].map(tr => `<tr>${[...tr.getElementsByTagNameNS(W, 'tc')].map(tc => `<td>${esc([...tc.getElementsByTagNameNS(W, 'p')].map(pText).join('\n'))}</td>`).join('')}</tr>`).join('')}</table>`);
+  }
+  return out.join('') || '<p class="dim">Документ пустой</p>';
+}
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
 function staffRow(u, day){
@@ -4956,7 +5059,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = kind === 'job' && ctx === 'full'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incEdo = false; ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
@@ -5381,6 +5484,11 @@ function renderDrawer(){
     </div>`;
   }
   if (d.kind === 'staffMark') { const x = STAFF_MARKS.find(m => m.id === d.id); D.innerHTML = dh(x ? 'Изменить отметку' : 'Отметка сотруднику') + markFormHtml(x, d.ctx); return; }
+  if (d.kind === 'refForm') { const r = REFS.find(x => x.id === d.id); D.innerHTML = dh(r ? 'Изменить справочник' : 'Новый справочник') + refFormHtml(r); return; }
+  if (d.kind === 'refView') { const [rid, fid] = String(d.id).split('|'), r = REFS.find(x => x.id === rid), f = r && (r.files || []).find(x => x.id === fid);
+    D.innerHTML = dh(f ? esc(f.name) : 'Файл') + (f ? `<div class="d-body"><div class="row-g" style="justify-content:space-between"><small class="dim">${esc(r.title)} · ${esc(refGroupName(r))}</small><div class="row-g">${(r.files || []).length > 1 ? r.files.map(x => `<button class="btn sm ${x.id === fid ? 'primary' : ''}" data-act="refView" data-id="${r.id}|${x.id}">${fileIco(x)} ${esc(x.name)}</button>`).join('') : ''}<button class="btn sm" data-act="close">Закрыть</button></div></div>
+      <div id="rfv" class="rfv"><p class="dim">Открываем…</p></div></div>` : '<div class="d-body"><p>Файл не найден</p></div>');
+    if (f) setTimeout(() => refViewFill(f), 0); return; }
   if (d.kind === 'warranty') { const j = jobOf(d.id); if (!j) { D.innerHTML = dh('Гарантия') + '<div class="d-body"><p>Работа не найдена</p></div>'; return; }
     const from = (j.doneAt || '').slice(0, 10) || today(), add = m => { const t = new Date(from + 'T00:00:00'); t.setMonth(t.getMonth() + m); t.setDate(t.getDate() - 1); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; };
     D.innerHTML = dh('Гарантийный срок') + `<div class="d-body">
@@ -6554,6 +6662,16 @@ async function act(el){
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
     case 'vNew': return openDrawer('vehicle', null);
+    case 'refNew': ui.refDraft = { title: '', text: '', files: [], scope: { type: 'common' }, restricted: false, viewers: [] }; return openDrawer('refForm', null);
+    case 'refEdit': { const r = REFS.find(x => x.id === id); ui.refDraft = JSON.parse(JSON.stringify({ title: r.title, text: r.text || '', files: r.files || [], scope: r.scope || { type: 'common' }, restricted: !!r.restricted, viewers: r.viewers || [] })); return openDrawer('refForm', id); }
+    case 'refMore': ui.refOpen = ui.refOpen === id ? null : id; return render();
+    case 'refView': return openDrawer('refView', id);
+    case 'rfScope': refKeep(); ui.refDraft.scope = { type: id, jobId: ui.refDraft.scope.jobId, name: ui.refDraft.scope.name }; return renderDrawer();
+    case 'rfFileDel': refKeep(); ui.refDraft.files.splice(Number(id), 1); return renderDrawer();
+    case 'refSave': { refKeep(); const d = ui.refDraft;
+      try { const r = await api(id ? 'PUT' : 'POST', '/api/refs' + (id ? '/' + id : ''), d); const i = REFS.findIndex(x => x.id === r.ref.id); if (i >= 0) REFS[i] = r.ref; else REFS.push(r.ref);
+        closeDrawer(); render(); toast(id ? 'Справочник сохранён' : 'Справочник добавлен'); refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
+    case 'refDel': try { await api('DELETE', '/api/refs/' + id); REFS = REFS.filter(x => x.id !== id); closeDrawer(); render(); toast('Справочник удалён'); } catch(e) { toast(errText(e)); } return;
     case 'warrOpen': return openDrawer('warranty', id);
     case 'warrQuick': { const i = $('wr-until'); if (i) i.value = id; return; }
     case 'warrSave': case 'warrNone': { const until = a === 'warrNone' ? '' : $('wr-until').value;
@@ -6717,6 +6835,7 @@ document.addEventListener('input', e => {
   if (t.id === 'ck-date') ui.ckDateSet = true;
   if (['ck-veh', 'ck-date', 'ck-liters', 'ck-sum', 'ck-seller', 'ck-work'].includes(t.id)) { ui[{ 'ck-veh': 'ckVeh', 'ck-date': 'ckDate', 'ck-liters': 'ckLiters', 'ck-sum': 'ckSum', 'ck-seller': 'ckSeller', 'ck-work': 'ckWork' }[t.id]] = t.value; return; }
   if (t.id === 'ck-job') { ui.ckJob = t.value; document.activeElement?.blur(); return render(); }
+  if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'trq') { ui.trq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vTransport(); const n = $('trq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'ptq') { ui.ptq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vParts(); const n = $('ptq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'pt-fv') { ui.ptVeh = t.value; return render(); }
@@ -6756,6 +6875,7 @@ document.addEventListener('toggle', e => { const d = e.target; if (d.matches && 
 document.addEventListener('click', e => { if (ui.dtMenu && !e.target.closest('details[data-menu]')) { ui.dtMenu = null; document.querySelectorAll('details[data-menu][open]').forEach(d => d.open = false); } });
 document.addEventListener('change', async e => {
   const t = e.target;
+  if (t.id === 'rf-restr') { refKeep(); return renderDrawer(); }
   // the manual percent of a work without points (the drop-down under a row of «Работы»)
   if (t.dataset && t.dataset.wlpct) { const v = t.value.trim(), n = Number(v);
     if (v !== '' && !(n >= 0 && n <= 100)) { toast('Процент — от 0 до 100'); return; }
@@ -6878,6 +6998,8 @@ document.addEventListener('change', async e => {
     try { await uploadMany(files, 'ckFiles'); } catch(e) { toast(errText(e)); } document.activeElement?.blur(); render();
     if (first && isImageFile(files[0])) ckRecognize(files[0]).catch(() => { ui.ckOcr = 'Не удалось распознать чек — заполните поля вручную.'; render(); });
     return; }
+  if (t.dataset.up === 'rfFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; refKeep();
+    try { for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); ui.refDraft.files.push({ id: u.id, name: u.name, type: fl.type, size: fl.size }); } } catch(e) { toast(errText(e)); } renderDrawer(); return; }
   if (t.dataset.up === 'vDoc') { const fl = t.files[0]; t.value = ''; if (!fl) return; const vid = t.dataset.id;
     try { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); const r = await api('POST', `/api/vehicles/${vid}/docs`, { file: { id: u.id }, title: $('vd-title')?.value.trim() || fl.name.replace(/\.[^.]+$/, ''), date: $('vd-date')?.value || '' }); trPut(r.vehicle); renderDrawer(); render(); toast('Документ загружен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'rqDoneFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; ui.rqNote = $('rq-note')?.value || '';
@@ -6960,8 +7082,8 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (['reqall', 'reqdev', 'reqdocs'].includes(h) || (['users', 'admFiles', 'reqrep', 'reqset'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks'].includes(h) ? h : 'wwork')
-    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'refs'].includes(h) && (h !== 'refs' || can('refs')) ? h : 'wwork')
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'refs' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
     const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
@@ -7026,7 +7148,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'devs'].includes(v); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'devs'].includes(v); });
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (!u.sys && !reqMode() && !isWorker()) {
     const pl = planTabsList(), pt = $('planTab'); pt.hidden = !pl.length; if (pl.length) pt.href = '#' + pl[0][0];
