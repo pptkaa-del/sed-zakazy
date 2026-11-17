@@ -388,6 +388,7 @@ function fileUsage(){
     for (const r of Object.values(db.requests || {})) for (const f of [...(r.files || []), ...(r.doneFiles || [])]) add(f.id, `Заявка № ${r.no || ''}`);
     for (const d of db.reqDocs || []) if (d.file) add(d.file.id, `Инструкция «${d.title}»`);
     for (const r of db.refs || []) for (const f of r.files || []) add(f.id, `Справочник «${r.title || ''}»`);
+    for (const t of db.trips || []) for (const f of t.files || []) add(f.id, `Путевой лист ${t.date || ''}`);
     for (const c of db.checks || []) for (const f of c.files || []) add(f.id, c.kind === 'fuel' ? 'Чек заправки' : `Чек покупки · ${c.seller || ''}`);
     for (const v of Object.values(db.vehicles || {})) for (const d of v.docs || []) if (d.file) add(d.file.id, `Транспорт ${v.name || ''} · ${d.title || ''}`);
     for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
@@ -576,7 +577,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -685,6 +686,7 @@ async function api(req, res, url) {
     // «Загрузить чек»: an employee sees his own receipts, a manager and the accountant see everyone's; the vehicles to choose for a refuelling
     if (orgType(user) !== 'requests') {
       out.checks = (Array.isArray(db.checks) ? db.checks : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
+      out.trips = (Array.isArray(db.trips) ? db.trips : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
       out.vehBrief = Object.entries(db.vehicles || {}).map(([id, v]) => ({ id, name: v.name, plate: v.plate || '' })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     }
     // «Транспорт»: the vehicles of the company with maintenance and documents, and the spare parts — for managers
@@ -971,6 +973,28 @@ async function api(req, res, url) {
     const x = p[2] && R.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Справочник не найден — обновите страницу');
     if (m === 'PUT') { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { updatedAt: now, updatedBy: user.id }); saveDb(); return send(res, 200, { ok: true, ref: x, rev: db.rev }); }
     if (m === 'DELETE') { db.refs = R.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Путевые листы»: an employee uploads the photo of a waybill and says which work it belongs to (and the vehicle, if he likes) */
+  if (p[1] === 'trips') {
+    if (user.sys || orgType(user) === 'requests') return fail(res, 403, 'Недоступно');
+    if (!Array.isArray(db.trips)) db.trips = [];
+    const T = db.trips;
+    if (m === 'POST' && !p[2]) {
+      const b = await readJsonBody(req);
+      const files = (Array.isArray(b.files) ? b.files : []).filter(f => f && db.files[f.id]).slice(0, 10).map(f => ({ id: f.id, name: db.files[f.id].name, type: db.files[f.id].type }));
+      if (!files.length) return fail(res, 400, 'Загрузите фото путевого листа');
+      const j = b.jobId && db.jobs[b.jobId];
+      if (!j) return fail(res, 400, 'Выберите, к какой работе относится путевой лист');
+      if (FIELD(user) && !onJob(user, j)) return fail(res, 403, 'Это не ваша работа');
+      if (b.vehicleId && !(db.vehicles || {})[b.vehicleId]) return fail(res, 400, 'Транспорт не найден');
+      const x = { id: newId(), by: user.id, at: new Date().toISOString(), date: /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : localDate(), jobId: b.jobId, vehicleId: b.vehicleId || null, note: String(b.note || '').trim().slice(0, 1000), files };
+      T.push(x); saveDb();
+      return send(res, 200, { ok: true, trip: x, rev: db.rev });
+    }
+    const x = p[2] && T.find(e => e.id === p[2]);
+    if (!x || !(x.by === user.id || HEAD(user))) return fail(res, 404, 'Путевой лист не найден — обновите страницу');
+    if (m === 'DELETE') { db.trips = T.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Загрузить чек»: a refuelling (photo of the receipt, the vehicle) and a purchase (the work, photo, date, seller, goods with quantity and price, sum) */

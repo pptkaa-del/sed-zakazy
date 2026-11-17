@@ -1112,7 +1112,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wover" data-v="wover" hidden>Ненорм. день</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
-      <a href="#stock" data-v="stock">Склад <span class="badge" id="payBadge" hidden title="Счета к оплате"></span></a>
+      <a href="#stock" data-v="stock">Учётка <span class="badge" id="payBadge" hidden title="Счета к оплате"></span></a>
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#staff" data-v="staff" id="staffTab" hidden>Сотрудники</a>
       <a href="#staffp" data-v="staffp" hidden>По проектам</a>
@@ -1125,6 +1125,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#mytasks" data-v="mytasks" id="mytTab" hidden>Мои задачи <span class="badge" id="mytBadge" hidden></span></a>
       <a href="#refs" data-v="refs" id="refsTab" hidden>Справочники</a>
       <a href="#checks" data-v="checks" hidden>Загрузить чек</a>
+      <a href="#trips" data-v="trips" hidden>Загрузить путевой лист</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
@@ -1347,7 +1348,7 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -1392,7 +1393,7 @@ function animateView(el){
   clearTimeout(enterTimer); enterTimer = setTimeout(() => el.classList.remove('enter'), 700);
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
-const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Склад', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
+const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
   ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Задачи', [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники']];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
@@ -1410,7 +1411,7 @@ const secHide = root => [...root.querySelectorAll('[data-sec]')].filter(i => !i.
 const STOCK_VIEWS = ['stock', 'inc', 'wo', 'pay'];
 // a manager: «Загрузить чек» is a sub-tab of «Склад»; «Разработки» — of «Задачи»; «План-график», «По проектам», «Сотрудники» — of «Планирование и аналитика»
 const PLAN_VIEWS = ['plan', 'staffp', 'staff'];
-const inStockGroup = v => STOCK_VIEWS.includes(v) || (v === 'checks' && !isWorker());
+const inStockGroup = v => STOCK_VIEWS.includes(v) || ((v === 'checks' || v === 'trips') && !isWorker());
 const planTabsList = () => [['plan', 'План-график', can('plan')], ['staffp', 'По проектам', isHead() && can('staffp')], ['staff', 'Сотрудники', isHead() && can('staff')]].filter(x => x[2]);
 const planTabs = () => `<nav class="seg stabs" aria-label="Планирование и аналитика">${planTabsList().map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
 /* «Администрирование» (the administrator): users, the initial balances from 1C, the files of the organization */
@@ -1455,8 +1456,8 @@ const canWo = () => isHead() || me?.role === 'accountant';
 function stockTabs(){
   const n = S.invoices.filter(i => i.status === 'topay').length;
   const inc = S.invoices.filter(i => incState(i) === 'wait').length;
-  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [['checks', 'Загрузить чек']]);
-  return `<nav class="seg stabs" aria-label="Разделы склада">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : k === 'inc' && inc ? ` <span class="badge" title="Ждут оприходования">${inc}</span>` : ''}</a>`).join('')}</nav>`;
+  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [['checks', 'Загрузить чек'], ['trips', 'Путевые листы']]);
+  return `<nav class="seg stabs" aria-label="Разделы учётки">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : k === 'inc' && inc ? ` <span class="badge" title="Ждут оприходования">${inc}</span>` : ''}</a>`).join('')}</nav>`;
 }
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
@@ -1473,7 +1474,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -4590,6 +4591,41 @@ async function docxHtml(blob){
   }
   return out.join('') || '<p class="dim">Документ пустой</p>';
 }
+/* ===== «Путевые листы»: сотрудник загружает фото путевого листа и выбирает работу; руководитель видит все в «Учётке» ===== */
+let TRIPS = [];
+function vTrips(){
+  const all = isHead() || me?.role === 'accountant', ym = ui.tpMonth || today().slice(0, 7);
+  const jobs = S.jobs.filter(j => j.status !== 'done' || (ui.tpJob === j.id)).sort((a, b) => jobNo(b) - jobNo(a));
+  const form = `<section class="card ckform" data-keep>
+      <h3>${all ? 'Загрузить путевой лист' : 'Путевой лист'}</h3>
+      <div class="row-g">${(ui.tpFiles || []).map((f, i) => `<span class="tw rqthumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}"><button type="button" class="btn sm ghost" data-act="tpFileDel" data-id="${i}" aria-label="Убрать">✕</button></span>`).join('')}
+        <label class="phdrop" style="flex:1 1 240px"><input type="file" accept="image/*,application/pdf" data-up="tpFile" multiple hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span><b>${(ui.tpFiles || []).length ? 'Добавить ещё фото' : 'Сфотографировать путевой лист'}</b><small>Фото обеих сторон, если заполнены</small></span></label></div>
+      <div class="form"><label class="wide"><span>К какой работе относится <em class="req-star">*</em></span><select class="in" id="tp-job"><option value="">— выберите работу —</option>${jobs.map(j => `<option value="${j.id}" ${ui.tpJob === j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}</select>
+          ${jobs.length ? '' : '<small class="dim">Вам пока не назначено работ.</small>'}</label>
+        <label>Дата<input class="in" type="date" id="tp-date" value="${esc(ui.tpDate || today())}" max="${today()}"></label>
+        ${VEH_BRIEF.length ? `<label>Транспорт<select class="in" id="tp-veh"><option value="">— не указан —</option>${VEH_BRIEF.map(v => `<option value="${v.id}" ${ui.tpVeh === v.id ? 'selected' : ''}>${esc(v.name + (v.plate ? ' · ' + v.plate : ''))}</option>`).join('')}</select></label>` : ''}
+        <label class="wide">Комментарий<input class="in" id="tp-note" maxlength="1000" value="${esc(ui.tpNote || '')}" placeholder="Необязательно"></label></div>
+      <div class="row-g"><button class="btn primary" data-act="tpSave">Загрузить путевой лист</button></div></section>`;
+  let L = TRIPS.filter(x => all ? x.date.startsWith(ym) : x.by === me.id);
+  if (all && ui.tpFJob) L = L.filter(x => x.jobId === ui.tpFJob);
+  if (all && ui.tpFWho) L = L.filter(x => x.by === ui.tpFWho);
+  L.sort((a, b) => b.date.localeCompare(a.date) || b.at.localeCompare(a.at));
+  const shift = k => { const [y, m] = ym.split('-').map(Number), d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const authors = [...new Set(TRIPS.map(x => x.by))];
+  const filters = all ? `<div class="toolbar" style="margin-top:16px"><h3 style="margin:0">Путевые листы <span class="dim">${L.length}</span></h3>
+      <div class="row-g"><button class="btn sm" data-act="tpMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="tpMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button></div>
+      <select class="f" id="tp-fjob" aria-label="Работа"><option value="">Все работы</option>${S.jobs.slice().sort((a, b) => jobNo(b) - jobNo(a)).map(j => `<option value="${j.id}" ${ui.tpFJob === j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}</select>
+      <select class="f" id="tp-fwho" aria-label="Сотрудник"><option value="">Все сотрудники</option>${authors.map(id => `<option value="${id}" ${ui.tpFWho === id ? 'selected' : ''}>${esc(who(id))}</option>`).join('')}</select></div>`
+    : `<h3 style="margin:16px 0 8px">Мои путевые листы <span class="dim">${L.length}</span></h3>`;
+  const list = L.length ? `<div class="cklist">${L.map(x => { const j = jobOf(x.jobId); return `<div class="card ckcard">
+      <div class="ckph">${(x.files || []).map(f => /^image\//.test(f.type || '') ? `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener"><img src="/files/${esc(f.id)}" alt="Путевой лист" loading="lazy"></a>` : `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener" class="chip c-mute">📄 ${esc(f.name)}</a>`).join('')}</div>
+      <div class="ckb"><div class="row-g" style="justify-content:space-between"><b>${fmtD(x.date)}</b>${x.by === me.id || isHead() ? armBtn('tpd:' + x.id, '✕', 'tpDel', x.id, 'btn sm ghost') : ''}</div>
+        <div>🏗 ${j ? esc('№ ' + jobNo(j) + ' · ' + j.title) : '<span class="dim">работа удалена</span>'}</div>
+        ${x.vehicleId ? `<div>🚚 ${esc(vehLabel(x.vehicleId))}</div>` : ''}${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}
+        <small class="dim">${all ? esc(who(x.by)) + ' · ' : ''}загружен ${esc(fmtDT(x.at))}</small></div></div>`; }).join('')}</div>`
+    : `<div class="empty">${all ? 'За этот месяц путевых листов нет.' : 'Вы ещё не загружали путевые листы.'}</div>`;
+  return form + filters + list;
+}
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
 function staffRow(u, day){
@@ -6135,7 +6171,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Склад'], ['cps', 'Контрагенты'], ['inc', 'Склад → Приходы'], ['pay', 'Склад → Счета'], ['wo', 'Склад → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Задачи']];
+const startViews = () => [['works', 'Работы'], ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -6662,6 +6698,12 @@ async function act(el){
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
     case 'vNew': return openDrawer('vehicle', null);
+    case 'tpFileDel': (ui.tpFiles || []).splice(Number(id), 1); document.activeElement?.blur(); return render();
+    case 'tpMonth': ui.tpMonth = id; return render();
+    case 'tpSave': { const body = { files: ui.tpFiles || [], jobId: $('tp-job').value, date: $('tp-date').value, vehicleId: $('tp-veh')?.value || null, note: $('tp-note').value };
+      if (!body.files.length) return toast('Загрузите фото путевого листа'); if (!body.jobId) return toast('Выберите, к какой работе относится путевой лист');
+      try { const r = await api('POST', '/api/trips', body); TRIPS.push(r.trip); Object.assign(ui, { tpFiles: [], tpNote: '', tpDate: '' }); document.activeElement?.blur(); render(); toast('Путевой лист загружен'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
+    case 'tpDel': try { await api('DELETE', '/api/trips/' + id); TRIPS = TRIPS.filter(x => x.id !== id); render(); toast('Путевой лист удалён'); } catch(e) { toast(errText(e)); } return;
     case 'refNew': ui.refDraft = { title: '', text: '', files: [], scope: { type: 'common' }, restricted: false, viewers: [] }; return openDrawer('refForm', null);
     case 'refEdit': { const r = REFS.find(x => x.id === id); ui.refDraft = JSON.parse(JSON.stringify({ title: r.title, text: r.text || '', files: r.files || [], scope: r.scope || { type: 'common' }, restricted: !!r.restricted, viewers: r.viewers || [] })); return openDrawer('refForm', id); }
     case 'refMore': ui.refOpen = ui.refOpen === id ? null : id; return render();
@@ -6836,6 +6878,8 @@ document.addEventListener('input', e => {
   if (['ck-veh', 'ck-date', 'ck-liters', 'ck-sum', 'ck-seller', 'ck-work'].includes(t.id)) { ui[{ 'ck-veh': 'ckVeh', 'ck-date': 'ckDate', 'ck-liters': 'ckLiters', 'ck-sum': 'ckSum', 'ck-seller': 'ckSeller', 'ck-work': 'ckWork' }[t.id]] = t.value; return; }
   if (t.id === 'ck-job') { ui.ckJob = t.value; document.activeElement?.blur(); return render(); }
   if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (['tp-job', 'tp-date', 'tp-veh', 'tp-note'].includes(t.id)) { ui[{ 'tp-job': 'tpJob', 'tp-date': 'tpDate', 'tp-veh': 'tpVeh', 'tp-note': 'tpNote' }[t.id]] = t.value; return; }
+  if (t.id === 'tp-fjob' || t.id === 'tp-fwho') { ui[t.id === 'tp-fjob' ? 'tpFJob' : 'tpFWho'] = t.value; return render(); }
   if (t.id === 'trq') { ui.trq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vTransport(); const n = $('trq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'ptq') { ui.ptq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vParts(); const n = $('ptq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'pt-fv') { ui.ptVeh = t.value; return render(); }
@@ -7000,6 +7044,8 @@ document.addEventListener('change', async e => {
     return; }
   if (t.dataset.up === 'rfFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; refKeep();
     try { for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); ui.refDraft.files.push({ id: u.id, name: u.name, type: fl.type, size: fl.size }); } } catch(e) { toast(errText(e)); } renderDrawer(); return; }
+  if (t.dataset.up === 'tpFile') { const files = [...t.files]; t.value = ''; if (!files.length) return;
+    try { await uploadMany(files, 'tpFiles'); } catch(e) { toast(errText(e)); } document.activeElement?.blur(); render(); return; }
   if (t.dataset.up === 'vDoc') { const fl = t.files[0]; t.value = ''; if (!fl) return; const vid = t.dataset.id;
     try { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); const r = await api('POST', `/api/vehicles/${vid}/docs`, { file: { id: u.id }, title: $('vd-title')?.value.trim() || fl.name.replace(/\.[^.]+$/, ''), date: $('vd-date')?.value || '' }); trPut(r.vehicle); renderDrawer(); render(); toast('Документ загружен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'rqDoneFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; ui.rqNote = $('rq-note')?.value || '';
@@ -7082,8 +7128,8 @@ function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : reqMode() ? (['reqall', 'reqdev', 'reqdocs'].includes(h) || (['users', 'admFiles', 'reqrep', 'reqset'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'refs'].includes(h) && (h !== 'refs' || can('refs')) ? h : 'wwork')
-    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'refs' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs'].includes(h) && (h !== 'refs' || can('refs')) ? h : 'wwork')
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || h === 'refs' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
     const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
@@ -7148,7 +7194,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'devs'].includes(v); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs'].includes(v); });
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (!u.sys && !reqMode() && !isWorker()) {
     const pl = planTabsList(), pt = $('planTab'); pt.hidden = !pl.length; if (pl.length) pt.href = '#' + pl[0][0];
