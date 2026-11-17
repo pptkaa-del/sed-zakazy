@@ -349,7 +349,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared', 'draw'], transport: ['cars', 'parts'], refs: [] };
+const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -445,6 +445,10 @@ let secret;
 try { secret = fs.readFileSync(SECRET_FILE); } catch {
   secret = crypto.randomBytes(32); fs.writeFileSync(SECRET_FILE, secret, { mode: 0o600 });
 }
+/* «Личное хранилище»: the entries of a user are kept encrypted (AES-256-GCM) with a key derived from secret.key */
+const VAULT_KEY = crypto.createHash('sha256').update(Buffer.concat([secret, Buffer.from('sed-vault-v1')])).digest();
+const vaultEnc = obj => { const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', VAULT_KEY, iv); const e = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]); return 'v1:' + Buffer.concat([iv, c.getAuthTag(), e]).toString('base64'); };
+const vaultDec = s => { try { const b = Buffer.from(String(s).slice(3), 'base64'), d = crypto.createDecipheriv('aes-256-gcm', VAULT_KEY, b.subarray(0, 12)); d.setAuthTag(b.subarray(12, 28)); return JSON.parse(Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8')); } catch { return null; } };
 
 /* ---------- passwords and sessions ---------- */
 function hashPassword(pw, salt = crypto.randomBytes(16).toString('hex')) {
@@ -583,7 +587,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -694,7 +698,7 @@ async function api(req, res, url) {
     out.staffRatings = (Array.isArray(db.staffRatings) ? db.staffRatings : []).filter(x => HEAD(user) || x.user === user.id);
     out.workCal = workCalOf();
     // «Справочники»: a manager sees all; the others — the open ones and those he is chosen for
-    if (orgType(user) !== 'requests' && sees(user, 'refs')) out.refs = (Array.isArray(db.refs) ? db.refs : []).filter(r => HEAD(user) || !r.restricted || (r.viewers || []).includes(user.id));
+    if (orgType(user) !== 'requests' && sees(user, 'refs:list')) out.refs = (Array.isArray(db.refs) ? db.refs : []).filter(r => HEAD(user) || !r.restricted || (r.viewers || []).includes(user.id));
     // «Загрузить чек»: an employee sees his own receipts, a manager and the accountant see everyone's; the vehicles to choose for a refuelling
     if (orgType(user) !== 'requests') {
       out.checks = (Array.isArray(db.checks) ? db.checks : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
@@ -969,10 +973,32 @@ async function api(req, res, url) {
   }
   /* «Справочники»: a manager adds files or text, says what it belongs to (a work, a name typed by hand, or general information)
      and who sees it (everyone or chosen employees); the others only read */
+  /* «Личное хранилище»: passwords and notes of the user himself — nobody else (not even the administrator) reads them */
+  if (p[1] === 'vault') {
+    if (orgType(user) === 'requests' || !sees(user, 'refs:vault')) return fail(res, 403, 'Этот раздел для вас закрыт');
+    if (!db.vault || typeof db.vault !== 'object') db.vault = {};
+    const V = db.vault[user.id] = db.vault[user.id] || { pw: [], notes: [] }, kind = p[2], now = new Date().toISOString();
+    const open = x => ({ id: x.id, at: x.at, updatedAt: x.updatedAt || null, ...(vaultDec(x.data) || { title: '(не удалось прочитать)' }) });
+    if (m === 'GET' && !p[2]) return send(res, 200, { pw: V.pw.map(open), notes: V.notes.map(open) });
+    if (!['pw', 'notes'].includes(kind)) return fail(res, 404, 'Не найдено');
+    const L = V[kind], t = (v, n) => String(v ?? '').slice(0, n);
+    const clean = b => kind === 'pw'
+      ? (t(b.title, 200).trim() ? { title: t(b.title, 200).trim(), login: t(b.login, 300), pass: t(b.pass, 500), url: t(b.url, 500).trim(), note: t(b.note, 2000) } : 'Напишите, от чего этот логин и пароль')
+      : (t(b.title, 200).trim() || t(b.text, 20000).trim() ? { title: t(b.title, 200).trim(), text: t(b.text, 20000) } : 'Заметка пустая');
+    if (m === 'POST' && !p[3]) {
+      if (L.length >= 2000) return fail(res, 400, 'Слишком много записей');
+      const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
+      const x = { id: newId(), at: now, data: vaultEnc(v) }; L.push(x); saveDb(); return send(res, 200, { ok: true, item: open(x), rev: db.rev });
+    }
+    const x = p[3] && L.find(e => e.id === p[3]); if (!x) return fail(res, 404, 'Запись не найдена — обновите страницу');
+    if (m === 'PUT') { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); x.data = vaultEnc(v); x.updatedAt = now; saveDb(); return send(res, 200, { ok: true, item: open(x), rev: db.rev }); }
+    if (m === 'DELETE') { V[kind] = L.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'refs') {
     if (user.sys || orgType(user) === 'requests') return fail(res, 403, 'Недоступно');
     if (!HEAD(user)) return fail(res, 403, 'Справочники ведёт руководитель или администратор');
-    if (!sees(user, 'refs')) return fail(res, 403, 'Этот раздел для вас закрыт');
+    if (!sees(user, 'refs:list')) return fail(res, 403, 'Этот раздел для вас закрыт');
     if (!Array.isArray(db.refs)) db.refs = [];
     const R = db.refs, now = new Date().toISOString(), txt = (v, n) => String(v ?? '').trim().slice(0, n);
     const clean = b => {

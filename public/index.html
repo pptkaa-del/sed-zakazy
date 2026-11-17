@@ -342,6 +342,8 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgall tr.sgt1 td,.sgall tr.sgt1 th{border-bottom:1px dashed var(--rule-2)}.sgall tr.sgt2 td,.sgall tr.sgt2 th{border-bottom:2px solid var(--rule)}.sgall td{height:34px}.sgall .sgname{border-bottom:2px solid var(--rule)}
 .sgt thead .sgsum small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}.sglg{font-size:12px;margin-right:2px}.sgrnote{margin:0 14px 10px;font-size:13px;background:var(--warn-soft, #FFF6D6)}
 .sgt .sgrate{min-width:150px;padding:4px 6px}.sgrate .rtsel{font-size:12px;padding:4px 6px;width:100%;max-width:200px}.sgrate .rtv{display:inline-block;min-width:26px;padding:2px 6px;border-radius:6px;color:#1F2633}.sgrate small{display:block;font-size:10px;color:var(--ink-2);white-space:normal}
+.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
+.vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
 .sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
 .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vcard{text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;font:inherit;color:inherit}.vcard:hover{border-color:var(--stamp)}
 .vtop{display:flex;gap:10px;justify-content:space-between;align-items:center}.vtop b{font-size:16px}.plate{font:600 13px var(--f-mono,monospace);border:1.5px solid var(--ink);border-radius:4px;padding:1px 6px;background:var(--sheet);white-space:nowrap}
@@ -1243,7 +1245,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#checks" data-v="checks" hidden>Загрузить чек</a>
       <a href="#trips" data-v="trips" hidden>Загрузить путевой лист</a>
       <a href="#trep" data-v="trep" hidden>Отчёты</a>
-      <a href="#refs" data-v="refs" id="refsTab" hidden>Справочники</a>
+      <a href="#refs" data-v="refs" id="refsTab" hidden>Справочники и инструменты</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
@@ -1513,11 +1515,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники']];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
-const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs' };
+const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault' };
 const viewOk = v => !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
 // the checkbox tree of the organization and user forms: checked — shown; what the organization hides is not offered to its users
 function secTree(hide, orgHide){
@@ -1582,7 +1584,7 @@ function stockTabs(){
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
   pending = false;
-  const navV = inStockGroup(ui.view) ? 'stock' : PLAN_VIEWS.includes(ui.view) ? 'plan' : ui.view === 'devs' && !isWorker() ? 'notes' : ADMIN_VIEWS.includes(ui.view) ? 'users' : TR_VIEWS.includes(ui.view) ? 'transport' : ui.view;
+  const navV = inStockGroup(ui.view) ? 'stock' : PLAN_VIEWS.includes(ui.view) ? 'plan' : ui.view === 'devs' && !isWorker() ? 'notes' : ADMIN_VIEWS.includes(ui.view) ? 'users' : TR_VIEWS.includes(ui.view) ? 'transport' : REF_VIEWS.includes(ui.view) ? 'refs' : ui.view;
   document.querySelectorAll('#views a').forEach(a => a.classList.toggle('on', a.dataset.v === navV));
   const n = S.invoices.filter(i => i.status === 'topay').length;
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
@@ -1594,9 +1596,9 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
-  if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
+  if (ui.view === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
@@ -4555,6 +4557,66 @@ let REFS = [];
 const refGroupKey = r => r.scope?.type === 'job' ? 'j:' + r.scope.jobId : r.scope?.type === 'other' ? 'o:' + r.scope.name.toLowerCase() : 'common';
 const refGroupName = r => r.scope?.type === 'job' ? (jobOf(r.scope.jobId) ? `№ ${jobNo(jobOf(r.scope.jobId))} · ${jobOf(r.scope.jobId).title}` : r.scope.name) : r.scope?.type === 'other' ? r.scope.name : 'Общая информация';
 const fileIco = f => { const e = ((f.name || '').split('.').pop() || '').toLowerCase(); return /^image\//.test(f.type || '') ? '🖼' : e === 'pdf' ? '📕' : /^(xlsx?|csv|ods)$/.test(e) ? '📊' : /^(docx?|odt|rtf)$/.test(e) ? '📄' : '📎'; };
+/* ===== «Справочники и инструменты»: справочники, рисовалка, личное хранилище ===== */
+const REF_VIEWS = ['refs', 'draw', 'vault'];
+const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище']];
+const refTabsList = () => REF_TABS.filter(([, k]) => can('refs:' + k));
+const refTabs = () => `<nav class="seg stabs" aria-label="Справочники и инструменты">${refTabsList().map(([v, , l]) => `<a href="#${v}" class="${ui.view === v ? 'on' : ''}" ${ui.view === v ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
+/* «Личное хранилище»: passwords (what for, login, password, link, note) and notes; only the user himself sees them, the server keeps them encrypted */
+let VAULT = null;
+async function loadVault(){ try { VAULT = await api('GET', '/api/vault'); } catch(e) { VAULT = { pw: [], notes: [], err: errText(e) }; } render(); }
+const vaultPut = (kind, x) => { const L = VAULT[kind], i = L.findIndex(e => e.id === x.id); if (i >= 0) L[i] = x; else L.push(x); };
+const copyText = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(what + ' скопирован'); } catch(e) { toast('Не удалось скопировать — выделите и скопируйте вручную'); } };
+function genPass(n = 16){ const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?-_', r = crypto.getRandomValues(new Uint32Array(n)); return Array.from(r, x => A[x % A.length]).join(''); }
+function vVault(){
+  if (!VAULT) { loadVault(); return '<div class="empty">Открываем хранилище…</div>'; }
+  if (VAULT.err) return `<div class="empty"><h3>Хранилище недоступно</h3>${esc(VAULT.err)}</div>`;
+  const tab = ui.vtab === 'notes' ? 'notes' : 'pw', q = (ui.vq || '').trim().toLowerCase(), show = ui.vShow || {};
+  const bar = `<div class="toolbar"><div class="seg">${[['pw', '🔑 Пароли', VAULT.pw.length], ['notes', '📝 Заметки', VAULT.notes.length]].map(([k, l, n]) => `<button data-act="vTab" data-id="${k}" class="${tab === k ? 'on' : ''}">${l}${n ? ` <span class="dim">${n}</span>` : ''}</button>`).join('')}</div>
+    <span data-keep style="display:contents"><input class="in" id="vq" type="search" placeholder="${tab === 'pw' ? 'От чего, логин, ссылка' : 'Заголовок, текст'}" aria-label="Поиск в хранилище" value="${esc(ui.vq || '')}" style="flex:1 1 200px;max-width:320px"></span>
+    <button class="btn primary" data-act="${tab === 'pw' ? 'vPwNew' : 'vNoteNew'}">${tab === 'pw' ? '+ Пароль' : '+ Заметка'}</button></div>
+    <p class="box vhint">🔒 Это ваше личное хранилище: записи видите только вы — ни руководитель, ни администратор их не видят. На сервере они хранятся в зашифрованном виде.</p>`;
+  if (tab === 'pw') {
+    const L = VAULT.pw.filter(x => !q || [x.title, x.login, x.url, x.note].join(' ').toLowerCase().includes(q)).sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+    if (!VAULT.pw.length) return bar + '<div class="empty"><h3>Паролей пока нет</h3>Нажмите «+ Пароль»: укажите, от чего логин и пароль (сайт, программа, почта, Wi-Fi), сам логин и пароль.</div>';
+    if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
+    return bar + `<div class="vlistc">${L.map(x => `<article class="card vitem">
+      <div class="vtop"><b>${esc(x.title)}</b><div class="row-g"><button class="btn sm" data-act="vPwEdit" data-id="${x.id}">Изменить</button>${armBtn('vpd:' + x.id, '✕', 'vPwDel', x.id, 'btn sm ghost')}</div></div>
+      <dl class="vkv"><dt>Логин</dt><dd>${x.login ? `<span class="mono">${esc(x.login)}</span> <button class="linkish" data-act="vCopyLogin" data-id="${x.id}" title="Скопировать логин">📋</button>` : '<span class="dim">—</span>'}</dd>
+        <dt>Пароль</dt><dd>${x.pass ? `<span class="mono vpass">${show[x.id] ? esc(x.pass) : '••••••••••'}</span> <button class="linkish" data-act="vShow" data-id="${x.id}" title="${show[x.id] ? 'Скрыть' : 'Показать'}">${show[x.id] ? '🙈' : '👁'}</button> <button class="linkish" data-act="vCopyPass" data-id="${x.id}" title="Скопировать пароль">📋</button>` : '<span class="dim">—</span>'}</dd>
+        ${x.url ? `<dt>Ссылка</dt><dd>${/^https?:\/\//i.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.url)}</a>` : esc(x.url)}</dd>` : ''}
+        ${x.note ? `<dt>Заметка</dt><dd style="white-space:pre-wrap">${esc(x.note)}</dd>` : ''}</dl></article>`).join('')}</div>`;
+  }
+  const L = VAULT.notes.filter(x => !q || [x.title, x.text].join(' ').toLowerCase().includes(q)).sort((a, b) => String(b.updatedAt || b.at).localeCompare(String(a.updatedAt || a.at)));
+  if (!VAULT.notes.length) return bar + '<div class="empty"><h3>Заметок пока нет</h3>Нажмите «+ Заметка» — для любых личных записей.</div>';
+  if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
+  return bar + `<div class="vlistc">${L.map(x => `<article class="card vitem click" data-act="vNoteEdit" data-id="${x.id}" role="button" tabindex="0"><b>${esc(x.title || 'Без заголовка')}</b>
+    <div class="vnote">${esc((x.text || '').slice(0, 600))}${(x.text || '').length > 600 ? '…' : ''}</div><small class="dim">${esc(fmtDT(x.updatedAt || x.at))}</small></article>`).join('')}</div>`;
+}
+function vaultPwHtml(x){
+  return `<div class="d-body"><div class="form" data-keep>
+    <label class="wide"><span>От чего <em class="req-star">*</em></span><input class="in" id="vp-title" maxlength="200" value="${esc(x?.title || '')}" placeholder="Например: Почта Яндекс, личный кабинет банка, Wi-Fi офиса"></label>
+    <label class="wide">Логин<input class="in mono" id="vp-login" maxlength="300" value="${esc(x?.login || '')}" autocomplete="off"></label>
+    <div class="wide"><span class="flab">Пароль</span><div class="row-g"><input class="in mono" id="vp-pass" type="${ui.vpVis ? 'text' : 'password'}" maxlength="500" value="${esc(x?.pass || '')}" autocomplete="new-password" style="flex:1 1 220px">
+      <button type="button" class="btn" data-act="vpVis">${ui.vpVis ? '🙈 Скрыть' : '👁 Показать'}</button><button type="button" class="btn" data-act="vpGen">🎲 Придумать</button></div></div>
+    <label class="wide">Ссылка или адрес<input class="in" id="vp-url" maxlength="500" value="${esc(x?.url || '')}" placeholder="https://…"></label>
+    <label class="wide">Заметка<textarea class="in" id="vp-note" rows="3" maxlength="2000">${esc(x?.note || '')}</textarea></label></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="vPwSave" data-id="${x?.id || ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('vpd:' + x.id, 'Удалить', 'vPwDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
+}
+function vaultNoteHtml(x){
+  return `<div class="d-body"><div class="form" data-keep>
+    <label class="wide">Заголовок<input class="in" id="vn-title" maxlength="200" value="${esc(x?.title || '')}"></label>
+    <label class="wide">Текст<textarea class="in" id="vn-text" rows="14" maxlength="20000">${esc(x?.text || '')}</textarea></label></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="vNoteSave" data-id="${x?.id || ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('vnd:' + x.id, 'Удалить', 'vNoteDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
+}
+async function vaultSave(kind, id, body){
+  const fe = $('ferr'); if (fe) fe.textContent = '';
+  try { const r = await api(id ? 'PUT' : 'POST', `/api/vault/${kind}${id ? '/' + id : ''}`, body); vaultPut(kind, r.item); document.activeElement?.blur(); closeDrawer(); render(); toast(id ? 'Сохранено' : 'Добавлено'); }
+  catch(e) { if (fe) fe.textContent = errText(e); else toast(errText(e)); }
+}
+async function vaultDel(kind, id){ try { await api('DELETE', `/api/vault/${kind}/${id}`); VAULT[kind] = VAULT[kind].filter(e => e.id !== id); if (ui.drawer?.id === id) closeDrawer(); render(); toast('Удалено'); } catch(e) { toast(errText(e)); } }
 function vRefs(){
   const q = (ui.rfq || '').trim().toLowerCase(), head = isHead();
   const L = REFS.filter(r => !q || [r.title, r.text, refGroupName(r), ...(r.files || []).map(f => f.name)].join(' ').toLowerCase().includes(q));
@@ -4839,7 +4901,7 @@ function vTmine(){
 
 // the menu of a transport organization: a driver — his trips, waybills, receipts; the accountant — orders, «Учётка», reports; managers — all
 const transNav = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : me.role === 'accountant' ? ['tor', 'stock', 'trep', 'notes', 'refs'] : ['tor', 'disp', 'transport', 'stock', 'trep', 'notes', 'refs', ...(me.role === 'admin' ? ['users'] : [])];
-const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
+const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
 /* ===== «Оборудование» системы заявок: справочник с QR-кодами и историей проблем ===== */
 let REQ_EQ = [];
 const eqOf = id => REQ_EQ.find(e => e.id === id);
@@ -5060,14 +5122,14 @@ function notesTabsBar(tab){
   const T = [...NOTE_TABS.filter(([k]) => open.includes(k)), ...(can('devs') && !reqMode() ? [['devs', 'Разработки']] : [])];
   return `<div class="seg ntabs" role="tablist">${T.map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
 }
-const NOTE_TABS = [['task', 'Собственные'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']];
+const NOTE_TABS = [['task', 'Собственные'], ['shared', 'Общие задачи']];
 const ntype = n => n.type || 'task';
 const isOwnNote = n => ntype(n) === 'task' || ntype(n) === 'memo';
 function vNotes(){
   const open = NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k), tab = open.includes(ui.ntab) ? ui.ntab : open[0];
   const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'memo' ? NOTES.filter(n => ntype(n) === 'memo').length : 0;
   const tabs = notesTabsBar(tab);
-  return myWorkBox() + tabs + (tab === 'shared' ? vShared() : tab === 'draw' ? vDraw() : vTasksList());
+  return myWorkBox() + tabs + (tab === 'shared' ? vShared() : vTasksList());
 }
 const thumbF = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp)$/i.test(f.name || '') ? `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener" class="thumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>` : `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>`;
 /* «Заметки»: text, pictures and drawings */
@@ -5134,8 +5196,8 @@ function vDraw(){
       <button class="btn sm ${DRAW.eraser ? 'primary' : ''}" data-act="drEraser">Ластик</button><button class="btn sm" data-act="drUndo">↶ Отменить</button><button class="btn sm" data-act="drClear">Очистить</button>
       <label class="btn sm">Вставить картинку<input type="file" accept="image/*" id="dr-img" hidden></label>
       <span class="dtsep"></span>
-      <select class="f" id="dr-target" aria-label="Куда прикрепить"><option value="">Прикрепить к новой заметке</option>${targets.map(n => `<option value="${esc(n.id)}" ${ui.drawTarget === n.id ? 'selected' : ''}>${esc((ntype(n) === 'shared' ? 'Общая задача: ' : 'Заметка: ') + (n.text || 'без текста').slice(0, 50))}</option>`).join('')}</select>
-      <button class="btn primary" data-act="drAttach">Прикрепить рисунок</button></div>
+      ${isWorker() ? '' : `<select class="f" id="dr-target" aria-label="Куда прикрепить"><option value="">Прикрепить к новой заметке</option>${targets.map(n => `<option value="${esc(n.id)}" ${ui.drawTarget === n.id ? 'selected' : ''}>${esc((ntype(n) === 'shared' ? 'Общая задача: ' : 'Заметка: ') + (n.text || 'без текста').slice(0, 50))}</option>`).join('')}</select>
+      <button class="btn primary" data-act="drAttach">Прикрепить рисунок</button>`}<button class="btn" data-act="drSave">💾 Скачать PNG</button></div>
     <div class="drawwrap"><canvas id="drawc" width="1600" height="1000"></canvas></div>`;
 }
 function initDraw(){
@@ -5836,6 +5898,8 @@ function renderDrawer(){
   if (d.kind === 'vehicle') { const v = VEHICLES.find(x => x.id === d.id); D.innerHTML = dh(v ? esc(vName(v)) : 'Новый транспорт') + vehicleHtml(v || {}); return; }
   if (d.kind === 'staffDay') { const u = STAFF.find(x => x.id === d.id); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + staffDayHtml(d.id, d.ctx); return; }
   if (d.kind === 'staffCard') { const u = STAFF.find(x => x.id === d.id), day = ui.stDay || today(); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + (u ? `<div class="d-body staffd">${staffCardHtml(staffRow(u, day), day)}<div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>` : ''); return; }
+  if (d.kind === 'vaultPw') { const x = d.id && VAULT?.pw.find(e => e.id === d.id); D.innerHTML = dh(x ? x.title : 'Новый пароль') + vaultPwHtml(x || null); return; }
+  if (d.kind === 'vaultNote') { const x = d.id && VAULT?.notes.find(e => e.id === d.id); D.innerHTML = dh(x ? (x.title || 'Заметка') : 'Новая заметка') + vaultNoteHtml(x || null); return; }
   if (d.kind === 'otHead') { const x = OVERTIME.find(o => o.id === d.id); D.innerHTML = dh('Ненормированный день') + (x ? otHeadHtml(x) : '<div class="d-body"><p>Запись удалена</p></div>'); return; }
   if (d.kind === 'workCal') { D.innerHTML = dh('График работы') + workCalHtml(); return; }
   if (d.kind === 'prefs') {
@@ -6648,7 +6712,7 @@ async function act(el){
     case 'ntab': if (id === 'devs') { location.hash = '#devs'; return; } ui.ntab = id; if (ui.view !== 'notes') { location.hash = '#notes'; return; } return render();
     case 'memoAdd': { const t = $('memo-new'), text = t.value.trim(); if (!text) return toast('Напишите текст заметки');
       try { const r = await api('POST', '/api/notes', { type: 'memo', text }); NOTES.unshift(r.note); t.value = ''; document.activeElement?.blur(); render(); toast('Заметка добавлена'); } catch(e) { toast(errText(e)); } return; }
-    case 'memoDraw': ui.drawTarget = id; DRAW.img = null; DRAW.undo = []; ui.ntab = 'draw'; return render();
+    case 'memoDraw': ui.drawTarget = id; DRAW.img = null; DRAW.undo = []; location.hash = '#draw'; return;
     case 'memoFileDel': { const [nid, fid] = id.split('|'), n = NOTES.find(x => x.id === nid); if (!n) return;
       try { const r = await api('PATCH', '/api/notes/' + nid, { files: (n.files || []).filter(f => f.id !== fid) }); Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
     case 'sharedAdd': { const text = ($('sh-new')?.value || '').trim(), share = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value), assignee = $('sh-as')?.value || '', due = $('sh-due')?.value || '';
@@ -6662,6 +6726,21 @@ async function act(el){
     case 'drUndo': return $('drawc')?._undo?.();
     case 'drClear': return $('drawc')?._clear?.();
     case 'drAttach': return drAttach();
+    case 'drSave': { const c = $('drawc'); if (!c) return; c.toBlob(b => { const u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = `Рисунок ${today()}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }, 'image/png'); return; }
+    case 'vTab': ui.vtab = id; return render();
+    case 'vShow': ui.vShow = { ...(ui.vShow || {}), [id]: !(ui.vShow || {})[id] }; return render();
+    case 'vCopyPass': { const x = VAULT.pw.find(e => e.id === id); return x && copyText(x.pass, 'Пароль'); }
+    case 'vCopyLogin': { const x = VAULT.pw.find(e => e.id === id); return x && copyText(x.login, 'Логин'); }
+    case 'vPwNew': ui.vpVis = false; return openDrawer('vaultPw', null);
+    case 'vPwEdit': ui.vpVis = false; return openDrawer('vaultPw', id);
+    case 'vNoteNew': return openDrawer('vaultNote', null);
+    case 'vNoteEdit': return openDrawer('vaultNote', id);
+    case 'vpVis': { ui.vpVis = !ui.vpVis; const p = $('vp-pass'); if (p) p.type = ui.vpVis ? 'text' : 'password'; el.textContent = ui.vpVis ? '🙈 Скрыть' : '👁 Показать'; return; }
+    case 'vpGen': { const p = $('vp-pass'); if (p) { p.value = genPass(); p.type = 'text'; ui.vpVis = true; } return; }
+    case 'vPwSave': return vaultSave('pw', id, { title: $('vp-title').value, login: $('vp-login').value, pass: $('vp-pass').value, url: $('vp-url').value, note: $('vp-note').value });
+    case 'vNoteSave': return vaultSave('notes', id, { title: $('vn-title').value, text: $('vn-text').value });
+    case 'vPwDel': return vaultDel('pw', id);
+    case 'vNoteDel': return vaultDel('notes', id);
     case 'noteEdit': ui.noteEdit = id; render(); { const t = $('note-ed'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } } return;
     case 'noteEditCancel': ui.noteEdit = null; document.activeElement?.blur(); return render();
     case 'noteSave': { const text = ($('note-ed')?.value || '').trim(); if (!text) return toast('Напишите текст задачи');
@@ -7185,7 +7264,8 @@ document.addEventListener('input', e => {
   if (t.id === 'ck-date') ui.ckDateSet = true;
   if (['ck-veh', 'ck-date', 'ck-liters', 'ck-sum', 'ck-seller', 'ck-work'].includes(t.id)) { ui[{ 'ck-veh': 'ckVeh', 'ck-date': 'ckDate', 'ck-liters': 'ckLiters', 'ck-sum': 'ckSum', 'ck-seller': 'ckSeller', 'ck-work': 'ckWork' }[t.id]] = t.value; return; }
   if (t.id === 'ck-job') { ui.ckJob = t.value; document.activeElement?.blur(); return render(); }
-  if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'vq') { ui.vq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vVault(); const n = $('vq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (['tp-job', 'tp-date', 'tp-veh', 'tp-note'].includes(t.id)) { ui[{ 'tp-job': 'tpJob', 'tp-date': 'tpDate', 'tp-veh': 'tpVeh', 'tp-note': 'tpNote' }[t.id]] = t.value; return; }
   if (t.id === 'tp-fjob' || t.id === 'tp-fwho') { ui[t.id === 'tp-fjob' ? 'tpFJob' : 'tpFWho'] = t.value; return render(); }
   if (t.id === 'toq') { ui.toq = t.value; const pos = t.selectionStart; $('view').innerHTML = vTor(); const n = $('toq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -7456,11 +7536,11 @@ function route(){
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs'].includes(h) && (h !== 'refs' || can('refs')) ? h : 'wwork')
-    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || h === 'refs' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
-    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
+    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
     ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
     try { history.replaceState(null, '', '#' + ui.view); } catch(e) {}
   }
@@ -7531,8 +7611,9 @@ async function start(u){
     const st = document.querySelector('#views a[data-v=stock]'); if (st) { st.hidden = false; st.href = tabOpen('stock') ? '#stock' : '#cps'; }
     const nt = $('notesTab'), notesOpen = tabOpen('notes'); if (!notesOpen && can('devs')) { nt.hidden = false; nt.href = '#devs'; } else nt.href = '#notes';
   }
+  if (!u.sys && !reqMode()) { const rt = $('refsTab'), rl = refTabsList(); if (rt && rl.length) rt.href = '#' + rl[0][0]; }
   document.body.classList.toggle('worker', isWorker());
-  ui.usersList = null;
+  ui.usersList = null; VAULT = null; ui.vShow = {};
   $('loginView').hidden = true; $('app').hidden = false;
   route();
   if (u.sys) { mode = 'live'; render(); }
