@@ -268,7 +268,7 @@ table.lines tr.ln-miss td{background:var(--warn-soft)}table.lines tr.ln-miss td:
 .wtable{padding:0;overflow:hidden}.wjr{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,1.2fr) minmax(0,1.2fr) 120px 110px 110px;gap:14px;align-items:start;padding:12px 16px;border-top:1px solid var(--rule-2)}
 .wjr.whead{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px;border-top:0;align-items:center}
 .wjr.click{cursor:pointer}.wjr.click:hover,.wjr.open{background:var(--paper)}.wl-name{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.wl-name b{font-weight:600}.wl-name small,.wl-dates small,.wl-list small{display:block;color:var(--ink-2);font-size:12px}
-.wl-dates b{font-weight:500;display:block}.wl-happen{font-size:13px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;min-width:0}.wl-dates.bad-t small{color:var(--bad)}.wl-list{display:flex;flex-direction:column;gap:2px;font-size:13px;min-width:0}.wl-item{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wl-arr{color:var(--ink-2);font-size:12px}
+.wl-dates b{font-weight:500;display:block}.wrk-st small{display:block;font-size:12px;margin-top:3px}.wpend{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-bottom:12px;border-color:var(--warn);background:var(--warn-soft)}.wl-happen{font-size:13px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;min-width:0}.wl-dates.bad-t small{color:var(--bad)}.wl-list{display:flex;flex-direction:column;gap:2px;font-size:13px;min-width:0}.wl-item{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wl-arr{color:var(--ink-2);font-size:12px}
 .wpanel{padding:14px 18px 16px;background:var(--paper);border-top:1px dashed var(--rule);display:flex;flex-direction:column;gap:14px}.wp-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.wp-col{display:flex;flex-direction:column;gap:12px}
 .wpanel h5{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}.wp-desc{margin:0;white-space:pre-wrap}.wl-ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}.wl-th{display:flex;margin-top:4px}.wl-th img{width:64px;height:48px}
 @media (max-width:900px){.wjr{grid-template-columns:1fr 1fr}.wjr.whead{display:none}.wjr>.wl-name{grid-column:1/-1}.wjr [data-l]::before{content:attr(data-l);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2)}.wp-grid{grid-template-columns:1fr}}
@@ -2412,17 +2412,19 @@ async function exportJobReport(j, day){
 function vWorkList(){
   const q = (ui.wlq || '').trim().toLowerCase(), K = ui.wlKind || 'all', St = ui.wlSt || 'active';
   const hay = j => [j.title, cpOf(j.customerId)?.name, j.description, '№' + j.no].join(' ').toLowerCase();
-  const base = S.jobs.filter(j => St === 'all' || (St === 'active' ? j.status !== 'done' : (j.status || 'new') === St));
+  const base = S.jobs.filter(j => jobStOk(j, St === 'done' ? 'archive' : St));
   const L = base.filter(j => (K === 'all' || (j.kind || 'mount') === K) && (!q || hay(j).includes(q)))
     .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9999').localeCompare(b.due || '9999') || (b.createdAt || '').localeCompare(a.createdAt || ''));
   const head = `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
-    <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => k === 'all' || (k === 'active' ? j.status !== 'done' : (j.status || 'new') === k)).length}</span></button>`).join('')}</div>
+    <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['warranty', 'На гарантии'], ['archive', 'Архив'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => jobStOk(j, k)).length}</span></button>`).join('')}</div>
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
-  if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
-  return head + `<section class="card wtable"><div class="wjr whead"><span>Работа</span><span>Что происходит</span><span>Что нужно сделать</span><span>Что нужно купить</span><span>Сроки</span><span>Выполнено</span><span>Статус</span></div>
+  const WP = canEdit() ? S.jobs.filter(warrantyPending) : [];
+  const warn = WP.length ? `<div class="box wpend"><b>Выполнены работы — установите гарантийный срок:</b>${WP.map(j => ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">№ ${jobNo(j)} · ${esc(j.title)}</button>`).join('')}</div>` : '';
+  if (!L.length) return head + warn + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
+  return head + warn + `<section class="card wtable"><div class="wjr whead"><span>Работа</span><span>Что происходит</span><span>Что нужно сделать</span><span>Что нужно купить</span><span>Сроки</span><span>Выполнено</span><span>Статус</span></div>
     ${L.map(j => wlRow(j) + (ui.wlOpen === j.id ? wlPanel(j) : '')).join('')}</section>`;
 }
 /* the percent of a work: by the done points when there are points, otherwise entered by hand («вручную») */
@@ -2446,7 +2448,8 @@ function wlRow(j){
     <div class="wl-list" data-l="Купить">${wlBrief(j.buy, 'куплено')}</div>
     <div class="wl-dates ${od ? 'bad-t' : ''}" data-l="Сроки">${j.start ? `<small>начало ${fmtD(j.start)}</small>` : ''}${j.due ? `<b>до ${fmtD(j.due)}</b><small>${od ? 'просрочено на ' + (-left) + ' дн.' : left !== null ? (left === 0 ? 'сегодня' : 'осталось ' + left + ' дн.') : ''}</small>` : '<span class="dim">срок не указан</span>'}</div>
     <div data-l="Выполнено">${(() => { const p = jobPct(j); return !p ? '<span class="dim">—</span>' : `<b>${p.pct}%</b><span class="wbar"><i style="width:${p.pct}%"></i></span><small class="dim">${p.auto ? `точек ${p.c} из ${p.n}` : '<span class="chip c-mute">вручную</span>'}</small>`; })()}</div>
-    <div class="wrk-st"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span><span class="wl-arr" aria-hidden="true">${ui.wlOpen === j.id ? '▴' : '▾'}</span></div></div>`;
+    <div class="wrk-st">${onWarranty(j) ? `<span class="chip ${wDays(j) <= 30 ? 'c-warn' : 'c-ok'}">На гарантии</span><small class="dim">до ${fmtD(j.warrantyUntil)}${wDays(j) <= 30 ? ` · осталось ${wDays(j)} дн.` : ''}</small>`
+      : inArchive(j) ? `<span class="chip c-mute">Архив</span>${j.warrantyUntil ? `<small class="dim">гарантия до ${fmtD(j.warrantyUntil)}</small>` : warrantyPending(j) ? '<small class="warn-t">гарантия не установлена</small>' : ''}` : `<span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>`}<span class="wl-arr" aria-hidden="true">${ui.wlOpen === j.id ? '▴' : '▾'}</span></div></div>`;
 }
 /* the drop-down under a row: everything important in short, «Показать всё» opens the whole card on the full screen */
 function wlPanel(j){
@@ -2483,6 +2486,12 @@ const myAssigned = () => !me || me.sys || reqMode() ? { jobs: [], tasks: [] } : 
 const canLead = () => canEdit();
 const JOB_ST = { new:'В планах', wait:'Ожидание старта', work:'В работе', done:'Выполнена' };
 const JOB_CHIP = { new:'c-info', wait:'c-mute', work:'c-warn', done:'c-ok' };
+const onWarranty = j => j.status === 'done' && !!j.warrantyUntil && j.warrantyUntil >= today();
+const inArchive = j => j.status === 'done' && !onWarranty(j);
+// done, but nobody decided about the warranty yet (the last point was closed by an employee) — the manager is reminded; only the last 60 days
+const warrantyPending = j => j.status === 'done' && j.warrantyUntil === undefined && !!j.doneAt && Date.now() - Date.parse(j.doneAt) < 60 * 864e5;
+const jobStOk = (j, k) => k === 'all' || (k === 'active' ? j.status !== 'done' : k === 'warranty' ? onWarranty(j) : k === 'archive' ? inArchive(j) : (j.status || 'new') === k);
+const wDays = j => Math.round((Date.parse(j.warrantyUntil) - Date.parse(today())) / 864e5);
 const jobOf = id => S.jobs.find(j => j.id === id);
 const mayEditJob = j => canEdit();
 const onJob = j => me && (j.leaderId === me.id || (j.workers || []).includes(me.id));
@@ -5326,6 +5335,15 @@ function renderDrawer(){
     </div>`;
   }
   if (d.kind === 'staffMark') { const x = STAFF_MARKS.find(m => m.id === d.id); D.innerHTML = dh(x ? 'Изменить отметку' : 'Отметка сотруднику') + markFormHtml(x, d.ctx); return; }
+  if (d.kind === 'warranty') { const j = jobOf(d.id); if (!j) { D.innerHTML = dh('Гарантия') + '<div class="d-body"><p>Работа не найдена</p></div>'; return; }
+    const from = (j.doneAt || '').slice(0, 10) || today(), add = m => { const t = new Date(from + 'T00:00:00'); t.setMonth(t.getMonth() + m); t.setDate(t.getDate() - 1); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; };
+    D.innerHTML = dh('Гарантийный срок') + `<div class="d-body">
+      <p style="margin:0"><b>№ ${jobNo(j)} · ${esc(j.title)}</b><br><span class="dim">Работа выполнена ${fmtD(from)}. Установите, до какого числа действует гарантия: работа будет в списке «На гарантии», а после окончания гарантии уйдёт в «Архив».</span></p>
+      <div class="row-g">${[[6, '6 месяцев'], [12, '1 год'], [24, '2 года'], [36, '3 года'], [60, '5 лет']].map(([m, l]) => `<button type="button" class="btn sm" data-act="warrQuick" data-id="${add(m)}">${l}</button>`).join('')}</div>
+      <div class="form" data-keep><label>Гарантия до (включительно)<input class="in" type="date" id="wr-until" value="${esc(j.warrantyUntil || add(12))}" min="${from}"></label>
+        <label class="wide">Условия гарантии <small class="dim">— необязательно</small><input class="in" id="wr-note" maxlength="500" value="${esc(j.warrantyNote || '')}" placeholder="Например: на смонтированное оборудование и кабельные линии"></label></div>
+      <div class="err" id="ferr"></div>
+      <div class="row-g"><button class="btn primary" data-act="warrSave" data-id="${j.id}">Установить гарантию</button><button class="btn" data-act="warrNone" data-id="${j.id}">Без гарантии — в архив</button></div></div>`; return; }
   if (d.kind === 'vehicle') { const v = VEHICLES.find(x => x.id === d.id); D.innerHTML = dh(v ? esc(vName(v)) : 'Новый транспорт') + vehicleHtml(v || {}); return; }
   if (d.kind === 'staffDay') { const u = STAFF.find(x => x.id === d.id); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + staffDayHtml(d.id, d.ctx); return; }
   if (d.kind === 'staffCard') { const u = STAFF.find(x => x.id === d.id), day = ui.stDay || today(); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + (u ? `<div class="d-body staffd">${staffCardHtml(staffRow(u, day), day)}<div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>` : ''); return; }
@@ -5408,6 +5426,7 @@ function renderDrawer(){
         ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${can('works:labels') ? `<button class="btn sm" data-act="labelsFor" data-id="${ord(j.orderId) ? 'order:' + j.orderId : 'job:' + j.id}">🏷 Этикетки</button> ` : ''}${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
+        ${j.status === 'done' ? `<dt>Гарантия</dt><dd>${j.warrantyUntil ? `до ${fmtD(j.warrantyUntil)} · ${onWarranty(j) ? `<span class="${wDays(j) <= 30 ? 'warn-t' : 'ok-t'}">на гарантии, осталось ${wDays(j)} дн.</span>` : '<span class="dim">закончилась, работа в архиве</span>'}` : '<span class="dim">не установлена — работа в архиве</span>'}${j.warrantyNote ? `<br><small class="dim">${esc(j.warrantyNote)}</small>` : ''}${canEdit() ? ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">${j.warrantyUntil ? 'Изменить' : 'Установить'}</button>` : ''}</dd>` : ''}
       </dl>
       ${j.features ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Ключевые особенности</b><div style="white-space:pre-wrap">${esc(j.features)}</div></div>` : ''}
       ${j.happening ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Что происходит</b><div style="white-space:pre-wrap">${esc(j.happening)}</div></div>` : ''}
@@ -5822,7 +5841,7 @@ async function onSubmit(e){
         features:($('j-feat').value || '').trim(), happening:($('j-happen').value || '').trim(), ...(prog !== undefined ? { progress: prog === '' ? null : Math.round(Number(prog)) } : {}), ...(!old || old.status !== $('j-status').value ? { status: $('j-status').value } : {}),
         photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
-      if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Работа сохранена'); }
+      if (d.id) { const was = old?.status; await upd('jobs', d.id, data); if (data.status === 'done' && was !== 'done') { openDrawer('warranty', d.id); toast('Работа выполнена — установите гарантийный срок'); } else { openDrawer('job', d.id); toast('Работа сохранена'); } }
       else { const id = await add('jobs', data); openDrawer('job', id); const o = ord(jobOf(id)?.orderId); toast((o ? `Работа создана, заказ на производство ${o.number} создан` : 'Работа создана') + (kindV === 'prod' ? '' : ' — добавьте к ней точки на вкладке «Карта объектов»')); }
     }
     if (kind === 'income') {
@@ -6222,7 +6241,8 @@ async function act(el){
     case 'jobStatus': {
       const [jid, st] = id.split('|'), patch = { status:st };
       const rep = $('j-report'); if (rep && ui.drawer?.kind === 'job') patch.report = rep.value.trim();
-      try { await api('PATCH', `/api/jobs/${jid}`, patch); await refresh(); if (ui.drawer?.kind === 'job') renderDrawer(); toast(st === 'done' ? 'Задача выполнена' : st === 'work' ? 'Задача в работе' : 'Сохранено'); }
+      const was = jobOf(jid)?.status;
+      try { await api('PATCH', `/api/jobs/${jid}`, patch); await refresh(); if (st === 'done' && was !== 'done') { openDrawer('warranty', jid); toast('Работа выполнена — установите гарантийный срок'); return; } if (ui.drawer?.kind === 'job') renderDrawer(); toast(st === 'done' ? 'Задача выполнена' : st === 'work' ? 'Задача в работе' : 'Сохранено'); }
       catch(e) { const fe = $('ferr'); if (fe && ui.drawer) fe.textContent = errText(e); else toast(errText(e)); }
       return;
     }
@@ -6485,6 +6505,12 @@ async function act(el){
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
     case 'vNew': return openDrawer('vehicle', null);
+    case 'warrOpen': return openDrawer('warranty', id);
+    case 'warrQuick': { const i = $('wr-until'); if (i) i.value = id; return; }
+    case 'warrSave': case 'warrNone': { const until = a === 'warrNone' ? '' : $('wr-until').value;
+      if (a === 'warrSave' && !until) { $('ferr').textContent = 'Укажите дату окончания гарантии'; return; }
+      try { await upd('jobs', id, { warrantyUntil: until, warrantyNote: a === 'warrNone' ? '' : $('wr-note').value.trim() }); openDrawer('job', id); render();
+        toast(until ? (until >= today() ? `Гарантия до ${fmtD(until)} — работа в списке «На гарантии»` : 'Гарантия уже закончилась — работа в архиве') : 'Работа в архиве'); } catch(e) { $('ferr').textContent = errText(e); } return; }
     case 'ckTab': ui.ckTab = id; ui.ckFiles = []; ui.ckSum = ''; ui.ckOcr = ''; ui.ckDate = ''; ui.ckDateSet = false; return render();
     case 'ckWho': ui.ckWho = id; return render();
     case 'ckOcr': { const f = (ui.ckFiles || [])[0]; if (!f) return; try { const blob = await (await fetch('/files/' + f.id)).blob(); ui.ckItems = null; ui.ckSum = ''; ui.ckSeller = ''; ui.ckLiters = ''; ui.ckDate = ''; ui.ckDateSet = false; await ckRecognize(new File([blob], f.name, { type: blob.type || f.type })); } catch(e) { toast(errText(e)); } return; }
