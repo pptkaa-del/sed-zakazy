@@ -1514,12 +1514,12 @@ function animateView(el){
   clearTimeout(enterTimer); enterTimer = setTimeout(() => el.classList.remove('enter'), 700);
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
-const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище']]]];
+const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
-const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'works:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault' };
+const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault' };
 const viewOk = v => !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
 // the checkbox tree of the organization and user forms: checked — shown; what the organization hides is not offered to its users
 function secTree(hide, orgHide){
@@ -2232,7 +2232,7 @@ function orderDetail(o){
       <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
-    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button>${can('works:labels') ? `<button class="btn sm" data-act="labelsFor" data-id="order:${o.id}">🏷 Этикетки</button>` : ''}<button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
+    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
   </div>
   <div class="seg otabs" role="tablist" aria-label="Разделы заказа">
     <button role="tab" data-act="orderTab" data-id="main" class="${ui.orderTab !== 'products' ? 'on' : ''}" aria-selected="${ui.orderTab !== 'products'}">Заказ</button>
@@ -3750,8 +3750,8 @@ function vLabels(){
   const t = lblDraft(), ed = canEdit();
   const list = `<div class="lbllist">${LABELS.map(x => `<button class="lblcard ${x.id === ui.lblId ? 'on' : ''}" data-act="lblPick" data-id="${x.id}"><b>${esc(x.name)}</b><small>${x.w}×${x.h} мм · след. ${esc(lblSerial(x, x.serial.next))}</small></button>`).join('')}
     ${ed ? '<button class="btn primary" data-act="lblNew" data-id="">+ Этикетка</button>' : ''}</div>`;
-  if (!t) return `<div class="toolbar"><a class="btn" href="#works">← Работы</a><h3 style="margin:0">Этикетки</h3></div>` + list + `<div class="empty"><h3>Этикеток пока нет</h3>${ed ? 'Создайте этикетку: размер, текст, серийный номер и штрихкод — и печатайте по одной кнопкой «Печать следующей».' : 'Этикетки создаёт руководитель или администратор.'}</div>`;
-  return `<div class="toolbar"><a class="btn" href="#works">← Работы</a><h3 style="margin:0">Этикетки</h3><span class="dim">Серийный номер выдаёт сервер — номера не повторяются, даже если печатают с разных компьютеров.</span></div>
+  if (!t) return `<div class="toolbar"><h3 style="margin:0">Печать этикеток</h3></div>` + list + `<div class="empty"><h3>Этикеток пока нет</h3>${ed ? 'Создайте этикетку: размер, текст, серийный номер и штрихкод — и печатайте по одной кнопкой «Печать следующей».' : 'Этикетки создаёт руководитель или администратор.'}</div>`;
+  return `<div class="toolbar"><h3 style="margin:0">Печать этикеток</h3><span class="dim">Серийный номер выдаёт сервер — номера не повторяются, даже если печатают с разных компьютеров.</span></div>
     <div class="lblwrap">${list}
     <div class="lbleditor" data-keep>
       <section class="card lblprevbox"><div class="lblstage" id="lbl-stage"><div id="lbl-prev">${lblPreview()}</div></div>
@@ -4558,9 +4558,9 @@ const refGroupKey = r => r.scope?.type === 'job' ? 'j:' + r.scope.jobId : r.scop
 const refGroupName = r => r.scope?.type === 'job' ? (jobOf(r.scope.jobId) ? `№ ${jobNo(jobOf(r.scope.jobId))} · ${jobOf(r.scope.jobId).title}` : r.scope.name) : r.scope?.type === 'other' ? r.scope.name : 'Общая информация';
 const fileIco = f => { const e = ((f.name || '').split('.').pop() || '').toLowerCase(); return /^image\//.test(f.type || '') ? '🖼' : e === 'pdf' ? '📕' : /^(xlsx?|csv|ods)$/.test(e) ? '📊' : /^(docx?|odt|rtf)$/.test(e) ? '📄' : '📎'; };
 /* ===== «Справочники и инструменты»: справочники, рисовалка, личное хранилище ===== */
-const REF_VIEWS = ['refs', 'draw', 'vault'];
-const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище']];
-const refTabsList = () => REF_TABS.filter(([, k]) => can('refs:' + k));
+const REF_VIEWS = ['refs', 'draw', 'vault', 'labels'];
+const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток']];
+const refTabsList = () => REF_TABS.filter(([, k]) => can('refs:' + k) && (k !== 'labels' || !isWorker()));
 const refTabs = () => `<nav class="seg stabs" aria-label="Справочники и инструменты">${refTabsList().map(([v, , l]) => `<a href="#${v}" class="${ui.view === v ? 'on' : ''}" ${ui.view === v ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
 /* «Личное хранилище»: passwords (what for, login, password, link, note) and notes; only the user himself sees them, the server keeps them encrypted */
 let VAULT = null;
@@ -5984,7 +5984,7 @@ function renderDrawer(){
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
         ${isMount(j) ? `<dt>Минимум в день</dt><dd>${j.minPerDay ? j.minPerDay + ' точ. на сотрудника' : '<span class="dim">не задан</span>'}</dd>` : ''}
-        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${can('works:labels') ? `<button class="btn sm" data-act="labelsFor" data-id="${ord(j.orderId) ? 'order:' + j.orderId : 'job:' + j.id}">🏷 Этикетки</button> ` : ''}${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
+        ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
         ${j.status === 'done' ? `<dt>Гарантия</dt><dd>${j.warrantyUntil ? `до ${fmtD(j.warrantyUntil)} · ${onWarranty(j) ? `<span class="${wDays(j) <= 30 ? 'warn-t' : 'ok-t'}">на гарантии, осталось ${wDays(j)} дн.</span>` : '<span class="dim">закончилась, работа в архиве</span>'}` : '<span class="dim">не установлена — работа в архиве</span>'}${j.warrantyNote ? `<br><small class="dim">${esc(j.warrantyNote)}</small>` : ''}${canEdit() ? ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">${j.warrantyUntil ? 'Изменить' : 'Установить'}</button>` : ''}</dd>` : ''}
@@ -6929,12 +6929,8 @@ async function act(el){
     case 'devCmt': { const t = ($('dc-text')?.value || '').trim(); if (!t) return toast('Напишите комментарий');
       try { await devApi('POST', `/api/devs/${id}/comments`, { text: t }); document.activeElement?.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
     case 'devCmtDel': { const [did, cid] = id.split('|'); try { await devApi('DELETE', `/api/devs/${did}/comments/${cid}`); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
-    case 'labelsFor': { const [ty, rid] = id.split(':'), ex = LABELS.find(x => x.ref?.type === ty && x.ref.id === rid);
-      closeDrawer();
-      if (ex) lblPick(ex.id); else if (canEdit()) { ui.lblId = null; ui.lblDraft = lblNewTpl({ type: ty, id: rid }); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; await lblSave(); }
-      if (location.hash !== '#labels') location.hash = 'labels'; else render(); return; }
     case 'lblPick': lblPick(id); return render();
-    case 'lblNew': ui.lblId = null; ui.lblDraft = lblNewTpl(null); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; if (await lblSave()) toast('Этикетка создана'); $('view').innerHTML = vLabels(); return;
+    case 'lblNew': ui.lblId = null; ui.lblDraft = lblNewTpl(null); ui.lblSel = ui.lblDraft.items[0].id; ui.lblDirty = true; if (await lblSave()) toast('Этикетка создана'); $('view').innerHTML = refTabs() + vLabels(); return;
     case 'lblSel': ui.lblSel = id; lblRedraw(); { const f = document.querySelector('.lblform'); if (f) f.innerHTML = lblForm(lblDraft()); } return;
     case 'lblAdd': { const t = lblDraft(), bottom = Math.max(0, ...t.items.filter(x => x.type !== 'box').map(x => x.y + (x.type === 'text' ? x.size * 0.42 * Math.max(1, String(x.text).split('\n').length) : x.h + (x.type === 'barcode' && x.bold ? x.size * 0.4 : 0)))), y = bottom + 5 <= t.h ? Math.round((bottom + 0.5) * 2) / 2 : 1;
       const x = id === 'date' ? { type: 'text', text: '{date}', size: 8, bold: false, h: 5 } : id === 'qr' ? { type: 'qr', mode: 'fields', els: t.items.filter(qrSrc).map(e => e.id), sep: ';', ec: 'M', text: '', size: 8, h: 18, w: Math.min(18, t.h - 2) } : id === 'scan' ? { type: 'text', text: '{scan}', size: 8, bold: false, h: 5 } : id === 'serial' ? { type: 'text', text: '{serial}', size: 9, bold: true, h: 5 } : id === 'barcode' ? { type: 'barcode', text: '{serial}', size: 7, bold: true, h: Math.min(15, t.h / 3) } : id === 'line' ? { type: 'line', h: 0.3 } : id === 'box' ? { type: 'box', h: t.h - 2, size: 6 } : { type: 'text', text: 'Текст', size: 9, bold: false, h: 5 };
@@ -6944,11 +6940,11 @@ async function act(el){
     case 'lblDel': { const t = lblDraft(); t.items = t.items.filter(x => x.id !== id); if (ui.lblSel === id) ui.lblSel = t.items[0]?.id || null; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); return; }
     case 'lblUp': { const t = lblDraft(), i = t.items.findIndex(x => x.id === id); if (i > 0) { [t.items[i - 1], t.items[i]] = [t.items[i], t.items[i - 1]]; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); } return; }
     case 'lblIns': { const ta = document.querySelector('[data-lb="it.text"]'); if (!ta) return; ta.value += id; lblChange('it.text', ta); ta.focus(); return; }
-    case 'lblSave': if (await lblSave()) { toast('Этикетка сохранена'); $('view').innerHTML = vLabels(); } return;
+    case 'lblSave': if (await lblSave()) { toast('Этикетка сохранена'); $('view').innerHTML = refTabs() + vLabels(); } return;
     case 'lblRemove': try { await api('DELETE', '/api/labels/' + id); LABELS = LABELS.filter(x => x.id !== id); lblPick(null); render(); toast('Этикетка удалена'); } catch(e) { toast(errText(e)); } return;
     case 'lblSetNext': { const n = Math.floor(Number($('lbl-setnext')?.value)); if (!(n >= 0)) return toast('Введите номер');
       if (ui.lblDirty && !(await lblSave())) return;
-      try { const r = await api('PUT', '/api/labels/' + ui.lblId, { ...lblDraft(), serial: { ...lblDraft().serial, setNext: n } }); const i = LABELS.findIndex(x => x.id === ui.lblId); LABELS[i] = r.label; lblPick(ui.lblId); $('view').innerHTML = vLabels(); toast('Следующий номер: ' + lblSerial(r.label, n)); } catch(e) { toast(errText(e)); } return; }
+      try { const r = await api('PUT', '/api/labels/' + ui.lblId, { ...lblDraft(), serial: { ...lblDraft().serial, setNext: n } }); const i = LABELS.findIndex(x => x.id === ui.lblId); LABELS[i] = r.label; lblPick(ui.lblId); $('view').innerHTML = refTabs() + vLabels(); toast('Следующий номер: ' + lblSerial(r.label, n)); } catch(e) { toast(errText(e)); } return; }
     case 'lblNext': case 'lblNextForce': { const cnt = Math.max(1, Math.min(500, Math.floor(Number($('lbl-count')?.value) || 1))); ui.lblCount = cnt;
       const scan = lblScanVal(lblDraft()); if (!lblScanReady(lblDraft(), scan, cnt)) return;
       if (ui.lblDirty && !(await lblSave())) return;
@@ -6956,7 +6952,7 @@ async function act(el){
         printLabels(t, r.nums, scan); lblScanDone(scan, r.serials[0]);
         const L = LABELS.find(x => x.id === ui.lblId), at = new Date().toISOString(); r.serials.forEach(sn => { LABEL_SN[sn] = [ui.lblId, at, me.id]; });
         [L, t].forEach(x => { if (!x) return; x.serial.next = r.next; x.prints = (x.prints || []).concat({ at, by: me.id, from: r.from, count: r.count, skipped: r.skipped.length ? r.skipped : undefined }); });
-        $('view').innerHTML = vLabels(); toast(`Отправлено на печать: ${r.serials[0]}${r.count > 1 ? ' – ' + r.serials[r.serials.length - 1] : ''}${r.skipped.length ? ` (пропущены уже напечатанные: ${r.skipped.slice(0, 5).join(', ')}${r.skipped.length > 5 ? '…' : ''})` : ''}`); refresh().catch(() => {});
+        $('view').innerHTML = refTabs() + vLabels(); toast(`Отправлено на печать: ${r.serials[0]}${r.count > 1 ? ' – ' + r.serials[r.serials.length - 1] : ''}${r.skipped.length ? ` (пропущены уже напечатанные: ${r.skipped.slice(0, 5).join(', ')}${r.skipped.length > 5 ? '…' : ''})` : ''}`); refresh().catch(() => {});
       } catch(e) { if (!lblScanDupShow(e, 'lblNextForce')) toast(errText(e)); } return; }
     case 'lblReprint': { const t = lblDraft(), raw = ($('lbl-re')?.value || '').trim(); if (!raw) return toast('Введите номер для повтора');
       // «125» means the 125th number of this label; anything else is taken as the printed text
@@ -6969,7 +6965,7 @@ async function act(el){
       try { const r = await api('POST', `/api/labels/${ui.lblId}/manual`, { serial: sn, scan, date: ui.lblDate || undefined, force: a === 'lblManualForce' });
         printLabels(t, [sn], scan); lblScanDone(scan, sn); LABEL_SN[sn] = LABEL_SN[sn] || [ui.lblId, new Date().toISOString(), me.id];
         const L = LABELS.find(x => x.id === ui.lblId); [L, t].forEach(x => { if (!x) return; x.manual = [sn, ...(x.manual || []).filter(y => y !== sn)]; x.prints = (x.prints || []).concat({ at: new Date().toISOString(), by: me.id, manual: sn, reprint: r.repeat || undefined }); });
-        ui.lblMan = ''; $('view').innerHTML = vLabels(); toast((r.repeat ? 'Повторная печать ' : 'Отправлено на печать: ') + sn); refresh().catch(() => {});
+        ui.lblMan = ''; $('view').innerHTML = refTabs() + vLabels(); toast((r.repeat ? 'Повторная печать ' : 'Отправлено на печать: ') + sn); refresh().catch(() => {});
       } catch(e) { const el = $('lbl-mancheck');
         if (lblScanDupShow(e, 'lblManualForce')) return;
         if (e.dup && el) { const d = e.dup, tl = LABELS.find(x => x.id === d.l); LABEL_SN[sn] = LABEL_SN[sn] || [d.l, d.at, d.by]; el.innerHTML = `<span class="bad-t">⚠ Номер ${esc(sn)} уже печатался: ${esc(fmtDT(d.at))}${d.by ? ', ' + esc(who(d.by)) : ''}${tl ? ` · этикетка «${esc(tl.name)}»` : ''}.</span> <button type="button" class="btn sm danger" data-act="lblManualForce">Всё равно напечатать повторно</button>`; } else toast(errText(e)); }

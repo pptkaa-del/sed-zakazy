@@ -349,7 +349,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault'] };
+const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -684,7 +684,7 @@ async function api(req, res, url) {
       out.devReadings = Array.isArray(db.devReadings) ? db.devReadings.slice(-10).reverse() : [];
     }
     out.devs = sees(user, 'devs') ? Object.entries(db.devs || {}).map(([id, d]) => ({ id, ...d })).filter(d => devSees(user, d)) : [];
-    out.labels = FIELD(user) || !sees(user, 'works:labels') ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
+    out.labels = FIELD(user) || !sees(user, 'refs:labels') ? [] : Object.entries(db.labels || {}).map(([id, t]) => ({ id, ...t }));
     // printed serial numbers — the page warns about a repeat while the number is typed
     if (!FIELD(user) && out.labels.length) { const S = labelSerials(), SC = labelScans(); out.labelSerials = Object.fromEntries(Object.entries(S).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by]]));
       out.labelScans = Object.fromEntries(Object.entries(SC).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by, v.serial || '']])); }
@@ -719,7 +719,7 @@ async function api(req, res, url) {
     return send(res, 200, out);
   }
   // hidden sections: their data is not given and their actions are refused
-  { const need = { devs: 'devs', labels: 'works:labels', receipts: 'stock:inc', notes: 'notes', 'stock-acct': 'stock:stock' }[p[1]];
+  { const need = { devs: 'devs', labels: 'refs:labels', receipts: 'stock:inc', notes: 'notes', 'stock-acct': 'stock:stock' }[p[1]];
     if (need && !user.sys && !sees(user, need)) return fail(res, 403, 'Этот раздел для вас закрыт'); }
   if (p[1] === 'devs') {
     if (orgType(user) === 'requests') return fail(res, 403, 'Разработки есть только в системе «Все сервисы»');
