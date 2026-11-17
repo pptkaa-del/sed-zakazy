@@ -349,7 +349,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels'] };
+const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -444,6 +444,26 @@ function orgState(o) {
 let secret;
 try { secret = fs.readFileSync(SECRET_FILE); } catch {
   secret = crypto.randomBytes(32); fs.writeFileSync(SECRET_FILE, secret, { mode: 0o600 });
+}
+/* «Сетевая папка»: a file server in another network runs a small agent (public/netshare/) on its own 127.0.0.1 and opens a reverse SSH tunnel
+   «ssh -N -R 127.0.0.1:<port>:127.0.0.1:<agent port> user@<this server>»; the program asks the agent through 127.0.0.1:<port> for the list of files.
+   NETSHARE_HOST — where the tunnels end (127.0.0.1; in Docker — the address of the host), NETSHARE_PORTS — the allowed ports of the tunnels. */
+const NS_HOST = process.env.NETSHARE_HOST || '127.0.0.1';
+const NS_PORTS = (() => { const m = String(process.env.NETSHARE_PORTS || '20000-20999').match(/^(\d+)-(\d+)$/); return m ? [Number(m[1]), Number(m[2])] : [20000, 20999]; })();
+const nsSees = (u, x) => HEAD(u) || !x.restricted || (x.viewers || []).includes(u.id);
+const nsPublic = x => ({ id: x.id, name: x.name, root: x.root, port: x.port, restricted: !!x.restricted, viewers: x.viewers || [], at: x.at, by: x.by });
+// a GET to the agent through the tunnel; the answer must be the JSON of the agent
+function nsAgent(x, pth, q){
+  return new Promise(resolve => {
+    const token = (vaultDec(x.token) || {}).t || '';
+    const rq = http.get({ host: NS_HOST, port: x.port, path: pth + '?' + new URLSearchParams(q).toString(), headers: { 'X-Token': token, Host: 'localhost' }, timeout: 10000 }, r => {
+      const ch = []; let n = 0;
+      r.on('data', c => { n += c.length; if (n > 8e6) { rq.destroy(); return resolve({ ok: false, error: 'Слишком большой ответ агента' }); } ch.push(c); });
+      r.on('end', () => { try { const j = JSON.parse(Buffer.concat(ch).toString('utf8')); resolve(j && typeof j === 'object' ? j : { ok: false, error: 'Неверный ответ агента' }); } catch { resolve({ ok: false, error: 'Ответ не похож на агента «Сетевая папка» — проверьте порт' }); } });
+    });
+    rq.on('timeout', () => { rq.destroy(); resolve({ ok: false, error: 'Агент не ответил за 10 секунд' }); });
+    rq.on('error', e => resolve({ ok: false, offline: true, error: e.code === 'ECONNREFUSED' ? 'Нет подключения: туннель не открыт или агент не запущен' : 'Нет подключения: ' + e.code }));
+  });
 }
 /* «Личное хранилище»: the entries of a user are kept encrypted (AES-256-GCM) with a key derived from secret.key */
 const VAULT_KEY = crypto.createHash('sha256').update(Buffer.concat([secret, Buffer.from('sed-vault-v1')])).digest();
@@ -587,7 +607,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -698,6 +718,8 @@ async function api(req, res, url) {
     out.staffRatings = (Array.isArray(db.staffRatings) ? db.staffRatings : []).filter(x => HEAD(user) || x.user === user.id);
     out.workCal = workCalOf();
     // «Справочники»: a manager sees all; the others — the open ones and those he is chosen for
+    // «Сетевая папка»: the connections the user may browse (without the key of the agent)
+    if (orgType(user) !== 'requests' && sees(user, 'refs:netshare')) out.netshares = (Array.isArray(db.netshares) ? db.netshares : []).filter(x => nsSees(user, x)).map(nsPublic);
     if (orgType(user) !== 'requests' && sees(user, 'refs:list')) out.refs = (Array.isArray(db.refs) ? db.refs : []).filter(r => HEAD(user) || !r.restricted || (r.viewers || []).includes(user.id));
     // «Загрузить чек»: an employee sees his own receipts, a manager and the accountant see everyone's; the vehicles to choose for a refuelling
     if (orgType(user) !== 'requests') {
@@ -973,6 +995,44 @@ async function api(req, res, url) {
   }
   /* «Справочники»: a manager adds files or text, says what it belongs to (a work, a name typed by hand, or general information)
      and who sees it (everyone or chosen employees); the others only read */
+  /* «Сетевая папка»: the administrator and the manager set up the connections; the chosen users browse the tree of folders */
+  if (p[1] === 'netshare') {
+    if (orgType(user) === 'requests' || !sees(user, 'refs:netshare')) return fail(res, 403, 'Этот раздел для вас закрыт');
+    if (!Array.isArray(db.netshares)) db.netshares = [];
+    const N = db.netshares, txt = (v, n) => String(v ?? '').trim().slice(0, n);
+    const clean = (b, old) => {
+      const name = txt(b.name, 200); if (!name) return 'Напишите название подключения';
+      const root = txt(b.root, 500); if (!root) return 'Укажите диск или папку на сервере, например D:\\ или /srv/share';
+      const port = Number(b.port); if (!Number.isInteger(port) || port < NS_PORTS[0] || port > NS_PORTS[1]) return `Порт туннеля — от ${NS_PORTS[0]} до ${NS_PORTS[1]}`;
+      if (N.some(e => e.port === port && e !== old)) return 'Этот порт уже занят другим подключением';
+      const viewers = [...new Set((Array.isArray(b.viewers) ? b.viewers : []).filter(id => orgUsers().some(u => u.id === id && !u.sys)))];
+      return { name, root, port, restricted: !!b.restricted, viewers };
+    };
+    if (m === 'GET' && !p[2]) return send(res, 200, N.filter(x => nsSees(user, x)).map(nsPublic));
+    if (m === 'POST' && !p[2]) {
+      if (!HEAD(user)) return fail(res, 403, 'Подключения настраивает руководитель или администратор');
+      const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
+      const t = crypto.randomBytes(24).toString('base64url'), x = { id: newId(), ...v, token: vaultEnc({ t }), at: new Date().toISOString(), by: user.id };
+      N.push(x); saveDb(); return send(res, 200, { ok: true, share: nsPublic(x), token: t, rev: db.rev });
+    }
+    const x = p[2] && N.find(e => e.id === p[2]);
+    if (!x || !nsSees(user, x)) return fail(res, 404, 'Подключение не найдено — обновите страницу');
+    if (p[3] === 'list' && m === 'GET') {
+      const sub = String(url.searchParams.get('path') || '').slice(0, 2000);
+      if (sub.split(/[\\/]/).includes('..')) return fail(res, 400, 'Недопустимый путь');
+      const r = await nsAgent(x, '/list', { root: x.root, path: sub });
+      if (!r.ok) return fail(res, r.offline ? 502 : 400, r.error || 'Агент вернул ошибку');
+      const entries = (Array.isArray(r.entries) ? r.entries : []).slice(0, 5000).map(e => ({ name: String(e.name || '').slice(0, 500), dir: !!e.dir, size: Number.isFinite(e.size) ? e.size : null, mtime: typeof e.mtime === 'string' ? e.mtime.slice(0, 40) : null }));
+      return send(res, 200, { ok: true, path: sub, total: Number(r.total) || entries.length, entries });
+    }
+    if (p[3] === 'ping' && m === 'GET') { const r = await nsAgent(x, '/ping', {}); return send(res, 200, { ok: !!r.ok && r.agent === 'sed-netshare', host: r.ok ? String(r.host || '').slice(0, 100) : '', platform: r.ok ? String(r.platform || '').slice(0, 20) : '', error: r.ok ? '' : r.error }); }
+    if (!HEAD(user)) return fail(res, 403, 'Подключения настраивает руководитель или администратор');
+    if (p[3] === 'token' && m === 'GET') return send(res, 200, { token: (vaultDec(x.token) || {}).t || '' });
+    if (p[3] === 'token' && m === 'POST') { const t = crypto.randomBytes(24).toString('base64url'); x.token = vaultEnc({ t }); saveDb(); return send(res, 200, { ok: true, token: t, rev: db.rev }); }
+    if (m === 'PUT' && p.length === 3) { const v = clean(await readJsonBody(req), x); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { updatedAt: new Date().toISOString() }); saveDb(); return send(res, 200, { ok: true, share: nsPublic(x), rev: db.rev }); }
+    if (m === 'DELETE' && p.length === 3) { db.netshares = N.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   /* «Личное хранилище»: passwords and notes of the user himself — nobody else (not even the administrator) reads them */
   if (p[1] === 'vault') {
     if (orgType(user) === 'requests' || !sees(user, 'refs:vault')) return fail(res, 403, 'Этот раздел для вас закрыт');
