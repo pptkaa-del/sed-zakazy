@@ -1238,7 +1238,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#dt" data-v="dt">Карта объектов</a>
       <a href="#devs" data-v="devs" id="devsTab">Разработки</a>
       <a href="#transport" data-v="transport" id="trTab" hidden>Транспорт</a>
-      <a href="#notes" data-v="notes" id="notesTab" hidden>Задачи <span class="badge" id="noteBadge" hidden></span></a>
+      <a href="#notes" data-v="notes" id="notesTab" hidden>Мои задачи <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#mytasks" data-v="mytasks" id="mytTab" hidden>Мои задачи <span class="badge" id="mytBadge" hidden></span></a>
       <a href="#checks" data-v="checks" hidden>Загрузить чек</a>
       <a href="#trips" data-v="trips" hidden>Загрузить путевой лист</a>
@@ -1513,7 +1513,7 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы'], ['labels', 'Этикетки']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Задачи', [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники']];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники']];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
@@ -5060,7 +5060,7 @@ function notesTabsBar(tab){
   const T = [...NOTE_TABS.filter(([k]) => open.includes(k)), ...(can('devs') && !reqMode() ? [['devs', 'Разработки']] : [])];
   return `<div class="seg ntabs" role="tablist">${T.map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
 }
-const NOTE_TABS = [['task', 'Заметки'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']];
+const NOTE_TABS = [['task', 'Собственные'], ['shared', 'Общие задачи'], ['draw', 'Рисовалка']];
 const ntype = n => n.type || 'task';
 const isOwnNote = n => ntype(n) === 'task' || ntype(n) === 'memo';
 function vNotes(){
@@ -6468,7 +6468,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Задачи']];
+const startViews = () => [['works', 'Работы'], ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
