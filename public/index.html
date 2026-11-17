@@ -365,6 +365,8 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .trgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}@media (max-width:900px){.trgrid{grid-template-columns:1fr}}
 .tmlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}.tmcard{text-align:left;padding:12px 14px;display:flex;flex-direction:column;gap:6px;cursor:pointer;font:inherit;color:inherit}.tmcard.today{border-color:var(--stamp);box-shadow:0 0 0 2px var(--stamp-soft)}.tmroute{font-weight:600}
 .vrowl{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.eqt td small,.eqh td small{display:block;font-size:12px;color:var(--ink-2);margin-top:2px}.eqtop{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}.eqqr{width:132px;height:132px;flex:none;background:#fff;padding:4px;border:1px solid var(--rule);border-radius:8px}
+.eqvideo{width:100%;max-height:60vh;background:#000;border-radius:8px}.box.eqline{display:flex;flex-direction:row;gap:8px;align-items:center;justify-content:flex-start;flex-wrap:wrap;text-align:left}
 .smtypes{flex-wrap:wrap}.mywork{padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}.rswitch{white-space:nowrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
@@ -1117,6 +1119,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#tmine" data-v="tmine" hidden>Мои рейсы</a>
       <a href="#req" data-v="req" id="reqTab" hidden>Заявки <span class="badge" id="reqBadge" hidden></span></a>
       <a href="#reqall" data-v="reqall" hidden>Все заявки</a>
+      <a href="#reqeq" data-v="reqeq" hidden>Оборудование</a>
       <a href="#reqdev" data-v="reqdev" hidden>Устройства</a>
       <a href="#reqdocs" data-v="reqdocs" hidden>Инструкции</a>
       <a href="#wwork" data-v="wwork" id="wworkTab" hidden>В работе <span class="badge" id="wBadge" hidden></span></a>
@@ -1361,7 +1364,7 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || transMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -1488,7 +1491,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -3865,7 +3868,7 @@ function vReq(){
     <span data-keep style="display:contents"><input class="in" id="reqq" type="search" aria-label="Поиск заявки" placeholder="Номер, текст, автор, исполнитель" value="${esc(ui.reqQ || '')}" style="flex:1 1 200px;max-width:320px"></span></div>`;
   if (!L.length) return head + `<div class="empty"><h3>${REQS.length ? 'Нет заявок по выбранному фильтру' : 'Заявок пока нет'}</h3>${f === 'todo' ? 'Здесь появятся заявки, которые поручены вам.' : 'Создайте заявку: выберите систему, опишите проблему и приложите фото.'}</div>`;
   return head + `<section class="card" style="padding:0;overflow:hidden">${L.map(r => `<div class="reqrow click ${reqOpen(r) ? '' : 'closed'}" data-act="reqOpen" data-id="${r.id}" role="button" tabindex="0">
-      <div><b>${r.system ? `<span class="rqsys" title="${esc(UPR_SYS[r.system])}">${uprIco(r.system)}</span>` : ''}№ ${r.no} · ${esc(r.title)}</b>${r.urgent && reqOpen(r) ? ' <span class="chip c-bad">Срочно</span>' : ''}<small>${esc(who(r.by))} → ${reqWho(r.assignee)} · ${esc(fmtDT(r.at))}${(r.comments || []).length ? ` · 💬 ${r.comments.length}` : ''}</small></div>
+      <div><b>${r.system ? `<span class="rqsys" title="${esc(UPR_SYS[r.system])}">${uprIco(r.system)}</span>` : ''}№ ${r.no} · ${esc(r.title)}</b>${r.urgent && reqOpen(r) ? ' <span class="chip c-bad">Срочно</span>' : ''}<small>${r.eqId && eqOf(r.eqId) ? '🔧 ' + esc(eqName(eqOf(r.eqId))) + ' · ' : ''}${esc(who(r.by))} → ${reqWho(r.assignee)} · ${esc(fmtDT(r.at))}${(r.comments || []).length ? ` · 💬 ${r.comments.length}` : ''}</small></div>
       <div>${r.due ? `<small class="${reqLate(r) ? 'bad-t' : 'dim'}">срок ${fmtD(r.due)}${reqLate(r) ? ' · просрочена' : ''}</small>` : ''}</div>
       <div><span class="chip ${REQ_CHIP[r.status]}">${REQ_ST[r.status]}</span></div></div>`).join('')}</section>`;
 }
@@ -3890,13 +3893,18 @@ const fileChips = (key, act) => (ui[key] || []).map((x, i) => isImgF(x) ? `<span
   : `<span class="chip c-mute">📎 ${esc(x.name)} <button type="button" class="linkish" data-act="${act}" data-id="${i}" aria-label="Убрать файл">✕</button></span>`).join('');
 const reqUserOpts = sel => `<option value="">— не назначен —</option>` + REQ_USERS.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<option value="${u.id}" ${u.id === sel ? 'selected' : ''}>${esc(u.name)}${u.id === me.id ? ' (я)' : ''} · ${esc(ROLE_NAMES_REQ[u.role] || '')}</option>`).join('');
 // the fields of the form survive a redraw (adding or removing a file)
-const reqKeep = () => ({ s: document.querySelector('input[name=rq-sys]:checked')?.value, x: $('rq-text')?.value, d: $('rq-due')?.value, u: $('rq-urg')?.checked, a: $('rq-to')?.value });
-const reqRestore = k => { if (!$('rq-text')) return; if (k.s) { const r = document.querySelector(`input[name=rq-sys][value="${k.s}"]`); if (r) r.checked = true; } $('rq-text').value = k.x || ''; $('rq-due').value = k.d || ''; $('rq-urg').checked = !!k.u; if ($('rq-to')) $('rq-to').value = k.a || ''; $('rq-count').textContent = ($('rq-text').value || '').length; };
+const reqKeep = () => ({ s: document.querySelector('input[name=rq-sys]:checked')?.value, t: $('rq-title')?.value, x: $('rq-text')?.value, d: $('rq-due')?.value, u: $('rq-urg')?.checked, a: $('rq-to')?.value });
+const reqRestore = k => { if (!$('rq-text')) return; if (k.s) { const r = document.querySelector(`input[name=rq-sys][value="${k.s}"]`); if (r) r.checked = true; } if ($('rq-title') && k.t !== undefined) $('rq-title').value = k.t || ''; if (k.x !== undefined) $('rq-text').value = k.x || ''; if (k.d !== undefined) $('rq-due').value = k.d || ''; $('rq-urg').checked = !!k.u; if ($('rq-to') && k.a !== undefined) $('rq-to').value = k.a || ''; $('rq-count').textContent = ($('rq-text').value || '').length; };
 function reqFormHtml(r){
-  const sys = r ? r.system || '' : '', text = r ? (r.text || r.title || '') : '';
+  const eqId = r ? (ui.reqEq !== undefined ? ui.reqEq : r.eqId || '') : ui.reqEq || '', eq = eqOf(eqId);
+  const sys = r ? r.system || '' : ui.reqSys || (eq && eq.system) || '', text = r ? (r.text && r.text !== r.title ? r.text : '') : '', title = r ? r.title || '' : '';
+  const L = REQ_EQ.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   return `<form class="d-body" data-form="reqForm" novalidate><div class="form">
-    <div class="wide"><span class="flab">Система <em class="req-star">*</em></span><div class="sysgrid" role="radiogroup" aria-label="Система">${Object.entries(UPR_SYS).map(([k, l]) => `<label class="sysopt"><input type="radio" name="rq-sys" value="${k}" ${sys === k ? 'checked' : ''}><span>${uprIco(k)}${esc(l)}</span></label>`).join('')}</div></div>
-    <label class="wide"><span>Описание проблемы <em class="req-star">*</em></span><textarea class="in" id="rq-text" rows="4" maxlength="2000" placeholder="Что случилось, где (адрес, кабинет, номер устройства)">${esc(text)}</textarea><small class="dim" style="text-align:right"><span id="rq-count">${text.length}</span> / 2000</small></label>
+    <div class="wide"><span class="flab">Оборудование</span><div class="row-g">${L.length ? `<select class="in" id="rq-eq" style="flex:1 1 260px"><option value="">— не выбрано —</option>${L.map(e => `<option value="${e.id}" ${eqId === e.id ? 'selected' : ''}>${esc(eqName(e))}${e.place ? ' · ' + esc(e.place) : ''}</option>`).join('')}</select>` : '<span class="dim" style="flex:1">Список оборудования пуст</span>'}
+      <button type="button" class="btn" data-act="eqScan">📷 Сканировать QR</button></div>${eq ? `<small class="dim">${esc(eq.place || '')}${eq.system ? ' · ' + esc(UPR_SYS[eq.system]) : ''}${(eq.hist || []).length ? ` · проблем раньше: ${eq.hist.length}` : ''}</small>` : ''}</div>
+    <label class="wide"><span>Что случилось <em class="req-star">*</em></span><input class="in" id="rq-title" maxlength="200" value="${esc(title)}" placeholder="Кратко: не открывается турникет, нет изображения с камеры…"></label>
+    <div class="wide"><span class="flab">Система</span><div class="sysgrid" role="radiogroup" aria-label="Система">${Object.entries(UPR_SYS).map(([k, l]) => `<label class="sysopt"><input type="radio" name="rq-sys" value="${k}" ${sys === k ? 'checked' : ''}><span>${uprIco(k)}${esc(l)}</span></label>`).join('')}</div></div>
+    <label class="wide"><span>Описание проблемы</span><textarea class="in" id="rq-text" rows="4" maxlength="2000" placeholder="Что случилось, где (адрес, кабинет, номер устройства)">${esc(text)}</textarea><small class="dim" style="text-align:right"><span id="rq-count">${text.length}</span> / 2000</small></label>
     ${r ? '' : `<label>Исполнитель<select class="in" id="rq-to">${reqUserOpts('')}</select></label>`}
     <label>Срок<input class="in" type="date" id="rq-due" value="${esc(r?.due || '')}"></label>
     <label class="wide" style="flex-direction:row;display:flex;gap:8px;align-items:center"><input type="checkbox" id="rq-urg" ${r?.urgent ? 'checked' : ''}> Срочная</label>
@@ -3929,7 +3937,8 @@ function reqViewHtml(r){
       <dt>Исполнитель</dt><dd>${canAssign ? `<select class="in" id="rq-assign" aria-label="Исполнитель" style="max-width:320px">${reqUserOpts(r.assignee || '')}</select>` : reqWho(r.assignee)}</dd>
       <dt>Закрыта</dt><dd>${r.doneAt && ['done', 'reject'].includes(r.status) ? `${esc(fmtDT(r.doneAt))} · ${esc(who(r.doneBy))}` : r.status === 'cancel' ? 'отменена ' + esc(fmtDT(r.cancelAt)) : '—'}</dd>
       ${r.due ? `<dt>Срок</dt><dd>${fmtD(r.due)}</dd>` : ''}</dl>
-    <section class="box"><h4>Описание от заявителя</h4><div style="white-space:pre-wrap">${esc(r.text || r.title)}</div>${reqPhotos(r.files)}
+    ${r.eqId || r.eqName ? `<div class="box eqline">🔧 <b>${esc(eqOf(r.eqId) ? eqName(eqOf(r.eqId)) : r.eqName || 'оборудование удалено')}</b>${eqOf(r.eqId)?.place ? ` <span class="dim">· ${esc(eqOf(r.eqId).place)}</span>` : ''}${eqOf(r.eqId) ? ` <button class="btn sm" data-act="eqOpen" data-id="${r.eqId}">История проблем</button>` : ''}</div>` : ''}
+    <section class="box"><h4>Описание от заявителя</h4><div><b>${esc(r.title)}</b></div>${r.text && r.text !== r.title ? `<div style="white-space:pre-wrap">${esc(r.text)}</div>` : ''}${reqPhotos(r.files)}
       ${canPh ? `<label class="btn sm" style="align-self:flex-start">📷 Добавить фото к заявке<input type="file" accept="image/*" data-up="reqAddPh" data-id="${r.id}" multiple hidden></label>` : ''}</section>
     ${['done', 'reject'].includes(r.status) ? `<section class="box rqres ${r.status}"><h4>${r.status === 'done' ? 'Ответ исполнителя' : 'Причина отклонения'}</h4><div style="white-space:pre-wrap">${r.doneNote ? esc(r.doneNote) : '<span class="dim">Комментарий не указан</span>'}</div>
       ${(r.repl || []).length ? `<h4 style="margin-top:6px">Замена оборудования</h4><div class="repl-list">${r.repl.map(x => `<div class="repl-item"><b>${esc(x.equipment)}</b>${x.equipment !== x.category ? ` <small class="dim">${esc(x.category)}</small>` : ''}<span>Новое: <code>${esc(x.newSerial)}</code> · Старое: <code>${esc(x.oldSerial)}</code></span></div>`).join('')}</div>` : ''}
@@ -4799,6 +4808,86 @@ function vTmine(){
 // the menu of a transport organization: a driver — his trips, waybills, receipts; the accountant — orders, «Учётка», reports; managers — all
 const transNav = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : me.role === 'accountant' ? ['tor', 'stock', 'trep', 'notes', 'refs'] : ['tor', 'disp', 'transport', 'stock', 'trep', 'notes', 'refs', ...(me.role === 'admin' ? ['users'] : [])];
 const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
+/* ===== «Оборудование» системы заявок: справочник с QR-кодами и историей проблем ===== */
+let REQ_EQ = [];
+const eqOf = id => REQ_EQ.find(e => e.id === id);
+const eqName = e => e ? e.name + (e.invNo ? ' · инв. ' + e.invNo : '') : '';
+const eqUrl = e => `${location.origin}/#eq-${e.id}`;
+const eqOwners = e => (e.owners || []).length ? e.owners.map(id => esc(who(id))).join(', ') : '<span class="dim">общее</span>';
+function vReqEq(){
+  const q = (ui.eqq || '').trim().toLowerCase(), adm = isHead();
+  const L = REQ_EQ.filter(e => !q || [e.name, e.invNo, e.place, UPR_SYS[e.system], (e.owners || []).map(who).join(' ')].join(' ').toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'ru') || String(a.invNo).localeCompare(String(b.invNo), 'ru'));
+  const bar = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="eqq" type="search" placeholder="Название, инв. №, место, за кем" aria-label="Поиск оборудования" value="${esc(ui.eqq || '')}" style="flex:1 1 220px;max-width:340px"></span>
+    ${adm ? `<button class="btn primary" data-act="eqNew">+ Оборудование</button>${REQ_EQ.length ? `<button class="btn" data-act="eqPrintAll">🖨 QR-наклейки (${L.length})</button>` : ''}` : ''}</div>`;
+  if (!REQ_EQ.length) return bar + `<div class="empty"><h3>Оборудования пока нет</h3>${adm ? 'Внесите оборудование: название, инвентарный номер, место. Распечатайте QR-наклейки — по ним сразу создаётся заявка на это оборудование.' : 'Список оборудования ведёт администратор.'}</div>`;
+  if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
+  return bar + `<section class="card" style="padding:0;overflow:hidden"><div class="tblwrap"><table class="jt eqt"><thead><tr><th>Оборудование</th><th>Инв. №</th><th>Место</th><th>Система</th><th>Закреплено</th><th>Заявки</th></tr></thead><tbody>
+    ${L.map(e => { const open = (e.hist || []).filter(h => ['new', 'work'].includes(h.status)).length; return `<tr class="click" data-act="eqOpen" data-id="${e.id}" tabindex="0"><td data-l="Оборудование"><b>${esc(e.name)}</b>${e.note ? `<small>${esc(e.note)}</small>` : ''}</td><td data-l="Инв. №" class="mono">${esc(e.invNo || '—')}</td>
+      <td data-l="Место">${esc(e.place || '—')}</td><td data-l="Система">${e.system ? esc(UPR_SYS[e.system]) : '—'}</td><td data-l="Закреплено">${eqOwners(e)}</td>
+      <td data-l="Заявки">${(e.hist || []).length ? `${e.hist.length}${open ? ` <span class="chip c-warn">открыто ${open}</span>` : ''}` : '<span class="dim">не было</span>'}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+}
+function eqCardHtml(e){
+  const H = e.hist || [], adm = isHead();
+  return `<div class="d-body">
+    <div class="eqtop"><div class="eqqr" title="${esc(eqUrl(e))}">${qrSvg(eqUrl(e), 'M')}</div>
+      <dl class="kv" style="margin:0"><dt>Название</dt><dd><b>${esc(e.name)}</b></dd><dt>Инв. №</dt><dd class="mono">${esc(e.invNo || '—')}</dd><dt>Место</dt><dd>${esc(e.place || '—')}</dd>
+        <dt>Система</dt><dd>${e.system ? esc(UPR_SYS[e.system]) : '—'}</dd><dt>Закреплено</dt><dd>${eqOwners(e)}</dd>${e.note ? `<dt>Примечание</dt><dd>${esc(e.note)}</dd>` : ''}</dl></div>
+    <div class="row-g"><button class="btn primary" data-act="eqReq" data-id="${e.id}">+ Заявка на это оборудование</button><button class="btn" data-act="eqPrint" data-id="${e.id}">🖨 Печать QR</button>${adm ? `<button class="btn" data-act="eqEdit" data-id="${e.id}">Изменить</button>${armBtn('eqd:' + e.id, 'Удалить', 'eqDel', e.id, 'btn danger')}` : ''}</div>
+    <h4 class="sub-h">Какие были проблемы и что сделано <span class="dim">${H.length}</span></h4>
+    ${H.length ? `<div class="tblwrap"><table class="jt eqh"><thead><tr><th>№</th><th>Дата</th><th>Что случилось</th><th>Статус</th><th>Что сделано</th><th>Исполнитель</th></tr></thead><tbody>
+      ${H.map(h => `<tr class="${REQS.some(r => r.no === h.no) ? 'click' : ''}" ${REQS.find(r => r.no === h.no) ? `data-act="reqOpen" data-id="${REQS.find(r => r.no === h.no).id}"` : ''}><td data-l="№"><b>${h.no}</b></td><td data-l="Дата">${esc(fmtDT(h.at))}<small class="dim">${esc(who(h.by))}</small></td>
+        <td data-l="Что случилось"><b>${esc(h.title)}</b>${h.text && h.text !== h.title ? `<small>${esc(h.text)}</small>` : ''}</td><td data-l="Статус"><span class="chip ${REQ_CHIP[h.status]}">${REQ_ST[h.status]}</span></td>
+        <td data-l="Что сделано">${h.doneNote ? esc(h.doneNote) : '<span class="dim">—</span>'}${(h.repl || []).map(x => `<small>замена: ${esc(x.equipment)} · новый ${esc(x.newSerial)}, старый ${esc(x.oldSerial)}</small>`).join('')}${h.doneAt ? `<small class="dim">${esc(fmtDT(h.doneAt))}</small>` : ''}</td>
+        <td data-l="Исполнитель">${h.doneBy ? esc(who(h.doneBy)) : h.assignee ? esc(who(h.assignee)) : '<span class="dim">—</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="dim" style="margin:0">Проблем с этим оборудованием не было.</p>'}
+    <div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+function eqFormHtml(e){
+  const d = ui.eqDraft, staff = REQ_USERS.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  return `<div class="d-body"><div class="form" data-keep>
+    <label class="wide"><span>Название <em class="req-star">*</em></span><input class="in" id="ef-name" maxlength="200" value="${esc(d.name || '')}" placeholder="Например: Турникет PERCo ST-01, проходная 1"></label>
+    <label>Инвентарный номер<input class="in mono" id="ef-inv" maxlength="60" value="${esc(d.invNo || '')}"></label>
+    <label>Место<input class="in" id="ef-place" maxlength="200" value="${esc(d.place || '')}" placeholder="Корпус, этаж, кабинет"></label>
+    <label class="wide">Система<select class="in" id="ef-sys"><option value="">— не указана —</option>${Object.entries(UPR_SYS).map(([k, l]) => `<option value="${k}" ${d.system === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+    <label class="wide chk"><input type="checkbox" id="ef-common" ${d.common ? 'checked' : ''}> Общее оборудование — видят все</label>
+    ${d.common ? '' : `<div class="wide"><span class="flab">За кем закреплено</span><div class="tstaff">${staff.map(u => `<label class="chk"><input type="checkbox" name="ef-own" value="${u.id}" ${(d.owners || []).includes(u.id) ? 'checked' : ''}> ${esc(u.name)}</label>`).join('')}</div><small class="dim">Закреплённое оборудование видят и выбирают в заявке только эти пользователи (и руководители).</small></div>`}
+    <label class="wide">Примечание<input class="in" id="ef-note" maxlength="1000" value="${esc(d.note || '')}"></label></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="eqSave" data-id="${e ? e.id : ''}">${e ? 'Сохранить' : 'Добавить'}</button><button class="btn" data-act="close">Отмена</button></div></div>`;
+}
+const eqKeep = () => { const d = ui.eqDraft; if (!d || !$('ef-name')) return; Object.assign(d, { name: $('ef-name').value, invNo: $('ef-inv').value, place: $('ef-place').value, system: $('ef-sys').value, note: $('ef-note').value, common: $('ef-common').checked });
+  if (!d.common) d.owners = [...document.querySelectorAll('input[name=ef-own]:checked')].map(x => x.value); };
+// QR stickers: QR, name, inventory number — a sheet of A4 in the print window
+function eqPrint(list){
+  const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'; document.body.appendChild(fr);
+  const d = fr.contentDocument;
+  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>QR-наклейки</title><style>@page{size:A4;margin:10mm}body{margin:0;font-family:Arial,sans-serif}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:6mm}.s{border:1px dashed #999;border-radius:3mm;padding:4mm;text-align:center;break-inside:avoid}.q{width:40mm;height:40mm;margin:0 auto}.n{font-size:10pt;font-weight:bold;margin-top:2mm}.i{font-size:9pt;font-family:monospace}.h{font-size:7pt;color:#555;margin-top:1mm}</style></head><body><div class="g">${list.map(e => `<div class="s"><div class="q">${qrSvg(eqUrl(e), 'M')}</div><div class="n">${esc(e.name)}</div>${e.invNo ? `<div class="i">инв. ${esc(e.invNo)}</div>` : ''}<div class="h">Наведите камеру телефона — откроется заявка</div></div>`).join('')}</div></body></html>`); d.close();
+  setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch(e) { toast('Не удалось открыть печать'); } setTimeout(() => fr.remove(), 60000); }, 300);
+}
+/* scanning a QR in the program: the camera (BarcodeDetector or jsQR) or a photo of the sticker */
+let eqStream = null;
+const eqIdFromQR = s => { const m = /#eq-([\w-]+)/.exec(String(s || '')) || /^([\w-]{6,40})$/.exec(String(s || '').trim()); return m && eqOf(m[1]) ? m[1] : null; };
+function eqScanStop(){ if (eqStream) { eqStream.getTracks().forEach(t => t.stop()); eqStream = null; } }
+async function eqScanStart(){
+  const v = $('eq-video'), st = $('eq-scanst'); if (!v) return;
+  try { eqStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); } catch(e) { if (st) st.textContent = 'Камера недоступна — выберите фото QR-кода ниже.'; return; }
+  v.srcObject = eqStream; await v.play().catch(() => {});
+  const det = 'BarcodeDetector' in window ? new BarcodeDetector({ formats: ['qr_code'] }) : null, jsQR = det ? null : await loadJsQR().catch(() => null);
+  const c = document.createElement('canvas'), g = c.getContext('2d', { willReadFrequently: true });
+  const tick = async () => {
+    if (!eqStream || !$('eq-video')) return eqScanStop();
+    let raw = null;
+    try {
+      if (det) { const r = await det.detect(v); raw = r[0]?.rawValue; }
+      else if (jsQR && v.videoWidth) { c.width = v.videoWidth; c.height = v.videoHeight; g.drawImage(v, 0, 0); const r = jsQR(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height); raw = r?.data; }
+    } catch(e) {}
+    const id = raw && eqIdFromQR(raw);
+    if (id) return eqPicked(id);
+    if (raw && st) st.textContent = 'Этот QR-код не относится к оборудованию организации.';
+    setTimeout(tick, 250);
+  };
+  tick();
+}
+function eqPicked(id){ eqScanStop(); ui.reqEq = id; const e = eqOf(id); if (e?.system && !ui.reqSys) ui.reqSys = e.system; openDrawer('reqForm'); setTimeout(() => reqRestore(ui.reqKeepState || {}), 0); toast('Оборудование: ' + eqName(e)); }
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
 function staffRow(u, day){
@@ -5268,7 +5357,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incEdo = false; ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
@@ -5276,7 +5365,8 @@ function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() &
   // «Выполнить»: start at the top, at the first photo — focusing the first field would scroll down to «Не работает» and «Закрыть точку»
   if (kind === 'wdo') { $('drawer').scrollTop = 0; $('drawer').querySelector('.d-body')?.scrollTo?.(0, 0); const first = $('drawer').querySelector('.slots li:not(.ok) label, .slots label, .upl2 label'); if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); } return; }
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
-function closeDrawer(){ if (mini) { try { mini.remove(); } catch(e){} mini = null; } ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
+function closeDrawer(){
+  eqScanStop(); if (mini) { try { mini.remove(); } catch(e){} mini = null; } ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const renderDrawerBase = renderDrawer;
 renderDrawer = function(){ renderDrawerBase(); supMarkAll(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
@@ -5693,6 +5783,10 @@ function renderDrawer(){
     </div>`;
   }
   if (d.kind === 'staffMark') { const x = STAFF_MARKS.find(m => m.id === d.id); D.innerHTML = dh(x ? 'Изменить отметку' : 'Отметка сотруднику') + markFormHtml(x, d.ctx); return; }
+  if (d.kind === 'eqCard') { const e = eqOf(d.id); D.innerHTML = dh(e ? '🔧 ' + esc(e.name) : 'Оборудование') + (e ? eqCardHtml(e) : '<div class="d-body"><p>Оборудование не найдено</p></div>'); return; }
+  if (d.kind === 'eqForm') { const e = eqOf(d.id); D.innerHTML = dh(e ? 'Изменить оборудование' : 'Новое оборудование') + eqFormHtml(e); return; }
+  if (d.kind === 'eqScan') { D.innerHTML = dh('Сканировать QR оборудования') + `<div class="d-body"><video id="eq-video" class="eqvideo" playsinline muted></video><small id="eq-scanst" class="dim">Наведите камеру на QR-наклейку оборудования.</small>
+      <label class="btn">🖼 Выбрать фото QR-кода<input type="file" accept="image/*" data-up="eqQrPhoto" hidden></label><div class="row-g"><button class="btn" data-act="eqScanBack">Назад к заявке</button></div></div>`; setTimeout(eqScanStart, 50); return; }
   if (d.kind === 'torForm') { const x = TORDERS.find(o => o.id === d.id); D.innerHTML = dh(x ? `Заказ № ${x.no}` : 'Новый заказ') + torFormHtml(x); return; }
   if (d.kind === 'tor') { const x = TORDERS.find(o => o.id === d.id); D.innerHTML = dh(x ? `Заказ № ${x.no} · ${esc(x.clientName)}` : 'Заказ') + (x ? torViewHtml(x) : '<div class="d-body"><p>Заказ не найден</p></div>'); return; }
   if (d.kind === 'refForm') { const r = REFS.find(x => x.id === d.id); D.innerHTML = dh(r ? 'Изменить справочник' : 'Новый справочник') + refFormHtml(r); return; }
@@ -6178,13 +6272,12 @@ async function onSubmit(e){
       else { const r = await devApi('POST', '/api/devs', body); ui.devEditing = null; openDrawer('dev', r.dev.id); render(); toast(`Разработка № ${r.dev.no} создана — добавьте документы и ссылки`); }
     }
     if (kind === 'reqForm') {
-      const system = document.querySelector('input[name=rq-sys]:checked')?.value || '', text = $('rq-text').value.trim();
-      if (!system) { $('ferr').textContent = 'Выберите систему'; return; }
-      if (text.length < 3) { $('ferr').textContent = 'Опишите проблему'; $('rq-text').focus(); return; }
-      const body = { system, title: text.split('\n')[0].slice(0, 200), text, due: val('rq-due'), urgent: $('rq-urg').checked, files: ui.reqFiles || [] };
+      const system = document.querySelector('input[name=rq-sys]:checked')?.value || '', text = $('rq-text').value.trim(), title = ($('rq-title')?.value || '').trim();
+      if (title.length < 3) { $('ferr').textContent = 'Напишите, что случилось'; $('rq-title').focus(); return; }
+      const body = { system, title: title.slice(0, 200), text, eqId: $('rq-eq')?.value || null, due: val('rq-due'), urgent: $('rq-urg').checked, files: ui.reqFiles || [] };
       if (!body.title) return fail('Напишите, что нужно сделать.');
       if (d.kind === 'req') { await reqApi('PATCH', '/api/requests/' + d.id, { action: 'edit', ...body }); ui.reqEdit = null; renderDrawer(); render(); toast('Заявка изменена'); }
-      else { const r = await reqApi('POST', '/api/requests', { ...body, assignee: val('rq-to') || null }); ui.reqFiles = []; openDrawer('req', r.request.id); render(); toast(`Заявка № ${r.request.no} создана`); }
+      else { const r = await reqApi('POST', '/api/requests', { ...body, assignee: val('rq-to') || null }); ui.reqFiles = []; ui.reqEq = ''; ui.reqSys = ''; ui.reqKeepState = null; openDrawer('req', r.request.id); render(); toast(`Заявка № ${r.request.no} создана`); }
     }
     if (kind === 'org') {
       const body = { name:val('o-name'), until:val('o-until'), note:val('o-note'), type: f.querySelector('[name=o-type]:checked')?.value || 'all', hide: secHide($('o-secs')) };
@@ -6692,7 +6785,7 @@ async function act(el){
     case 'openInvoice': return openDrawer('invoice', id);
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
-    case 'reqNew': ui.reqFiles = []; return openDrawer('reqForm');
+    case 'reqNew': ui.reqFiles = []; ui.reqEq = ''; ui.reqSys = ''; ui.reqKeepState = null; return openDrawer('reqForm');
     case 'jlAdd': { const [jid, k] = id.split('|'); return jlAdd(jid, k); }
     case 'jlDel': { const [jid, k, iid] = id.split('|'); try { await jlApi(jid, k, 'DELETE', iid); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
     case 'jlLinkOpen': ui.jlLink = id || null; renderDrawer(); $('jl-url')?.focus(); return;
@@ -6767,7 +6860,7 @@ async function act(el){
         if (e.dup && el) { const d = e.dup, tl = LABELS.find(x => x.id === d.l); LABEL_SN[sn] = LABEL_SN[sn] || [d.l, d.at, d.by]; el.innerHTML = `<span class="bad-t">⚠ Номер ${esc(sn)} уже печатался: ${esc(fmtDT(d.at))}${d.by ? ', ' + esc(who(d.by)) : ''}${tl ? ` · этикетка «${esc(tl.name)}»` : ''}.</span> <button type="button" class="btn sm danger" data-act="lblManualForce">Всё равно напечатать повторно</button>`; } else toast(errText(e)); }
       return; }
     case 'reqOpen': ui.reqEdit = null; if (ui.drawer?.kind !== 'req' || ui.drawer?.id !== id) reqCloseReset(); return openDrawer('req', id);
-    case 'reqEdit': { const r = REQS.find(x => x.id === id); ui.reqFiles = (r?.files || []).map(x => ({ ...x })); ui.reqEdit = id; return renderDrawer(); }
+    case 'reqEdit': { const r = REQS.find(x => x.id === id); ui.reqFiles = (r?.files || []).map(x => ({ ...x })); ui.reqEq = r?.eqId || ''; ui.reqEdit = id; return renderDrawer(); }
     case 'reqF': ui.reqF = id; return render();
     case 'otSave': { const body = { date: $('ot-date').value, from: $('ot-from').value, to: $('ot-to').value, note: $('ot-note').value.trim() };
       if (!body.date) return toast('Укажите дату'); if (!body.from) return toast('Укажите время начала'); if (!body.to) return toast('Укажите время окончания'); if (body.from === body.to) return toast('Время начала и окончания совпадают');
@@ -6873,6 +6966,18 @@ async function act(el){
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
     case 'vNew': return openDrawer('vehicle', null);
+    case 'eqOpen': return openDrawer('eqCard', id);
+    case 'eqNew': ui.eqDraft = { common: true, owners: [] }; return openDrawer('eqForm', null);
+    case 'eqEdit': { const e = eqOf(id); ui.eqDraft = { ...e, common: !(e.owners || []).length, owners: [...(e.owners || [])] }; return openDrawer('eqForm', id); }
+    case 'eqSave': { eqKeep(); const d = ui.eqDraft, body = { name: d.name, invNo: d.invNo, place: d.place, system: d.system, note: d.note, owners: d.common ? [] : d.owners };
+      if (!d.common && !(d.owners || []).length) { $('ferr').textContent = 'Отметьте, за кем закреплено оборудование, или поставьте «Общее»'; return; }
+      try { const r = await api(id ? 'PUT' : 'POST', '/api/req-equip' + (id ? '/' + id : ''), body); await refresh(); openDrawer('eqCard', r.eq.id); render(); toast(id ? 'Сохранено' : 'Оборудование добавлено'); } catch(e) { $('ferr').textContent = errText(e); } return; }
+    case 'eqDel': try { await api('DELETE', '/api/req-equip/' + id); REQ_EQ = REQ_EQ.filter(e => e.id !== id); closeDrawer(); render(); toast('Оборудование удалено'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return;
+    case 'eqPrint': return eqPrint([eqOf(id)]);
+    case 'eqPrintAll': { const q = (ui.eqq || '').trim().toLowerCase(); return eqPrint(REQ_EQ.filter(e => !q || [e.name, e.invNo, e.place].join(' ').toLowerCase().includes(q))); }
+    case 'eqReq': ui.reqFiles = []; ui.reqEq = id; ui.reqSys = ''; ui.reqKeepState = null; return openDrawer('reqForm');
+    case 'eqScan': ui.reqKeepState = reqKeep(); ui.reqEq = $('rq-eq')?.value || ui.reqEq || ''; return openDrawer('eqScan');
+    case 'eqScanBack': eqScanStop(); openDrawer('reqForm'); setTimeout(() => reqRestore(ui.reqKeepState || {}), 0); return;
     case 'toSt': ui.toSt = id; return render();
     case 'toKind': ui.toKind = id; return render();
     case 'toNew': ui.toDraft = { kind: 'cargo', date: today(), unit: 'trip' }; return openDrawer('torForm', null);
@@ -7075,6 +7180,9 @@ document.addEventListener('input', e => {
   if (t.id === 'tp-fjob' || t.id === 'tp-fwho') { ui[t.id === 'tp-fjob' ? 'tpFJob' : 'tpFWho'] = t.value; return render(); }
   if (t.id === 'toq') { ui.toq = t.value; const pos = t.selectionStart; $('view').innerHTML = vTor(); const n = $('toq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'tf-unit' || t.id === 'tf-veh' || t.id === 'tf-date' || t.id === 'tf-dateto') { torKeep(); if (t.id === 'tf-unit' || t.id === 'tf-veh') { const keepFocus = t.id; renderDrawer(); $(keepFocus)?.focus(); } return; }
+  if (t.id === 'eqq') { ui.eqq = t.value; const pos = t.selectionStart; $('view').innerHTML = vReqEq(); const n = $('eqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'rq-eq') { const k = reqKeep(); ui.reqEq = t.value; const e = eqOf(t.value); if (e?.system) k.s = e.system; renderDrawer(); reqRestore(k); return; }
+  if (t.id === 'ef-common') { eqKeep(); return renderDrawer(); }
   if (t.id === 'trq') { ui.trq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vTransport(); const n = $('trq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'ptq') { ui.ptq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vParts(); const n = $('ptq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'pt-fv') { ui.ptVeh = t.value; return render(); }
@@ -7245,6 +7353,11 @@ document.addEventListener('change', async e => {
     try { await uploadMany(files, 'toFiles'); } catch(e) { toast(errText(e)); } renderDrawer(); if ($('to-fact')) { $('to-fact').value = keep.f || ''; $('to-dnote').value = keep.n || ''; } return; }
   if (t.dataset.up === 'toDoc') { const files = [...t.files]; t.value = ''; if (!files.length) return; const oid = t.dataset.id, x = TORDERS.find(o => o.id === oid);
     try { ui.toAdd = []; await uploadMany(files, 'toAdd'); const r = await api('PATCH', '/api/tor/' + oid, { action: 'docs', files: [...(x.docs || []), ...ui.toAdd] }); TORDERS[TORDERS.findIndex(o => o.id === oid)] = r.order; renderDrawer(); toast('Документ добавлен'); } catch(e) { toast(errText(e)); } return; }
+  if (t.dataset.up === 'eqQrPhoto') { const fl = t.files[0]; t.value = ''; if (!fl) return; const st = $('eq-scanst');
+    const id = await (async () => { try { const img = await createImageBitmap(fl); if ('BarcodeDetector' in window) { const r = await new BarcodeDetector({ formats: ['qr_code'] }).detect(img); if (r[0]) return eqIdFromQR(r[0].rawValue); }
+      const jsQR = await loadJsQR(), c = document.createElement('canvas'), k = Math.min(1, 1600 / Math.max(img.width, img.height)); c.width = img.width * k; c.height = img.height * k; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const r = jsQR(c.getContext('2d').getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: 'attemptBoth' }); return r ? eqIdFromQR(r.data) : null; } catch(e) { return null; } })();
+    if (id) eqPicked(id); else if (st) st.textContent = 'На фото не найден QR-код оборудования организации.'; return; }
   if (t.dataset.up === 'vDoc') { const fl = t.files[0]; t.value = ''; if (!fl) return; const vid = t.dataset.id;
     try { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); const r = await api('POST', `/api/vehicles/${vid}/docs`, { file: { id: u.id }, title: $('vd-title')?.value.trim() || fl.name.replace(/\.[^.]+$/, ''), date: $('vd-date')?.value || '' }); trPut(r.vehicle); renderDrawer(); render(); toast('Документ загружен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'rqDoneFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; ui.rqNote = $('rq-note')?.value || '';
@@ -7324,10 +7437,13 @@ document.addEventListener('change', async e => {
   }
 });
 function route(){
-  const h = location.hash.slice(1);
+  const h0 = location.hash.slice(1);
+  if (/^eq-[\w-]+$/.test(h0) && me && reqMode()) { const id = h0.slice(3); try { history.replaceState(null, '', '#req'); } catch(e) {} ui.reqFiles = []; ui.reqKeepState = null; ui.reqSys = '';
+    setTimeout(() => { if (eqOf(id)) { ui.reqEq = id; openDrawer('reqForm'); } else toast('Оборудование не найдено или закреплено за другим пользователем'); }, 600); }
+  const h = /^eq-/.test(h0) ? 'req' : h0;
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
-    : reqMode() ? (['reqall', 'reqdev', 'reqdocs'].includes(h) || (['users', 'admFiles', 'reqrep', 'reqset'].includes(h) && me.role === 'admin') ? h : 'req')
+    : reqMode() ? (['reqall', 'reqeq', 'reqdev', 'reqdocs'].includes(h) || (['users', 'admFiles', 'reqrep', 'reqset'].includes(h) && me.role === 'admin') ? h : 'req')
     : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs'].includes(h) && (h !== 'refs' || can('refs')) ? h : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || h === 'refs' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
@@ -7394,7 +7510,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqeq', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqeq', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (transMode() && !isWorker()) { const st = document.querySelector('#views a[data-v=stock]'); if (st) st.href = '#cps'; }
   if (!u.sys && !reqMode() && !transMode() && !isWorker()) {
