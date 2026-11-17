@@ -1577,10 +1577,10 @@ function vAdmFiles(){
 }
 const canWo = () => isHead() || me?.role === 'accountant';
 function stockTabs(){
-  if (transMode()) return `<nav class="seg stabs" aria-label="Разделы учётки">${[['cps', 'Клиенты'], ['checks', 'Загрузить чек'], ['trips', 'Путевые листы']].map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
+  if (transMode()) return `<nav class="seg stabs" aria-label="Разделы учётки">${[['cps', 'Клиенты'], ['checks', 'Чеки'], ['trips', 'Путевые листы']].map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
   const n = S.invoices.filter(i => i.status === 'topay').length;
   const inc = S.invoices.filter(i => incState(i) === 'wait').length;
-  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [...(can('cps') ? [['cps', 'Контрагенты']] : []), ['checks', 'Загрузить чек'], ['trips', 'Путевые листы']]);
+  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [...(can('cps') ? [['cps', 'Контрагенты']] : []), ['checks', 'Чеки'], ['trips', 'Путевые листы']]);
   return `<nav class="seg stabs" aria-label="Разделы учётки">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : k === 'inc' && inc ? ` <span class="badge" title="Ждут оприходования">${inc}</span>` : ''}</a>`).join('')}</nav>`;
 }
 function render(){
