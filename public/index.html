@@ -4033,24 +4033,40 @@ function otExtra(x){
 }
 /* the marks of the manager */
 const MARK_T = { sick: 'Больничный', vacation: 'Отпуск', time: 'Опоздание / ушёл раньше', absent: 'Невыход на работу', late: 'Опоздание / ушёл раньше', early: 'Опоздание / ушёл раньше' };
+const markBy = x => x.by ? 'отметил ' + who(x.by) : '';
 const MARK_C = { sick: 'c-info', vacation: 'c-ok', time: 'c-warn', late: 'c-warn', early: 'c-warn', absent: 'c-bad' };
 const MARK_FORM = ['sick', 'vacation', 'time', 'absent'];
 // the time of a mark «опоздание / ушёл раньше»; the old separate marks are read the same way
 const markIn = x => x.type === 'time' ? x.tin || '' : x.type === 'late' ? x.time : '';
 const markOut = x => x.type === 'time' ? x.tout || '' : x.type === 'early' ? x.time : '';
 const isTimeMark = x => ['time', 'late', 'early'].includes(x.type);
+/* a mark «приход / уход»: arriving before the start of the working day and leaving after its end is overtime,
+   arriving later and leaving earlier is penalty; on a day off all the time between arrival and leaving is overtime */
+function markSplit(x){
+  const a = markIn(x), b = markOut(x), r = { late: 0, early: 0, overIn: 0, overOut: 0, over: 0, pen: 0 };
+  if (dayKind(x.from) !== 'work') { if (a && b) r.over = r.overIn = Math.max(0, hm(b) - hm(a)); return r; }
+  const S = hm(WORK_CAL.from), E = hm(WORK_CAL.to);
+  if (a) { const d = hm(a) - S; if (d > 0) r.late = d; else r.overIn = -d; }
+  if (b) { const d = E - hm(b); if (d > 0) r.early = d; else r.overOut = -d; }
+  r.over = r.overIn + r.overOut; r.pen = r.late + r.early; return r;
+}
+// what a mark «приход / уход» means: «опоздание 30 мин, переработка 1 ч»
+const markKinds = x => { const r = markSplit(x); return [r.late && 'опоздание ' + otDur(r.late), r.early && 'ушёл раньше на ' + otDur(r.early), r.over && 'переработка ' + otDur(r.over)].filter(Boolean).join(', '); };
 const markDays = x => { let n = 0; for (let d = dayOf(x.from); ymdOf(d) <= x.to; d.setDate(d.getDate() + 1)) if (dayKind(ymdOf(d)) === 'work') n++; return n; };
 function markText(x){
   if (x.type === 'sick' || x.type === 'vacation') { const n = markDays(x); return `${x.from === x.to ? fmtD(x.from) : fmtD(x.from) + ' – ' + fmtD(x.to)} · рабочих дней ${n}`; }
   if (isTimeMark(x)) {
-    const a = markIn(x), b = markOut(x), la = a ? hm(a) - hm(WORK_CAL.from) : 0, ea = b ? hm(WORK_CAL.to) - hm(b) : 0;
-    return [fmtD(x.from), a && `пришёл в ${a}${la > 0 ? ' (опоздание ' + otDur(la) + ')' : ''}`, b && `ушёл в ${b}${ea > 0 ? ' (раньше на ' + otDur(ea) + ')' : ''}`].filter(Boolean).join(' · ');
+    const a = markIn(x), b = markOut(x), r = markSplit(x), off = dayKind(x.from) !== 'work';
+    return [fmtD(x.from), a && `пришёл в ${a}${r.late ? ' (опоздание ' + otDur(r.late) + ')' : !off && r.overIn ? ' (раньше на ' + otDur(r.overIn) + ' — переработка)' : ''}`,
+      b && `ушёл в ${b}${r.early ? ' (раньше на ' + otDur(r.early) + ')' : !off && r.overOut ? ' (позже на ' + otDur(r.overOut) + ' — переработка)' : ''}`, off && r.over && `выходной — переработка ${otDur(r.over)}`].filter(Boolean).join(' · ');
   }
   return fmtD(x.from);
 }
 const marksOf = (uid, ym) => STAFF_MARKS.filter(x => x.user === uid && x.from.slice(0, 7) <= ym && x.to.slice(0, 7) >= ym).sort((a, b) => b.from.localeCompare(a.from));
 const markOn = (uid, day) => STAFF_MARKS.find(x => x.user === uid && x.from <= day && x.to >= day && ['sick', 'vacation', 'absent'].includes(x.type));
 const markLine = (x, edit) => `<li><span class="chip ${MARK_C[x.type]}">${MARK_T[x.type]}</span> <small>${markText(x)}${x.note ? ' · ' + esc(x.note) : ''}</small>${edit ? ` <button class="linkish" data-act="smEdit" data-id="${x.id}">изменить</button>` : ''}</li>`;
+// a live hint under the times of the form: what the mark will count
+function smCalc(a, b, day){ const k = markKinds({ type: 'time', tin: a || '', tout: b || '', from: day || today() }); return k ? `<span class="chip c-mute">${esc(k)}</span>` : ''; }
 function markFormHtml(x, uid){
   const t0 = ui.smType || x?.type || 'time', t = ['late', 'early'].includes(t0) ? 'time' : t0, range = t === 'sick' || t === 'vacation', u = STAFF.find(s => s.id === (x?.user || uid));
   return `<div class="d-body"><p style="margin:0"><b>${esc(u ? u.name : '')}</b></p>
@@ -4058,7 +4074,7 @@ function markFormHtml(x, uid){
     <div class="form" data-keep>
       <label>${range ? 'С' : 'Дата'}<input class="in" type="date" id="sm-from" value="${esc(x?.from || ui.stDay || today())}"></label>
       ${range ? `<label>По (включительно)<input class="in" type="date" id="sm-to" value="${esc(x?.to || x?.from || ui.stDay || today())}"></label>` : ''}
-      ${t === 'time' ? `<label>Пришёл в <small class="dim">— если опоздал</small><input class="in" type="time" id="sm-in" value="${esc(x ? markIn(x) : '')}"></label><label>Ушёл в <small class="dim">— если ушёл раньше</small><input class="in" type="time" id="sm-out" value="${esc(x ? markOut(x) : '')}"></label><small class="wide dim">Заполните одно время или оба.</small>` : ''}
+      ${t === 'time' ? `<label>Время прихода<input class="in" type="time" id="sm-in" value="${esc(x ? markIn(x) : '')}"></label><label>Время ухода<input class="in" type="time" id="sm-out" value="${esc(x ? markOut(x) : '')}"></label><small class="wide dim">Заполните одно время или оба. Пришёл раньше ${esc(WORK_CAL.from)} — переработка, позже — штрафные; ушёл раньше ${esc(WORK_CAL.to)} — штрафные, позже — переработка.</small><div class="wide" id="sm-calc" aria-live="polite">${x ? smCalc(markIn(x), markOut(x), x.from) : ''}</div>` : ''}
       <label class="wide">Комментарий<input class="in" id="sm-note" maxlength="1000" value="${esc(x?.note || '')}" placeholder="${range ? 'Номер листка нетрудоспособности, приказ…' : 'Причина'}"></label></div>
     <small class="dim">Рабочий день по графику: ${esc(WORK_CAL.from)}–${esc(WORK_CAL.to)} по будням, праздники — выходные.</small>
     <div class="err" id="ferr"></div>
@@ -4096,6 +4112,17 @@ function sgAssigned(u, day){
   if (did) out.push(`сделано точек: ${did}`);
   return out;
 }
+// the hint of a cell: «Опоздание — пришёл в 09:40, ушёл в 18:00 · отметил Петров»
+function markTip(x){
+  const r = markSplit(x), a = markIn(x), b = markOut(x), k = [r.late && 'Опоздание', r.early && 'Ушёл раньше', r.over && 'Переработка'].filter(Boolean).join(', ') || 'Приход / уход';
+  return `${k} — ${[a && 'пришёл в ' + a, b && 'ушёл в ' + b].filter(Boolean).join(', ')}${markKinds(x) ? ' (' + markKinds(x) + ')' : ''}${x.note ? ' — ' + x.note : ''}${x.by ? ' · ' + markBy(x) : ''}`;
+}
+// overtime entered by the employee: «пришёл в» when earlier than the start, «ушёл в» when later than the end (on a day off — both)
+function otTip(x){
+  const a = hm(x.from), e = a + otMin(x), work = dayKind(x.date) === 'work', S = hm(WORK_CAL.from), E = hm(WORK_CAL.to);
+  const parts = work ? [a < S && 'пришёл в ' + x.from, e > E && 'ушёл в ' + x.to].filter(Boolean) : ['пришёл в ' + x.from, 'ушёл в ' + x.to];
+  return `Переработка — ${parts.length ? parts.join(', ') : x.from + '–' + x.to} (сверх графика ${otDur(otExtra(x))}) · отметил сотрудник${x.note ? ' — ' + x.note : ''}`;
+}
 function sgCell(u, day){
   const kind = dayKind(day), as = sgAssigned(u, day), ot = OVERTIME.filter(x => x.by === u.id && x.date === day);
   const mk = STAFF_MARKS.filter(x => x.user === u.id && x.from <= day && x.to >= day);
@@ -4103,15 +4130,16 @@ function sgCell(u, day){
   if (has('sick')) { cols.push('blue'); codes.push('Б'); } if (has('vacation')) { cols.push('blue'); codes.push('О'); }
   if (has('absent')) { cols.push('red'); codes.push('Н'); }
   const tm = mk.filter(isTimeMark);
-  if (tm.length) { cols.push('lilac'); if (tm.some(markIn)) codes.push('Оп'); if (tm.some(markOut)) codes.push('Р'); }
-  const ext = ot.reduce((a, x) => a + otExtra(x), 0), dur = ot.reduce((a, x) => a + otMin(x), 0);
-  if (ot.length) { cols.push('green'); codes.push('+' + (ext >= 60 ? Math.round(ext / 6) / 10 + 'ч' : ext + 'м')); }
+  const tr = tm.map(markSplit), mOver = tr.reduce((a, r) => a + r.over, 0);
+  if (tr.some(r => r.pen)) { cols.push('lilac'); if (tr.some(r => r.late)) codes.push('Оп'); if (tr.some(r => r.early)) codes.push('Р'); }
+  const ext = ot.reduce((a, x) => a + otExtra(x), 0) + mOver, dur = ot.reduce((a, x) => a + otMin(x), 0);
+  if (ot.length || mOver) { cols.push('green'); codes.push('+' + (ext >= 60 ? Math.round(ext / 6) / 10 + 'ч' : ext + 'м')); }
   const idle = kind === 'work' && !as.length && !mk.some(x => ['sick', 'vacation', 'absent'].includes(x.type));
   // yellow — the day has assignments; a dot — idle (a working day without assignments)
   if (as.length && !cols.length) cols.push('yellow');
   if (idle) tip.push('простой: нет назначений');
-  mk.forEach(x => tip.push(MARK_T[x.type] + (isTimeMark(x) ? ': ' + markText(x).split(' · ').slice(1).join(', ') : '') + (x.note ? ' — ' + x.note : '')));
-  if (ot.length) tip.push(`ненорм. день: ${ot.map(x => x.from + '–' + x.to).join(', ')} (${otDur(dur)}, сверх графика ${otDur(ext)})`);
+  mk.forEach(x => tip.push(isTimeMark(x) ? markTip(x) : MARK_T[x.type] + (x.note ? ' — ' + x.note : '') + (x.by ? ' · ' + markBy(x) : '')));
+  ot.forEach(x => tip.push(otTip(x)));
   as.slice(0, 6).forEach(a => tip.push(a)); if (as.length > 6) tip.push(`и ещё ${as.length - 6}`);
   const c = [...new Set(cols)], bg = !c.length ? '' : c.length === 1 ? SG_COL[c[0]] : `linear-gradient(135deg,${SG_COL[c[0]]} 50%,${SG_COL[c[1]]} 50%)`;
   return { bg, codes, tip: tip.join('\n'), idle, ext, off: kind !== 'work', dot: idle && !codes.length };
@@ -4124,7 +4152,7 @@ function sgPenalty(u, days){
   for (const d of days) {
     const mk = STAFF_MARKS.filter(x => x.user === u.id && x.from <= d && x.to >= d);
     if (mk.some(x => x.type === 'absent') && dayKind(d) === 'work') { abs += E - S; absN++; continue; }
-    for (const x of mk.filter(isTimeMark)) { const a = markIn(x), b = markOut(x); if (a) late += Math.max(0, hm(a) - S); if (b) early += Math.max(0, E - hm(b)); }
+    for (const x of mk.filter(isTimeMark)) { const r = markSplit(x); late += r.late; early += r.early; }
   }
   const total = late + early + abs;
   return { total, tip: total ? `опоздания ${hmm(late)}, ушёл раньше ${hmm(early)}, невыходы ${absN} дн. (${hmm(abs)})` : 'нет' };
@@ -4792,7 +4820,7 @@ function staffRow(u, day){
     const doneAll = S.jobs.flatMap(j => (j.places || []).filter(x => x.doneAt && (x.doneBy === u.id || (!x.doneBy && x.assignee === u.id))).map(x => ({ j, x })));
     const doneDay = doneAll.filter(({ x }) => localDay(x.doneAt) === day);
     const tasks = S.tasks.filter(t => !t.done && (t.staff || []).includes(u.id) && t.end >= day);
-    const otM = OVERTIME.filter(x => x.by === u.id && x.date.startsWith(day.slice(0, 7))).reduce((a, x) => a + otExtra(x), 0), mkN = marksOf(u.id, day.slice(0, 7)).length;
+    const otM = OVERTIME.filter(x => x.by === u.id && x.date.startsWith(day.slice(0, 7))).reduce((a, x) => a + otExtra(x), 0) + STAFF_MARKS.filter(x => x.user === u.id && isTimeMark(x) && x.from.startsWith(day.slice(0, 7))).reduce((a, x) => a + markSplit(x).over, 0), mkN = marksOf(u.id, day.slice(0, 7)).length;
     return { u, jobs, mine, doneAll, doneDay, tasks, otM, mkN, open: jobs.reduce((a, j) => a + mine(j).filter(x => !x.doneAt).length, 0) };
 }
 // the card of an employee — opened by a click on his name in the table
@@ -4832,7 +4860,7 @@ function staffDayHtml(uid, day){
   return `<div class="d-body">
     <p style="margin:0"><b>${fmtD(day)}</b> · ${['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'][dayOf(day).getDay()]} · ${DAY_KIND[kind]}${kind === 'work' ? ` (по графику ${esc(WORK_CAL.from)}–${esc(WORK_CAL.to)})` : ''}</p>
     ${idle ? '<div class="box sgidle">Простой: в этот рабочий день у сотрудника нет назначений.</div>' : ''}
-    ${mk.length ? `<div class="box"><h4>Отметки</h4>${mk.map(x => `<div class="sdrow"><div><span class="chip ${MARK_C[x.type]}">${MARK_T[x.type]}</span> <small>${markText(x)}</small>${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}</div><button class="btn sm" data-act="smEdit" data-id="${x.id}">Изменить</button></div>`).join('')}</div>` : ''}
+    ${mk.length ? `<div class="box"><h4>Отметки</h4>${mk.map(x => `<div class="sdrow"><div><span class="chip ${MARK_C[x.type]}">${MARK_T[x.type]}</span> <small>${markText(x)}</small>${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}${x.by ? `<small class="dim">${esc(markBy(x))}</small>` : ''}</div><button class="btn sm" data-act="smEdit" data-id="${x.id}">Изменить</button></div>`).join('')}</div>` : ''}
     ${ot.length ? `<div class="box"><h4>Ненормированный рабочий день</h4>${ot.map(x => `<div class="sdrow"><div><b>${otSpan(x)}</b> · ${otDur(otMin(x))}${otExtra(x) ? ` · сверх графика <b>${otDur(otExtra(x))}</b>` : ''}${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}<small class="dim">внесено ${esc(fmtDT(x.at))}${x.updatedAt ? ', изменено ' + esc(fmtDT(x.updatedAt)) : ''}</small></div><button class="btn sm" data-act="otHEdit" data-id="${x.id}">Изменить</button></div>`).join('')}</div>` : ''}
     ${tasks.length || jobs.length || did.length ? `<div class="box"><h4>Назначено</h4><ul class="stlist">
       ${tasks.map(t => `<li><button class="linkish" data-act="editTask" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([KIND[t.kind], jobOf(t.jobId) && '№ ' + jobNo(jobOf(t.jobId)) + ' · ' + jobOf(t.jobId).title, fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small></li>`).join('')}
@@ -7061,6 +7089,7 @@ document.addEventListener('input', e => {
   if (t.id === 'pt-veh' && !ui.ptEdit) { ui.ptFor = t.value; return; }
   if (t.id === 'rq-text' && $('rq-count')) $('rq-count').textContent = t.value.length;
   if (t.id === 'rq-note') ui.rqNote = t.value;
+  if (['sm-in', 'sm-out', 'sm-from'].includes(t.id) && $('sm-calc')) $('sm-calc').innerHTML = smCalc($('sm-in')?.value, $('sm-out')?.value, $('sm-from')?.value);
   if (t.id === 'reqq') { ui.reqQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReq(); const n = $('reqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'spq') { ui.spq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaffProj(); const n = $('spq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'stq') { ui.stq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaff(); const n = $('stq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
