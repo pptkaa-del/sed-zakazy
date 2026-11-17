@@ -110,6 +110,9 @@ function cleanJob(d){
       ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
   // the key features of a work and what is happening with it now; the percent done by hand (when the work has no points)
+  // the warranty after the work is done: its last day; when it passes the work goes to the archive
+  if ('warrantyUntil' in d) out.warrantyUntil = /^\d{4}-\d{2}-\d{2}$/.test(d.warrantyUntil || '') ? d.warrantyUntil : '';
+  if ('warrantyNote' in d) out.warrantyNote = String(d.warrantyNote || '').trim().slice(0, 500);
   if ('features' in d) out.features = String(d.features || '').trim().slice(0, 2000);
   if ('happening' in d) out.happening = String(d.happening || '').trim().slice(0, 2000);
   if ('progress' in d) out.progress = d.progress === null || d.progress === '' || !Number.isFinite(Number(d.progress)) ? null : Math.max(0, Math.min(100, Math.round(Number(d.progress))));
