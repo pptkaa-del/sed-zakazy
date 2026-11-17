@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Управление предприятием</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<script>try{var t=localStorage.getItem('sed-theme');if(['light','dark','telecom','pink','engineer','upr','anime','xp'].indexOf(t)>=0)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<script>try{var t=localStorage.getItem('sed-theme');if(['light','dark','telecom','pink','engineer','upr','anime','xp','w98'].indexOf(t)>=0)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Unbounded:wght@500;600&family=Montserrat:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=PT+Sans:wght@400;700&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap">
@@ -23,7 +23,7 @@
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-theme="telecom"]):not([data-theme="pink"]):not([data-theme="engineer"]):not([data-theme="upr"]):not([data-theme="anime"]):not([data-theme="xp"]){
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]):not([data-theme="telecom"]):not([data-theme="pink"]):not([data-theme="engineer"]):not([data-theme="upr"]):not([data-theme="anime"]):not([data-theme="xp"]):not([data-theme="w98"]){
   --paper:#11151B; --sheet:#181E26; --ink:#E6EAF0; --ink-2:#9AA5B4; --rule:#2C343F; --rule-2:#222932;
   --stamp:#8C9BFF; --stamp-soft:#252C55; --stamp-ink:#0E1220; --work:#4FD1C5; --work-soft:#173634;
   --ok:#5CCB92; --ok-soft:#173327; --warn:#F0AE55; --warn-soft:#3A2A14; --bad:#FF7B7B; --bad-soft:#3E1C1F;
@@ -756,6 +756,58 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 :root[data-theme="xp"] #toast,:root[data-theme="xp"] .toast{background:#FFFFE1;color:#000;border:1px solid #000;border-radius:6px;box-shadow:2px 2px 4px rgba(0,0,0,.4)}
 :root[data-theme="xp"] ::-webkit-scrollbar{width:16px;height:16px}:root[data-theme="xp"] ::-webkit-scrollbar-track{background:#F4F3EE}
 :root[data-theme="xp"] ::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#CADBFC,#B6CBF6);border:1px solid #9EB7EC;border-radius:3px}
+
+/* ===== Тема «Windows 98»: бирюзовый рабочий стол, серые окна с объёмными рамками, тёмно-синие заголовки, прямые углы ===== */
+:root[data-theme="w98"]{
+  --paper:#C0C0C0; --sheet:#FFFFFF; --ink:#000000; --ink-2:#404040; --rule:#808080; --rule-2:#DFDFDF;
+  --stamp:#000080; --stamp-soft:#C9D3F0; --stamp-ink:#FFFFFF; --work:#008080; --work-soft:#D0ECEC;
+  --ok:#007000; --ok-soft:#D7F0D7; --warn:#806000; --warn-soft:#FFF5C8; --bad:#B00000; --bad-soft:#F7D6D6;
+  --info:#000080; --info-soft:#D6DCF5; --mute:#606060; --mute-soft:#E4E4E4;
+  --shadow:none; --tile-filter:none;
+  --f-display:"Microsoft Sans Serif","MS Sans Serif",Tahoma,Arial,sans-serif; --f-body:"Microsoft Sans Serif","MS Sans Serif",Tahoma,Arial,sans-serif;
+  --w98-out:inset -1px -1px #0A0A0A,inset 1px 1px #FFFFFF,inset -2px -2px #808080,inset 2px 2px #DFDFDF;
+  --w98-in:inset -1px -1px #FFFFFF,inset 1px 1px #808080,inset -2px -2px #DFDFDF,inset 2px 2px #0A0A0A;
+  color-scheme:light;
+}
+:root[data-theme="w98"]{background:#008080}
+:root[data-theme="w98"] body{min-height:100vh;background:transparent;font-size:13px}
+:root[data-theme="w98"] *{border-radius:0 !important}
+:root[data-theme="w98"] header.top{background:#C0C0C0;box-shadow:var(--w98-out);border:0;color:#000}
+:root[data-theme="w98"] h1{display:inline-block;color:#fff;background:linear-gradient(90deg,#000080,#1084D0);padding:3px 10px;font-weight:700;font-size:18px}
+:root[data-theme="w98"] header.top .sub{color:#000}
+:root[data-theme="w98"] nav.views{background:#C0C0C0;box-shadow:var(--w98-out);border:0;padding:3px}
+:root[data-theme="w98"] nav.views a{color:#000;box-shadow:var(--w98-out);background:#C0C0C0;margin:1px;font-weight:400}
+:root[data-theme="w98"] nav.views a:hover{background:#C8C8C8}
+:root[data-theme="w98"] nav.views a.on{box-shadow:var(--w98-in);background:repeating-conic-gradient(#C0C0C0 0 25%,#FFFFFF 0 50%) 0 0/2px 2px;font-weight:700;color:#000}
+:root[data-theme="w98"] nav.views .badge{background:#000080;color:#fff}
+:root[data-theme="w98"] .ubtn{background:#C0C0C0;box-shadow:var(--w98-out);border:0;color:#000}
+:root[data-theme="w98"] .avatar{background:#000080;color:#fff}
+:root[data-theme="w98"] .btn{background:#C0C0C0;color:#000;border:0;box-shadow:var(--w98-out);font-weight:400}
+:root[data-theme="w98"] .btn:active{box-shadow:var(--w98-in)}
+:root[data-theme="w98"] .btn:focus-visible{outline:1px dotted #000;outline-offset:-5px}
+:root[data-theme="w98"] .btn.primary{font-weight:700;box-shadow:0 0 0 1px #000,var(--w98-out);color:#000;background:#C0C0C0}
+:root[data-theme="w98"] .btn.ok,:root[data-theme="w98"] .btn.danger{background:#C0C0C0;color:#000;font-weight:700}
+:root[data-theme="w98"] .btn.danger{color:#B00000}
+:root[data-theme="w98"] .btn.ghost{box-shadow:none;background:transparent}
+:root[data-theme="w98"] .in{background:#fff;border:0;box-shadow:var(--w98-in);padding-left:6px}
+:root[data-theme="w98"] .in:focus{outline:none;box-shadow:var(--w98-in)}
+:root[data-theme="w98"] .card,:root[data-theme="w98"] .empty,:root[data-theme="w98"] .stat,:root[data-theme="w98"] .pgroup,:root[data-theme="w98"] .wgroup{background:#C0C0C0;border:0;box-shadow:var(--w98-out);padding:3px}
+:root[data-theme="w98"] .card>*{background-color:#fff}
+:root[data-theme="w98"] .box{background:#C0C0C0;border:1px solid #808080;box-shadow:1px 1px 0 #fff}
+:root[data-theme="w98"] h3,:root[data-theme="w98"] h4{color:#000}
+:root[data-theme="w98"] .seg{background:#C0C0C0;border:0;box-shadow:none}
+:root[data-theme="w98"] .seg button,:root[data-theme="w98"] .seg a{box-shadow:var(--w98-out);background:#C0C0C0;color:#000;margin-right:2px}
+:root[data-theme="w98"] .seg button.on,:root[data-theme="w98"] .seg a.on{box-shadow:var(--w98-in);background:#E0E0E0;color:#000;font-weight:700}
+:root[data-theme="w98"] table.jt th,:root[data-theme="w98"] .comp th,:root[data-theme="w98"] .sgt thead th{background:#C0C0C0;color:#000;box-shadow:var(--w98-out);border:0}
+:root[data-theme="w98"] .chip{border:1px solid currentColor}
+:root[data-theme="w98"] .tile{background:#C0C0C0;box-shadow:var(--w98-out);border:0;color:#000}
+:root[data-theme="w98"] .drawer{background:#C0C0C0;border:0;box-shadow:var(--w98-out),-4px 0 0 rgba(0,0,0,.25)}
+:root[data-theme="w98"] .d-head{background:linear-gradient(90deg,#000080,#1084D0);color:#fff;margin:3px 3px 0}
+:root[data-theme="w98"] .d-head h2{color:#fff;font-weight:700}
+:root[data-theme="w98"] .d-head button{background:#C0C0C0;color:#000;box-shadow:var(--w98-out);border:0}
+:root[data-theme="w98"] #toast,:root[data-theme="w98"] .toast{background:#FFFFE1;color:#000;border:1px solid #000;box-shadow:none}
+:root[data-theme="w98"] ::-webkit-scrollbar{width:16px;height:16px}:root[data-theme="w98"] ::-webkit-scrollbar-track{background:repeating-conic-gradient(#C0C0C0 0 25%,#FFFFFF 0 50%) 0 0/2px 2px}
+:root[data-theme="w98"] ::-webkit-scrollbar-thumb{background:#C0C0C0;box-shadow:var(--w98-out)}
 
 /* ===== Theme «Инженерная»: чертёж-«синька» — тёмно-синий, миллиметровая сетка, моноширинный шрифт, прямые углы ===== */
 :root[data-theme="engineer"]{
@@ -5788,7 +5840,7 @@ function renderDrawer(){
   if (d.kind === 'workCal') { D.innerHTML = dh('График работы') + workCalHtml(); return; }
   if (d.kind === 'prefs') {
     const th = PREFS.theme || themeGet(), sc = PREFS.scale || 1, field = isWorker() || me.sys;
-    const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40', pink:'#C2306E', engineer:'#123A5E', upr:'linear-gradient(180deg,#0B2A57 70%,#fff 70%,#fff 80%,#0D4C92 80%,#0D4C92 90%,#D52B1E 90%)', anime:'linear-gradient(135deg,#FF7EB6,#B48CFF 55%,#7FD3FF)', xp:'linear-gradient(180deg,#0053EE 45%,#ECE9D8 45%,#ECE9D8 75%,#3C9A2E 75%)' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком', pink:'Розовая', engineer:'Инженерная', upr:'ФКУ Упрдор', anime:'Аниме' , xp:'Windows XP' };
+    const sw = { system:'linear-gradient(90deg,#fff 50%,#181E26 50%)', light:'#fff', dark:'#181E26', telecom:'#1F4D40', pink:'#C2306E', engineer:'#123A5E', upr:'linear-gradient(180deg,#0B2A57 70%,#fff 70%,#fff 80%,#0D4C92 80%,#0D4C92 90%,#D52B1E 90%)', anime:'linear-gradient(135deg,#FF7EB6,#B48CFF 55%,#7FD3FF)', xp:'linear-gradient(180deg,#0053EE 45%,#ECE9D8 45%,#ECE9D8 75%,#3C9A2E 75%)', w98:'linear-gradient(180deg,#000080 40%,#C0C0C0 40%,#C0C0C0 70%,#008080 70%)' }, tn = { system:'Как в системе', light:'Светлая', dark:'Тёмная', telecom:'Телеком', pink:'Розовая', engineer:'Инженерная', upr:'ФКУ Упрдор', anime:'Аниме' , xp:'Windows XP', w98:'Windows 98' };
     const col = (k, l) => { const v = k.startsWith('n_') ? NEED_COLOR[k.slice(2)] : DT_COLOR[k]; return `<label class="pcol"><input type="color" data-pcolor="${k}" value="${v}"><span>${esc(l)}</span></label>`; };
     D.innerHTML = dh('Настройки') + `<div class="d-body">
       <p class="dim" style="margin:0">Настройки ваши личные: они сохраняются в вашей учётной записи и действуют на любом устройстве.</p>
@@ -6391,7 +6443,7 @@ async function onSubmit(e){
 }
 
 /* ---------- theme ---------- */
-const THEMES = ['system', 'light', 'dark', 'telecom', 'pink', 'engineer', 'upr', 'anime', 'xp'];
+const THEMES = ['system', 'light', 'dark', 'telecom', 'pink', 'engineer', 'upr', 'anime', 'xp', 'w98'];
 function themeGet(){ try { const t = localStorage.getItem('sed-theme'); return THEMES.includes(t) ? t : 'system'; } catch(e) { return 'system'; } }
 function themeSet(t){
   try { if (t === 'system') localStorage.removeItem('sed-theme'); else localStorage.setItem('sed-theme', t); } catch(e){}
