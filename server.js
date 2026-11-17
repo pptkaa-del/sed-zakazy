@@ -347,7 +347,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared', 'draw'], transport: ['cars', 'parts'] };
+const SECTIONS = { works: ['works', 'labels'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared', 'draw'], transport: ['cars', 'parts'], refs: [] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -387,6 +387,7 @@ function fileUsage(){
     for (const t of Object.values(db.labels || {})) for (const x of t.items || []) if (x.img) add(x.img.id, `Этикетка «${t.name}»`);
     for (const r of Object.values(db.requests || {})) for (const f of [...(r.files || []), ...(r.doneFiles || [])]) add(f.id, `Заявка № ${r.no || ''}`);
     for (const d of db.reqDocs || []) if (d.file) add(d.file.id, `Инструкция «${d.title}»`);
+    for (const r of db.refs || []) for (const f of r.files || []) add(f.id, `Справочник «${r.title || ''}»`);
     for (const c of db.checks || []) for (const f of c.files || []) add(f.id, c.kind === 'fuel' ? 'Чек заправки' : `Чек покупки · ${c.seller || ''}`);
     for (const v of Object.values(db.vehicles || {})) for (const d of v.docs || []) if (d.file) add(d.file.id, `Транспорт ${v.name || ''} · ${d.title || ''}`);
     for (const c of Object.values(db.counterparties || {})) for (const k of ['files', 'docs', 'contracts']) for (const f of [].concat(c[k] || [])) add(f && (f.file ? f.file.id : f.id), `Контрагент ${c.name || ''}`);
@@ -679,6 +680,8 @@ async function api(req, res, url) {
     // the marks of the manager (sick leave, vacation, late, left early, absence) and the working schedule
     out.staffMarks = (Array.isArray(db.staffMarks) ? db.staffMarks : []).filter(x => HEAD(user) || x.user === user.id);
     out.workCal = workCalOf();
+    // «Справочники»: a manager sees all; the others — the open ones and those he is chosen for
+    if (orgType(user) !== 'requests' && sees(user, 'refs')) out.refs = (Array.isArray(db.refs) ? db.refs : []).filter(r => HEAD(user) || !r.restricted || (r.viewers || []).includes(user.id));
     // «Загрузить чек»: an employee sees his own receipts, a manager and the accountant see everyone's; the vehicles to choose for a refuelling
     if (orgType(user) !== 'requests') {
       out.checks = (Array.isArray(db.checks) ? db.checks : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
@@ -941,6 +944,33 @@ async function api(req, res, url) {
       delete R[p[2]]; saveDb();
       return send(res, 200, { ok: true, rev: db.rev });
     }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Справочники»: a manager adds files or text, says what it belongs to (a work, a name typed by hand, or general information)
+     and who sees it (everyone or chosen employees); the others only read */
+  if (p[1] === 'refs') {
+    if (user.sys || orgType(user) === 'requests') return fail(res, 403, 'Недоступно');
+    if (!HEAD(user)) return fail(res, 403, 'Справочники ведёт руководитель или администратор');
+    if (!sees(user, 'refs')) return fail(res, 403, 'Этот раздел для вас закрыт');
+    if (!Array.isArray(db.refs)) db.refs = [];
+    const R = db.refs, now = new Date().toISOString(), txt = (v, n) => String(v ?? '').trim().slice(0, n);
+    const clean = b => {
+      const title = txt(b.title, 300), text = txt(b.text, 20000);
+      const files = (Array.isArray(b.files) ? b.files : []).filter(f => f && db.files[f.id]).slice(0, 50).map(f => ({ id: f.id, name: db.files[f.id].name, type: db.files[f.id].type, size: db.files[f.id].size }));
+      if (!title) return 'Напишите название справочника';
+      if (!text && !files.length) return 'Загрузите файл или внесите текст';
+      const s0 = b.scope || {}; let scope;
+      if (s0.type === 'job') { const j = db.jobs[s0.jobId]; if (!j) return 'Выберите проект'; scope = { type: 'job', jobId: s0.jobId, name: `№ ${j.no || ''} · ${j.title || ''}` }; }
+      else if (s0.type === 'other') { const name = txt(s0.name, 200); if (!name) return 'Впишите, к чему относится справочник'; scope = { type: 'other', name }; }
+      else scope = { type: 'common', name: 'Общая информация' };
+      const restricted = !!b.restricted, viewers = restricted ? [...new Set((Array.isArray(b.viewers) ? b.viewers : []).filter(id => orgUsers().some(u => u.id === id && !u.sys)))] : [];
+      if (restricted && !viewers.length) return 'Выберите сотрудников, которые видят справочник';
+      return { title, text, files, scope, restricted, viewers };
+    };
+    if (m === 'POST' && !p[2]) { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); const x = { id: newId(), ...v, at: now, by: user.id }; R.push(x); saveDb(); return send(res, 200, { ok: true, ref: x, rev: db.rev }); }
+    const x = p[2] && R.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Справочник не найден — обновите страницу');
+    if (m === 'PUT') { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { updatedAt: now, updatedBy: user.id }); saveDb(); return send(res, 200, { ok: true, ref: x, rev: db.rev }); }
+    if (m === 'DELETE') { db.refs = R.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Загрузить чек»: a refuelling (photo of the receipt, the vehicle) and a purchase (the work, photo, date, seller, goods with quantity and price, sum) */
