@@ -690,6 +690,8 @@ async function api(req, res, url) {
     out.overtime = (Array.isArray(db.overtime) ? db.overtime : []).filter(x => HEAD(user) || x.by === user.id);
     // the marks of the manager (sick leave, vacation, late, left early, absence) and the working schedule
     out.staffMarks = (Array.isArray(db.staffMarks) ? db.staffMarks : []).filter(x => HEAD(user) || x.user === user.id);
+    // the monthly ratings 1–5 the manager gives: a manager sees all, an employee only his own
+    out.staffRatings = (Array.isArray(db.staffRatings) ? db.staffRatings : []).filter(x => HEAD(user) || x.user === user.id);
     out.workCal = workCalOf();
     // «Справочники»: a manager sees all; the others — the open ones and those he is chosen for
     if (orgType(user) !== 'requests' && sees(user, 'refs')) out.refs = (Array.isArray(db.refs) ? db.refs : []).filter(r => HEAD(user) || !r.restricted || (r.viewers || []).includes(user.id));
@@ -1234,6 +1236,19 @@ async function api(req, res, url) {
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* the working schedule of the organization: the hours of a working day and the exceptions of the calendar */
+  /* the rating of an employee for a month: 1 — отлынивал … 3 — работал нормально … 5 — вкалывал; 0 removes it */
+  if (p[1] === 'staff-ratings' && m === 'PUT') {
+    if (!HEAD(user)) return fail(res, 403, 'Оценки ставит руководитель или администратор');
+    const b = await readJsonBody(req), score = Number(b.score), ym = String(b.ym || '');
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)) return fail(res, 400, 'Укажите месяц');
+    if (!orgUsers().some(u => u.id === b.user && !u.sys)) return fail(res, 400, 'Сотрудник не найден');
+    if (!(Number.isInteger(score) && score >= 0 && score <= 5)) return fail(res, 400, 'Оценка — от 1 до 5');
+    if (!Array.isArray(db.staffRatings)) db.staffRatings = [];
+    db.staffRatings = db.staffRatings.filter(x => !(x.user === b.user && x.ym === ym));
+    let x = null;
+    if (score) { x = { user: b.user, ym, score, note: String(b.note || '').trim().slice(0, 500), by: user.id, at: new Date().toISOString() }; db.staffRatings.push(x); }
+    saveDb(); return send(res, 200, { ok: true, rating: x, rev: db.rev });
+  }
   if (p[1] === 'workcal' && m === 'PUT') {
     if (!HEAD(user)) return fail(res, 403, 'График меняет руководитель или администратор');
     const b = await readJsonBody(req), T = /^([01]\d|2[0-3]):[0-5]\d$/, D = /^\d{4}-\d{2}-\d{2}$/;

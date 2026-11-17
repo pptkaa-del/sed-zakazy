@@ -338,6 +338,10 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgt td{height:40px;min-width:30px;cursor:pointer;color:#1F2633;font-weight:700;font-size:11px;line-height:1.1}.sgt td.off:not([style*=background]){background:repeating-linear-gradient(135deg,var(--mute-soft) 0 4px,var(--sheet) 4px 7px)}
 .sgt td:hover{outline:2px solid var(--stamp);outline-offset:-2px}.sgt td.sel{outline:2px solid var(--ink);outline-offset:-2px}.sgdot{color:var(--stamp);font-size:9px}
 .sgt .sgsum{min-width:84px;padding:0 8px;font-weight:400;color:var(--ink);cursor:default;white-space:nowrap}.sgt thead .sgsum{font-size:11px}
+.sgall .sgname{width:150px;min-width:150px;max-width:150px;box-sizing:border-box}.sgall .sgkind{position:sticky;left:150px;z-index:2;background:var(--sheet);font-size:10px;font-weight:500;color:var(--ink-2);text-align:left;padding:0 6px;min-width:84px;white-space:nowrap}.sgall thead .sgkind{z-index:3}
+.sgall tr.sgt1 td,.sgall tr.sgt1 th{border-bottom:1px dashed var(--rule-2)}.sgall tr.sgt2 td,.sgall tr.sgt2 th{border-bottom:2px solid var(--rule)}.sgall td{height:34px}.sgall .sgname{border-bottom:2px solid var(--rule)}
+.sgt thead .sgsum small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}.sglg{font-size:12px;margin-right:2px}.sgrnote{margin:0 14px 10px;font-size:13px;background:var(--warn-soft, #FFF6D6)}
+.sgt .sgrate{min-width:150px;padding:4px 6px}.sgrate .rtsel{font-size:12px;padding:4px 6px;width:100%;max-width:200px}.sgrate .rtv{display:inline-block;min-width:26px;padding:2px 6px;border-radius:6px;color:#1F2633}.sgrate small{display:block;font-size:10px;color:var(--ink-2);white-space:normal}
 .sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
 .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vcard{text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;font:inherit;color:inherit}.vcard:hover{border-color:var(--stamp)}
 .vtop{display:flex;gap:10px;justify-content:space-between;align-items:center}.vtop b{font-size:16px}.plate{font:600 13px var(--f-mono,monospace);border:1.5px solid var(--ink);border-radius:4px;padding:1px 6px;background:var(--sheet);white-space:nowrap}
@@ -1364,7 +1368,7 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || transMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -3992,7 +3996,7 @@ function otStaffBlock(u, day){
   return h;
 }
 /* ---------- the working schedule: weekdays from 9:00 to 18:00, weekends and public holidays are days off ---------- */
-let STAFF_MARKS = [], WORK_CAL = { from: '09:00', to: '18:00', off: [], work: [] };
+let STAFF_RATINGS = [], STAFF_MARKS = [], WORK_CAL = { from: '09:00', to: '18:00', off: [], work: [] };
 // public holidays of Russia (Labour Code, art. 112); a holiday on a weekend moves to the next working day (except 1–8 January)
 const HOL_FIXED = ['01-01', '01-02', '01-03', '01-04', '01-05', '01-06', '01-07', '01-08', '02-23', '03-08', '05-01', '05-09', '06-12', '11-04'];
 const HOL_NAMES = { '01-01': 'Новогодние каникулы', '01-07': 'Рождество Христово', '02-23': 'День защитника Отечества', '03-08': 'Международный женский день', '05-01': 'Праздник Весны и Труда', '05-09': 'День Победы', '06-12': 'День России', '11-04': 'День народного единства' };
@@ -4032,7 +4036,7 @@ function otExtra(x){
   return dur - inside;
 }
 /* the marks of the manager */
-const MARK_T = { sick: 'Больничный', vacation: 'Отпуск', time: 'Опоздание / ушёл раньше', absent: 'Невыход на работу', late: 'Опоздание / ушёл раньше', early: 'Опоздание / ушёл раньше' };
+const MARK_T = { sick: 'Больничный', vacation: 'Отпуск', time: 'Ненормированный выход', absent: 'Невыход на работу', late: 'Ненормированный выход', early: 'Ненормированный выход' };
 const markBy = x => x.by ? 'отметил ' + who(x.by) : '';
 const MARK_C = { sick: 'c-info', vacation: 'c-ok', time: 'c-warn', late: 'c-warn', early: 'c-warn', absent: 'c-bad' };
 const MARK_FORM = ['sick', 'vacation', 'time', 'absent'];
@@ -4074,7 +4078,7 @@ function markFormHtml(x, uid){
     <div class="form" data-keep>
       <label>${range ? 'С' : 'Дата'}<input class="in" type="date" id="sm-from" value="${esc(x?.from || ui.stDay || today())}"></label>
       ${range ? `<label>По (включительно)<input class="in" type="date" id="sm-to" value="${esc(x?.to || x?.from || ui.stDay || today())}"></label>` : ''}
-      ${t === 'time' ? `<label>Время прихода<input class="in" type="time" id="sm-in" value="${esc(x ? markIn(x) : '')}"></label><label>Время ухода<input class="in" type="time" id="sm-out" value="${esc(x ? markOut(x) : '')}"></label><small class="wide dim">Заполните одно время или оба. Пришёл раньше ${esc(WORK_CAL.from)} — переработка, позже — штрафные; ушёл раньше ${esc(WORK_CAL.to)} — штрафные, позже — переработка.</small><div class="wide" id="sm-calc" aria-live="polite">${x ? smCalc(markIn(x), markOut(x), x.from) : ''}</div>` : ''}
+      ${t === 'time' ? `<label>Время прихода<input class="in" type="time" id="sm-in" value="${esc(x ? markIn(x) : WORK_CAL.from)}" ${x ? '' : 'data-def="1"'}></label><label>Время ухода<input class="in" type="time" id="sm-out" value="${esc(x ? markOut(x) : WORK_CAL.to)}" ${x ? '' : 'data-def="1"'}></label><small class="wide dim">Заполните одно время или оба. Пришёл раньше ${esc(WORK_CAL.from)} — переработка, позже — штрафные; ушёл раньше ${esc(WORK_CAL.to)} — штрафные, позже — переработка.</small><small class="wide dim">Время по умолчанию — по графику; нажмите на поле, чтобы изменить, — подставится текущее время.</small><div class="wide" id="sm-calc" aria-live="polite">${x ? smCalc(markIn(x), markOut(x), x.from) : ''}</div>` : ''}
       <label class="wide">Комментарий<input class="in" id="sm-note" maxlength="1000" value="${esc(x?.note || '')}" placeholder="${range ? 'Номер листка нетрудоспособности, приказ…' : 'Причина'}"></label></div>
     <small class="dim">Рабочий день по графику: ${esc(WORK_CAL.from)}–${esc(WORK_CAL.to)} по будням, праздники — выходные.</small>
     <div class="err" id="ferr"></div>
@@ -4157,18 +4161,36 @@ function sgPenalty(u, days){
   const total = late + early + abs;
   return { total, tip: total ? `опоздания ${hmm(late)}, ушёл раньше ${hmm(early)}, невыходы ${absN} дн. (${hmm(abs)})` : 'нет' };
 }
+/* the monthly rating of an employee by the manager */
+const RATE_T = { 1: 'Отлынивал', 2: 'Вроде работал, но отлынивал', 3: 'Работал нормально', 4: 'Вроде работал, но периодически вкалывал', 5: 'Вкалывал' };
+const RATE_C = { 1: '#FFC9C9', 2: '#FFE3C2', 3: '#E8ECF2', 4: '#D3F4DC', 5: '#4CBB72' };
+const rateOf = (uid, ym) => STAFF_RATINGS.find(x => x.user === uid && x.ym === ym);
+function rateCell(u, ym){
+  const r = rateOf(u.id, ym), tip = r ? `${r.score} — ${RATE_T[r.score]} · поставил ${who(r.by)}, ${fmtDT(r.at)}` : 'Оценка за месяц ещё не поставлена';
+  if (!isHead()) return `<td class="sgsum sgrate" rowspan="2" title="${esc(tip)}">${r ? `<b class="rtv" style="background:${RATE_C[r.score]}">${r.score}</b><small>${esc(RATE_T[r.score])}</small>` : '—'}</td>`;
+  return `<td class="sgsum sgrate" rowspan="2" title="${esc(tip)}"><select class="in rtsel" data-rate="${u.id}|${ym}" aria-label="Оценка за месяц: ${esc(u.name)}" style="${r ? `background:${RATE_C[r.score]};color:#1F2633` : ''}">
+    <option value="0">— оценка —</option>${[5, 4, 3, 2, 1].map(k => `<option value="${k}" ${r?.score === k ? 'selected' : ''}>${k} — ${RATE_T[k]}</option>`).join('')}</select></td>`;
+}
 function staffGrid(people){
   const ym = ui.stMonth || today().slice(0, 7), [y, m] = ym.split('-').map(Number), n = new Date(y, m, 0).getDate();
   const days = Array.from({ length: n }, (_, i) => `${ym}-${pad(i + 1)}`), wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
   const shift = k => { const d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
-  const rows = people.map(u => { const cells = days.map(d => sgCell(u, d)); return { u, cells, ext: cells.reduce((a, c) => a + c.ext, 0), pen: sgPenalty(u, days) }; });
+  const rows = people.map(u => { const cells = days.map(d => sgCell(u, d)), pf = days.map(d => pfCell(u, d)), planned = pf.filter(c => c.min);
+    return { u, cells, pf, ext: cells.reduce((a, c) => a + c.ext, 0), pen: sgPenalty(u, days), total: pf.reduce((a, c) => a + c.did, 0), below: planned.filter(c => c.col === 'red').length, planned: planned.length, workDays: pf.filter(c => !c.off && !c.away && c.did).length }; });
+  const sel = ui.stDay || today(), monthEnd = ym < today().slice(0, 7) || Number(today().slice(8)) >= n - 4;
   return `<section class="card sgwrap"><div class="sghead">
       <div class="row-g"><button class="btn sm" data-act="stMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="stMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="stMonth" data-id="${today().slice(0, 7)}">Текущий</button>` : ''}</div>
-      <div class="sglegend">${[['yellow', 'есть назначения'], ['green', 'сверх графика'], ['blue', 'больничный (Б), отпуск (О)'], ['red', 'невыход (Н)'], ['lilac', 'опоздание (Оп) / ушёл раньше (Р)']].map(([k, l]) => `<span><i style="background:${SG_COL[k]}"></i>${l}</span>`).join('')}<span><i class="sgoff"></i>выходной, праздник</span><span><span class="sgdot">●</span> простой (нет назначений)</span></div></div>
-    ${rows.length ? `<div class="sgscroll"><table class="sgt"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum" title="Работа сверх графика за месяц, часы:минуты">Переработка</th><th class="sgsum" title="Опоздания, ранний уход и невыходы (невыход — рабочий день по графику), часы:минуты">Штрафных</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><th class="sgname"><button class="linkish sgu" data-act="stCard" data-id="${r.u.id}" title="Подробно по сотруднику">${esc(r.u.name)}</button><small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${days[i] === (ui.stDay || today()) ? 'sel' : ''}" style="${c.bg ? `background:${c.bg}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.codes.length ? c.codes.join('<br>') : c.dot ? '<span class="sgdot">●</span>' : ''}</td>`).join('')}
-        <td class="sgsum ${r.ext ? 'sgplus' : ''}">${r.ext ? `<b>${hmm(r.ext)}</b>` : '—'}</td><td class="sgsum ${r.pen.total ? 'sgminus' : ''}" title="${esc(r.pen.tip)}">${r.pen.total ? `<b>${hmm(r.pen.total)}</b>` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
-    <small class="dim sgnote">Нажмите на клетку — что было в этот день (отметки, ненормированный день, назначения); на имя — подробно по сотруднику.</small></section>`;
+      <div class="sglegend"><b class="sglg">Табель:</b>${[['yellow', 'есть назначения'], ['green', 'сверх графика'], ['blue', 'больничный (Б), отпуск (О)'], ['red', 'невыход (Н)'], ['lilac', 'ненормированный выход (Оп — опоздал, Р — ушёл раньше)']].map(([k, l]) => `<span><i style="background:${SG_COL[k]}"></i>${l}</span>`).join('')}<span><i class="sgoff"></i>выходной, праздник</span><span><span class="sgdot">●</span> простой</span></div>
+      <div class="sglegend"><b class="sglg">Успеваемость:</b><span><i style="background:${PF_COL.red}"></i>меньше минимума</span><span><i style="background:${PF_COL.lg}"></i>минимум выполнен</span><span><i style="background:${PF_COL.dg}"></i>больше минимума на 50 % и более</span><span>число — сделано точек / минимум</span></div></div>
+    ${isHead() && monthEnd && rows.some(r => !rateOf(r.u.id, ym)) ? `<div class="box sgrnote">Конец месяца — поставьте сотрудникам оценки в последнем столбце: 5 — вкалывал, 4 — вроде работал, но периодически вкалывал, 3 — работал нормально, 2 — вроде работал, но отлынивал, 1 — отлынивал.</div>` : ''}
+    ${rows.length ? `<div class="sgscroll"><table class="sgt sgall"><thead><tr><th class="sgname">Сотрудник</th><th class="sgkind"></th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}
+        <th class="sgsum" title="Табель: работа сверх графика, часы:минуты · Успеваемость: точек за месяц">Переработка<small>точек</small></th><th class="sgsum" title="Табель: опоздания, ранний уход и невыходы, часы:минуты · Успеваемость: дней ниже минимума">Штрафных<small>ниже минимума</small></th><th class="sgsum" title="Оценка руководителя за месяц, 1–5">Оценка</th></tr></thead>
+      <tbody>${rows.map(r => `<tr class="sgt1"><th class="sgname" rowspan="2"><button class="linkish sgu" data-act="stCard" data-id="${r.u.id}" title="Подробно по сотруднику">${esc(r.u.name)}</button><small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th><th class="sgkind">Табель</th>
+          ${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${days[i] === sel ? 'sel' : ''}" style="${c.bg ? `background:${c.bg}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.codes.length ? c.codes.join('<br>') : c.dot ? '<span class="sgdot">●</span>' : ''}</td>`).join('')}
+          <td class="sgsum ${r.ext ? 'sgplus' : ''}">${r.ext ? `<b>${hmm(r.ext)}</b>` : '—'}</td><td class="sgsum ${r.pen.total ? 'sgminus' : ''}" title="${esc(r.pen.tip)}">${r.pen.total ? `<b>${hmm(r.pen.total)}</b>` : '—'}</td>${rateCell(r.u, ym)}</tr>
+        <tr class="sgt2 pft"><th class="sgkind">Успеваемость</th>${r.pf.map((c, i) => `<td class="${c.off ? 'off' : ''} ${c.col === 'dg' ? 'pfdg' : ''}" style="${c.col ? `background:${PF_COL[c.col]}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.did || (c.min ? '0' : '')}${c.min ? `<small class="pfmin">/${c.min}</small>` : ''}</td>`).join('')}
+          <td class="sgsum"><b>${r.total}</b>${r.workDays ? `<small class="dim"> · ${Math.round(r.total / r.workDays * 10) / 10} в день</small>` : ''}</td><td class="sgsum ${r.below ? 'sgminus' : ''}">${r.planned ? `<b>${r.below}</b> из ${r.planned} дн.` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
+    <small class="dim sgnote">По каждому сотруднику сверху — табель, ниже — успеваемость (сделано точек / минимум дня). Нажмите на клетку — что было в этот день; на имя — подробно по сотруднику.</small></section>`;
 }
 /* ===== «Транспорт» (руководители): машины компании, ТО по дате и пробегу, документы; «Запчасти» — номер, описание, ссылка ===== */
 let VEHICLES = [], PARTS = [];
@@ -4428,20 +4450,6 @@ function pfCell(u, day){
   const col = !min ? '' : did < min ? 'red' : did >= min * 1.5 ? 'dg' : 'lg';
   const tip = [`${fmtD(day)} — ${DAY_KIND[kind]}`, `сделано точек: ${did}`, min ? `минимум ${min} (работа № ${jobNo(from)} · ${from.title})` : away ? MARK_T[away.type] : 'минимум не задан'].join('\n');
   return { did, min, col, tip, away, off: kind !== 'work' };
-}
-function staffPerf(people){
-  const ym = ui.stMonth || today().slice(0, 7), [y, m] = ym.split('-').map(Number), n = new Date(y, m, 0).getDate();
-  const days = Array.from({ length: n }, (_, i) => `${ym}-${pad(i + 1)}`), wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-  const shift = k => { const d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
-  const rows = people.map(u => { const cells = days.map(d => pfCell(u, d)), planned = cells.filter(c => c.min);
-    return { u, cells, total: cells.reduce((a, c) => a + c.did, 0), below: planned.filter(c => c.col === 'red').length, planned: planned.length, workDays: cells.filter(c => !c.off && !c.away && c.did).length }; });
-  return `<section class="card sgwrap"><div class="sghead">
-      <div class="row-g"><button class="btn sm" data-act="stMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="stMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="stMonth" data-id="${today().slice(0, 7)}">Текущий</button>` : ''}</div>
-      <div class="sglegend"><span><i style="background:${PF_COL.red}"></i>меньше минимума</span><span><i style="background:${PF_COL.lg}"></i>минимум выполнен</span><span><i style="background:${PF_COL.dg}"></i>больше минимума на 50 % и более</span><span><i class="sgoff"></i>выходной, праздник</span><span>число — сделано точек</span></div></div>
-    ${rows.length ? `<div class="sgscroll"><table class="sgt pft"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum">Точек за месяц</th><th class="sgsum" title="Дней с минимумом, где сделано меньше">Ниже минимума</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><th class="sgname"><button class="linkish sgu" data-act="stCard" data-id="${r.u.id}">${esc(r.u.name)}</button><small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${c.col === 'dg' ? 'pfdg' : ''}" style="${c.col ? `background:${PF_COL[c.col]}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.did || (c.min ? '0' : c.away ? `<small class="dim">${c.away.type === 'sick' ? 'Б' : 'О'}</small>` : '')}${c.min ? `<small class="pfmin">/${c.min}</small>` : ''}</td>`).join('')}
-        <td class="sgsum"><b>${r.total}</b>${r.workDays ? `<small class="dim"> · ${Math.round(r.total / r.workDays * 10) / 10} в день</small>` : ''}</td><td class="sgsum ${r.below ? 'sgminus' : ''}">${r.planned ? `<b>${r.below}</b> из ${r.planned} дн.` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
-    <small class="dim sgnote">В клетке — сделано точек, после косой черты — минимум дня (наибольший «Минимум точек в день» среди работ, назначенных сотруднику). Нажмите на клетку — что было в этот день.</small></section>`;
 }
 /* ===== «Справочники»: файлы и текст по проектам, по своим разделам и «Общая информация»; руководитель ведёт, остальные читают ===== */
 let REFS = [];
@@ -4845,9 +4853,8 @@ function vStaff(){
     <button class="btn sm" data-act="workCal">📅 График работы</button><span class="dim">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}</span>
     <span class="dim">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}: <b>${rows.reduce((a, r) => a + r.doneDay.length, 0)}</b></span></div>`;
   if (!rows.length) return head + '<div class="empty"><h3>Сотрудников нет</h3>Добавьте пользователей с ролью «Сотрудник» или «Подрядчик» на вкладке «Пользователи».</div>';
-  const people = rows.map(r => r.u).sort((a, b) => a.name.localeCompare(b.name, 'ru')), tab = ui.stTab || 'grid';
-  const tabs = `<nav class="seg stabs" aria-label="Сотрудники">${[['grid', 'Табель'], ['perf', 'Успеваемость']].map(([k, l]) => `<button type="button" data-act="stTab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-pressed="${tab === k}">${l}</button>`).join('')}</nav>`;
-  return tabs + head + (tab === 'perf' ? staffPerf(people) : staffGrid(people));
+  const people = rows.map(r => r.u).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  return head + staffGrid(people);
 }
 /* a cell of the table: the marks and the irregular hours of the day with «Изменить», and what was assigned */
 function staffDayHtml(uid, day){
@@ -6951,7 +6958,6 @@ async function act(el){
       try { const r = await api('PUT', '/api/overtime/' + id, body); Object.assign(x, r.entry); render(); openDrawer('staffDay', x.by, x.date); toast('Запись изменена'); refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
     case 'otHDel': { const x = OVERTIME.find(o => o.id === id); try { await api('DELETE', '/api/overtime/' + id); OVERTIME = OVERTIME.filter(o => o.id !== id); render(); openDrawer('staffDay', x.by, x.date); toast('Запись удалена'); } catch(e) { toast(errText(e)); } return; }
     case 'stMonth': ui.stMonth = id; return render();
-    case 'stTab': ui.stTab = id; return render();
     case 'spG': ui.spG = id; return render();
     case 'spP': ui.spP = id; return render();
     case 'spAll': ui.spAll = !!id; return render();
@@ -7041,6 +7047,12 @@ document.addEventListener('keydown', e => {
 });
 $('scrim').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('submit', onSubmit);
+// a time of a new mark shows the schedule; the first click to change it puts the current time
+document.addEventListener('pointerdown', e => {
+  const t = e.target; if (!(t && ['sm-in', 'sm-out'].includes(t.id) && t.dataset.def)) return;
+  delete t.dataset.def; const d = new Date(); t.value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if ($('sm-calc')) $('sm-calc').innerHTML = smCalc($('sm-in')?.value, $('sm-out')?.value, $('sm-from')?.value);
+});
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'cp-q') return cpResults();
@@ -7121,6 +7133,10 @@ document.addEventListener('click', e => { if (ui.dtMenu && !e.target.closest('de
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'rf-restr') { refKeep(); return renderDrawer(); }
+  // the monthly rating of an employee (the last column of «Табель»)
+  if (t.dataset.rate) { const [user, ym] = t.dataset.rate.split('|'), score = Number(t.value);
+    try { const r = await api('PUT', '/api/staff-ratings', { user, ym, score }); STAFF_RATINGS = STAFF_RATINGS.filter(x => !(x.user === user && x.ym === ym)); if (r.rating) STAFF_RATINGS.push(r.rating);
+      t.blur(); render(); toast(score ? `Оценка ${score} — ${RATE_T[score]}` : 'Оценка снята'); } catch(err) { toast(errText(err)); render(); } return; }
   // the manual percent of a work without points (the drop-down under a row of «Работы»)
   if (t.dataset && t.dataset.wlpct) { const v = t.value.trim(), n = Number(v);
     if (v !== '' && !(n >= 0 && n <= 100)) { toast('Процент — от 0 до 100'); return; }
