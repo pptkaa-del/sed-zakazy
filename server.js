@@ -63,6 +63,7 @@ const ROLES = {
   accountant: 'Бухгалтер',
   worker:     'Сотрудник',
   contractor: 'Подрядчик',
+  executor:   'Исполнитель',   // only in «Управление заявками»
 };
 /* «Сотрудник» and «Подрядчик» work in the field: only their points; a contractor's access ends on a set date */
 const FIELD = u => u && (u.role === 'worker' || u.role === 'contractor');
@@ -329,7 +330,7 @@ const orgById = id => orgs.find(o => o.id === id);
 // «Все сервисы», «Управление заявками», «Транспортная организация» (спецтехника и грузоперевозки)
 const ORG_TYPES = ['all', 'requests', 'transport'];
 const orgType = u => { const o = u && orgById(u.orgId); return o && ORG_TYPES.includes(o.type) ? o.type : 'all'; };
-const REQ_ROLES = ['admin', 'head', 'worker'];
+const REQ_ROLES = ['admin', 'head', 'executor', 'worker'];
 // «time» — late and/or left early in one mark (the old «late» and «early» are still read)
 const STAFF_MARKS = ['sick', 'vacation', 'time', 'late', 'early', 'absent'];
 const workCalOf = () => { const c = db.workCal && typeof db.workCal === 'object' ? db.workCal : {}; return { from: c.from || '09:00', to: c.to || '18:00', off: c.off || [], work: c.work || [] }; };
@@ -354,10 +355,11 @@ const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTI
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
 const hiddenFor = u => { const o = u && orgById(u.orgId); return [...new Set([...((o && o.hide) || []), ...((u && u.hide) || [])])]; };
 const sees = (u, key) => { const H = hiddenFor(u), top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
-// a request is seen by its author, its executor, the administrator and the manager
-const reqSees = (u, r) => HEAD(u) || r.by === u.id || r.assignee === u.id;
+// a request is seen by its author, the executors («Исполнитель» sees all, new ones too), the administrator and the manager
+const REQ_EXEC = u => HEAD(u) || (u && u.role === 'executor');
+const reqSees = (u, r) => REQ_EXEC(u) || r.by === u.id || r.assignee === u.id;
 /* the equipment of a requests organization: the administrator keeps the list; an item is general (everyone) or fixed to chosen users */
-const eqSees = (u, e) => HEAD(u) || !(e.owners || []).length || (e.owners || []).includes(u.id);
+const eqSees = (u, e) => REQ_EXEC(u) || !(e.owners || []).length || (e.owners || []).includes(u.id);
 /* serial numbers of labels: the text of a number and the index of every number already printed in the organization */
 const serialStr = (t, n) => (t.serial.prefix || '') + String(n).padStart(t.serial.digits || 1, '0') + (t.serial.suffix || '');
 function labelSerials(){
@@ -581,7 +583,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -591,7 +593,7 @@ async function api(req, res, url) {
       const b = await readJsonBody(req);
       const err = validateUser(b, true); if (err) return fail(res, 400, err);
       if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
-      if (orgType(user) === 'requests' && !REQ_ROLES.includes(b.role)) return fail(res, 400, 'В системе заявок роли: администратор, руководитель, сотрудник');
+      if (orgType(user) === 'requests' ? !REQ_ROLES.includes(b.role) : b.role === 'executor') return fail(res, 400, orgType(user) === 'requests' ? 'В системе заявок роли: администратор, руководитель, исполнитель, пользователь' : 'Роль «Исполнитель» есть только в системе заявок');
       if (b.role === 'contractor' && !/^\d{4}-\d{2}-\d{2}$/.test(String(b.accessUntil || ''))) return fail(res, 400, 'Для подрядчика укажите, до какой даты у него доступ');
       const nu = addUser(String(b.login), b.role, String(b.name).trim(), String(b.password), user.orgId);
       if (b.role === 'contractor') nu.accessUntil = String(b.accessUntil);
@@ -604,7 +606,7 @@ async function api(req, res, url) {
       const b = await readJsonBody(req);
       if (b.role !== undefined) {
         if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
-        if (orgType(user) === 'requests' && !REQ_ROLES.includes(b.role)) return fail(res, 400, 'В системе заявок роли: администратор, руководитель, сотрудник');
+        if (orgType(user) === 'requests' ? !REQ_ROLES.includes(b.role) : b.role === 'executor') return fail(res, 400, orgType(user) === 'requests' ? 'В системе заявок роли: администратор, руководитель, исполнитель, пользователь' : 'Роль «Исполнитель» есть только в системе заявок');
         if (target.id === user.id && b.role !== 'admin') return fail(res, 400, 'Нельзя снять роль администратора с самого себя');
         target.role = b.role;
       }
@@ -892,9 +894,9 @@ async function api(req, res, url) {
       const b = await readJsonBody(req), act = b.action, note = String(b.note || '').trim().slice(0, 2000);
       const log = (a, extra = {}) => { r.history = Array.isArray(r.history) ? r.history : []; r.history.push({ at: now, by: user.id, act: a, ...(note ? { note } : {}), ...extra }); r.updatedAt = now; };
       if (act === 'take') {
-        if (!(executor || boss || (!r.assignee))) return fail(res, 403, 'Взять в работу может исполнитель заявки');
+        if (!REQ_EXEC(user)) return fail(res, 403, 'Приступить к выполнению может исполнитель');
         if (r.status !== 'new') return fail(res, 409, 'Заявка уже в работе или закрыта');
-        if (!r.assignee) r.assignee = user.id;
+        r.assignee = user.id;
         r.status = 'work'; r.takenAt = now; log('take');
       } else if (act === 'done' || act === 'reject') {
         // «Выполнена» or «Отклонена»: what was done (or why it is rejected), the replaced equipment and the photos of the result
