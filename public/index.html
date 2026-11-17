@@ -356,6 +356,15 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .rfv{display:flex;flex-direction:column;gap:10px;align-items:center;min-height:200px;flex:none}.rfvimg{max-width:100%;height:auto;border-radius:6px}.rfvpage{width:100%;max-width:1100px;height:auto;box-shadow:0 1px 6px rgba(0,0,0,.18);background:#fff}
 .rfvsheet{overflow:auto;max-width:100%;align-self:stretch}.rfvsheet table,.rfvtbl{border-collapse:collapse;font-size:13px}.rfvsheet td,.rfvtbl td{border:1px solid var(--rule);padding:4px 8px;vertical-align:top;white-space:pre-wrap}
 .rfvdoc{align-self:stretch;max-width:900px;margin:0 auto;background:#fff;color:#111;padding:24px 28px;border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,.12)}.rfvdoc p{margin:0 0 8px;white-space:pre-wrap}.rfvtext{align-self:stretch;white-space:pre-wrap;font-size:13px;background:var(--paper);padding:12px;border-radius:6px}
+.tort td small{display:block;font-size:12px;color:var(--ink-2);margin-top:2px}.tort tr.done td{color:var(--ink-2)}
+.dp{padding:0;overflow:auto}.dprow{display:flex;border-top:1px solid var(--rule-2);min-width:max-content}.dphead{border-top:0;background:var(--mute-soft)}.dplab{flex:0 0 190px;position:sticky;left:0;z-index:2;background:var(--sheet);padding:8px 12px;border-right:1px solid var(--rule);font-size:13px}.dphead .dplab{background:var(--mute-soft);font-size:12px;color:var(--ink-2);text-transform:uppercase}
+.dplab b{display:block}.dplab small{color:var(--ink-2);font-size:12px}.dptrack{position:relative;min-height:38px}.dptrack>i{position:absolute;top:0;bottom:0;border-left:1px solid var(--rule-2)}.dptrack>i.off{background:repeating-linear-gradient(135deg,var(--mute-soft) 0 4px,transparent 4px 8px)}.dptrack>i.tod{background:var(--stamp-soft)}
+.dphead .dptrack{height:40px}.dphead .dptrack span{position:absolute;top:4px;text-align:center;font-size:12px;font-weight:600;line-height:1.1}.dphead .dptrack span small{display:block;font-weight:400;color:var(--ink-2)}.dphead .dptrack span.off{color:var(--bad)}.dphead .dptrack span.tod{color:var(--stamp)}
+.dpbar{position:absolute;height:26px;border:0;border-radius:6px;color:#fff;font:600 12px var(--f-body);padding:0 8px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:#E07B00}.dpbar.rent{background:#3B82F6}.dpbar.done{background:#9CA3AF}.dpbar.new{opacity:.8;border:2px dashed rgba(255,255,255,.8)}.dpbar.clash{box-shadow:0 0 0 2px var(--bad)}
+.trstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.trstats .stat{padding:12px 14px;display:flex;flex-direction:column;gap:4px}.trstats .stat span{font-size:12px;color:var(--ink-2)}.trstats .stat b{font-size:20px}
+.trgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}@media (max-width:900px){.trgrid{grid-template-columns:1fr}}
+.tmlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}.tmcard{text-align:left;padding:12px 14px;display:flex;flex-direction:column;gap:6px;cursor:pointer;font:inherit;color:inherit}.tmcard.today{border-color:var(--stamp);box-shadow:0 0 0 2px var(--stamp-soft)}.tmroute{font-weight:600}
+.vrowl{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 .smtypes{flex-wrap:wrap}.mywork{padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}.rswitch{white-space:nowrap}.sgu{font-weight:600;font-size:13px;text-align:left;color:var(--ink);text-decoration:underline dotted;text-underline-offset:3px}.sdrow{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--rule-2)}.sdrow:first-of-type{border-top:0}.sdrow>div>small{display:block}.sgidle{background:#FFF7CC;border-color:#E8D36A;color:#5C4A00}.staffd .staffc{box-shadow:none;border:0;padding:0}.calhol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .otrow{display:grid;grid-template-columns:150px 120px 120px minmax(0,1fr);gap:10px}.otrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.otrow{grid-template-columns:1fr 1fr}.otrow label:first-child,.otrow .otnote{grid-column:1/-1}}
@@ -1103,6 +1112,9 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <div><h1 id="happ">Управление предприятием</h1><p class="sub" id="hsub">Заказы, контрагенты, документы, счета и план-график</p></div>
     </div>
     <nav class="views" id="views">
+      <a href="#tor" data-v="tor" hidden>Заказы</a>
+      <a href="#disp" data-v="disp" hidden>Диспетчерская</a>
+      <a href="#tmine" data-v="tmine" hidden>Мои рейсы</a>
       <a href="#req" data-v="req" id="reqTab" hidden>Заявки <span class="badge" id="reqBadge" hidden></span></a>
       <a href="#reqall" data-v="reqall" hidden>Все заявки</a>
       <a href="#reqdev" data-v="reqdev" hidden>Устройства</a>
@@ -1123,9 +1135,10 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#transport" data-v="transport" id="trTab" hidden>Транспорт</a>
       <a href="#notes" data-v="notes" id="notesTab" hidden>Задачи <span class="badge" id="noteBadge" hidden></span></a>
       <a href="#mytasks" data-v="mytasks" id="mytTab" hidden>Мои задачи <span class="badge" id="mytBadge" hidden></span></a>
-      <a href="#refs" data-v="refs" id="refsTab" hidden>Справочники</a>
       <a href="#checks" data-v="checks" hidden>Загрузить чек</a>
       <a href="#trips" data-v="trips" hidden>Загрузить путевой лист</a>
+      <a href="#trep" data-v="trep" hidden>Отчёты</a>
+      <a href="#refs" data-v="refs" id="refsTab" hidden>Справочники</a>
       <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
@@ -1227,7 +1240,7 @@ const ROLE_INFO_REQ = {
   head:'Видит и меняет все заявки, назначает и меняет исполнителей.',
   worker:'Создаёт заявки и выбирает исполнителя; выполняет порученные ему заявки. Видит свои и порученные ему заявки.'
 };
-const roleNames = () => reqMode() ? ROLE_NAMES_REQ : ROLE_NAMES;
+const roleNames = () => reqMode() ? ROLE_NAMES_REQ : transMode() ? { ...ROLE_NAMES, head: 'Руководитель / диспетчер', worker: 'Водитель', contractor: 'Водитель-подрядчик' } : ROLE_NAMES;
 const roleInfo = k => (reqMode() ? ROLE_INFO_REQ : ROLE_INFO)[k] || '';
 const ROLE_INFO = {
   admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, карта объектов, назначение точек, пользователи.',
@@ -1348,8 +1361,8 @@ async function refresh(){
   const d = await api('GET', '/api/data');
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
-  $('devsTab').hidden = !!me?.sys || reqMode() || !can('devs') || !isWorker() || !DEVS.length;
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; if (d.workCal) WORK_CAL = d.workCal;
+  $('devsTab').hidden = !!me?.sys || reqMode() || transMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
   if (reqMode()) { const n = reqTodo().length; $('reqBadge').hidden = !n; $('reqBadge').textContent = n; if (ui.drawer?.kind === 'req' && !drawerBusy()) renderDrawer(); }
@@ -1454,6 +1467,7 @@ function vAdmFiles(){
 }
 const canWo = () => isHead() || me?.role === 'accountant';
 function stockTabs(){
+  if (transMode()) return `<nav class="seg stabs" aria-label="Разделы учётки">${[['cps', 'Клиенты'], ['checks', 'Загрузить чек'], ['trips', 'Путевые листы']].map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
   const n = S.invoices.filter(i => i.status === 'topay').length;
   const inc = S.invoices.filter(i => incState(i) === 'wait').length;
   const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [...(can('cps') ? [['cps', 'Контрагенты']] : []), ['checks', 'Загрузить чек'], ['trips', 'Путевые листы']]);
@@ -1474,7 +1488,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : '') + (ui.view === 'admInit' ? vAdmInit() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqall' ? vReqAll() : ui.view === 'reqdev' ? vReqDev() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'reqrep' ? vReqRep() : ui.view === 'reqset' ? vReqSet() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'notes' && ui.ntab === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -3425,7 +3439,7 @@ function vOrgs(){
   const rows = L.slice().sort((a, b) => (a.id === me.org?.id ? -1 : b.id === me.org?.id ? 1 : 0) || a.name.localeCompare(b.name, 'ru')).map(o => {
     const [cc, cl] = ORG_STATE(o), mine = o.id === me.org?.id;
     return `<div class="orow ${o.state !== 'active' ? 'off' : ''}">
-      <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b> <span class="chip ${o.type === 'requests' ? 'c-info' : 'c-mute'}">${o.type === 'requests' ? 'Управление заявками' : 'Все сервисы'}</span><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
+      <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b> <span class="chip ${o.type === 'requests' ? 'c-info' : o.type === 'transport' ? 'c-warn' : 'c-mute'}">${o.type === 'requests' ? 'Управление заявками' : o.type === 'transport' ? 'Транспортная организация' : 'Все сервисы'}</span><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
       <div><small class="lbl">Пользователей</small>${o.users}</div>
       <div><small class="lbl">Администраторы</small>${!o.admins.some(a => !a.sys) ? '<span class="chip c-warn">нет администратора организации</span><br>' : ''}${o.admins.length ? o.admins.map(a => `${esc(a.name)} <span class="mono dim">${esc(a.login)}</span>${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}`).join('<br>') : '<span class="dim">нет</span>'}</div>
       <div><span class="chip ${cc}">${cl}</span><small>${o.until ? 'до ' + fmtD(o.until) + ' включительно' : 'без срока'}</small></div>
@@ -4595,37 +4609,196 @@ async function docxHtml(blob){
 let TRIPS = [];
 function vTrips(){
   const all = isHead() || me?.role === 'accountant', ym = ui.tpMonth || today().slice(0, 7);
-  const jobs = S.jobs.filter(j => j.status !== 'done' || (ui.tpJob === j.id)).sort((a, b) => jobNo(b) - jobNo(a));
+  const jobs = transMode() ? TORDERS.filter(x => x.status !== 'cancel' && (isWorker() ? x.driverId === me.id : true) && (torOpen(x) || x.date >= dstr(dnum(today()) - 30))).sort((a, b) => b.date.localeCompare(a.date)).map(x => ({ id: x.id, no: x.no, title: `${torWhen(x)} · ${x.clientName}`, tor: true }))
+    : S.jobs.filter(j => j.status !== 'done' || (ui.tpJob === j.id)).sort((a, b) => jobNo(b) - jobNo(a));
+  const jlabel = j => j.tor ? `Заказ № ${j.no} · ${j.title}` : '№ ' + jobNo(j) + ' · ' + j.title, tripRef = x => { if (x.orderId) { const o = TORDERS.find(y => y.id === x.orderId); return o ? `Заказ № ${o.no} · ${torWhen(o)} · ${o.clientName}` : null; } const j = jobOf(x.jobId); return j ? '№ ' + jobNo(j) + ' · ' + j.title : null; };
   const form = `<section class="card ckform" data-keep>
       <h3>${all ? 'Загрузить путевой лист' : 'Путевой лист'}</h3>
       <div class="row-g">${(ui.tpFiles || []).map((f, i) => `<span class="tw rqthumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}"><button type="button" class="btn sm ghost" data-act="tpFileDel" data-id="${i}" aria-label="Убрать">✕</button></span>`).join('')}
         <label class="phdrop" style="flex:1 1 240px"><input type="file" accept="image/*,application/pdf" data-up="tpFile" multiple hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span><b>${(ui.tpFiles || []).length ? 'Добавить ещё фото' : 'Сфотографировать путевой лист'}</b><small>Фото обеих сторон, если заполнены</small></span></label></div>
-      <div class="form"><label class="wide"><span>К какой работе относится <em class="req-star">*</em></span><select class="in" id="tp-job"><option value="">— выберите работу —</option>${jobs.map(j => `<option value="${j.id}" ${ui.tpJob === j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}</select>
-          ${jobs.length ? '' : '<small class="dim">Вам пока не назначено работ.</small>'}</label>
+      <div class="form"><label class="wide"><span>${transMode() ? 'К какому заказу относится' : 'К какой работе относится'} <em class="req-star">*</em></span><select class="in" id="tp-job"><option value="">— ${transMode() ? 'выберите заказ' : 'выберите работу'} —</option>${jobs.map(j => `<option value="${j.id}" ${ui.tpJob === j.id ? 'selected' : ''}>${esc(jlabel(j))}</option>`).join('')}</select>
+          ${jobs.length ? '' : `<small class="dim">${transMode() ? 'Вам пока не назначено заказов.' : 'Вам пока не назначено работ.'}</small>`}</label>
         <label>Дата<input class="in" type="date" id="tp-date" value="${esc(ui.tpDate || today())}" max="${today()}"></label>
         ${VEH_BRIEF.length ? `<label>Транспорт<select class="in" id="tp-veh"><option value="">— не указан —</option>${VEH_BRIEF.map(v => `<option value="${v.id}" ${ui.tpVeh === v.id ? 'selected' : ''}>${esc(v.name + (v.plate ? ' · ' + v.plate : ''))}</option>`).join('')}</select></label>` : ''}
         <label class="wide">Комментарий<input class="in" id="tp-note" maxlength="1000" value="${esc(ui.tpNote || '')}" placeholder="Необязательно"></label></div>
       <div class="row-g"><button class="btn primary" data-act="tpSave">Загрузить путевой лист</button></div></section>`;
   let L = TRIPS.filter(x => all ? x.date.startsWith(ym) : x.by === me.id);
-  if (all && ui.tpFJob) L = L.filter(x => x.jobId === ui.tpFJob);
+  if (all && ui.tpFJob) L = L.filter(x => x.jobId === ui.tpFJob || x.orderId === ui.tpFJob);
   if (all && ui.tpFWho) L = L.filter(x => x.by === ui.tpFWho);
   L.sort((a, b) => b.date.localeCompare(a.date) || b.at.localeCompare(a.at));
   const shift = k => { const [y, m] = ym.split('-').map(Number), d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
   const authors = [...new Set(TRIPS.map(x => x.by))];
   const filters = all ? `<div class="toolbar" style="margin-top:16px"><h3 style="margin:0">Путевые листы <span class="dim">${L.length}</span></h3>
       <div class="row-g"><button class="btn sm" data-act="tpMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="tpMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button></div>
-      <select class="f" id="tp-fjob" aria-label="Работа"><option value="">Все работы</option>${S.jobs.slice().sort((a, b) => jobNo(b) - jobNo(a)).map(j => `<option value="${j.id}" ${ui.tpFJob === j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}</select>
+      <select class="f" id="tp-fjob" aria-label="Работа"><option value="">${transMode() ? 'Все заказы' : 'Все работы'}</option>${(transMode() ? TORDERS.slice().sort((a, b) => b.no - a.no).map(o => [o.id, `Заказ № ${o.no} · ${o.clientName}`]) : S.jobs.slice().sort((a, b) => jobNo(b) - jobNo(a)).map(j => [j.id, '№ ' + jobNo(j) + ' · ' + j.title])).map(([id, l]) => `<option value="${id}" ${ui.tpFJob === id ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
       <select class="f" id="tp-fwho" aria-label="Сотрудник"><option value="">Все сотрудники</option>${authors.map(id => `<option value="${id}" ${ui.tpFWho === id ? 'selected' : ''}>${esc(who(id))}</option>`).join('')}</select></div>`
     : `<h3 style="margin:16px 0 8px">Мои путевые листы <span class="dim">${L.length}</span></h3>`;
   const list = L.length ? `<div class="cklist">${L.map(x => { const j = jobOf(x.jobId); return `<div class="card ckcard">
       <div class="ckph">${(x.files || []).map(f => /^image\//.test(f.type || '') ? `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener"><img src="/files/${esc(f.id)}" alt="Путевой лист" loading="lazy"></a>` : `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener" class="chip c-mute">📄 ${esc(f.name)}</a>`).join('')}</div>
       <div class="ckb"><div class="row-g" style="justify-content:space-between"><b>${fmtD(x.date)}</b>${x.by === me.id || isHead() ? armBtn('tpd:' + x.id, '✕', 'tpDel', x.id, 'btn sm ghost') : ''}</div>
-        <div>🏗 ${j ? esc('№ ' + jobNo(j) + ' · ' + j.title) : '<span class="dim">работа удалена</span>'}</div>
+        <div>${x.orderId ? '🚚' : '🏗'} ${tripRef(x) ? esc(tripRef(x)) : `<span class="dim">${x.orderId ? 'заказ удалён' : 'работа удалена'}</span>`}</div>
         ${x.vehicleId ? `<div>🚚 ${esc(vehLabel(x.vehicleId))}</div>` : ''}${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}
         <small class="dim">${all ? esc(who(x.by)) + ' · ' : ''}загружен ${esc(fmtDT(x.at))}</small></div></div>`; }).join('')}</div>`
     : `<div class="empty">${all ? 'За этот месяц путевых листов нет.' : 'Вы ещё не загружали путевые листы.'}</div>`;
   return form + filters + list;
 }
+/* ===== Транспортная организация: спецтехника и грузоперевозки — заказы, диспетчерская, отчёты, рейсы водителя ===== */
+let TORDERS = [];
+const transMode = () => !!(me && !me.sys && me.org && me.org.type === 'transport');
+const TOR_KIND = { rent: 'Аренда спецтехники', cargo: 'Грузоперевозка' };
+const TOR_ST = { new: 'Новый', assigned: 'Назначен', work: 'В работе', done: 'Выполнен', cancel: 'Отменён' };
+const TOR_CHIP = { new: 'c-info', assigned: 'c-mute', work: 'c-warn', done: 'c-ok', cancel: 'c-mute' };
+const TOR_UNIT = { hour: ['час', 'ч', 'Часов'], shift: ['смена', 'смен', 'Смен'], trip: ['рейс', 'рейс.', 'Рейсов'], km: ['км', 'км', 'Километров'] };
+const TOR_ACT = { created: 'заказ создан', edit: 'изменён', start: 'водитель начал', done: 'выполнен', cancel: 'отменён', reopen: 'возвращён в работу', paid: 'оплачен', unpaid: 'оплата снята', docs: 'документы' };
+const torOpen = x => ['new', 'assigned', 'work'].includes(x.status);
+const torMoney = v => v == null ? '—' : Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ₽';
+const torVeh = id => { const v = (VEHICLES.length ? VEHICLES : VEH_BRIEF).find(x => x.id === id); return v ? v.name + (v.plate ? ' · ' + v.plate : '') : ''; };
+const torDays = x => { const a = dnum(x.date), b = x.dateTo ? dnum(x.dateTo) : a; return [a, Math.max(a, b)]; };
+const torWhen = x => `${fmtD(x.date)}${x.dateTo && x.dateTo !== x.date ? ' – ' + fmtD(x.dateTo) : ''}${x.timeFrom ? ' · ' + x.timeFrom + (x.timeTo ? '–' + x.timeTo : '') : ''}`;
+const torRoute = x => x.kind === 'rent' ? (x.from ? '📍 ' + x.from : '') : [x.from, x.to].filter(Boolean).join(' → ');
+const torQty = (x, q) => q == null ? '—' : `${String(q).replace('.', ',')} ${TOR_UNIT[x.unit || 'trip'][1]}`;
+const drivers = () => STAFF.filter(u => ['worker', 'contractor'].includes(u.role)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+// a vehicle busy on the same days with another open order
+const torClash = x => x.vehicleId && torOpen(x) ? TORDERS.filter(y => y.id !== x.id && y.vehicleId === x.vehicleId && torOpen(y) && torDays(y)[0] <= torDays(x)[1] && torDays(x)[0] <= torDays(y)[1]
+  && (!x.timeFrom || !y.timeFrom || x.date !== y.date || !(x.timeTo && x.timeTo <= y.timeFrom) && !(y.timeTo && y.timeTo <= x.timeFrom))) : [];
+
+/* «Заказы» */
+function vTor(){
+  const q = (ui.toq || '').trim().toLowerCase(), st = ui.toSt || 'active', K = ui.toKind || 'all';
+  const okSt = (x, k) => k === 'all' || (k === 'active' ? torOpen(x) : k === 'unpaid' ? x.status === 'done' && !x.paid : x.status === k);
+  const L = TORDERS.filter(x => okSt(x, st) && (K === 'all' || x.kind === K) && (!q || [x.no, x.clientName, x.phone, x.from, x.to, x.cargo, torVeh(x.vehicleId), who(x.driverId)].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => st === 'active' || st === 'new' || st === 'assigned' || st === 'work' ? (a.date + (a.timeFrom || '')).localeCompare(b.date + (b.timeFrom || '')) : (b.date + (b.timeFrom || '')).localeCompare(a.date + (a.timeFrom || '')));
+  const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="toq" type="search" placeholder="Клиент, адрес, транспорт, водитель" aria-label="Поиск заказа" value="${esc(ui.toq || '')}" style="flex:1 1 220px;max-width:320px"></span>
+    <div class="seg">${[['all', 'Все виды'], ['rent', 'Спецтехника'], ['cargo', 'Грузоперевозки']].map(([k, l]) => `<button data-act="toKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="seg">${[['active', 'Текущие'], ['new', 'Новые'], ['assigned', 'Назначены'], ['work', 'В работе'], ['done', 'Выполнены'], ['unpaid', 'Не оплачены'], ['all', 'Все']].map(([k, l]) => `<button data-act="toSt" data-id="${k}" class="${st === k ? 'on' : ''}">${l} <span class="dim">${TORDERS.filter(x => okSt(x, k)).length}</span></button>`).join('')}</div>
+    ${isHead() ? '<button class="btn primary" data-act="toNew">+ Заказ</button>' : ''}</div>`;
+  if (!TORDERS.length) return head + `<div class="empty"><h3>Заказов пока нет</h3>${isHead() ? 'Создайте заказ: аренда спецтехники или грузоперевозка — клиент, дата, адрес, транспорт, водитель и тариф.' : ''}</div>`;
+  if (!L.length) return head + '<div class="empty">Нет заказов по выбранному фильтру</div>';
+  return head + `<section class="card" style="padding:0;overflow:hidden"><div class="tblwrap"><table class="jt tort"><thead><tr><th>№</th><th>Когда</th><th>Клиент</th><th>Услуга и маршрут</th><th>Транспорт и водитель</th><th>Сумма</th><th>Статус</th></tr></thead><tbody>
+    ${L.map(x => { const clash = torClash(x).length; return `<tr class="click ${torOpen(x) ? '' : 'done'}" data-act="toOpen" data-id="${x.id}" tabindex="0">
+      <td data-l="№"><b>${x.no}</b></td><td data-l="Когда">${torWhen(x)}</td>
+      <td data-l="Клиент"><b>${esc(x.clientName)}</b>${x.phone ? `<small>${esc(x.phone)}</small>` : ''}</td>
+      <td data-l="Услуга"><span class="chip ${x.kind === 'rent' ? 'c-info' : 'c-warn'}">${TOR_KIND[x.kind]}</span><small>${esc(torRoute(x))}${x.cargo ? ' · ' + esc(x.cargo.slice(0, 80)) : ''}</small></td>
+      <td data-l="Транспорт">${x.vehicleId ? esc(torVeh(x.vehicleId)) : '<span class="bad-t">не назначен</span>'}${clash ? ' <span class="chip c-bad" title="Машина занята другим заказом в эти дни">пересечение</span>' : ''}<small>${x.driverId ? '👤 ' + esc(who(x.driverId)) : '<span class="bad-t">водитель не назначен</span>'}</small></td>
+      <td data-l="Сумма"><b>${torMoney(x.sum)}</b><small>${x.price != null ? torMoney(x.price) + '/' + TOR_UNIT[x.unit][0] : ''} · ${x.factQty != null ? 'факт ' + torQty(x, x.factQty) : 'план ' + torQty(x, x.planQty)}</small></td>
+      <td data-l="Статус"><span class="chip ${TOR_CHIP[x.status]}">${TOR_ST[x.status]}</span>${x.status === 'done' ? `<small class="${x.paid ? 'ok-t' : 'bad-t'}">${x.paid ? 'оплачен' : 'не оплачен'}</small>` : ''}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+}
+function torFormHtml(x){
+  const d = ui.toDraft, kind = d.kind, cps = cpsSorted(), veh = VEHICLES.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const clash = torClash({ ...d, id: x?.id, status: x?.status || 'new' });
+  return `<div class="d-body"><div class="form" data-keep>
+    <div class="wide"><span class="flab">Услуга</span><div class="seg">${Object.entries(TOR_KIND).map(([k, l]) => `<button type="button" data-act="toFKind" data-id="${k}" class="${kind === k ? 'on' : ''}">${k === 'rent' ? '🚜' : '🚚'} ${l}</button>`).join('')}</div></div>
+    <label class="wide"><span>Клиент <em class="req-star">*</em></span><input class="in" id="tf-client" list="tf-cps" value="${esc(d.clientName || '')}" placeholder="Организация или человек"><datalist id="tf-cps">${cps.map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist><small class="dim">Новый клиент добавится в «Клиенты».</small></label>
+    <label>Телефон<input class="in" id="tf-phone" value="${esc(d.phone || '')}" inputmode="tel"></label>
+    <label><span>Дата <em class="req-star">*</em></span><input class="in" type="date" id="tf-date" value="${esc(d.date || '')}"></label>
+    <label>По (если несколько дней)<input class="in" type="date" id="tf-dateto" value="${esc(d.dateTo || '')}"></label>
+    <label>Время с<input class="in" type="time" id="tf-t1" value="${esc(d.timeFrom || '')}"></label><label>до<input class="in" type="time" id="tf-t2" value="${esc(d.timeTo || '')}"></label>
+    ${kind === 'rent' ? `<label class="wide">Адрес объекта<input class="in" id="tf-from" value="${esc(d.from || '')}" placeholder="Где работает техника"></label>`
+      : `<label class="wide">Откуда<input class="in" id="tf-from" value="${esc(d.from || '')}" placeholder="Адрес погрузки"></label><label class="wide">Куда<input class="in" id="tf-to" value="${esc(d.to || '')}" placeholder="Адрес выгрузки"></label>`}
+    <label class="wide">${kind === 'rent' ? 'Какие работы' : 'Груз'}<textarea class="in" id="tf-cargo" rows="2" maxlength="1000" placeholder="${kind === 'rent' ? 'Например: погрузка щебня, рытьё траншеи' : 'Что везём, вес, объём, габариты'}">${esc(d.cargo || '')}</textarea></label>
+    <label>Транспорт<select class="in" id="tf-veh"><option value="">— не назначен —</option>${veh.map(v => `<option value="${v.id}" ${d.vehicleId === v.id ? 'selected' : ''}>${esc(v.name + (v.plate ? ' · ' + v.plate : ''))}</option>`).join('')}</select>${VEHICLES.length ? '' : '<small class="dim">Добавьте машины во вкладке «Транспорт».</small>'}</label>
+    <label>Водитель<select class="in" id="tf-drv"><option value="">— не назначен —</option>${drivers().map(u => `<option value="${u.id}" ${d.driverId === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></label>
+    ${clash.length ? `<div class="wide box" style="border-color:var(--bad);background:var(--bad-soft)">⚠ Машина в эти дни занята: ${clash.map(y => `№ ${y.no} (${torWhen(y)})`).join(', ')}</div>` : ''}
+    <label>Тариф<select class="in" id="tf-unit">${Object.entries(TOR_UNIT).map(([k, u]) => `<option value="${k}" ${d.unit === k ? 'selected' : ''}>за ${u[0]}</option>`).join('')}</select></label>
+    <label>Цена, ₽<input class="in mono" id="tf-price" inputmode="decimal" value="${esc(d.price ?? '')}"></label>
+    <label>План, ${TOR_UNIT[d.unit][1]}<input class="in mono" id="tf-plan" inputmode="decimal" value="${esc(d.planQty ?? '')}"></label>
+    <label>Сумма вручную, ₽ <small class="dim">— если не по тарифу</small><input class="in mono" id="tf-sum" inputmode="decimal" value="${esc(d.sumManual ?? '')}"></label>
+    <label class="wide">Примечание<textarea class="in" id="tf-note" rows="2" maxlength="2000">${esc(d.note || '')}</textarea></label></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="toSave" data-id="${x ? x.id : ''}">${x ? 'Сохранить' : 'Создать заказ'}</button><button class="btn" data-act="${x ? 'toOpen' : 'close'}" data-id="${x ? x.id : ''}">Отмена</button></div></div>`;
+}
+const torKeep = () => { const d = ui.toDraft; if (!d || !$('tf-client')) return; Object.assign(d, { clientName: $('tf-client').value, phone: $('tf-phone').value, date: $('tf-date').value, dateTo: $('tf-dateto').value, timeFrom: $('tf-t1').value, timeTo: $('tf-t2').value,
+  from: $('tf-from')?.value || '', to: $('tf-to')?.value || '', cargo: $('tf-cargo').value, vehicleId: $('tf-veh').value, driverId: $('tf-drv').value, unit: $('tf-unit').value, price: $('tf-price').value, planQty: $('tf-plan').value, sumManual: $('tf-sum').value, note: $('tf-note').value }); };
+function torViewHtml(x){
+  const H = isHead(), drv = x.driverId === me.id, acc = me.role === 'accountant', clash = torClash(x);
+  return `<div class="d-body">
+    <div class="row-g"><span class="chip ${x.kind === 'rent' ? 'c-info' : 'c-warn'}">${TOR_KIND[x.kind]}</span><span class="chip ${TOR_CHIP[x.status]}">${TOR_ST[x.status]}</span>${x.status === 'done' ? `<span class="chip ${x.paid ? 'c-ok' : 'c-bad'}">${x.paid ? 'оплачен' : 'не оплачен'}</span>` : ''}${clash.length ? '<span class="chip c-bad">машина занята другим заказом</span>' : ''}</div>
+    <dl class="kv"><dt>Клиент</dt><dd><b>${esc(x.clientName)}</b>${x.phone ? ` · <a href="tel:${esc(x.phone.replace(/[^\d+]/g, ''))}">${esc(x.phone)}</a>` : ''}</dd>
+      <dt>Когда</dt><dd>${torWhen(x)}</dd>
+      ${x.kind === 'rent' ? `<dt>Адрес</dt><dd>${esc(x.from || '—')}</dd>` : `<dt>Откуда</dt><dd>${esc(x.from || '—')}</dd><dt>Куда</dt><dd>${esc(x.to || '—')}</dd>`}
+      ${x.cargo ? `<dt>${x.kind === 'rent' ? 'Работы' : 'Груз'}</dt><dd style="white-space:pre-wrap">${esc(x.cargo)}</dd>` : ''}
+      <dt>Транспорт</dt><dd>${x.vehicleId ? esc(torVeh(x.vehicleId)) : '<span class="bad-t">не назначен</span>'}</dd>
+      <dt>Водитель</dt><dd>${x.driverId ? esc(who(x.driverId)) : '<span class="bad-t">не назначен</span>'}</dd>
+      <dt>Тариф</dt><dd>${x.price != null ? torMoney(x.price) + ' за ' + TOR_UNIT[x.unit][0] : '—'} · план ${torQty(x, x.planQty)}${x.factQty != null ? ' · факт <b>' + torQty(x, x.factQty) + '</b>' : ''}</dd>
+      <dt>Сумма</dt><dd><b>${torMoney(x.sum)}</b>${x.sumManual != null ? ' <small class="dim">(вручную)</small>' : ''}</dd>
+      ${x.note ? `<dt>Примечание</dt><dd style="white-space:pre-wrap">${esc(x.note)}</dd>` : ''}
+      ${x.doneNote ? `<dt>Водитель написал</dt><dd style="white-space:pre-wrap">${esc(x.doneNote)}</dd>` : ''}</dl>
+    ${(x.docs || []).length ? `<div class="box"><h4>Документы</h4><div class="rqph">${x.docs.map(f => /^image\//.test(f.type || '') ? `<a class="ph" href="/files/${esc(f.id)}" target="_blank" rel="noopener"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}"></a>` : `<a class="chip c-mute" href="/files/${esc(f.id)}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`).join('')}</div></div>` : ''}
+    ${(drv || H) && torOpen(x) ? `<div class="box"><h4>${x.status === 'work' ? 'Завершить заказ' : 'Выполнение'}</h4>
+      ${['new', 'assigned'].includes(x.status) ? `<button class="btn" data-act="toDo" data-id="${x.id}|start">▶ Начать</button>` : ''}
+      <div class="row-g" data-keep><label class="vrowl">Факт, ${TOR_UNIT[x.unit][2].toLowerCase()} <input class="in mono" id="to-fact" inputmode="decimal" value="${esc(x.planQty ?? '')}" style="width:110px"></label><label class="vrowl" style="flex:1 1 200px">Комментарий<input class="in" id="to-dnote" maxlength="1000"></label></div>
+      <div class="row-g">${fileChips('toFiles', 'toFileDel')}<label class="btn sm">📷 ТТН, путевой лист, акт<input type="file" accept="image/*,application/pdf" data-up="toFile" multiple hidden></label></div>
+      <div class="row-g"><button class="btn ok" data-act="toDone" data-id="${x.id}">✓ Выполнен</button></div></div>` : ''}
+    <div class="row-g">${H ? `<button class="btn" data-act="toEdit" data-id="${x.id}">Изменить</button>` : ''}
+      ${(H || acc) && x.status === 'done' ? `<button class="btn ${x.paid ? '' : 'ok'}" data-act="toPaid" data-id="${x.id}|${x.paid ? 0 : 1}">${x.paid ? 'Снять оплату' : '₽ Оплачен'}</button>` : ''}
+      ${H && !torOpen(x) ? `<button class="btn" data-act="toDo" data-id="${x.id}|reopen">Вернуть в работу</button>` : ''}
+      ${H && torOpen(x) ? armBtn('toc:' + x.id, 'Отменить заказ', 'toDo', x.id + '|cancel', 'btn') : ''}
+      ${(drv || H || acc) ? `<label class="btn sm">📎 Документ<input type="file" accept="image/*,application/pdf" data-up="toDoc" data-id="${x.id}" multiple hidden></label>` : ''}
+      ${H ? armBtn('tod2:' + x.id, 'Удалить', 'toDel', x.id, 'btn danger') : ''}</div>
+    <h4 class="sub-h">История</h4><ul class="reqfeed">${(x.history || []).map(h => `<li class="h"><small class="dim">${esc(fmtDT(h.at))} · ${esc(who(h.by))}: ${TOR_ACT[h.act] || h.act}${h.qty != null ? ' — ' + torQty(x, h.qty) : ''}${h.note ? ' — ' + esc(h.note) : ''}</small></li>`).join('')}</ul>
+    <div class="err" id="ferr"></div><div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+/* «Диспетчерская»: машины по строкам, дни по столбцам, заказы — полосами */
+function vDisp(){
+  const tn = dnum(today()); if (ui.dpFrom == null) ui.dpFrom = tn - ((tn + 3) % 7);
+  const from = ui.dpFrom, N = 14, days = Array.from({ length: N }, (_, i) => from + i), DW = 96;
+  const veh = VEHICLES.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')), L = TORDERS.filter(x => x.status !== 'cancel');
+  const lane = rows => { // orders on one row; overlapping ones go on extra lines
+    const lines = []; rows.sort((a, b) => torDays(a)[0] - torDays(b)[0]).forEach(x => { const [a, b] = torDays(x); let k = lines.findIndex(l => l < a); if (k < 0) { k = lines.length; lines.push(b); } else lines[k] = b; x._ln = k; });
+    return { h: Math.max(1, lines.length) * 30 + 8, html: rows.map(x => { const [a, b] = torDays(x), s = Math.max(a, from), e = Math.min(b, from + N - 1); if (e < s) return ''; const clash = torClash(x).length;
+      return `<button class="dpbar ${x.status} ${x.kind} ${clash ? 'clash' : ''}" style="left:${(s - from) * DW + 2}px;width:${(e - s + 1) * DW - 4}px;top:${4 + x._ln * 30}px" data-act="toOpen" data-id="${x.id}" title="${esc(`№ ${x.no} · ${x.clientName} · ${torWhen(x)} · ${TOR_ST[x.status]}${x.driverId ? ' · ' + who(x.driverId) : ''}`)}">№${x.no} ${esc(x.clientName)}${x.timeFrom ? ' ' + x.timeFrom : ''}</button>`; }).join('') };
+  };
+  const row = (label, sub, list) => { const l = lane(list); return `<div class="dprow"><div class="dplab"><b>${label}</b>${sub ? `<small>${sub}</small>` : ''}</div><div class="dptrack" style="width:${N * DW}px;height:${l.h}px">${days.map((d, i) => `<i class="${dayKind(dstr(d)) !== 'work' ? 'off' : ''} ${d === tn ? 'tod' : ''}" style="left:${i * DW}px;width:${DW}px"></i>`).join('')}${l.html}</div></div>`; };
+  const lbl = n => { const d = new Date(n * 864e5); return `${d.getUTCDate()}.${pad(d.getUTCMonth() + 1)}<small>${['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][d.getUTCDay()]}</small>`; };
+  const none = L.filter(x => !x.vehicleId && torDays(x)[1] >= from && torDays(x)[0] <= from + N - 1);
+  return `<div class="toolbar"><button class="btn sm" data-act="dpShift" data-id="-7">‹ Неделя</button><button class="btn sm" data-act="dpShift" data-id="0">Сегодня</button><button class="btn sm" data-act="dpShift" data-id="7">Неделя ›</button>
+      <span class="dim">${fmtD(dstr(from))} – ${fmtD(dstr(from + N - 1))}</span>${isHead() ? '<button class="btn primary" data-act="toNew">+ Заказ</button>' : ''}
+      <div class="legend"><span><i class="dot" style="background:#3B82F6"></i>Спецтехника</span><span><i class="dot" style="background:#E07B00"></i>Грузоперевозка</span><span><i class="dot" style="background:#9CA3AF"></i>Выполнен</span><span><i class="dot" style="background:#fff;border:2px solid var(--bad)"></i>Пересечение</span></div></div>
+    ${veh.length ? `<section class="card dp"><div class="dprow dphead"><div class="dplab">Транспорт</div><div class="dptrack" style="width:${N * DW}px">${days.map((d, i) => `<span style="left:${i * DW}px;width:${DW}px" class="${dayKind(dstr(d)) !== 'work' ? 'off' : ''} ${d === tn ? 'tod' : ''}">${lbl(d)}</span>`).join('')}</div></div>
+      ${veh.map(v => row(esc(v.name), esc(v.plate || ''), L.filter(x => x.vehicleId === v.id))).join('')}
+      ${none.length ? row('<span class="bad-t">Без транспорта</span>', 'назначьте машину', none) : ''}</section>`
+      : '<div class="empty"><h3>Транспорта нет</h3>Добавьте машины во вкладке «Транспорт».</div>'}`;
+}
+/* «Отчёты»: выручка, оплата, по машинам (с расходами на топливо и ТО), по клиентам, по водителям */
+function vTrep(){
+  const ym = ui.trMonth || today().slice(0, 7), [y, m] = ym.split('-').map(Number), shift = k => { const d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const inM = x => x.date.startsWith(ym), L = TORDERS.filter(inM), D = L.filter(x => x.status === 'done');
+  const sum = a => a.reduce((s, x) => s + (Number(x.sum) || 0), 0), paid = sum(D.filter(x => x.paid)), revenue = sum(D);
+  const fuel = vid => CHECKS.filter(c => c.kind === 'fuel' && c.vehicleId === vid && c.date.startsWith(ym)).reduce((s, c) => s + (c.sum || 0), 0);
+  const toCost = v => (v.to || []).filter(t => t.date.startsWith(ym)).reduce((s, t) => s + (Number(String(t.cost || '').replace(/\s/g, '').replace(',', '.')) || 0), 0);
+  const byVeh = VEHICLES.map(v => { const o = D.filter(x => x.vehicleId === v.id), r = sum(o), f = fuel(v.id), t = toCost(v);
+    const qty = Object.keys(TOR_UNIT).map(u => { const q = o.filter(x => x.unit === u).reduce((s, x) => s + (x.factQty || 0), 0); return q ? `${String(Math.round(q * 10) / 10).replace('.', ',')} ${TOR_UNIT[u][1]}` : ''; }).filter(Boolean).join(', ');
+    const busy = new Set(); L.filter(x => x.vehicleId === v.id && x.status !== 'cancel').forEach(x => { const [a, b] = torDays(x); for (let d = a; d <= b; d++) busy.add(d); });
+    return { v, n: o.length, qty, r, f, t, days: busy.size }; }).sort((a, b) => b.r - a.r);
+  const clients = new Map(); for (const x of D) { const k = x.clientName; const c = clients.get(k) || { name: k, n: 0, r: 0, debt: 0 }; c.n++; c.r += x.sum || 0; if (!x.paid) c.debt += x.sum || 0; clients.set(k, c); }
+  const drv = new Map(); for (const x of D) if (x.driverId) { const c = drv.get(x.driverId) || { n: 0, r: 0 }; c.n++; c.r += x.sum || 0; drv.set(x.driverId, c); }
+  const dim = new Date(y, m, 0).getDate();
+  const debtAll = sum(TORDERS.filter(x => x.status === 'done' && !x.paid));
+  return `<div class="toolbar"><button class="btn sm" data-act="trMonth" data-id="${shift(-1)}">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="trMonth" data-id="${shift(1)}">›</button></div>
+    <div class="stats trstats">${[['Заказов', L.filter(x => x.status !== 'cancel').length], ['Выполнено', D.length], ['Выручка', torMoney(revenue)], ['Оплачено', torMoney(paid)], ['Долг за месяц', torMoney(revenue - paid)], ['Весь долг клиентов', torMoney(debtAll)]].map(([l, v]) => `<div class="stat"><span>${l}</span><b>${v}</b></div>`).join('')}</div>
+    <section class="card" style="padding:0;overflow:hidden;margin-top:14px"><div style="padding:12px 14px"><h3 style="margin:0">По транспорту</h3></div><div class="tblwrap"><table class="jt"><thead><tr><th>Транспорт</th><th>Занят дней</th><th>Заказов</th><th>Отработано</th><th>Выручка</th><th>Топливо</th><th>ТО и ремонт</th><th>Итог</th></tr></thead><tbody>
+      ${byVeh.map(r => `<tr><td data-l="Транспорт"><b>${esc(r.v.name)}</b><small>${esc(r.v.plate || '')}</small></td><td data-l="Занят">${r.days} из ${dim}</td><td data-l="Заказов">${r.n}</td><td data-l="Отработано">${r.qty || '—'}</td><td data-l="Выручка">${torMoney(r.r)}</td><td data-l="Топливо">${r.f ? torMoney(r.f) : '—'}</td><td data-l="ТО">${r.t ? torMoney(r.t) : '—'}</td><td data-l="Итог"><b class="${r.r - r.f - r.t < 0 ? 'bad-t' : ''}">${torMoney(r.r - r.f - r.t)}</b></td></tr>`).join('') || '<tr><td colspan="8" class="dim">Транспорта нет</td></tr>'}</tbody></table></div></section>
+    <div class="trgrid"><section class="card" style="padding:0;overflow:hidden"><div style="padding:12px 14px"><h3 style="margin:0">По клиентам</h3></div><table class="jt"><thead><tr><th>Клиент</th><th>Заказов</th><th>Сумма</th><th>Не оплачено</th></tr></thead><tbody>
+      ${[...clients.values()].sort((a, b) => b.r - a.r).map(c => `<tr><td data-l="Клиент">${esc(c.name)}</td><td data-l="Заказов">${c.n}</td><td data-l="Сумма">${torMoney(c.r)}</td><td data-l="Долг" class="${c.debt ? 'bad-t' : ''}">${c.debt ? torMoney(c.debt) : '—'}</td></tr>`).join('') || '<tr><td colspan="4" class="dim">Нет выполненных заказов</td></tr>'}</tbody></table></section>
+    <section class="card" style="padding:0;overflow:hidden"><div style="padding:12px 14px"><h3 style="margin:0">По водителям</h3></div><table class="jt"><thead><tr><th>Водитель</th><th>Заказов</th><th>Выручка</th></tr></thead><tbody>
+      ${[...drv.entries()].sort((a, b) => b[1].r - a[1].r).map(([id, c]) => `<tr><td data-l="Водитель">${esc(who(id))}</td><td data-l="Заказов">${c.n}</td><td data-l="Выручка">${torMoney(c.r)}</td></tr>`).join('') || '<tr><td colspan="3" class="dim">Нет выполненных заказов</td></tr>'}</tbody></table></section></div>`;
+}
+/* «Мои рейсы» водителя */
+function vTmine(){
+  const mine = TORDERS.filter(x => x.driverId === me.id), open = mine.filter(torOpen).sort((a, b) => (a.date + (a.timeFrom || '')).localeCompare(b.date + (b.timeFrom || '')));
+  const done = mine.filter(x => x.status === 'done').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
+  const card = x => `<button class="card tmcard ${x.date === today() ? 'today' : ''}" data-act="toOpen" data-id="${x.id}">
+      <div class="row-g" style="justify-content:space-between"><b>№ ${x.no} · ${torWhen(x)}</b><span class="chip ${TOR_CHIP[x.status]}">${TOR_ST[x.status]}</span></div>
+      <div><span class="chip ${x.kind === 'rent' ? 'c-info' : 'c-warn'}">${TOR_KIND[x.kind]}</span> ${esc(x.clientName)}${x.phone ? ' · ' + esc(x.phone) : ''}</div>
+      <div class="tmroute">${esc(torRoute(x)) || '<span class="dim">адрес не указан</span>'}</div>
+      ${x.cargo ? `<small class="dim">${esc(x.cargo)}</small>` : ''}${x.vehicleId ? `<small>🚚 ${esc(torVeh(x.vehicleId))}</small>` : ''}</button>`;
+  return `<h3 style="margin:0 0 10px">Мои рейсы <span class="dim">${open.length}</span></h3>${open.length ? `<div class="tmlist">${open.map(card).join('')}</div>` : '<div class="empty">Назначенных рейсов нет.</div>'}
+    ${done.length ? `<h3 style="margin:18px 0 10px">Выполненные</h3><div class="tmlist">${done.map(card).join('')}</div>` : ''}`;
+}
+
+// the menu of a transport organization: a driver — his trips, waybills, receipts; the accountant — orders, «Учётка», reports; managers — all
+const transNav = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : me.role === 'accountant' ? ['tor', 'stock', 'trep', 'notes', 'refs'] : ['tor', 'disp', 'transport', 'stock', 'trep', 'notes', 'refs', ...(me.role === 'admin' ? ['users'] : [])];
+const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
 function staffRow(u, day){
@@ -5449,9 +5622,9 @@ function renderDrawer(){
     D.innerHTML = dh(o ? esc(o.name) : 'Новая организация') + `<form class="d-body" data-form="org"><div class="form">
       <label class="wide">Название организации<input class="in" id="o-name" value="${v(o,'name')}" required></label>
       <fieldset class="wide otype"><legend>Тип системы</legend>
-        ${[['all', 'Все сервисы', 'Работы, заказы, склад, контрагенты, счета, план-график, карта объектов, задачи.'], ['requests', 'Управление заявками', 'Пользователь создаёт заявку и выбирает исполнителя, исполнитель отмечает её выполнение.']].map(([k, l, h]) => `<label><input type="radio" name="o-type" value="${k}" ${(o?.type || 'all') === k ? 'checked' : ''}> <span><b>${l}</b><small class="dim">${h}</small></span></label>`).join('')}
+        ${[['all', 'Все сервисы', 'Работы, заказы, склад, контрагенты, счета, план-график, карта объектов, задачи.'], ['requests', 'Управление заявками', 'Пользователь создаёт заявку и выбирает исполнителя, исполнитель отмечает её выполнение.'], ['transport', 'Транспортная организация', 'Спецтехника и грузоперевозки: заказы, диспетчерская, транспорт и ТО, водители, путевые листы, чеки, отчёты по выручке и расходам.']].map(([k, l, h]) => `<label><input type="radio" name="o-type" value="${k}" ${(o?.type || 'all') === k ? 'checked' : ''}> <span><b>${l}</b><small class="dim">${h}</small></span></label>`).join('')}
         ${o ? '<small class="dim">Смена типа не удаляет данные: при возврате они снова будут видны.</small>' : ''}</fieldset>
-      <fieldset class="wide otype secbox" id="o-secs" ${(o?.type || 'all') === 'requests' ? 'hidden' : ''}><legend>Какие вкладки и подвкладки видит организация</legend>${secTree(o?.hide || [])}<small class="dim">Снятая галочка скрывает раздел у всех пользователей организации. Администратор организации может дополнительно закрыть разделы отдельным пользователям.</small></fieldset>
+      <fieldset class="wide otype secbox" id="o-secs" ${(o?.type || 'all') !== 'all' ? 'hidden' : ''}><legend>Какие вкладки и подвкладки видит организация</legend>${secTree(o?.hide || [])}<small class="dim">Снятая галочка скрывает раздел у всех пользователей организации. Администратор организации может дополнительно закрыть разделы отдельным пользователям.</small></fieldset>
       <label>Доступ до (включительно)<input class="in" type="date" id="o-until" value="${v(o,'until')}"><small class="dim" style="font-size:12px">Пусто — без срока. После этой даты всем в организации покажется сообщение о блокировке.</small></label>
       ${o ? '' : `<label>Код (латиницей, необязательно)<input class="in mono" id="o-id" pattern="[a-z0-9][a-z0-9-]{1,30}"></label>`}
       <label class="wide">Заметка (видна только вам)<input class="in" id="o-note" value="${v(o,'note')}"></label>
@@ -5520,6 +5693,8 @@ function renderDrawer(){
     </div>`;
   }
   if (d.kind === 'staffMark') { const x = STAFF_MARKS.find(m => m.id === d.id); D.innerHTML = dh(x ? 'Изменить отметку' : 'Отметка сотруднику') + markFormHtml(x, d.ctx); return; }
+  if (d.kind === 'torForm') { const x = TORDERS.find(o => o.id === d.id); D.innerHTML = dh(x ? `Заказ № ${x.no}` : 'Новый заказ') + torFormHtml(x); return; }
+  if (d.kind === 'tor') { const x = TORDERS.find(o => o.id === d.id); D.innerHTML = dh(x ? `Заказ № ${x.no} · ${esc(x.clientName)}` : 'Заказ') + (x ? torViewHtml(x) : '<div class="d-body"><p>Заказ не найден</p></div>'); return; }
   if (d.kind === 'refForm') { const r = REFS.find(x => x.id === d.id); D.innerHTML = dh(r ? 'Изменить справочник' : 'Новый справочник') + refFormHtml(r); return; }
   if (d.kind === 'refView') { const [rid, fid] = String(d.id).split('|'), r = REFS.find(x => x.id === rid), f = r && (r.files || []).find(x => x.id === fid);
     D.innerHTML = dh(f ? esc(f.name) : 'Файл') + (f ? `<div class="d-body"><div class="row-g" style="justify-content:space-between"><small class="dim">${esc(r.title)} · ${esc(refGroupName(r))}</small><div class="row-g">${(r.files || []).length > 1 ? r.files.map(x => `<button class="btn sm ${x.id === fid ? 'primary' : ''}" data-act="refView" data-id="${r.id}|${x.id}">${fileIco(x)} ${esc(x.name)}</button>`).join('') : ''}<button class="btn sm" data-act="close">Закрыть</button></div></div>
@@ -5770,7 +5945,7 @@ function renderDrawer(){
       <label class="wide" id="uf-until-w" ${(u?.role || 'worker') === 'contractor' ? '' : 'hidden'}>Доступ подрядчика до (включительно)<input class="in" type="date" id="uf-until" value="${esc(u?.accessUntil || '')}"><small class="dim" style="font-size:12px">На следующий день вход для подрядчика закроется.</small></label>
       <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<span class="pwrow"><input class="in mono" id="uf-pass" autocomplete="new-password" ${u?'':'required'}><span class="pwgen"><button type="button" class="btn sm" data-act="genPass" data-id="#uf-pass" title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm ghost" data-act="copyPass" data-id="#uf-pass" title="Скопировать пароль">Копировать</button></span></span></label></div>
       <p class="hint dim" id="uf-info" style="margin:0">${esc(roleInfo(u?.role || 'worker'))}</p>
-      ${reqMode() ? '' : `<fieldset class="wide otype secbox" id="uf-secs"><legend>Какие вкладки и подвкладки видит пользователь</legend>${secTree(u?.hide || [], me.org?.hide || [])}<small class="dim">Показаны разделы, открытые организации. Права роли действуют как прежде: например, «Списание материалов» видят только администратор, руководитель и бухгалтер.</small></fieldset>`}
+      ${reqMode() || transMode() ? '' : `<fieldset class="wide otype secbox" id="uf-secs"><legend>Какие вкладки и подвкладки видит пользователь</legend>${secTree(u?.hide || [], me.org?.hide || [])}<small class="dim">Показаны разделы, открытые организации. Права роли действуют как прежде: например, «Списание материалов» видят только администратор, руководитель и бухгалтер.</small></fieldset>`}
       ${u ? '<p class="hint" style="margin:0">После смены пароля сотрудник выйдет со всех устройств.</p>' : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${u?'Сохранить':'Добавить'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
@@ -6698,10 +6873,28 @@ async function act(el){
     case 'stCell': { const [uid, day] = id.split('|'); ui.stDay = day; render(); return openDrawer('staffDay', uid, day); }
     case 'stCard': return openDrawer('staffCard', id);
     case 'vNew': return openDrawer('vehicle', null);
+    case 'toSt': ui.toSt = id; return render();
+    case 'toKind': ui.toKind = id; return render();
+    case 'toNew': ui.toDraft = { kind: 'cargo', date: today(), unit: 'trip' }; return openDrawer('torForm', null);
+    case 'toEdit': { const x = TORDERS.find(o => o.id === id); ui.toDraft = { ...x, price: x.price ?? '', planQty: x.planQty ?? '', sumManual: x.sumManual ?? '' }; return openDrawer('torForm', id); }
+    case 'toFKind': torKeep(); ui.toDraft.kind = id; if (id === 'rent' && ui.toDraft.unit === 'trip') ui.toDraft.unit = 'hour'; if (id === 'cargo' && ui.toDraft.unit === 'hour') ui.toDraft.unit = 'trip'; return renderDrawer();
+    case 'toOpen': ui.toFiles = []; return openDrawer('tor', id);
+    case 'toSave': { torKeep(); const d = ui.toDraft, nm = (d.clientName || '').trim(); let clientId = null;
+      if (nm) { const c = cpByName(nm); clientId = c ? c.id : await add('counterparties', { name: nm, roles: ['customer'], contacts: d.phone ? [{ name: '', phone: d.phone }] : [], contracts: [], createdAt: new Date().toISOString() }); }
+      const body = { ...d, clientId, clientName: nm };
+      try { const r = await api(id ? 'PATCH' : 'POST', '/api/tor' + (id ? '/' + id : ''), id ? { action: 'edit', ...body } : body); const i = TORDERS.findIndex(o => o.id === r.order.id); if (i >= 0) TORDERS[i] = r.order; else TORDERS.push(r.order);
+        openDrawer('tor', r.order.id); render(); toast(id ? 'Заказ сохранён' : `Заказ № ${r.order.no} создан`); refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
+    case 'toDo': { const [oid, act] = id.split('|'); try { const r = await api('PATCH', '/api/tor/' + oid, { action: act }); TORDERS[TORDERS.findIndex(o => o.id === oid)] = r.order; renderDrawer(); render(); toast({ start: 'Заказ начат', cancel: 'Заказ отменён', reopen: 'Заказ возвращён в работу' }[act] || 'Готово'); } catch(e) { const fe = $('ferr'); if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
+    case 'toDone': try { const r = await api('PATCH', '/api/tor/' + id, { action: 'done', factQty: $('to-fact').value, note: $('to-dnote').value, files: ui.toFiles || [] }); TORDERS[TORDERS.findIndex(o => o.id === id)] = r.order; ui.toFiles = []; renderDrawer(); render(); toast('Заказ выполнен · ' + torMoney(r.order.sum)); } catch(e) { $('ferr').textContent = errText(e); } return;
+    case 'toPaid': { const [oid, v] = id.split('|'); try { const r = await api('PATCH', '/api/tor/' + oid, { action: 'paid', paid: v === '1' }); TORDERS[TORDERS.findIndex(o => o.id === oid)] = r.order; renderDrawer(); render(); toast(v === '1' ? 'Оплата отмечена' : 'Оплата снята'); } catch(e) { toast(errText(e)); } return; }
+    case 'toDel': try { await api('DELETE', '/api/tor/' + id); TORDERS = TORDERS.filter(o => o.id !== id); closeDrawer(); render(); toast('Заказ удалён'); } catch(e) { toast(errText(e)); } return;
+    case 'toFileDel': (ui.toFiles || []).splice(Number(id), 1); return renderDrawer();
+    case 'dpShift': { const n = Number(id), tn = dnum(today()); ui.dpFrom = n === 0 ? tn - ((tn + 3) % 7) : ui.dpFrom + n; return render(); }
+    case 'trMonth': ui.trMonth = id; return render();
     case 'tpFileDel': (ui.tpFiles || []).splice(Number(id), 1); document.activeElement?.blur(); return render();
     case 'tpMonth': ui.tpMonth = id; return render();
-    case 'tpSave': { const body = { files: ui.tpFiles || [], jobId: $('tp-job').value, date: $('tp-date').value, vehicleId: $('tp-veh')?.value || null, note: $('tp-note').value };
-      if (!body.files.length) return toast('Загрузите фото путевого листа'); if (!body.jobId) return toast('Выберите, к какой работе относится путевой лист');
+    case 'tpSave': { const body = { files: ui.tpFiles || [], jobId: $('tp-job').value, orderId: transMode() ? $('tp-job').value : undefined, date: $('tp-date').value, vehicleId: $('tp-veh')?.value || null, note: $('tp-note').value };
+      if (!body.files.length) return toast('Загрузите фото путевого листа'); if (!body.jobId) return toast(transMode() ? 'Выберите, к какому заказу относится путевой лист' : 'Выберите, к какой работе относится путевой лист');
       try { const r = await api('POST', '/api/trips', body); TRIPS.push(r.trip); Object.assign(ui, { tpFiles: [], tpNote: '', tpDate: '' }); document.activeElement?.blur(); render(); toast('Путевой лист загружен'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return; }
     case 'tpDel': try { await api('DELETE', '/api/trips/' + id); TRIPS = TRIPS.filter(x => x.id !== id); render(); toast('Путевой лист удалён'); } catch(e) { toast(errText(e)); } return;
     case 'refNew': ui.refDraft = { title: '', text: '', files: [], scope: { type: 'common' }, restricted: false, viewers: [] }; return openDrawer('refForm', null);
@@ -6880,6 +7073,8 @@ document.addEventListener('input', e => {
   if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (['tp-job', 'tp-date', 'tp-veh', 'tp-note'].includes(t.id)) { ui[{ 'tp-job': 'tpJob', 'tp-date': 'tpDate', 'tp-veh': 'tpVeh', 'tp-note': 'tpNote' }[t.id]] = t.value; return; }
   if (t.id === 'tp-fjob' || t.id === 'tp-fwho') { ui[t.id === 'tp-fjob' ? 'tpFJob' : 'tpFWho'] = t.value; return render(); }
+  if (t.id === 'toq') { ui.toq = t.value; const pos = t.selectionStart; $('view').innerHTML = vTor(); const n = $('toq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'tf-unit' || t.id === 'tf-veh' || t.id === 'tf-date' || t.id === 'tf-dateto') { torKeep(); if (t.id === 'tf-unit' || t.id === 'tf-veh') { const keepFocus = t.id; renderDrawer(); $(keepFocus)?.focus(); } return; }
   if (t.id === 'trq') { ui.trq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vTransport(); const n = $('trq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'ptq') { ui.ptq = t.value; const pos = t.selectionStart; $('view').innerHTML = trTabs() + vParts(); const n = $('ptq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'pt-fv') { ui.ptVeh = t.value; return render(); }
@@ -6989,7 +7184,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
   if (t.dataset.sec && !t.dataset.top) { t.closest('.secg')?.querySelectorAll('[data-top]').forEach(x => { x.disabled = !t.checked; }); return; }
-  if (t.name === 'o-type') { const b = $('o-secs'); if (b) b.hidden = t.value === 'requests'; return; }
+  if (t.name === 'o-type') { const b = $('o-secs'); if (b) b.hidden = t.value !== 'all'; return; }
   if (t.dataset.jl) { const [jid, k, iid] = t.dataset.jl.split('|'); try { await jlApi(jid, k, 'PATCH', iid, { done: t.checked }); renderDrawer(); } catch(e) { toast(errText(e)); t.checked = !t.checked; } return; }
   if (t.dataset.dacc) { ui.devAcc = ui.devAcc || {}; if (t.value) ui.devAcc[t.dataset.dacc] = t.value; else delete ui.devAcc[t.dataset.dacc]; return; }
   if (t.id === 'rq-assign') { const rid = ui.drawer?.id; try { await reqApi('PATCH', '/api/requests/' + rid, { action: 'assign', assignee: t.value || null }); renderDrawer(); render(); toast(t.value ? 'Исполнитель назначен' : 'Исполнитель снят'); } catch(e) { toast(errText(e)); renderDrawer(); } return; }
@@ -7046,6 +7241,10 @@ document.addEventListener('change', async e => {
     try { for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); ui.refDraft.files.push({ id: u.id, name: u.name, type: fl.type, size: fl.size }); } } catch(e) { toast(errText(e)); } renderDrawer(); return; }
   if (t.dataset.up === 'tpFile') { const files = [...t.files]; t.value = ''; if (!files.length) return;
     try { await uploadMany(files, 'tpFiles'); } catch(e) { toast(errText(e)); } document.activeElement?.blur(); render(); return; }
+  if (t.dataset.up === 'toFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; const keep = { f: $('to-fact')?.value, n: $('to-dnote')?.value };
+    try { await uploadMany(files, 'toFiles'); } catch(e) { toast(errText(e)); } renderDrawer(); if ($('to-fact')) { $('to-fact').value = keep.f || ''; $('to-dnote').value = keep.n || ''; } return; }
+  if (t.dataset.up === 'toDoc') { const files = [...t.files]; t.value = ''; if (!files.length) return; const oid = t.dataset.id, x = TORDERS.find(o => o.id === oid);
+    try { ui.toAdd = []; await uploadMany(files, 'toAdd'); const r = await api('PATCH', '/api/tor/' + oid, { action: 'docs', files: [...(x.docs || []), ...ui.toAdd] }); TORDERS[TORDERS.findIndex(o => o.id === oid)] = r.order; renderDrawer(); toast('Документ добавлен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'vDoc') { const fl = t.files[0]; t.value = ''; if (!fl) return; const vid = t.dataset.id;
     try { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); const r = await api('POST', `/api/vehicles/${vid}/docs`, { file: { id: u.id }, title: $('vd-title')?.value.trim() || fl.name.replace(/\.[^.]+$/, ''), date: $('vd-date')?.value || '' }); trPut(r.vehicle); renderDrawer(); render(); toast('Документ загружен'); } catch(e) { toast(errText(e)); } return; }
   if (t.dataset.up === 'rqDoneFile') { const files = [...t.files]; t.value = ''; if (!files.length) return; ui.rqNote = $('rq-note')?.value || '';
@@ -7127,10 +7326,11 @@ document.addEventListener('change', async e => {
 function route(){
   const h = location.hash.slice(1);
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
+    : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (['reqall', 'reqdev', 'reqdocs'].includes(h) || (['users', 'admFiles', 'reqrep', 'reqset'].includes(h) && me.role === 'admin') ? h : 'req')
     : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs'].includes(h) && (h !== 'refs' || can('refs')) ? h : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || h === 'refs' ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
-  if (!me?.sys && !reqMode() && !viewOk(ui.view)) {
+  if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
     const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
     ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
@@ -7187,16 +7387,17 @@ async function start(u){
   $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = isWorker() || !!u.sys || reqMode();
   $('orgsTab').hidden = !u.sys; ui.orgsList = null;
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
-  $('happ').textContent = reqMode() ? 'Управление заявками' : 'Управление предприятием';
+  $('happ').textContent = reqMode() ? 'Управление заявками' : transMode() ? 'Спецтехника и грузоперевозки' : 'Управление предприятием';
   document.body.classList.toggle('reqmode', reqMode());
   $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
   $('orgwarn').hidden = !u.orgWarn; $('orgwarn').textContent = u.orgWarn ? '⚠ ' + u.orgWarn + ' Для продления обратитесь к администратору системы.' : '';
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
+    a.hidden = u.sys ? !['orgs', 'server'].includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) || (v === 'users' && u.role === 'admin')) : ['req', 'reqall', 'reqdev', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
-  if (!u.sys && !reqMode() && !isWorker()) {
+  if (transMode() && !isWorker()) { const st = document.querySelector('#views a[data-v=stock]'); if (st) st.href = '#cps'; }
+  if (!u.sys && !reqMode() && !transMode() && !isWorker()) {
     const pl = planTabsList(), pt = $('planTab'); pt.hidden = !pl.length; if (pl.length) pt.href = '#' + pl[0][0];
     // «Учётка» is shown while any of its sub-tabs is open (the warehouse sections, «Контрагенты», receipts, waybills)
     const st = document.querySelector('#views a[data-v=stock]'); if (st) { st.hidden = false; st.href = tabOpen('stock') ? '#stock' : '#cps'; }

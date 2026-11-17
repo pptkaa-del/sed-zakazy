@@ -326,8 +326,9 @@ const saveUsers = () => { writeJSON(USERS_FILE, users); usersStamp = stamp(USERS
 const saveOrgs = () => { writeJSON(ORGS_FILE, orgs); orgsStamp = stamp(ORGS_FILE); };
 const orgById = id => orgs.find(o => o.id === id);
 /* the kind of system an organization works in: «Все сервисы» (all) or «Управление заявками» (requests) */
-const ORG_TYPES = ['all', 'requests'];
-const orgType = u => { const o = u && orgById(u.orgId); return o && o.type === 'requests' ? 'requests' : 'all'; };
+// «Все сервисы», «Управление заявками», «Транспортная организация» (спецтехника и грузоперевозки)
+const ORG_TYPES = ['all', 'requests', 'transport'];
+const orgType = u => { const o = u && orgById(u.orgId); return o && ORG_TYPES.includes(o.type) ? o.type : 'all'; };
 const REQ_ROLES = ['admin', 'head', 'worker'];
 // «time» — late and/or left early in one mark (the old «late» and «early» are still read)
 const STAFF_MARKS = ['sick', 'vacation', 'time', 'late', 'early', 'absent'];
@@ -388,6 +389,7 @@ function fileUsage(){
     for (const r of Object.values(db.requests || {})) for (const f of [...(r.files || []), ...(r.doneFiles || [])]) add(f.id, `Заявка № ${r.no || ''}`);
     for (const d of db.reqDocs || []) if (d.file) add(d.file.id, `Инструкция «${d.title}»`);
     for (const r of db.refs || []) for (const f of r.files || []) add(f.id, `Справочник «${r.title || ''}»`);
+    for (const o of Object.values(db.tOrders || {})) for (const f of o.docs || []) add(f.id, `Заказ № ${o.no || ''}`);
     for (const t of db.trips || []) for (const f of t.files || []) add(f.id, `Путевой лист ${t.date || ''}`);
     for (const c of db.checks || []) for (const f of c.files || []) add(f.id, c.kind === 'fuel' ? 'Чек заправки' : `Чек покупки · ${c.seller || ''}`);
     for (const v of Object.values(db.vehicles || {})) for (const d of v.docs || []) if (d.file) add(d.file.id, `Транспорт ${v.name || ''} · ${d.title || ''}`);
@@ -577,7 +579,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if (FIELD(user) && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -687,6 +689,10 @@ async function api(req, res, url) {
     if (orgType(user) !== 'requests') {
       out.checks = (Array.isArray(db.checks) ? db.checks : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
       out.trips = (Array.isArray(db.trips) ? db.trips : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
+      // a transport organization: the orders (rent of special vehicles, cargo); a driver gets his own
+      if (orgType(user) === 'transport') {
+        out.tOrders = Object.entries(db.tOrders || {}).map(([id, x]) => ({ id, ...x })).filter(x => HEAD(user) || user.role === 'accountant' || x.driverId === user.id);
+      }
       out.vehBrief = Object.entries(db.vehicles || {}).map(([id, v]) => ({ id, name: v.name, plate: v.plate || '' })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     }
     // «Транспорт»: the vehicles of the company with maintenance and documents, and the spare parts — for managers
@@ -975,6 +981,85 @@ async function api(req, res, url) {
     if (m === 'DELETE') { db.refs = R.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
+  /* «Заказы» of a transport organization: rent of special vehicles or a cargo transport — the client, the date and time, the route,
+     the vehicle and the driver, the rate (hour / shift / trip / km), planned and actual quantity, the sum, the status, the payment, documents.
+     Managers create and change; the accountant marks the payment; the driver starts and finishes his own orders. */
+  if (p[1] === 'tor') {
+    if (orgType(user) !== 'transport') return fail(res, 403, 'Заказы есть только у транспортной организации');
+    if (!db.tOrders || typeof db.tOrders !== 'object') db.tOrders = {};
+    const O = db.tOrders, now = new Date().toISOString(), txt = (v, n) => String(v ?? '').trim().slice(0, n);
+    const D = /^\d{4}-\d{2}-\d{2}$/, T = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const num = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN; };
+    const files = a => (Array.isArray(a) ? a : []).filter(f => f && db.files[f.id]).slice(0, 50).map(f => ({ id: f.id, name: db.files[f.id].name, type: db.files[f.id].type, size: db.files[f.id].size, at: f.at || db.files[f.id].at }));
+    const total = x => { const q = x.factQty != null ? x.factQty : x.planQty; return x.sumManual != null ? x.sumManual : q != null && x.price != null ? Math.round(q * x.price * 100) / 100 : null; };
+    const out = (id, x) => { x.sum = total(x); saveDb(); return send(res, 200, { ok: true, order: { id, ...x }, rev: db.rev }); };
+    const log = (x, act, extra = {}) => { x.history = Array.isArray(x.history) ? x.history : []; x.history.push({ at: now, by: user.id, act, ...extra }); x.updatedAt = now; };
+    const clean = (b, old = {}) => {
+      const kind = ['rent', 'cargo'].includes(b.kind) ? b.kind : old.kind || 'cargo';
+      const date = b.date !== undefined ? String(b.date || '') : old.date || '';
+      if (!D.test(date)) return 'Укажите дату';
+      const t1 = b.timeFrom !== undefined ? String(b.timeFrom || '') : old.timeFrom || '', t2 = b.timeTo !== undefined ? String(b.timeTo || '') : old.timeTo || '';
+      if ((t1 && !T.test(t1)) || (t2 && !T.test(t2))) return 'Время — в формате 09:00';
+      const dateTo = b.dateTo !== undefined ? (D.test(b.dateTo || '') ? b.dateTo : '') : old.dateTo || '';
+      if (dateTo && dateTo < date) return 'Дата окончания раньше даты начала';
+      const clientId = b.clientId !== undefined ? (b.clientId && db.counterparties[b.clientId] ? b.clientId : null) : old.clientId || null;
+      const clientName = txt(b.clientName ?? old.clientName, 200);
+      if (!clientId && !clientName) return 'Укажите клиента';
+      const vehicleId = b.vehicleId !== undefined ? (b.vehicleId || null) : old.vehicleId || null;
+      if (vehicleId && !(db.vehicles || {})[vehicleId]) return 'Транспорт не найден';
+      const driverId = b.driverId !== undefined ? (b.driverId || null) : old.driverId || null;
+      if (driverId && !orgUsers().some(u => u.id === driverId && !u.sys)) return 'Водитель не найден';
+      const unit = ['hour', 'shift', 'trip', 'km'].includes(b.unit) ? b.unit : old.unit || (kind === 'rent' ? 'hour' : 'trip');
+      const price = b.price !== undefined ? num(b.price) : old.price ?? null, planQty = b.planQty !== undefined ? num(b.planQty) : old.planQty ?? null;
+      const sumManual = b.sumManual !== undefined ? num(b.sumManual) : old.sumManual ?? null;
+      if ([price, planQty, sumManual].some(Number.isNaN)) return 'Цена, количество и сумма — числа';
+      return { kind, date, dateTo, timeFrom: t1, timeTo: t2, clientId, clientName: clientId ? db.counterparties[clientId].name : clientName, phone: txt(b.phone ?? old.phone, 60),
+        from: txt(b.from ?? old.from, 300), to: txt(b.to ?? old.to, 300), cargo: txt(b.cargo ?? old.cargo, 1000), vehicleId, driverId, unit, price, planQty, sumManual, note: txt(b.note ?? old.note, 2000) };
+    };
+    if (m === 'POST' && !p[2]) {
+      if (!HEAD(user)) return fail(res, 403, 'Заказы создаёт руководитель или диспетчер');
+      const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
+      const id = newId(), no = Math.max(0, ...Object.values(O).map(x => x.no || 0)) + 1;
+      O[id] = { no, ...v, status: v.driverId && v.vehicleId ? 'assigned' : 'new', paid: false, factQty: null, docs: [], at: now, by: user.id, history: [] };
+      log(O[id], 'created');
+      return out(id, O[id]);
+    }
+    const x = p[2] && O[p[2]];
+    if (!x || !(HEAD(user) || user.role === 'accountant' || x.driverId === user.id)) return fail(res, 404, 'Заказ не найден — обновите страницу');
+    if (m === 'PATCH' && p.length === 3) {
+      const b = await readJsonBody(req), act = b.action, driver = x.driverId === user.id;
+      if (act === 'edit') {
+        if (!HEAD(user)) return fail(res, 403, 'Изменять заказ может руководитель или диспетчер');
+        const v = clean(b, x); if (typeof v === 'string') return fail(res, 400, v);
+        Object.assign(x, v); if (x.status === 'new' && x.driverId && x.vehicleId) x.status = 'assigned'; log(x, 'edit');
+      } else if (act === 'start') {
+        if (!(driver || HEAD(user))) return fail(res, 403, 'Начать может водитель заказа');
+        if (!['new', 'assigned'].includes(x.status)) return fail(res, 409, 'Заказ уже выполняется или закрыт');
+        x.status = 'work'; x.startAt = now; log(x, 'start');
+      } else if (act === 'done') {
+        if (!(driver || HEAD(user))) return fail(res, 403, 'Завершить может водитель заказа');
+        if (['done', 'cancel'].includes(x.status)) return fail(res, 409, 'Заказ уже закрыт');
+        const q = num(b.factQty); if (q === null || Number.isNaN(q)) return fail(res, 400, x.unit === 'km' ? 'Укажите, сколько километров' : x.unit === 'trip' ? 'Укажите, сколько рейсов' : x.unit === 'shift' ? 'Укажите, сколько смен' : 'Укажите, сколько часов');
+        x.factQty = q; x.status = 'done'; x.doneAt = now; x.doneBy = user.id; x.doneNote = txt(b.note, 1000);
+        x.docs = files([...(x.docs || []), ...(Array.isArray(b.files) ? b.files : [])]); log(x, 'done', { qty: q });
+      } else if (act === 'cancel') {
+        if (!HEAD(user)) return fail(res, 403, 'Отменить может руководитель или диспетчер');
+        x.status = 'cancel'; log(x, 'cancel', { note: txt(b.note, 500) });
+      } else if (act === 'reopen') {
+        if (!HEAD(user)) return fail(res, 403, 'Вернуть в работу может руководитель или диспетчер');
+        x.status = x.startAt ? 'work' : x.driverId && x.vehicleId ? 'assigned' : 'new'; x.doneAt = null; log(x, 'reopen');
+      } else if (act === 'paid') {
+        if (!(HEAD(user) || user.role === 'accountant')) return fail(res, 403, 'Оплату отмечает бухгалтер или руководитель');
+        x.paid = !!b.paid; x.paidAt = x.paid ? now : null; log(x, x.paid ? 'paid' : 'unpaid');
+      } else if (act === 'docs') {
+        if (!(driver || HEAD(user) || user.role === 'accountant')) return fail(res, 403, 'Нет доступа');
+        x.docs = files(b.files); log(x, 'docs');
+      } else return fail(res, 400, 'Неизвестное действие');
+      return out(p[2], x);
+    }
+    if (m === 'DELETE' && p.length === 3) { if (!HEAD(user)) return fail(res, 403, 'Удалить заказ может руководитель'); delete O[p[2]]; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   /* «Путевые листы»: an employee uploads the photo of a waybill and says which work it belongs to (and the vehicle, if he likes) */
   if (p[1] === 'trips') {
     if (user.sys || orgType(user) === 'requests') return fail(res, 403, 'Недоступно');
@@ -984,11 +1069,11 @@ async function api(req, res, url) {
       const b = await readJsonBody(req);
       const files = (Array.isArray(b.files) ? b.files : []).filter(f => f && db.files[f.id]).slice(0, 10).map(f => ({ id: f.id, name: db.files[f.id].name, type: db.files[f.id].type }));
       if (!files.length) return fail(res, 400, 'Загрузите фото путевого листа');
-      const j = b.jobId && db.jobs[b.jobId];
-      if (!j) return fail(res, 400, 'Выберите, к какой работе относится путевой лист');
-      if (FIELD(user) && !onJob(user, j)) return fail(res, 403, 'Это не ваша работа');
+      const tr = orgType(user) === 'transport', j = !tr && b.jobId && db.jobs[b.jobId], to = tr && b.orderId && (db.tOrders || {})[b.orderId];
+      if (tr ? !to : !j) return fail(res, 400, tr ? 'Выберите, к какому заказу относится путевой лист' : 'Выберите, к какой работе относится путевой лист');
+      if (FIELD(user) && (tr ? to.driverId !== user.id : !onJob(user, j))) return fail(res, 403, tr ? 'Это не ваш заказ' : 'Это не ваша работа');
       if (b.vehicleId && !(db.vehicles || {})[b.vehicleId]) return fail(res, 400, 'Транспорт не найден');
-      const x = { id: newId(), by: user.id, at: new Date().toISOString(), date: /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : localDate(), jobId: b.jobId, vehicleId: b.vehicleId || null, note: String(b.note || '').trim().slice(0, 1000), files };
+      const x = { id: newId(), by: user.id, at: new Date().toISOString(), date: /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : localDate(), jobId: tr ? null : b.jobId, orderId: tr ? b.orderId : null, vehicleId: b.vehicleId || null, note: String(b.note || '').trim().slice(0, 1000), files };
       T.push(x); saveDb();
       return send(res, 200, { ok: true, trip: x, rev: db.rev });
     }
@@ -2017,7 +2102,7 @@ async function api(req, res, url) {
 const ORG_ID = /^[a-z0-9][a-z0-9-]{1,30}$/;
 const orgOut = o => {
   const st = orgState(o), us = users.filter(u => u.orgId === o.id);
-  return { id: o.id, name: o.name, type: o.type === 'requests' ? 'requests' : 'all', hide: o.hide || [], until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '', createdAt: o.createdAt || null,
+  return { id: o.id, name: o.name, type: ORG_TYPES.includes(o.type) ? o.type : 'all', hide: o.hide || [], until: o.until || '', blocked: !!o.blocked, blockNote: o.blockNote || '', note: o.note || '', createdAt: o.createdAt || null,
     state: st.blocked ? st.reason : 'active', left: st.left ?? null, users: us.length,
     admins: us.filter(u => u.role === 'admin').map(u => ({ id: u.id, login: u.login, name: u.name, blocked: !!u.blocked, sys: !!u.sys, lastLoginAt: u.lastLoginAt || null })) };
 };
