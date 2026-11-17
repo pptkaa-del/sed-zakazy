@@ -338,7 +338,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgt td{height:40px;min-width:30px;cursor:pointer;color:#1F2633;font-weight:700;font-size:11px;line-height:1.1}.sgt td.off:not([style*=background]){background:repeating-linear-gradient(135deg,var(--mute-soft) 0 4px,var(--sheet) 4px 7px)}
 .sgt td:hover{outline:2px solid var(--stamp);outline-offset:-2px}.sgt td.sel{outline:2px solid var(--ink);outline-offset:-2px}.sgdot{color:var(--stamp);font-size:9px}
 .sgt .sgsum{min-width:84px;padding:0 8px;font-weight:400;color:var(--ink);cursor:default;white-space:nowrap}.sgt thead .sgsum{font-size:11px}
-.sgnote{display:block;padding:8px 14px}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
+.sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
 .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vcard{text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;font:inherit;color:inherit}.vcard:hover{border-color:var(--stamp)}
 .vtop{display:flex;gap:10px;justify-content:space-between;align-items:center}.vtop b{font-size:16px}.plate{font:600 13px var(--f-mono,monospace);border:1.5px solid var(--ink);border-radius:4px;padding:1px 6px;background:var(--sheet);white-space:nowrap}
 .vcard .kv{margin:0}.vrow{align-items:flex-end}.vrow>label:not(.btn){display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.vlist{list-style:none;margin:0;padding:0}.vlist li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--rule-2);font-size:14px}.vlist li:first-child{border-top:0}
@@ -4450,6 +4450,38 @@ async function ckRecognize(file){
   // the form is redrawn at once, or — while the user types in it — as soon as he leaves the field (his input is not lost)
   st(ui.ckOcr); render();
 }
+/* «Сотрудники → Успеваемость»: сколько точек сделал сотрудник в каждый день; минимум дня — наибольший «минимум точек в день»
+   среди работ, назначенных ему в этот рабочий день (в выходные, на больничном, в отпуске минимума нет).
+   красный — меньше минимума, светло-зелёный — минимум выполнен, тёмно-зелёный — больше минимума на 50 % и более */
+const PF_COL = { red: '#FFC9C9', lg: '#D3F4DC', dg: '#4CBB72' };
+function pfCell(u, day){
+  const did = S.jobs.reduce((a, j) => a + (j.places || []).filter(x => x.doneAt && localDay(x.doneAt) === day && (x.doneBy === u.id || (!x.doneBy && x.assignee === u.id))).length, 0);
+  const kind = dayKind(day), n = dnum(day), tn = dnum(today());
+  const away = STAFF_MARKS.find(x => x.user === u.id && x.from <= day && x.to >= day && ['sick', 'vacation'].includes(x.type));
+  let min = 0, from = null;
+  if (kind === 'work' && !away && day <= today()) for (const j of S.jobs) {
+    if (!(j.minPerDay > 0) || !((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id))) continue;
+    const [a, b] = jobSpan(j), end = j.status !== 'done' ? Math.max(b, tn) : b;
+    if (n >= a && n <= end && j.minPerDay > min) { min = j.minPerDay; from = j; }
+  }
+  const col = !min ? '' : did < min ? 'red' : did >= min * 1.5 ? 'dg' : 'lg';
+  const tip = [`${fmtD(day)} — ${DAY_KIND[kind]}`, `сделано точек: ${did}`, min ? `минимум ${min} (работа № ${jobNo(from)} · ${from.title})` : away ? MARK_T[away.type] : 'минимум не задан'].join('\n');
+  return { did, min, col, tip, away, off: kind !== 'work' };
+}
+function staffPerf(people){
+  const ym = ui.stMonth || today().slice(0, 7), [y, m] = ym.split('-').map(Number), n = new Date(y, m, 0).getDate();
+  const days = Array.from({ length: n }, (_, i) => `${ym}-${pad(i + 1)}`), wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  const shift = k => { const d = new Date(y, m - 1 + k, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const rows = people.map(u => { const cells = days.map(d => pfCell(u, d)), planned = cells.filter(c => c.min);
+    return { u, cells, total: cells.reduce((a, c) => a + c.did, 0), below: planned.filter(c => c.col === 'red').length, planned: planned.length, workDays: cells.filter(c => !c.off && !c.away && c.did).length }; });
+  return `<section class="card sgwrap"><div class="sghead">
+      <div class="row-g"><button class="btn sm" data-act="stMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="stMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="stMonth" data-id="${today().slice(0, 7)}">Текущий</button>` : ''}</div>
+      <div class="sglegend"><span><i style="background:${PF_COL.red}"></i>меньше минимума</span><span><i style="background:${PF_COL.lg}"></i>минимум выполнен</span><span><i style="background:${PF_COL.dg}"></i>больше минимума на 50 % и более</span><span><i class="sgoff"></i>выходной, праздник</span><span>число — сделано точек</span></div></div>
+    ${rows.length ? `<div class="sgscroll"><table class="sgt pft"><thead><tr><th class="sgname">Сотрудник</th>${days.map(d => { const k = dayKind(d); return `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`; }).join('')}<th class="sgsum">Точек за месяц</th><th class="sgsum" title="Дней с минимумом, где сделано меньше">Ниже минимума</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><th class="sgname"><button class="linkish sgu" data-act="stCard" data-id="${r.u.id}">${esc(r.u.name)}</button><small>${esc(ROLE_NAMES[r.u.role] || '')}</small></th>${r.cells.map((c, i) => `<td class="${c.off ? 'off' : ''} ${c.col === 'dg' ? 'pfdg' : ''}" style="${c.col ? `background:${PF_COL[c.col]}` : ''}" title="${esc(c.tip)}" data-act="stCell" data-id="${r.u.id}|${days[i]}" role="button" tabindex="0">${c.did || (c.min ? '0' : c.away ? `<small class="dim">${c.away.type === 'sick' ? 'Б' : 'О'}</small>` : '')}${c.min ? `<small class="pfmin">/${c.min}</small>` : ''}</td>`).join('')}
+        <td class="sgsum"><b>${r.total}</b>${r.workDays ? `<small class="dim"> · ${Math.round(r.total / r.workDays * 10) / 10} в день</small>` : ''}</td><td class="sgsum ${r.below ? 'sgminus' : ''}">${r.planned ? `<b>${r.below}</b> из ${r.planned} дн.` : '—'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty" style="border:0">Сотрудников нет</div>'}
+    <small class="dim sgnote">В клетке — сделано точек, после косой черты — минимум дня (наибольший «Минимум точек в день» среди работ, назначенных сотруднику). Нажмите на клетку — что было в этот день.</small></section>`;
+}
 /* ---------- «Сотрудники»: what is assigned to whom and where, and how much each one did in a day ---------- */
 // a row of «Сотрудники»: what is assigned to the employee, what he did and his marks
 function staffRow(u, day){
@@ -4483,7 +4515,9 @@ function vStaff(){
     <button class="btn sm" data-act="workCal">📅 График работы</button><span class="dim">${fmtD(day)} — ${DAY_KIND[dayKind(day)]}</span>
     <span class="dim">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}: <b>${rows.reduce((a, r) => a + r.doneDay.length, 0)}</b></span></div>`;
   if (!rows.length) return head + '<div class="empty"><h3>Сотрудников нет</h3>Добавьте пользователей с ролью «Сотрудник» или «Подрядчик» на вкладке «Пользователи».</div>';
-  return head + staffGrid(rows.map(r => r.u).sort((a, b) => a.name.localeCompare(b.name, 'ru')));
+  const people = rows.map(r => r.u).sort((a, b) => a.name.localeCompare(b.name, 'ru')), tab = ui.stTab || 'grid';
+  const tabs = `<nav class="seg stabs" aria-label="Сотрудники">${[['grid', 'Табель'], ['perf', 'Успеваемость']].map(([k, l]) => `<button type="button" data-act="stTab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-pressed="${tab === k}">${l}</button>`).join('')}</nav>`;
+  return tabs + head + (tab === 'perf' ? staffPerf(people) : staffGrid(people));
 }
 /* a cell of the table: the marks and the irregular hours of the day with «Изменить», and what was assigned */
 function staffDayHtml(uid, day){
@@ -5423,6 +5457,7 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
+        ${isMount(j) ? `<dt>Минимум в день</dt><dd>${j.minPerDay ? j.minPerDay + ' точ. на сотрудника' : '<span class="dim">не задан</span>'}</dd>` : ''}
         ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${can('works:labels') ? `<button class="btn sm" data-act="labelsFor" data-id="${ord(j.orderId) ? 'order:' + j.orderId : 'job:' + j.id}">🏷 Этикетки</button> ` : ''}${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
@@ -5463,6 +5498,7 @@ function renderDrawer(){
       <label class="wide">Что происходит<textarea class="in" id="j-happen" rows="2" maxlength="2000" placeholder="Текущее состояние: что сейчас делается, чего ждём">${esc(j?.happening || '')}</textarea></label>
       ${j && (j.places || []).length ? '' : `<label>Процент выполнения, % <small class="dim" style="font-size:12px">вручную — пока нет точек</small><input class="in mono" type="number" min="0" max="100" step="1" id="j-prog" value="${esc(j?.progress ?? '')}"></label>`}
       <label>Срок окончания работ<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
+      <label id="j-min-w" ${kind === 'prod' ? 'hidden' : ''}>Минимум точек в день <small class="dim" style="font-size:12px">на одного сотрудника</small><input class="in mono" type="number" min="0" max="10000" step="1" id="j-min" value="${esc(j?.minPerDay ?? '')}" placeholder="не задан"></label>
       <label>Статус<select class="in" id="j-status">${Object.entries(JOB_ST).filter(([k]) => j || k !== 'done').map(([k, l]) => `<option value="${k}" ${(j?.status || 'new') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="wide">Документы<input class="in" type="file" id="j-files" accept="${ACCEPT}" multiple>${j && (j.docs || []).length ? `<small class="dim" style="font-size:12px">Уже загружено: ${j.docs.length}. Новые файлы добавятся к ним.</small>` : ''}</label>
       <label class="wide" id="j-photos-w" ${kind === 'prod' ? 'hidden' : ''}>Какие фото нужны на каждой точке — по одному в строке<textarea class="in" id="j-photos" rows="3">${esc(j ? (j.photoSpec || []).join('\n') : 'Общий вид\nДо замены\nПосле замены')}</textarea><small class="dim" style="font-size:12px">Сотрудник увидит эти пункты в окне точки. Пусто — фото не обязательны.</small></label>
@@ -5838,6 +5874,7 @@ async function onSubmit(e){
       const prog = $('j-prog') ? $('j-prog').value.trim() : undefined;
       if (prog !== undefined && prog !== '' && !(Number(prog) >= 0 && Number(prog) <= 100)) return fail('Процент выполнения — от 0 до 100.');
       const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs,
+        minPerDay: $('j-min') && $('j-min').value.trim() !== '' ? Math.round(Number($('j-min').value)) : null,
         features:($('j-feat').value || '').trim(), happening:($('j-happen').value || '').trim(), ...(prog !== undefined ? { progress: prog === '' ? null : Math.round(Number(prog)) } : {}), ...(!old || old.status !== $('j-status').value ? { status: $('j-status').value } : {}),
         photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
@@ -6545,6 +6582,7 @@ async function act(el){
       try { const r = await api('PUT', '/api/overtime/' + id, body); Object.assign(x, r.entry); render(); openDrawer('staffDay', x.by, x.date); toast('Запись изменена'); refresh().catch(() => {}); } catch(e) { $('ferr').textContent = errText(e); } return; }
     case 'otHDel': { const x = OVERTIME.find(o => o.id === id); try { await api('DELETE', '/api/overtime/' + id); OVERTIME = OVERTIME.filter(o => o.id !== id); render(); openDrawer('staffDay', x.by, x.date); toast('Запись удалена'); } catch(e) { toast(errText(e)); } return; }
     case 'stMonth': ui.stMonth = id; return render();
+    case 'stTab': ui.stTab = id; return render();
     case 'spG': ui.spG = id; return render();
     case 'spP': ui.spP = id; return render();
     case 'spAll': ui.spAll = !!id; return render();
@@ -6737,7 +6775,7 @@ document.addEventListener('change', async e => {
   if (t.name && t.name.startsWith('sh-edit-')) { const nid = t.name.slice(8), share = [...document.querySelectorAll(`input[name="${t.name}"]:checked`)].map(x => x.value); if (!share.length) { t.checked = true; return toast('Хотя бы один участник'); }
     try { const r = await api('PATCH', '/api/notes/' + nid, { share }); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); toast('Участники изменены'); } catch(err) { toast(errText(err)); } return; }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
-  if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; return; }
+  if (t.name === 'jf-kind') { ui.jfKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); $('j-photos-w').hidden = t.value === 'prod'; if ($('j-min-w')) $('j-min-w').hidden = t.value === 'prod'; return; }
   if (t.id === 'w-nw') { ui.wNotWorking = t.checked; ui.wComment = $('w-comment') ? $('w-comment').value : ui.wComment; return renderDrawer(); }
   if (t.id === 'dtJob') { ui.dtJob = t.value || null; ui.dtJobFit = true; return renderDt(); }
   if (t.id === 'dtAsgWho') { ui.dtAsg = t.value || 'any'; return renderDt(); }
