@@ -265,10 +265,10 @@ table.lines tr.ln-miss td{background:var(--warn-soft)}table.lines tr.ln-miss td:
 .jl-b{display:flex;flex-direction:column;gap:4px;min-width:0}.jl-t{white-space:pre-wrap;overflow-wrap:anywhere}.jl.done .jl-t{text-decoration:line-through;color:var(--ink-2)}.jl-acts{display:flex;gap:2px;align-items:center}
 .jl-links{display:flex;flex-wrap:wrap;gap:6px}.jl-link{display:inline-flex;gap:6px;align-items:center;padding:2px 8px;border-radius:999px;background:var(--info-soft);font-size:13px;max-width:100%}.jl-link a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
 .jl-done summary{margin-top:6px;font-size:13px}.jlist .note-add textarea{min-height:38px}
-.wtable{padding:0;overflow:hidden}.wjr{display:grid;grid-template-columns:minmax(0,1.5fr) 130px minmax(0,1.3fr) minmax(0,1.3fr) 110px 120px;gap:14px;align-items:start;padding:12px 16px;border-top:1px solid var(--rule-2)}
+.wtable{padding:0;overflow:hidden}.wjr{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,1.2fr) minmax(0,1.2fr) 120px 110px 110px;gap:14px;align-items:start;padding:12px 16px;border-top:1px solid var(--rule-2)}
 .wjr.whead{background:var(--mute-soft);font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);padding-block:8px;border-top:0;align-items:center}
 .wjr.click{cursor:pointer}.wjr.click:hover,.wjr.open{background:var(--paper)}.wl-name{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.wl-name b{font-weight:600}.wl-name small,.wl-dates small,.wl-list small{display:block;color:var(--ink-2);font-size:12px}
-.wl-dates b{font-weight:500;display:block}.wl-dates.bad-t small{color:var(--bad)}.wl-list{display:flex;flex-direction:column;gap:2px;font-size:13px;min-width:0}.wl-item{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wl-arr{color:var(--ink-2);font-size:12px}
+.wl-dates b{font-weight:500;display:block}.wl-happen{font-size:13px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;min-width:0}.wl-dates.bad-t small{color:var(--bad)}.wl-list{display:flex;flex-direction:column;gap:2px;font-size:13px;min-width:0}.wl-item{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wl-arr{color:var(--ink-2);font-size:12px}
 .wpanel{padding:14px 18px 16px;background:var(--paper);border-top:1px dashed var(--rule);display:flex;flex-direction:column;gap:14px}.wp-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.wp-col{display:flex;flex-direction:column;gap:12px}
 .wpanel h5{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}.wp-desc{margin:0;white-space:pre-wrap}.wl-ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}.wl-th{display:flex;margin-top:4px}.wl-th img{width:64px;height:48px}
 @media (max-width:900px){.wjr{grid-template-columns:1fr 1fr}.wjr.whead{display:none}.wjr>.wl-name{grid-column:1/-1}.wjr [data-l]::before{content:attr(data-l);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2)}.wp-grid{grid-template-columns:1fr}}
@@ -2419,14 +2419,20 @@ function vWorkList(){
     <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
     <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['done', 'Выполненные'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => k === 'all' || (k === 'active' ? j.status !== 'done' : (j.status || 'new') === k)).length}</span></button>`).join('')}</div>
-    ${can('works:labels') ? '<a class="btn" href="#labels" title="Конструктор этикеток с серийным номером">🏷 Этикетки</a>' : ''}
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   if (!L.length) return head + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
-  return head + `<section class="card wtable"><div class="wjr whead"><span>Работа</span><span>Сроки</span><span>Что нужно сделать</span><span>Что нужно купить</span><span>Точки</span><span>Статус</span></div>
+  return head + `<section class="card wtable"><div class="wjr whead"><span>Работа</span><span>Что происходит</span><span>Что нужно сделать</span><span>Что нужно купить</span><span>Сроки</span><span>Выполнено</span><span>Статус</span></div>
     ${L.map(j => wlRow(j) + (ui.wlOpen === j.id ? wlPanel(j) : '')).join('')}</section>`;
 }
-/* a row of the works table: the name, the dates, what to do and to buy in short, the points */
+/* the percent of a work: by the done points when there are points, otherwise entered by hand («вручную») */
+function jobPct(j){
+  const P = j.places || [];
+  if (P.length) { const c = P.filter(x => x.doneAt).length; return { pct: Math.round(c / P.length * 100), auto: true, c, n: P.length }; }
+  if (j.progress != null && j.progress !== '') return { pct: Math.max(0, Math.min(100, Number(j.progress) || 0)), manual: true };
+  return null;
+}
+/* a row of the works table: the name, what is happening, what to do and to buy in short, the dates, the percent */
 const wlBrief = (L, word) => { const open = (L || []).filter(x => !x.done), all = (L || []).length;
   if (!all) return '<span class="dim">—</span>';
   return `${open.slice(0, 2).map(x => `<span class="wl-item">• ${esc((x.text || ((x.links || [])[0] ? jlHost(x.links[0].url) : 'без текста')).slice(0, 48))}${(x.links || []).length ? ' 🔗' : ''}${(x.files || []).length ? ' 🖼' : ''}</span>`).join('')}${open.length > 2 ? `<span class="dim">ещё ${open.length - 2}</span>` : ''}${!open.length ? `<span class="ok-t">всё ${word}</span>` : ''}<small class="dim">${word} ${all - open.length} из ${all}</small>`; };
@@ -2435,10 +2441,11 @@ function wlRow(j){
   const left = j.due && j.status !== 'done' ? Math.round((Date.parse(j.due) - Date.parse(today())) / 864e5) : null;
   return `<div class="wjr click ${ui.wlOpen === j.id ? 'open' : ''}" data-act="wlToggle" data-id="${j.id}" role="button" tabindex="0" aria-expanded="${ui.wlOpen === j.id}">
     <div class="wl-name"><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}</small></div>
-    <div class="wl-dates ${od ? 'bad-t' : ''}" data-l="Сроки">${j.start ? `<small>начало ${fmtD(j.start)}</small>` : ''}${j.due ? `<b>до ${fmtD(j.due)}</b><small>${od ? 'просрочено на ' + (-left) + ' дн.' : left !== null ? (left === 0 ? 'сегодня' : 'осталось ' + left + ' дн.') : ''}</small>` : '<span class="dim">срок не указан</span>'}</div>
+    <div class="wl-happen" data-l="Что происходит">${j.happening ? esc(j.happening) : '<span class="dim">—</span>'}</div>
     <div class="wl-list" data-l="Сделать">${wlBrief(j.todo, 'сделано')}</div>
     <div class="wl-list" data-l="Купить">${wlBrief(j.buy, 'куплено')}</div>
-    <div data-l="Точки">${isMount(j) && P.length ? `<b>${c} / ${P.length}</b><span class="wbar"><i style="width:${Math.round(c / P.length * 100)}%"></i></span>` : '<span class="dim">—</span>'}</div>
+    <div class="wl-dates ${od ? 'bad-t' : ''}" data-l="Сроки">${j.start ? `<small>начало ${fmtD(j.start)}</small>` : ''}${j.due ? `<b>до ${fmtD(j.due)}</b><small>${od ? 'просрочено на ' + (-left) + ' дн.' : left !== null ? (left === 0 ? 'сегодня' : 'осталось ' + left + ' дн.') : ''}</small>` : '<span class="dim">срок не указан</span>'}</div>
+    <div data-l="Выполнено">${(() => { const p = jobPct(j); return !p ? '<span class="dim">—</span>' : `<b>${p.pct}%</b><span class="wbar"><i style="width:${p.pct}%"></i></span><small class="dim">${p.auto ? `точек ${p.c} из ${p.n}` : '<span class="chip c-mute">вручную</span>'}</small>`; })()}</div>
     <div class="wrk-st"><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span><span class="wl-arr" aria-hidden="true">${ui.wlOpen === j.id ? '▴' : '▾'}</span></div></div>`;
 }
 /* the drop-down under a row: everything important in short, «Показать всё» opens the whole card on the full screen */
@@ -2449,7 +2456,10 @@ function wlPanel(j){
   return `<div class="wpanel">
     <div class="wp-grid">
       <div class="wp-col">
+        ${j.features ? `<div><h5>Ключевые особенности</h5><p class="wp-desc">${esc(j.features)}</p></div>` : ''}
+        ${j.happening ? `<div><h5>Что происходит</h5><p class="wp-desc">${esc(j.happening)}</p></div>` : ''}
         ${j.description ? `<div><h5>Описание</h5><p class="wp-desc">${esc(j.description)}</p></div>` : ''}
+        ${!P.length && canEdit() ? `<div><h5>Процент выполнения <span class="chip c-mute">вручную</span></h5><div class="row-g"><input class="in mono" type="number" min="0" max="100" step="5" data-wlpct="${j.id}" value="${esc(j.progress ?? '')}" style="width:90px" aria-label="Процент выполнения"> %<small class="dim">Точек нет — процент задаётся вручную.</small></div></div>` : ''}
         <div><h5>Участники</h5>${jobPeople(j).length ? jobPeople(j).map(id => `<span class="wchip">${esc(who(id))}${id === j.leaderId ? ' (рук.)' : ''}</span>`).join(' ') : '<span class="dim">никто не назначен</span>'}</div>
         ${T.length ? `<div><h5>План-график</h5><ul class="wl-ul">${T.slice(0, 4).map(t => `<li>${esc(t.title)} <small class="dim">${fmtD(t.start)} – ${fmtD(t.end)}</small></li>`).join('')}${T.length > 4 ? `<li class="dim">ещё ${T.length - 4}</li>` : ''}</ul></div>` : ''}
         ${isMount(j) && P.length ? `<div><h5>Точки по исполнителям</h5><ul class="wl-ul">${Object.entries(byP).map(([k, v]) => `<li>${k ? esc(who(k)) : '<span class="dim">не назначены</span>'} — ${v.c} из ${v.t}</li>`).join('')}</ul></div>` : ''}
@@ -5399,6 +5409,8 @@ function renderDrawer(){
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
       </dl>
+      ${j.features ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Ключевые особенности</b><div style="white-space:pre-wrap">${esc(j.features)}</div></div>` : ''}
+      ${j.happening ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Что происходит</b><div style="white-space:pre-wrap">${esc(j.happening)}</div></div>` : ''}
       ${j.description || canEdit() ? `<p class="jdesc ${j.description ? '' : 'dim'}" ${edAttr('jobs', j.id, 'description', true)}>${j.description ? esc(j.description) : 'Описание — дважды щёлкните, чтобы добавить'}</p>` : ''}
       ${jobListBox(j, 'todo')}
       ${jobListBox(j, 'buy')}
@@ -5428,6 +5440,9 @@ function renderDrawer(){
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Тип работы</span><div class="seg kindseg" style="margin-top:6px">${Object.entries(WORK_KIND).map(([k, l]) => `<label class="${kind === k ? 'on' : ''}"><input type="radio" name="jf-kind" value="${k}" ${kind === k ? 'checked' : ''}> ${l}</label>`).join('')}</div></div>
       <label class="wide">Название проекта<input class="in" id="j-title" value="${v(j,'title')}" required></label>
       <label class="wide">Контрагент<input class="in" id="j-cust" list="j-cust-list" autocomplete="off" value="${esc(cp ? cp.name : '')}"><datalist id="j-cust-list">${cpsSorted().map(c => `<option value="${esc(c.name)}"></option>`).join('')}</datalist><small class="dim" style="font-size:12px">Выберите из списка или впишите нового — он добавится в контрагенты.</small></label>
+      <label class="wide">Ключевые особенности<textarea class="in" id="j-feat" rows="2" maxlength="2000" placeholder="Что важно знать о работе: условия, доступ, требования заказчика">${esc(j?.features || '')}</textarea></label>
+      <label class="wide">Что происходит<textarea class="in" id="j-happen" rows="2" maxlength="2000" placeholder="Текущее состояние: что сейчас делается, чего ждём">${esc(j?.happening || '')}</textarea></label>
+      ${j && (j.places || []).length ? '' : `<label>Процент выполнения, % <small class="dim" style="font-size:12px">вручную — пока нет точек</small><input class="in mono" type="number" min="0" max="100" step="1" id="j-prog" value="${esc(j?.progress ?? '')}"></label>`}
       <label>Срок окончания работ<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
       <label>Статус<select class="in" id="j-status">${Object.entries(JOB_ST).filter(([k]) => j || k !== 'done').map(([k, l]) => `<option value="${k}" ${(j?.status || 'new') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="wide">Документы<input class="in" type="file" id="j-files" accept="${ACCEPT}" multiple>${j && (j.docs || []).length ? `<small class="dim" style="font-size:12px">Уже загружено: ${j.docs.length}. Новые файлы добавятся к ним.</small>` : ''}</label>
@@ -5801,7 +5816,10 @@ async function onSubmit(e){
       const old = d.id && jobOf(d.id), docs = [...(old?.docs || [])];
       const files = [...($('j-files').files || [])];
       for (const fl of files) { fail(`Загружаем «${fl.name}»…`); const u = await upload(fl); docs.push({ id:u.id, name:u.name }); }
-      const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs, ...(!old || old.status !== $('j-status').value ? { status: $('j-status').value } : {}),
+      const prog = $('j-prog') ? $('j-prog').value.trim() : undefined;
+      if (prog !== undefined && prog !== '' && !(Number(prog) >= 0 && Number(prog) <= 100)) return fail('Процент выполнения — от 0 до 100.');
+      const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs,
+        features:($('j-feat').value || '').trim(), happening:($('j-happen').value || '').trim(), ...(prog !== undefined ? { progress: prog === '' ? null : Math.round(Number(prog)) } : {}), ...(!old || old.status !== $('j-status').value ? { status: $('j-status').value } : {}),
         photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
       if (d.id) { await upd('jobs', d.id, data); openDrawer('job', d.id); toast('Работа сохранена'); }
@@ -6662,6 +6680,10 @@ document.addEventListener('toggle', e => { const d = e.target; if (d.matches && 
 document.addEventListener('click', e => { if (ui.dtMenu && !e.target.closest('details[data-menu]')) { ui.dtMenu = null; document.querySelectorAll('details[data-menu][open]').forEach(d => d.open = false); } });
 document.addEventListener('change', async e => {
   const t = e.target;
+  // the manual percent of a work without points (the drop-down under a row of «Работы»)
+  if (t.dataset && t.dataset.wlpct) { const v = t.value.trim(), n = Number(v);
+    if (v !== '' && !(n >= 0 && n <= 100)) { toast('Процент — от 0 до 100'); return; }
+    try { await upd('jobs', t.dataset.wlpct, { progress: v === '' ? null : Math.round(n) }); render(); toast(v === '' ? 'Процент убран' : 'Процент выполнения: ' + Math.round(n) + '%'); } catch(err) { toast(errText(err)); } return; }
   if (t.id === 'note-new-urg') { ui.noteNewUrg = t.checked; return; }
   if (t.dataset.noteurg) { const n = NOTES.find(x => x.id === t.dataset.noteurg); if (n) { n.urgent = t.checked; n.urgentAt = t.checked ? new Date().toISOString() : null; render(); }
     try { await api('PATCH', '/api/notes/' + t.dataset.noteurg, { urgent: t.checked }); } catch(e) { toast(errText(e)); } refresh().catch(() => {}); return; }

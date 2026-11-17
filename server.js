@@ -109,6 +109,10 @@ function cleanJob(d){
       ...(isNeed(x.need) ? { need: x.need } : {}),
       ...(x.dtNo ? { dtNo: String(x.dtNo).slice(0, 60), cats: (Array.isArray(x.cats) ? x.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other', 'check'].includes(c)), road: String(x.road || '').slice(0, 200) } : {}) }));
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
+  // the key features of a work and what is happening with it now; the percent done by hand (when the work has no points)
+  if ('features' in d) out.features = String(d.features || '').trim().slice(0, 2000);
+  if ('happening' in d) out.happening = String(d.happening || '').trim().slice(0, 2000);
+  if ('progress' in d) out.progress = d.progress === null || d.progress === '' || !Number.isFinite(Number(d.progress)) ? null : Math.max(0, Math.min(100, Math.round(Number(d.progress))));
   // which photos a worker must take at every point, e.g. «Общий вид», «До замены», «После замены»
   // materials for a montage work: warehouse positions and quantities to be written off
   if ('materials' in d) out.materials = (Array.isArray(d.materials) ? d.materials : []).slice(0, 500).filter(x => x && String(x.name || '').trim() && Number(x.qty) > 0)
