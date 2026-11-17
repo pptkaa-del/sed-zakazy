@@ -5118,18 +5118,25 @@ function myWorkBox(){
 // the sub-tabs of «Задачи»: notes, shared tasks, the drawing board and «Разработки»
 function notesTabsBar(tab){
   const open = NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k);
-  const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'devs' ? DEVS.length : 0;
-  const T = [...NOTE_TABS.filter(([k]) => open.includes(k)), ...(can('devs') && !reqMode() ? [['devs', 'Разработки']] : [])];
+  const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'devs' ? DEVS.length : k === 'mine' ? myAssignedCount() : 0;
+  const T = [...NOTE_TABS.filter(([k]) => open.includes(k)), ...(tabOpen('notes') ? [['mine', 'Назначенные мне']] : []), ...(can('devs') && !reqMode() ? [['devs', 'Разработки']] : [])];
   return `<div class="seg ntabs" role="tablist">${T.map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
 }
 const NOTE_TABS = [['task', 'Собственные'], ['shared', 'Общие задачи']];
 const ntype = n => n.type || 'task';
 const isOwnNote = n => ntype(n) === 'task' || ntype(n) === 'memo';
 function vNotes(){
-  const open = NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k), tab = open.includes(ui.ntab) ? ui.ntab : open[0];
+  const open = [...NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k), 'mine'], tab = open.includes(ui.ntab) ? ui.ntab : open[0];
   const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'memo' ? NOTES.filter(n => ntype(n) === 'memo').length : 0;
   const tabs = notesTabsBar(tab);
-  return myWorkBox() + tabs + (tab === 'shared' ? vShared() : vTasksList());
+  return tabs + (tab === 'shared' ? vShared() : tab === 'mine' ? vAssignedToMe() : vTasksList());
+}
+// «Назначенные мне»: works and plan tasks where I am an executor, and shared tasks assigned to me
+const myAssignedCount = () => { const a = myAssigned(); return a.jobs.length + a.tasks.length + NOTES.filter(n => n.type === 'shared' && n.assignee === me?.id && !n.done).length; };
+function vAssignedToMe(){
+  const box = myWorkBox(), sh = NOTES.some(n => n.type === 'shared' && n.assignee === me.id);
+  if (!box && !sh) return '<div class="empty"><h3>Вам пока ничего не назначено</h3>Здесь появятся работы и задачи план-графика, где вы указаны исполнителем, и общие задачи, назначенные вам.</div>';
+  return box + (sh ? `<h3 class="sub-h">Общие задачи, назначенные мне</h3>${vMyTasks('')}` : '');
 }
 const thumbF = f => /^image\//.test(f.type || '') || /\.(png|jpe?g|gif|webp)$/i.test(f.name || '') ? `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener" class="thumb"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>` : `<a href="/files/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>`;
 /* «Заметки»: text, pictures and drawings */
@@ -5160,9 +5167,9 @@ function shComments(n, own){
         <div class="row-g" data-keep><input class="in" id="shc-${esc(n.id)}" placeholder="Комментарий" style="flex:1 1 220px"><button class="btn sm" data-act="shCmt" data-id="${esc(n.id)}">Отправить</button></div></div>`;
 }
 /* «Мои задачи» of an employee: the shared tasks assigned to him */
-function vMyTasks(){
+function vMyTasks(title){
   const L = NOTES.filter(n => n.type === 'shared' && n.assignee === me.id).sort((a, b) => (a.done - b.done) || String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(b.at).localeCompare(String(a.at)));
-  return `<div class="notes"><h2 style="margin:0 0 12px">Мои задачи</h2>${L.length ? `<ul class="memo-list">${L.map(n => `<li class="memo shared ${n.done ? 'done' : ''} ${shLate(n) ? 'late' : ''}">
+  return `<div class="notes">${title === '' ? '' : `<h2 style="margin:0 0 12px">${title || 'Мои задачи'}</h2>`}${L.length ? `<ul class="memo-list">${L.map(n => `<li class="memo shared ${n.done ? 'done' : ''} ${shLate(n) ? 'late' : ''}">
       <div class="sh-h"><label class="note-cb"><input type="checkbox" data-note="${esc(n.id)}" ${n.done ? 'checked' : ''} aria-label="Выполнено"></label><div class="memo-t">${esc(n.text)}</div></div>
       <div class="sh-meta">${shMeta(n)}</div>
       ${(n.files || []).length ? `<div class="thumbs">${n.files.map(f => `<span class="tw">${thumbF(f)}</span>`).join('')}</div>` : ''}
