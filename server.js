@@ -1825,10 +1825,10 @@ async function api(req, res, url) {
     for (const [k, v] of Object.entries(b.map || {})) if (/^(id|n):/.test(k) && db.stock[v]) map[k] = v;
     const lines = writeoffLines(o, map);
     if (!lines.length) return fail(res, 400, p[1] === 'jobs' ? 'В работе нет материалов' : 'В изделиях заказа нет компонентов');
-    const bad = lines.filter(L => L.source !== 'acct');
-    if (bad.length) return fail(res, 409, 'Не хватает в бухгалтерских остатках: ' + bad.slice(0, 5).map(L => L.name).join(', ') + (bad.length > 5 ? ` и ещё ${bad.length - 5}` : '') + '. Замените номенклатуру или обновите остатки');
+    if (!lines.some(L => L.take > 0)) return fail(res, 400, 'Нечего списывать: ни одной позиции нет в бухгалтерских остатках');
+    // lines that are short are written off as much as there is on the books (the rest is «не хватает»)
     const target = p[1] === 'jobs' ? db.jobs[p[2]] : o, at = new Date().toISOString(), prev = woTaken(target), next = {};
-    lines.forEach(L => { next[L.stockId] = r3((next[L.stockId] || 0) + L.need); });
+    lines.forEach(L => { if (L.stockId && L.take > 0) next[L.stockId] = r3((next[L.stockId] || 0) + L.take); });
     const what = p[1] === 'jobs' ? `работе № ${target.no || ''} · ${target.title || ''}` : `заказу ${o.number || ''} · ${o.title || ''}`;
     for (const sid of new Set([...Object.keys(prev), ...Object.keys(next)])) {
       const it = db.stock[sid], d = r3((next[sid] || 0) - (prev[sid] || 0)); if (!it || !d) continue;
@@ -1839,7 +1839,7 @@ async function api(req, res, url) {
     }
     target.woMap = map;
     if (target.woDraft) { delete target.woDraft.map; if (!target.woDraft.full) delete target.woDraft; }
-    target.writeoff = { at, by: user.id, applied: true, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.need })) };
+    target.writeoff = { at, by: user.id, applied: true, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.take, need: L.need })) };
     saveDb();
     return send(res, 200, { ok: true, writeoff: target.writeoff, rev: db.rev });
   }
@@ -1876,6 +1876,13 @@ async function api(req, res, url) {
     return send(res, 200, { ok: true, woFull: o.woFull, rev: db.rev });
   }
   /* write-off list for an order: Excel with highlighting */
+  if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff-table.xlsx' && m === 'GET') {
+    const o = woDoc(p[1], p[2]); if (!o) return fail(res, 404, 'Не найдено');
+    const buf = writeoffPlainXlsx(o), name = `Таблица списания ${o.number || ''} ${o.title || ''}`.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 90) + '.xlsx';
+    res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="writeoff-table.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`, 'Content-Length': buf.length, 'Cache-Control': 'no-store' });
+    return res.end(buf);
+  }
   if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff.xlsx' && m === 'GET') {
     const o = woDoc(p[1], p[2]);
     if (!o) return fail(res, 404, 'Не найдено');
@@ -2617,7 +2624,9 @@ function writeoffLines(o, mapOverride) {
   return [...lines.values()].map(L => {
     const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : 'short';
     const shortage = source === 'acct' ? 0 : Math.round((L.need - (L.inStock ? L.acct : 0)) * 1000) / 1000;
-    return { ...L, source, shortage };
+    // what will be written off: the quantity, but not more than the accounting balance
+    const take = L.inStock ? r3(Math.max(0, Math.min(L.need, L.acct))) : 0;
+    return { ...L, source, shortage, take };
   }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
 const SOURCE_LABEL = { acct: 'Хватает', short: 'Не хватает', none: 'Нет в бухгалтерских остатках' };
@@ -2732,8 +2741,8 @@ function writeoffXlsx(o) {
   const ord = job && o.orderId && db.orders[o.orderId];
   const wb = o.writeoff, u = wb && users.find(x => x.id === wb.by);
   // the lines of the saved list when it is saved (that is what was taken off the books), otherwise the current ones
-  const out = wb && Array.isArray(wb.lines) && wb.lines.length ? wb.lines.map(L => { const it = L.stockId && db.stock[L.stockId]; return { name: it ? it.name : L.name, sku: (it && it.sku) || L.sku || '', unit: (it && it.unit) || L.unit || 'шт', qty: Number(L.qty) || 0 }; })
-    : lines.map(L => ({ name: L.name, sku: L.sku || '', unit: L.unit || 'шт', qty: L.need }));
+  const out = (wb && Array.isArray(wb.lines) && wb.lines.length ? wb.lines.map(L => { const it = L.stockId && db.stock[L.stockId]; return { name: it ? it.name : L.name, sku: (it && it.sku) || L.sku || '', unit: (it && it.unit) || L.unit || 'шт', qty: Number(L.qty) || 0 }; })
+    : lines.map(L => ({ name: L.name, sku: L.sku || '', unit: L.unit || 'шт', qty: L.take }))).filter(L => L.qty > 0);
   const goods = [['№', 'Номенклатура', 'Единица', 'Количество'].map(v => ({ v, s: 1 })),
     ...out.map((L, i) => [{ v: i + 1, s: 3 }, { v: L.name, s: 2 }, { v: L.unit, s: 2 }, { v: L.qty, s: 3 }])];
   const bad = lines.filter(L => L.source !== 'acct');
@@ -2758,18 +2767,36 @@ function writeoffXlsx(o) {
   ];
   const st = { acct: [4, 5], short: [8, 9], none: [8, 9] };
   const check = [
-    ['№', 'Наименование', 'Ед.', 'Списать', 'Бух. остаток', 'Факт. остаток', 'Состояние', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
+    ['№', 'Наименование', 'Ед.', 'Нужно списать', 'Спишется', 'Бух. остаток', 'Факт. остаток', 'Состояние', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
     ...lines.map((L, i) => { const [ts, ns] = st[L.source]; return [
-      { v: i + 1, s: ns }, { v: L.name, s: ts }, { v: L.unit, s: ts }, { v: L.need, s: ns },
+      { v: i + 1, s: ns }, { v: L.name, s: ts }, { v: L.unit, s: ts }, { v: L.need, s: ns }, { v: L.take, s: ns },
       L.inStock ? { v: L.acct, s: ns } : { v: '—', s: ts }, L.inStock ? { v: L.real, s: ns } : { v: '—', s: ts },
       { v: SOURCE_LABEL[L.source], s: ts }, L.shortage ? { v: L.shortage, s: ns } : { v: '', s: ts }, { v: L.products.join(', '), s: ts }]; }),
     [],
     [{ v: 'Хватает бухгалтерского остатка', s: 4 }],
     [{ v: 'Позиции нет в бухгалтерских остатках или её не хватает', s: 8 }],
   ];
-  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 50, 9, 12] }, { name: 'Реквизиты', rows: info, widths: [30, 70] }, { name: 'Проверка остатков', rows: check, widths: [5, 42, 7, 11, 13, 13, 30, 12, 30] }]);
+  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 50, 9, 12] }, { name: 'Реквизиты', rows: info, widths: [30, 70] }, { name: 'Проверка остатков', rows: check, widths: [5, 42, 7, 13, 11, 13, 13, 30, 12, 30] }]);
 }
 
+/* the plain table of a write-off: what had to be written off, what is written off (not more than the books), what is short */
+function writeoffPlainXlsx(o) {
+  const lines = writeoffLines(o), wb = o.writeoff, saved = !!(wb && wb.applied && Array.isArray(wb.lines));
+  const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : '';
+  const rows = saved ? wb.lines.map(L => { const it = L.stockId && db.stock[L.stockId], need = Number(L.need ?? L.qty) || 0, got = Number(L.qty) || 0; return { name: it ? it.name : L.name, unit: (it && it.unit) || L.unit || 'шт', need, got, short: r3(Math.max(0, need - got)) }; })
+    : lines.map(L => ({ name: L.name, unit: L.unit || 'шт', need: L.need, got: L.take, short: r3(Math.max(0, L.need - L.take)) }));
+  const what = /^работа/.test(o.number || '') ? `Работа ${String(o.number || '').replace(/^работа\s*/, '')} · ${o.title || ''}` : `Заказ ${o.number || ''} · ${o.title || ''}`;
+  const sum = k => r3(rows.reduce((a, x) => a + x[k], 0));
+  const t = [
+    [{ v: 'Списание материалов — ' + what, s: 10 }],
+    [saved ? `Список сохранён ${fmt(wb.at)}` : 'Список ещё не сохранён — в столбце «Списано» показано, сколько спишется'],
+    [],
+    ['№', 'Номенклатура', 'Ед.', 'Нужно списать', 'Списано', 'Не хватает'].map(v => ({ v, s: 1 })),
+    ...rows.map((x, i) => [{ v: i + 1, s: x.short ? 9 : 3 }, { v: x.name, s: x.short ? 8 : 2 }, { v: x.unit, s: x.short ? 8 : 2 }, { v: x.need, s: x.short ? 9 : 3 }, { v: x.got, s: x.short ? 9 : 3 }, x.short ? { v: x.short, s: 9 } : { v: '', s: 2 }]),
+    [{ v: '', s: 2 }, { v: 'Итого', s: 1 }, { v: '', s: 2 }, { v: sum('need'), s: 3 }, { v: sum('got'), s: 3 }, { v: sum('short') || '', s: 3 }],
+  ];
+  return xlsxBook([{ name: 'Списание', rows: t, widths: [5, 60, 7, 15, 13, 13] }]);
+}
 /* ---------- ZIP of invoices to pay (stored, no compression; no dependencies) ---------- */
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
