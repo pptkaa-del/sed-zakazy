@@ -2803,14 +2803,12 @@ function writeoffPlainXlsx(o) {
   const rows = lines.map(L => { let got = L.take; if (saved) { got = L.stockId ? r3(Math.min(L.need, left[L.stockId] || 0)) : 0; if (L.stockId) left[L.stockId] = r3((left[L.stockId] || 0) - got); }
     return { name: L.name, unit: L.unit || 'шт', need: L.need, got, short: r3(Math.max(0, L.need - got)) }; });
   const what = /^работа/.test(o.number || '') ? `Работа ${String(o.number || '').replace(/^работа\s*/, '')} · ${o.title || ''}` : `Заказ ${o.number || ''} · ${o.title || ''}`;
-  const sum = k => r3(rows.reduce((a, x) => a + x[k], 0));
   const t = [
     [{ v: 'Списание материалов — ' + what, s: 10 }],
     [saved ? `Списание сохранено ${fmt(wb.at)}` : 'Список ещё не сохранён — в столбце «Списано» показано, сколько спишется'],
     [],
     ['№', 'Номенклатура', 'Ед.', 'Нужно списать', 'Списано', 'Не хватает'].map(v => ({ v, s: 1 })),
     ...rows.map((x, i) => [{ v: i + 1, s: x.short ? 9 : 3 }, { v: x.name, s: x.short ? 8 : 2 }, { v: x.unit, s: x.short ? 8 : 2 }, { v: x.need, s: x.short ? 9 : 3 }, { v: x.got, s: x.short ? 9 : 3 }, x.short ? { v: x.short, s: 9 } : { v: '', s: 2 }]),
-    [{ v: '', s: 2 }, { v: 'Итого', s: 1 }, { v: '', s: 2 }, { v: sum('need'), s: 3 }, { v: sum('got'), s: 3 }, { v: sum('short') || '', s: 3 }],
   ];
   return xlsxBook([{ name: 'Списание', rows: t, widths: [5, 60, 7, 15, 13, 13] }]);
 }
