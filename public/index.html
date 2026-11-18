@@ -342,6 +342,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgall tr.sgt1 td,.sgall tr.sgt1 th{border-bottom:1px dashed var(--rule-2)}.sgall tr.sgt2 td,.sgall tr.sgt2 th{border-bottom:2px solid var(--rule)}.sgall td{height:34px}.sgall .sgname{border-bottom:2px solid var(--rule)}
 .sgt thead .sgsum small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}.sglg{font-size:12px;margin-right:2px}.sgrnote{margin:0 14px 10px;font-size:13px;background:var(--warn-soft, #FFF6D6)}
 .sgt .sgrate{min-width:150px;padding:4px 6px}.sgrate .rtsel{font-size:12px;padding:4px 6px;width:100%;max-width:200px}.sgrate .rtv{display:inline-block;min-width:26px;padding:2px 6px;border-radius:6px;color:#1F2633}.sgrate small{display:block;font-size:10px;color:var(--ink-2);white-space:normal}
+.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
 .nscard{padding:0;overflow:hidden;margin-bottom:8px}.nsroot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--rule-2);background:var(--paper)}
 .nshead span:first-child{grid-column:1/4}.nshead span:not(:first-child){text-align:right}.nshead{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;padding:6px 14px;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--rule-2)}
 .nstree{list-style:none;margin:0;padding:0}.nsrow{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;align-items:center;padding:5px 14px 5px calc(14px + var(--d,0) * 20px);font-size:14px;border-bottom:1px solid var(--rule-2)}
@@ -2528,6 +2529,19 @@ function cpDetail(c){
 const WORK_KIND = { prod:'Производство', mount:'Монтаж', both:'Производство и монтаж' };
 const WORK_CHIP = { prod:'c-mute', mount:'c-info', both:'c-work' };
 const isMount = j => (j.kind || 'mount') !== 'prod';
+// the minimum of points a day for a worker on a work: his personal one, otherwise the common one of the work
+const jobMinOf = (j, uid) => (j.minByWorker || {})[uid] > 0 ? j.minByWorker[uid] : j.minPerDay || 0;
+// the block «Минимум точек в день по сотрудникам» in the card of a work
+function jobMinBox(j){
+  if (!isMount(j)) return '';
+  const ids = [...new Set([...(j.workers || []), ...(j.places || []).map(x => x.assignee).filter(Boolean)])], ed = mayEditJob(j), M = j.minByWorker || {};
+  if (!ids.length) return ed ? `<div class="box jminbox"><b>Минимум точек в день по сотрудникам</b><small class="dim">Появится, когда на работу назначат сотрудников или исполнителей точек.</small></div>` : '';
+  if (!ed && !Object.keys(M).length) return '';
+  const rows = ids.map(id => ({ id, name: who(id) })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  return `<div class="box jminbox"><b>Минимум точек в день по сотрудникам</b>
+    <small class="dim">Учитывается в «Планирование и аналитика → Сотрудники» (строка «Успеваемость»). Пусто — общий минимум работы${j.minPerDay ? ` (${j.minPerDay})` : ' (не задан)'}.</small>
+    <div class="jminrows">${rows.map(r => `<label class="jminrow"><span>${esc(r.name)}</span>${ed ? `<input class="in mono" type="number" min="0" max="10000" step="1" data-jmin="${j.id}|${r.id}" value="${M[r.id] > 0 ? M[r.id] : ''}" placeholder="${j.minPerDay || '—'}" aria-label="Минимум точек в день: ${esc(r.name)}">` : `<b class="mono">${M[r.id] > 0 ? M[r.id] : j.minPerDay || '—'}</b>`}<small class="dim">${M[r.id] > 0 ? 'личный' : 'общий'}</small></label>`).join('')}</div></div>`;
+}
 /* the report of a work: closed points per executor — for a chosen day and for all time, and day by day */
 const localDay = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 function jobReport(j, day){
@@ -4548,12 +4562,13 @@ function pfCell(u, day){
   const away = STAFF_MARKS.find(x => x.user === u.id && x.from <= day && x.to >= day && ['sick', 'vacation'].includes(x.type));
   let min = 0, from = null;
   if (kind === 'work' && !away && day <= today()) for (const j of S.jobs) {
-    if (!(j.minPerDay > 0) || !((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id))) continue;
+    const jm = jobMinOf(j, u.id);
+    if (!(jm > 0) || !((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id))) continue;
     const [a, b] = jobSpan(j), end = j.status !== 'done' ? Math.max(b, tn) : b;
-    if (n >= a && n <= end && j.minPerDay > min) { min = j.minPerDay; from = j; }
+    if (n >= a && n <= end && jm > min) { min = jm; from = j; }
   }
   const col = !min ? '' : did < min ? 'red' : did >= min * 1.5 ? 'dg' : 'lg';
-  const tip = [`${fmtD(day)} — ${DAY_KIND[kind]}`, `сделано точек: ${did}`, min ? `минимум ${min} (работа № ${jobNo(from)} · ${from.title})` : away ? MARK_T[away.type] : 'минимум не задан'].join('\n');
+  const tip = [`${fmtD(day)} — ${DAY_KIND[kind]}`, `сделано точек: ${did}`, min ? `минимум ${min}${(from.minByWorker || {})[u.id] > 0 ? ' — личный' : ''} (работа № ${jobNo(from)} · ${from.title})` : away ? MARK_T[away.type] : 'минимум не задан'].join('\n');
   return { did, min, col, tip, away, off: kind !== 'work' };
 }
 /* ===== «Справочники»: файлы и текст по проектам, по своим разделам и «Общая информация»; руководитель ведёт, остальные читают ===== */
@@ -6053,12 +6068,13 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
-        ${isMount(j) ? `<dt>Минимум в день</dt><dd>${j.minPerDay ? j.minPerDay + ' точ. на сотрудника' : '<span class="dim">не задан</span>'}</dd>` : ''}
+        ${isMount(j) ? `<dt>Минимум в день</dt><dd>${j.minPerDay ? j.minPerDay + ' точ. на сотрудника' : '<span class="dim">не задан</span>'}${Object.keys(j.minByWorker || {}).length ? ` <small class="dim">· личный у ${Object.keys(j.minByWorker).length}</small>` : ''}</dd>` : ''}
         ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
         ${j.status === 'done' ? `<dt>Гарантия</dt><dd>${j.warrantyUntil ? `до ${fmtD(j.warrantyUntil)} · ${onWarranty(j) ? `<span class="${wDays(j) <= 30 ? 'warn-t' : 'ok-t'}">на гарантии, осталось ${wDays(j)} дн.</span>` : '<span class="dim">закончилась, работа в архиве</span>'}` : '<span class="dim">не установлена — работа в архиве</span>'}${j.warrantyNote ? `<br><small class="dim">${esc(j.warrantyNote)}</small>` : ''}${canEdit() ? ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">${j.warrantyUntil ? 'Изменить' : 'Установить'}</button>` : ''}</dd>` : ''}
       </dl>
+      ${jobMinBox(j)}
       ${j.features ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Ключевые особенности</b><div style="white-space:pre-wrap">${esc(j.features)}</div></div>` : ''}
       ${j.happening ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Что происходит</b><div style="white-space:pre-wrap">${esc(j.happening)}</div></div>` : ''}
       ${j.description || canEdit() ? `<p class="jdesc ${j.description ? '' : 'dim'}" ${edAttr('jobs', j.id, 'description', true)}>${j.description ? esc(j.description) : 'Описание — дважды щёлкните, чтобы добавить'}</p>` : ''}
@@ -7402,6 +7418,11 @@ document.addEventListener('click', e => { if (ui.dtMenu && !e.target.closest('de
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'rf-restr') { refKeep(); return renderDrawer(); }
+  // the personal minimum of a worker on a work (the card of the work)
+  if (t.dataset.jmin) { const [jid, uid] = t.dataset.jmin.split('|'), j = jobOf(jid); if (!j) return;
+    const v = t.value.trim(), n = Math.round(Number(v)); if (v !== '' && !(n >= 0 && n <= 10000)) { toast('Минимум — от 0 до 10000'); return; }
+    const M = { ...(j.minByWorker || {}) }; if (v === '' || n <= 0) delete M[uid]; else M[uid] = n;
+    try { await upd('jobs', jid, { minByWorker: M }); toast(v === '' || n <= 0 ? `${who(uid)}: общий минимум` : `${who(uid)}: минимум ${n} точ. в день`); t.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
   if (t.id === 'nf-restr') { nsKeep(); return renderDrawer(); }
   // the monthly rating of an employee (the last column of «Табель»)
   if (t.dataset.rate) { const [user, ym] = t.dataset.rate.split('|'), score = Number(t.value);
