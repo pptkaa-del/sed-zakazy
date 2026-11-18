@@ -2142,7 +2142,6 @@ function acctMatch(row){
 
 /* ===== Warehouse ===== */
 const canMoveStock = () => canEdit();
-const isLow = it => (Number(it.minQty) || 0) > 0 && (Number(it.qty) || 0) <= Number(it.minQty);
 function vStock(){
   const q = ui.sq.trim().toLowerCase();
   const hay = it => [it.name, it.location, it.note].join(' ').toLowerCase();
@@ -2161,9 +2160,9 @@ function vStock(){
   return head + `<section class="card" style="padding:0;overflow:hidden">
     <div class="stk head"><span>Наименование</span><span style="text-align:right">Бухгалтерский</span><span style="text-align:right">Фактический</span><span>Где</span></div>
     ${list.map(it => `<div class="stk click" data-act="viewStock" data-id="${it.id}" role="button" tabindex="0">
-      <div><b>${esc(it.name)}</b>${it.note ? `<small>${esc(it.note)}</small>` : ''}${isLow(it) ? '<small style="color:var(--warn)">меньше минимального запаса (' + fmtQty(it.minQty) + ')</small>' : ''}</div>
+      <div><b>${esc(it.name)}</b>${it.note ? `<small>${esc(it.note)}</small>` : ''}</div>
       <div class="bal acct">${fmtQty(it.acctQty) + ' ' + esc(it.unit || 'шт')}<small>бухгалтерский${Math.abs((Number(it.acctQty)||0) - (Number(it.qty)||0)) > 1e-9 ? ` · <span class="diff">разница ${((Number(it.qty)||0) - (Number(it.acctQty)||0) > 0 ? '+' : '')}${fmtQty((Number(it.qty)||0) - (Number(it.acctQty)||0))}</span>` : ''}</small></div>
-      <div class="bal ${isLow(it) ? 'low' : ''}">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}<small>фактический</small></div>
+      <div class="bal ">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}<small>фактический</small></div>
       <div class="dim">${it.location ? '📍 ' + esc(it.location) : '—'}</div>
     </div>`).join('')}
   </section>
@@ -5888,7 +5887,6 @@ function renderDrawer(){
       <label class="wide">Наименование<input class="in" id="st-name" value="${v(it,'name')}" required></label>
       <label>Единица<input class="in" id="st-unit" value="${esc(it?.unit || 'шт')}"></label>
       <label>Где хранится<input class="in" id="st-loc" value="${v(it,'location')}" placeholder="Склад, стеллаж, полка…"></label>
-      <label>Минимальный запас<input class="in mono" id="st-min" value="${esc(it?.minQty || '')}" inputmode="decimal"></label>
       ${it ? '' : '<label>Начальный остаток<input class="in mono" id="st-init" inputmode="decimal"></label>'}
       <label class="wide">Примечание<input class="in" id="st-note" value="${v(it,'note')}"></label></div>
       <div class="err" id="ferr"></div>
@@ -5909,10 +5907,10 @@ function renderDrawer(){
     const mv = (it.moves || []).slice().reverse();
     D.innerHTML = dh(`<span ${edAttr('stock', it.id, 'name')}>${esc(it.name)}</span>`) + `<div class="d-body">
       ${canEdit() ? `<p class="jdesc ${it.note ? '' : 'dim'}" style="margin:0" ${edAttr('stock', it.id, 'note', true)}>${it.note ? esc(it.note) : 'Примечание — дважды щёлкните, чтобы добавить'}</p>` : ''}
-      <dl class="kv"><dt>Фактический остаток</dt><dd><b class="mono ${isLow(it) ? 'warn-t' : ''}" style="font-size:18px">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</b></dd>
+      <dl class="kv"><dt>Фактический остаток</dt><dd><b class="mono " style="font-size:18px">${fmtQty(it.qty)} ${esc(it.unit || 'шт')}</b></dd>
         <dt>Бухгалтерский остаток</dt><dd><b class="mono" style="font-size:18px">${fmtQty(it.acctQty)} ${esc(it.unit || 'шт')}</b></dd>
         <dt>Где</dt><dd>${esc(it.location || '—')}</dd>
-        <dt>Минимальный запас</dt><dd>${it.minQty ? fmtQty(it.minQty) + ' ' + esc(it.unit || 'шт') : '—'}</dd>${it.note ? `<dt>Примечание</dt><dd>${esc(it.note)}</dd>` : ''}</dl>
+        ${it.note ? `<dt>Примечание</dt><dd>${esc(it.note)}</dd>` : ''}</dl>
       <div class="row-g">${canMoveStock() ? `<button class="btn ok" data-act="stockIn" data-id="${it.id}">+ Приход</button><button class="btn" data-act="stockOut" data-id="${it.id}">− Расход</button>` : ''}${canEdit() ? `<button class="btn" data-act="editStock" data-id="${it.id}">Изменить</button>` : ''}</div>
       <div><h4 class="sub-h" style="margin:4px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)">Движение</h4>
       ${mv.length ? `<ul class="mvs">${mv.map(m => `<li><span class="q ${m.type === 'wo' ? 'out' : m.type === 'init' ? 'in' : m.type}">${m.type === 'in' || m.type === 'init' || (m.type === 'wo' && m.qty < 0) ? '+' : '−'}${fmtQty(Math.abs(m.qty))}</span><span>${m.type === 'init' ? 'Начальный остаток <small class="dim" style="display:inline">· фактический и бухгалтерский</small>' : m.type === 'in' ? 'Приход' + (m.acct ? ' <small class="dim" style="display:inline">· в фактический и бухгалтерский</small>' : '') : m.type === 'wo' ? 'Списание <small class="dim" style="display:inline">· из бухгалтерского</small>' : 'Расход <small class="dim" style="display:inline">· из фактического</small>'}${ord(m.orderId) ? ' · ' + esc(ordName(ord(m.orderId))) : ''}${m.note ? `<small>${esc(m.note)}</small>` : ''}<small>${esc(who(m.by))}, ${esc(fmtDT(m.at))}</small></span><span class="dim mono">ост. ${fmtQty(m.balance)}${m.acct ? `<small>бух. ${fmtQty(m.acctBalance)}</small>` : ''}</span></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Движений пока не было.</p>'}</div>
@@ -6494,7 +6492,7 @@ async function onSubmit(e){
       const name = val('st-name'); if (!name) return fail('Укажите наименование.');
       const dup = S.stock.find(x => x.id !== d.id && (x.name||'').trim().toLowerCase() === name.toLowerCase());
       if (dup) return fail('Такая позиция уже есть на складе.');
-      const data = { name, unit: val('st-unit') || 'шт', location: val('st-loc'), minQty: num(val('st-min')) || 0, note: val('st-note') };
+      const data = { name, unit: val('st-unit') || 'шт', location: val('st-loc'), note: val('st-note') };
       if (d.id) { await upd('stock', d.id, data); openDrawer('stockView', d.id); toast('Сохранено'); }
       else {
         const id = await add('stock', data);
