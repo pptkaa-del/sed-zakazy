@@ -1853,7 +1853,8 @@ async function api(req, res, url) {
     const target = db[p[1]] && db[p[1]][p[2]]; if (!target) return fail(res, 404, p[1] === 'jobs' ? 'Работа не найдена' : 'Заказ не найден');
     if (m === 'DELETE') { delete target.woDraft; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     const b = await readJsonBody(req), d = { at: new Date().toISOString(), by: user.id };
-    if (Array.isArray(b.full) && p[1] === 'orders') d.full = b.full.slice(0, 1000).map(x => ({ id: String(x && x.id || newId()).slice(0, 40), stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null, name: String(x && x.name || '').slice(0, 300), unit: String(x && x.unit || '').slice(0, 20), qty: String((x && x.qty) ?? '').slice(0, 30) }));
+    if (Array.isArray(b.full) && p[1] === 'orders') d.full = b.full.slice(0, 1000).map(x => ({ id: String(x && x.id || newId()).slice(0, 40), stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null, name: String(x && x.name || '').slice(0, 300), unit: String(x && x.unit || '').slice(0, 20), qty: String((x && x.qty) ?? '').slice(0, 30), per: String((x && x.per) ?? '').slice(0, 30) }));
+    if (b.units !== undefined && p[1] === 'orders') d.units = String(b.units ?? '').slice(0, 30);
     if (b.map && typeof b.map === 'object') { d.map = {}; for (const [k, v] of Object.entries(b.map)) if (/^(id|n):/.test(k) && db.stock[v]) d.map[k] = v; }
     if (!d.full && !d.map) { delete target.woDraft; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     target.woDraft = d; saveDb(); return send(res, 200, { ok: true, woDraft: d, rev: db.rev });
@@ -1870,10 +1871,10 @@ async function api(req, res, url) {
       if (!name) return fail(res, 400, `Строка ${i + 1}: укажите номенклатуру`);
       if (!(qty > 0) || qty > 1e9) return fail(res, 400, `Строка ${i + 1}: укажите количество больше нуля`);
       const sid = x.stockId && db.stock[x.stockId] && normName(db.stock[x.stockId].name) === normName(name) ? x.stockId : (Object.entries(db.stock).find(([, it]) => normName(it.name) === normName(name)) || [])[0] || null;
-      lines.push({ id: String(x.id || newId()).slice(0, 40), stockId: sid, name: sid ? db.stock[sid].name : name, unit: String((sid && db.stock[sid].unit) || x.unit || 'шт').slice(0, 20), qty: r3(qty) });
+      const per = Number(x.per); lines.push({ id: String(x.id || newId()).slice(0, 40), stockId: sid, name: sid ? db.stock[sid].name : name, unit: String((sid && db.stock[sid].unit) || x.unit || 'шт').slice(0, 20), qty: r3(qty), ...(x.per != null && x.per !== '' && per > 0 && per <= 1e9 ? { per: r3(per) } : {}) });
     }
     if (!lines.length) return fail(res, 400, 'Добавьте хотя бы одну строку');
-    o.woFull = { lines, at: new Date().toISOString(), by: user.id };
+    const units = Number(b.units); o.woFull = { lines, ...(units > 0 && units <= 1e9 ? { units: r3(units) } : {}), at: new Date().toISOString(), by: user.id };
     if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; }
     saveDb();
     return send(res, 200, { ok: true, woFull: o.woFull, rev: db.rev });
