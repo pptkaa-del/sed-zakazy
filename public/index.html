@@ -819,6 +819,23 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 :root[data-theme="w98"] ::-webkit-scrollbar{width:16px;height:16px}:root[data-theme="w98"] ::-webkit-scrollbar-track{background:repeating-conic-gradient(#C0C0C0 0 25%,#FFFFFF 0 50%) 0 0/2px 2px}
 :root[data-theme="w98"] ::-webkit-scrollbar-thumb{background:#C0C0C0;box-shadow:var(--w98-out)}
 
+:root[data-theme="w98"] body{padding-bottom:34px}
+.w98bar{display:none}
+:root[data-theme="w98"] .w98bar:not([hidden]){display:flex;align-items:center;gap:4px;position:fixed;left:0;right:0;bottom:0;height:30px;padding:2px;z-index:950;background:#C0C0C0;box-shadow:inset 0 1px #DFDFDF,inset 0 2px #FFFFFF;font-size:12px}
+:root[data-theme="w98"] .w98start{display:flex;align-items:center;gap:4px;height:24px;padding:0 6px;background:#C0C0C0;border:0;box-shadow:var(--w98-out);font:inherit;font-weight:700;cursor:pointer;color:#000}
+:root[data-theme="w98"] .w98start[aria-expanded="true"]{box-shadow:var(--w98-in)}
+.w98logo{font-size:14px;line-height:1}
+:root[data-theme="w98"] .w98sep{width:2px;height:22px;box-shadow:inset -1px 0 #FFFFFF,inset 1px 0 #808080;margin:0 2px}
+:root[data-theme="w98"] .w98task{flex:0 1 220px;min-width:0;height:24px;line-height:24px;padding:0 8px;box-shadow:var(--w98-in);background:repeating-conic-gradient(#C0C0C0 0 25%,#FFFFFF 0 50%) 0 0/2px 2px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root[data-theme="w98"] .w98tray{margin-left:auto;height:24px;line-height:24px;padding:0 10px;box-shadow:inset -1px -1px #FFFFFF,inset 1px 1px #808080}
+:root[data-theme="w98"] .w98menu:not([hidden]){display:flex;position:absolute;left:2px;bottom:30px;min-width:230px;max-height:calc(100vh - 40px);background:#C0C0C0;box-shadow:var(--w98-out);padding:3px}
+:root[data-theme="w98"] .w98side{writing-mode:vertical-rl;transform:rotate(180deg);background:linear-gradient(0deg,#000080,#1084D0);color:#C0C0C0;font-size:16px;padding:6px 3px;letter-spacing:.02em;white-space:nowrap}
+:root[data-theme="w98"] .w98side b{color:#fff}
+:root[data-theme="w98"] .w98items{display:flex;flex-direction:column;flex:1;overflow:auto}
+:root[data-theme="w98"] .w98items a,:root[data-theme="w98"] .w98items button{display:block;padding:7px 22px 7px 10px;color:#000;text-decoration:none;background:transparent;border:0;box-shadow:none;font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
+:root[data-theme="w98"] .w98items a:hover,:root[data-theme="w98"] .w98items button:hover,:root[data-theme="w98"] .w98items a:focus-visible,:root[data-theme="w98"] .w98items button:focus-visible{background:#000080;color:#fff;outline:none}
+:root[data-theme="w98"] .w98items hr{border:0;height:2px;margin:3px 2px;box-shadow:inset 0 1px #808080,inset 0 -1px #FFFFFF}
+:root[data-theme="w98"] #toast,:root[data-theme="w98"] .toast{bottom:42px}
 /* ===== Theme «Инженерная»: чертёж-«синька» — тёмно-синий, миллиметровая сетка, моноширинный шрифт, прямые углы ===== */
 :root[data-theme="engineer"]{
   --paper:#0E2741; --sheet:#12304F; --ink:#E4F1FF; --ink-2:#93B4D4; --rule:#2B5378; --rule-2:#1C4063;
@@ -1301,6 +1318,9 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden role="dialog" aria-modal="true"></aside>
 <div class="toast" id="toast" hidden></div>
+<!-- the taskbar of the theme «Windows 98»: «Пуск» with the sections, the current section, the clock -->
+<div class="w98bar" id="w98bar" hidden><button type="button" class="w98start" id="w98start" aria-haspopup="menu" aria-expanded="false" aria-controls="w98menu"><span class="w98logo" aria-hidden="true">🖥️</span><b>Пуск</b></button><span class="w98sep" aria-hidden="true"></span><span class="w98task" id="w98task"></span><span class="w98tray"><span id="w98clock"></span></span>
+  <div class="w98menu" id="w98menu" role="menu" hidden><div class="w98side" aria-hidden="true"><b>Управление</b> предприятием</div><div class="w98items" id="w98items"></div></div></div>
 </div>
 <div class="blockscr" id="blockscr" hidden role="alertdialog" aria-labelledby="blk-h" aria-describedby="blk-msg">
   <div class="blockbox"><div class="blk-ic" aria-hidden="true">🔒</div><h2 id="blk-h">Доступ заблокирован</h2><p id="blk-msg"></p>
@@ -1593,11 +1613,30 @@ function stockTabs(){
   const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [...(can('cps') ? [['cps', 'Контрагенты']] : []), ['checks', 'Чеки'], ['trips', 'Путевые листы']]);
   return `<nav class="seg stabs" aria-label="Разделы учётки">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : k === 'inc' && inc ? ` <span class="badge" title="Ждут оприходования">${inc}</span>` : ''}</a>`).join('')}</nav>`;
 }
+function w98Update(){
+  const bar = $('w98bar'); if (!bar) return;
+  const on = !!me && !$('app').hidden; bar.hidden = !on; if (!on) return;
+  const a = document.querySelector('#views a.on:not([hidden])'), sec = a ? a.textContent.replace(/\s*\d+\s*$/, '').trim() : '';
+  $('w98task').textContent = (sec ? sec + ' — ' : '') + 'Управление предприятием';
+  const d = new Date(); $('w98clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function w98Menu(open){
+  const m = $('w98menu'), b = $('w98start'); if (!m) return; open = open ?? m.hidden;
+  if (open) { $('w98items').innerHTML = [...document.querySelectorAll('#views a:not([hidden])')].map(a => `<a role="menuitem" href="${esc(a.getAttribute('href'))}">${esc(a.textContent.replace(/\s*\d+\s*$/, '').trim())}</a>`).join('')
+      + '<hr><button type="button" role="menuitem" data-act="prefs">⚙ Настройки</button><button type="button" role="menuitem" data-act="logout">Выйти…</button>'; }
+  m.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) m.querySelector('a,button')?.focus();
+}
+document.addEventListener('click', e => { const st = e.target.closest?.('#w98start'); if (st) { w98Menu(); return; } if (!e.target.closest?.('#w98menu') || e.target.closest('a,button')) { if ($('w98menu') && !$('w98menu').hidden) setTimeout(() => w98Menu(false), 0); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('w98menu') && !$('w98menu').hidden) { e.stopPropagation(); w98Menu(false); $('w98start').focus(); } }, true);
+setInterval(() => { if (document.documentElement.dataset.theme === 'w98') w98Update(); }, 20000);
+// the taskbar follows the login and the logout (the window of the program is shown or hidden)
+new MutationObserver(() => w98Update()).observe(document.getElementById('app') || document.body, { attributes: true, attributeFilter: ['hidden'] });
 function render(){
   if (document.activeElement?.closest('[data-keep]')) { pending = true; return; }
   pending = false;
   const navV = inStockGroup(ui.view) ? 'stock' : PLAN_VIEWS.includes(ui.view) ? 'plan' : ui.view === 'devs' && !isWorker() ? 'notes' : ADMIN_VIEWS.includes(ui.view) ? 'users' : TR_VIEWS.includes(ui.view) ? 'transport' : REF_VIEWS.includes(ui.view) ? 'refs' : ui.view;
   document.querySelectorAll('#views a').forEach(a => a.classList.toggle('on', a.dataset.v === navV));
+  w98Update();
   const n = S.invoices.filter(i => i.status === 'topay').length;
   $('payBadge').hidden = !n; $('payBadge').textContent = n;
   const V = $('view');
