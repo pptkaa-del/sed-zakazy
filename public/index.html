@@ -855,7 +855,7 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 :root[data-theme="engineer"] table.jt th,:root[data-theme="engineer"] .comp th,:root[data-theme="engineer"] .urow.head,:root[data-theme="engineer"] .g-head .g-lab,:root[data-theme="engineer"] .g-head .g-track{background:#0B2238;color:var(--stamp);font-family:var(--f-mono)}
 :root[data-theme="engineer"] .tile{background:#0B2238;border:1px solid var(--stamp);color:var(--ink);border-radius:2px}
 :root[data-theme="engineer"] .tile b{color:var(--stamp);font-family:var(--f-mono)}
-:root[data-theme="engineer"] .avatar{background:var(--stamp);color:var(--stamp-ink);border-radius:2px}
+:root[data-theme="engineer"] .avatar{background:var(--stamp);color:var(--stamp-ink);border-radius:2px}:root[data-theme="engineer"] .ubtn{border-radius:2px;padding:3px 8px 3px 3px}
 :root[data-theme="engineer"] .drawer{border-left:1px solid var(--stamp);background:var(--sheet)}
 :root[data-theme="engineer"] .badge{border-radius:2px}
 .themes{display:flex;gap:4px;padding:4px 6px 8px;flex-wrap:wrap}
@@ -1142,6 +1142,8 @@ textarea{resize:vertical;min-height:70px}
 .upop button:hover{background:var(--mute-soft)}
 .upop button.danger{color:var(--bad)}
 @media (max-width:640px){.ubtn .uname{display:none}.ubtn{padding-right:6px}}
+/* phone: «Интерфейс сотрудника» goes to its own row under the name, so it does not cover the name of the program */
+@media (max-width:640px){#roleSw{order:2;flex:1 0 100%;justify-content:center}header.top .brand h1{overflow-wrap:anywhere}}
 /* header: name and user menu on the first row, tabs on the second */
 header.top .brand{flex:1;min-width:0}
 nav.views{order:3;width:100%}
