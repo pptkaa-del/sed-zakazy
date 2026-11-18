@@ -350,7 +350,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .nsmsg{padding:6px 14px 6px calc(52px + var(--d,0) * 20px);font-size:13px;border-bottom:1px solid var(--rule-2)}
 .nscmdw{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0}.nscmdw .nscmd{margin:0;align-self:stretch}.nscmd{margin:6px 0;padding:8px 10px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-all;font-family:var(--f-mono,ui-monospace,monospace)}.nssteps{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 @media (max-width:640px){.nshead{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nshead span:last-child{display:none}.nsrow{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nsrow .nsmeta:last-child{display:none}}
-.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
+.vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
 .vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
 .sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
 .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vcard{text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;font:inherit;color:inherit}.vcard:hover{border-color:var(--stamp)}
@@ -4642,16 +4642,17 @@ const refTabs = () => `<nav class="seg stabs" aria-label="Справочники
 /* «Личное хранилище»: passwords (what for, login, password, link, note) and notes; only the user himself sees them, the server keeps them encrypted */
 let VAULT = null;
 async function loadVault(){ try { VAULT = await api('GET', '/api/vault'); } catch(e) { VAULT = { pw: [], notes: [], err: errText(e) }; } render(); }
-const vaultPut = (kind, x) => { const L = VAULT[kind], i = L.findIndex(e => e.id === x.id); if (i >= 0) L[i] = x; else L.push(x); };
+const vaultPut = (kind, x) => { const L = VAULT[kind] = VAULT[kind] || [], i = L.findIndex(e => e.id === x.id); if (i >= 0) L[i] = x; else L.push(x); };
 const copyText = async (t, what) => { try { await navigator.clipboard.writeText(t); toast(what + ' скопирован'); } catch(e) { toast('Не удалось скопировать — выделите и скопируйте вручную'); } };
 function genPass(n = 16){ const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?-_', r = crypto.getRandomValues(new Uint32Array(n)); return Array.from(r, x => A[x % A.length]).join(''); }
 function vVault(){
   if (!VAULT) { loadVault(); return '<div class="empty">Открываем хранилище…</div>'; }
   if (VAULT.err) return `<div class="empty"><h3>Хранилище недоступно</h3>${esc(VAULT.err)}</div>`;
-  const tab = ui.vtab === 'notes' ? 'notes' : 'pw', q = (ui.vq || '').trim().toLowerCase(), show = ui.vShow || {};
-  const bar = `<div class="toolbar"><div class="seg">${[['pw', '🔑 Пароли', VAULT.pw.length], ['notes', '📝 Заметки', VAULT.notes.length]].map(([k, l, n]) => `<button data-act="vTab" data-id="${k}" class="${tab === k ? 'on' : ''}">${l}${n ? ` <span class="dim">${n}</span>` : ''}</button>`).join('')}</div>
-    <span data-keep style="display:contents"><input class="in" id="vq" type="search" placeholder="${tab === 'pw' ? 'От чего, логин, ссылка' : 'Заголовок, текст'}" aria-label="Поиск в хранилище" value="${esc(ui.vq || '')}" style="flex:1 1 200px;max-width:320px"></span>
-    <button class="btn primary" data-act="${tab === 'pw' ? 'vPwNew' : 'vNoteNew'}">${tab === 'pw' ? '+ Пароль' : '+ Заметка'}</button></div>
+  VAULT.contacts = VAULT.contacts || [];
+  const tab = ['notes', 'contacts'].includes(ui.vtab) ? ui.vtab : 'pw', q = (ui.vq || '').trim().toLowerCase(), show = ui.vShow || {};
+  const bar = `<div class="toolbar"><div class="seg">${[['pw', '🔑 Пароли', VAULT.pw.length], ['contacts', '👤 Контакты', VAULT.contacts.length], ['notes', '📝 Заметки', VAULT.notes.length]].map(([k, l, n]) => `<button data-act="vTab" data-id="${k}" class="${tab === k ? 'on' : ''}">${l}${n ? ` <span class="dim">${n}</span>` : ''}</button>`).join('')}</div>
+    <span data-keep style="display:contents"><input class="in" id="vq" type="search" placeholder="${tab === 'pw' ? 'От чего, логин, ссылка' : tab === 'contacts' ? 'ФИО, телефон, описание' : 'Заголовок, текст'}" aria-label="Поиск в хранилище" value="${esc(ui.vq || '')}" style="flex:1 1 200px;max-width:320px"></span>
+    <button class="btn primary" data-act="${tab === 'pw' ? 'vPwNew' : tab === 'contacts' ? 'vCtNew' : 'vNoteNew'}">${tab === 'pw' ? '+ Пароль' : tab === 'contacts' ? '+ Контакт' : '+ Заметка'}</button></div>
     <p class="box vhint">🔒 Это ваше личное хранилище: записи видите только вы — ни руководитель, ни администратор их не видят. На сервере они хранятся в зашифрованном виде.</p>`;
   if (tab === 'pw') {
     const L = VAULT.pw.filter(x => !q || [x.title, x.login, x.url, x.note].join(' ').toLowerCase().includes(q)).sort((a, b) => a.title.localeCompare(b.title, 'ru'));
@@ -4663,6 +4664,15 @@ function vVault(){
         <dt>Пароль</dt><dd>${x.pass ? `<span class="mono vpass">${show[x.id] ? esc(x.pass) : '••••••••••'}</span> <button class="linkish" data-act="vShow" data-id="${x.id}" title="${show[x.id] ? 'Скрыть' : 'Показать'}">${show[x.id] ? '🙈' : '👁'}</button> <button class="linkish" data-act="vCopyPass" data-id="${x.id}" title="Скопировать пароль">📋</button>` : '<span class="dim">—</span>'}</dd>
         ${x.url ? `<dt>Ссылка</dt><dd>${/^https?:\/\//i.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.url)}</a>` : esc(x.url)}</dd>` : ''}
         ${x.note ? `<dt>Заметка</dt><dd style="white-space:pre-wrap">${esc(x.note)}</dd>` : ''}</dl></article>`).join('')}</div>`;
+  }
+  if (tab === 'contacts') {
+    const qd = q.replace(/\D/g, ''), L = VAULT.contacts.filter(x => !q || [x.name, x.phone, x.note].join(' ').toLowerCase().includes(q) || (qd.length >= 3 && String(x.phone || '').replace(/\D/g, '').includes(qd))).sort((a, b) => String(a.name || a.phone).localeCompare(String(b.name || b.phone), 'ru'));
+    if (!VAULT.contacts.length) return bar + '<div class="empty"><h3>Контактов пока нет</h3>Нажмите «+ Контакт»: ФИО, номер телефона и описание (кто это, по какому вопросу).</div>';
+    if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
+    return bar + `<div class="vlistc">${L.map(x => { const tel = String(x.phone || '').replace(/[^\d+]/g, ''); return `<article class="card vitem">
+      <div class="vtop"><b>${esc(x.name || 'Без имени')}</b><div class="row-g"><button class="btn sm" data-act="vCtEdit" data-id="${x.id}">Изменить</button>${armBtn('vcd:' + x.id, '✕', 'vCtDel', x.id, 'btn sm ghost')}</div></div>
+      ${x.phone ? `<div class="vphone">${tel ? `<a href="tel:${esc(tel)}" class="mono">📞 ${esc(x.phone)}</a>` : `<span class="mono">${esc(x.phone)}</span>`} <button class="linkish" data-act="vCopyPhone" data-id="${x.id}" title="Скопировать номер">📋</button></div>` : '<span class="dim">номер не указан</span>'}
+      ${x.note ? `<div class="vnote">${esc(x.note)}</div>` : ''}</article>`; }).join('')}</div>`;
   }
   const L = VAULT.notes.filter(x => !q || [x.title, x.text].join(' ').toLowerCase().includes(q)).sort((a, b) => String(b.updatedAt || b.at).localeCompare(String(a.updatedAt || a.at)));
   if (!VAULT.notes.length) return bar + '<div class="empty"><h3>Заметок пока нет</h3>Нажмите «+ Заметка» — для любых личных записей.</div>';
@@ -4680,6 +4690,14 @@ function vaultPwHtml(x){
     <label class="wide">Заметка<textarea class="in" id="vp-note" rows="3" maxlength="2000">${esc(x?.note || '')}</textarea></label></div>
     <div class="err" id="ferr"></div>
     <div class="row-g"><button class="btn primary" data-act="vPwSave" data-id="${x?.id || ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('vpd:' + x.id, 'Удалить', 'vPwDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
+}
+function vaultCtHtml(x){
+  return `<div class="d-body"><div class="form" data-keep>
+    <label class="wide"><span>ФИО</span><input class="in" id="vc-name" maxlength="200" value="${esc(x?.name || '')}" placeholder="Иванов Иван Иванович" autocomplete="off"></label>
+    <label class="wide"><span>Номер телефона</span><input class="in mono" id="vc-phone" maxlength="60" type="tel" inputmode="tel" value="${esc(x?.phone || '')}" placeholder="+7 900 123-45-67" autocomplete="off"></label>
+    <label class="wide">Описание<textarea class="in" id="vc-note" rows="4" maxlength="2000" placeholder="Кто это, организация, по какому вопросу">${esc(x?.note || '')}</textarea></label></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g"><button class="btn primary" data-act="vCtSave" data-id="${x?.id || ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('vcd:' + x.id, 'Удалить', 'vCtDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
 }
 function vaultNoteHtml(x){
   return `<div class="d-body"><div class="form" data-keep>
@@ -6170,6 +6188,7 @@ function renderDrawer(){
   if (d.kind === 'staffCard') { const u = STAFF.find(x => x.id === d.id), day = ui.stDay || today(); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + (u ? `<div class="d-body staffd">${staffCardHtml(staffRow(u, day), day)}<div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>` : ''); return; }
   if (d.kind === 'nsForm') { const x = d.id && NETSHARES.find(e => e.id === d.id); D.innerHTML = dh(x ? 'Подключение · ' + x.name : 'Новое подключение к сетевой папке') + nsFormHtml(x || null); return; }
   if (d.kind === 'vaultPw') { const x = d.id && VAULT?.pw.find(e => e.id === d.id); D.innerHTML = dh(x ? x.title : 'Новый пароль') + vaultPwHtml(x || null); return; }
+  if (d.kind === 'vaultCt') { const x = d.id && VAULT?.contacts?.find(e => e.id === d.id); D.innerHTML = dh(x ? (x.name || 'Контакт') : 'Новый контакт') + vaultCtHtml(x || null); return; }
   if (d.kind === 'vaultNote') { const x = d.id && VAULT?.notes.find(e => e.id === d.id); D.innerHTML = dh(x ? (x.title || 'Заметка') : 'Новая заметка') + vaultNoteHtml(x || null); return; }
   if (d.kind === 'otHead') { const x = OVERTIME.find(o => o.id === d.id); D.innerHTML = dh('Ненормированный день') + (x ? otHeadHtml(x) : '<div class="d-body"><p>Запись удалена</p></div>'); return; }
   if (d.kind === 'workCal') { D.innerHTML = dh('График работы') + workCalHtml(); return; }
@@ -7021,6 +7040,11 @@ async function act(el){
     case 'vPwNew': ui.vpVis = false; return openDrawer('vaultPw', null);
     case 'vPwEdit': ui.vpVis = false; return openDrawer('vaultPw', id);
     case 'vNoteNew': return openDrawer('vaultNote', null);
+    case 'vCtNew': return openDrawer('vaultCt', null);
+    case 'vCtEdit': return openDrawer('vaultCt', id);
+    case 'vCtSave': return vaultSave('contacts', id, { name: $('vc-name').value, phone: $('vc-phone').value, note: $('vc-note').value });
+    case 'vCtDel': return vaultDel('contacts', id);
+    case 'vCopyPhone': { const x = VAULT.contacts.find(e => e.id === id); return x && copyText(x.phone, 'Номер'); }
     case 'vNoteEdit': return openDrawer('vaultNote', id);
     case 'vpVis': { ui.vpVis = !ui.vpVis; const p = $('vp-pass'); if (p) p.type = ui.vpVis ? 'text' : 'password'; el.textContent = ui.vpVis ? '🙈 Скрыть' : '👁 Показать'; return; }
     case 'vpGen': { const p = $('vp-pass'); if (p) { p.value = genPass(); p.type = 'text'; ui.vpVis = true; } return; }

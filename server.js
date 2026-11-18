@@ -1041,11 +1041,14 @@ async function api(req, res, url) {
     if (orgType(user) === 'requests' || !sees(user, 'refs:vault')) return fail(res, 403, 'Этот раздел для вас закрыт');
     if (!db.vault || typeof db.vault !== 'object') db.vault = {};
     const V = db.vault[user.id] = db.vault[user.id] || { pw: [], notes: [] }, kind = p[2], now = new Date().toISOString();
+    if (!Array.isArray(V.contacts)) V.contacts = [];
     const open = x => ({ id: x.id, at: x.at, updatedAt: x.updatedAt || null, ...(vaultDec(x.data) || { title: '(не удалось прочитать)' }) });
-    if (m === 'GET' && !p[2]) return send(res, 200, { pw: V.pw.map(open), notes: V.notes.map(open) });
-    if (!['pw', 'notes'].includes(kind)) return fail(res, 404, 'Не найдено');
+    if (m === 'GET' && !p[2]) return send(res, 200, { pw: V.pw.map(open), notes: V.notes.map(open), contacts: V.contacts.map(open) });
+    if (!['pw', 'notes', 'contacts'].includes(kind)) return fail(res, 404, 'Не найдено');
     const L = V[kind], t = (v, n) => String(v ?? '').slice(0, n);
-    const clean = b => kind === 'pw'
+    const clean = b => kind === 'contacts'
+      ? (t(b.name, 200).trim() || t(b.phone, 60).trim() ? { name: t(b.name, 200).trim(), phone: t(b.phone, 60).trim(), note: t(b.note, 2000) } : 'Укажите ФИО или номер телефона')
+      : kind === 'pw'
       ? (t(b.title, 200).trim() ? { title: t(b.title, 200).trim(), login: t(b.login, 300), pass: t(b.pass, 500), url: t(b.url, 500).trim(), note: t(b.note, 2000) } : 'Напишите, от чего этот логин и пароль')
       : (t(b.title, 200).trim() || t(b.text, 20000).trim() ? { title: t(b.title, 200).trim(), text: t(b.text, 20000) } : 'Заметка пустая');
     if (m === 'POST' && !p[3]) {
