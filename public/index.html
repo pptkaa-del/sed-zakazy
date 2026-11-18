@@ -342,7 +342,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgall tr.sgt1 td,.sgall tr.sgt1 th{border-bottom:1px dashed var(--rule-2)}.sgall tr.sgt2 td,.sgall tr.sgt2 th{border-bottom:2px solid var(--rule)}.sgall td{height:34px}.sgall .sgname{border-bottom:2px solid var(--rule)}
 .sgt thead .sgsum small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}.sglg{font-size:12px;margin-right:2px}.sgrnote{margin:0 14px 10px;font-size:13px;background:var(--warn-soft, #FFF6D6)}
 .sgt .sgrate{min-width:150px;padding:4px 6px}.sgrate .rtsel{font-size:12px;padding:4px 6px;width:100%;max-width:200px}.sgrate .rtv{display:inline-block;min-width:26px;padding:2px 6px;border-radius:6px;color:#1F2633}.sgrate small{display:block;font-size:10px;color:var(--ink-2);white-space:normal}
-.sugg{position:fixed;z-index:1000;background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:auto;overscroll-behavior:contain}.sugg .sg{padding:7px 12px;cursor:pointer;border-top:1px solid var(--rule-2);white-space:normal;overflow-wrap:anywhere;line-height:1.3}.sugg .sg:first-child{border-top:0}.sugg .sg b{display:block;font-weight:500;font-size:14px}.sugg .sg small{color:var(--ink-2);font-size:12px}.sugg .sg.on,.sugg .sg:hover{background:var(--stamp-soft)}.wodraft{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border-color:var(--warn);background:var(--warn-soft)}.wodraft>div{flex:1 1 260px;min-width:0;overflow-wrap:anywhere}.wodraft .btn{white-space:normal;text-align:left;max-width:100%}.jminall{max-width:420px}.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
+.sugg{position:fixed;z-index:1000;background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:auto;overscroll-behavior:contain}.sugg .sg{padding:7px 12px;cursor:pointer;border-top:1px solid var(--rule-2);white-space:normal;overflow-wrap:anywhere;line-height:1.3}.sugg .sg:first-child{border-top:0}.sugg .sg b{display:block;font-weight:500;font-size:14px}.sugg .sg small{color:var(--ink-2);font-size:12px}.sugg .sg.on,.sugg .sg:hover{background:var(--stamp-soft)}.won{cursor:pointer;user-select:none;text-align:center;font-weight:600}.won:hover{text-decoration:underline}table.wo tr.wosel td{background:color-mix(in srgb,var(--stamp) 22%,var(--sheet))!important;color:var(--ink)}table.wo tr.wosel td.won{box-shadow:inset 3px 0 0 var(--stamp)}.wosum{display:block;width:100%;margin:6px 0 0;padding:8px 12px;border:1px solid var(--stamp);border-radius:8px;background:var(--stamp-soft);color:var(--ink);font:inherit;font-size:14px;text-align:left;cursor:pointer}.wodraft{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border-color:var(--warn);background:var(--warn-soft)}.wodraft>div{flex:1 1 260px;min-width:0;overflow-wrap:anywhere}.wodraft .btn{white-space:normal;text-align:left;max-width:100%}.jminall{max-width:420px}.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
 .nscard{padding:0;overflow:hidden;margin-bottom:8px}.nsroot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--rule-2);background:var(--paper)}
 .nshead span:first-child{grid-column:1/4}.nshead span:not(:first-child){text-align:right}.nshead{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;padding:6px 14px;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--rule-2)}
 .nstree{list-style:none;margin:0;padding:0}.nsrow{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;align-items:center;padding:5px 14px 5px calc(14px + var(--d,0) * 20px);font-size:14px;border-bottom:1px solid var(--rule-2)}
@@ -5645,6 +5645,27 @@ function woDraftSave(now){
     catch(e) { toast('Черновик не сохранён: ' + errText(e)); }
   }, now ? 0 : 500);
 }
+/* selected rows of the write-off tables: a click on the number selects a row; under the table — the sum of «Количество»;
+   a click on the sum clears the selection. f — the list «на весь объём», c — the check table */
+const woSelHas = (t, id) => !!(ui.woSel && ui.woSel[t] && ui.woSel[t].includes(id));
+const woQtyNum = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+function woSelSum(t, L){
+  const ids = (ui.woSel && ui.woSel[t]) || [];
+  const R = t === 'f' ? (ui.woFullDraft || []).filter(x => ids.includes(x.id)) : (L || []).filter(x => ids.includes(x.key));
+  return { n: R.length, sum: Math.round(R.reduce((a, x) => a + (t === 'f' ? woQtyNum(x.qty) : Number(x.need) || 0), 0) * 1000) / 1000 };
+}
+function woSumHtml(t, L){
+  const r = woSelSum(t, L);
+  return `<button type="button" class="wosum" data-act="woSelClear" data-id="${t}" ${r.n ? '' : 'hidden'} title="Нажмите, чтобы снять выделение">Выделено строк: <b>${r.n}</b> · сумма количества: <b class="mono">${fmtQty(r.sum)}</b> <span class="dim">✕ снять выделение</span></button>`;
+}
+// the selection changes without redrawing the window (the cursor may stay in a field)
+function woSelPaint(t){
+  const box = document.querySelector(t === 'f' ? '#drawer .wofullt' : '#drawer table.wo:not(.wofullt)'); if (!box) return renderDrawer();
+  box.querySelectorAll('tbody tr[data-selid]').forEach(tr => tr.classList.toggle('wosel', woSelHas(t, tr.dataset.selid)));
+  const d = ui.drawer, src = d && woSrcOf(d.ctx === 'jobs' ? 'jobs' : 'orders', d.id), o = src && (d.ctx === 'jobs' ? jobWoDoc(src) : src);
+  const old = box.closest('.tscroll')?.nextElementSibling; const html = woSumHtml(t, t === 'c' && o ? writeoffLines(o, ui.woMap) : null);
+  if (old && old.classList.contains('wosum')) old.outerHTML = html; else box.closest('.tscroll')?.insertAdjacentHTML('afterend', html);
+}
 function woFullHtml(o, ed){
   const on = woFullOn(o), dr = o.woDraft && o.woDraft.full, mode = on || dr || ui.woMode === 'full' ? 'full' : 'prod';
   const seg = `<div class="seg" role="group" aria-label="Из чего строится список"><button type="button" data-act="woMode" data-id="prod" class="${mode === 'prod' ? 'on' : ''}" ${on || dr ? 'disabled title="Сначала удалите список на весь объём или верните как было"' : ''}>По изделиям заказа</button><button type="button" data-act="woMode" data-id="full" class="${mode === 'full' ? 'on' : ''}">На весь объём</button></div>`;
@@ -5654,9 +5675,10 @@ function woFullHtml(o, ed){
   return seg + `<section class="box wofull"><h4>Список на весь объём${on ? ` <span class="dim">· сохранён ${esc(fmtDT(o.woFull.at))} · ${esc(who(o.woFull.by))}</span>` : ''}</h4>
     <small class="dim">Материалы на всё производство заказа. Пока этот список есть, списание по изделиям заказа не считается. Номенклатура — из бухгалтерских остатков склада.</small>
     ${ed ? `    <div class="tscroll"><table class="wo wofullt"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Количество</th><th class="r">Бух. остаток</th><th></th></tr></thead><tbody data-keep>
-      ${D.map((x, i) => { const it = stockByName(x.name); return `<tr><td>${i + 1}</td><td><input class="in" data-wof="${i}|name" value="${esc(x.name || '')}" data-sugg="stock" autocomplete="off" placeholder="Начните вводить название" aria-label="Номенклатура, строка ${i + 1}" style="min-width:240px"></td>
+      ${D.map((x, i) => { const it = stockByName(x.name); return `<tr class="${woSelHas('f', x.id) ? 'wosel' : ''}" data-selid="${esc(x.id)}"><td class="won" data-act="woSel" data-id="f|${esc(x.id)}" role="button" tabindex="0" title="Выделить строку — сумма количества внизу">${i + 1}</td><td><input class="in" data-wof="${i}|name" value="${esc(x.name || '')}" data-sugg="stock" autocomplete="off" placeholder="Начните вводить название" aria-label="Номенклатура, строка ${i + 1}" style="min-width:240px"></td>
         <td>${esc((it && it.unit) || x.unit || 'шт')}</td><td class="r"><input class="in mono" data-wof="${i}|qty" value="${esc(x.qty ?? '')}" inputmode="decimal" aria-label="Количество, строка ${i + 1}" style="width:110px;text-align:right"></td>
         <td class="r mono">${it ? fmtQty(it.acctQty) : '<span class="bad-t">нет на складе</span>'}</td><td><button type="button" class="btn sm ghost" data-act="wofDel" data-id="${i}" aria-label="Убрать строку">✕</button></td></tr>`; }).join('')}</tbody></table></div>
+    ${woSumHtml('f')}
     <div class="row-g"><button type="button" class="btn sm" data-act="wofAdd">+ Строка</button><button type="button" class="btn sm" data-act="wofFromProd" data-id="${o.id}" title="Заполнить суммой по изделиям заказа — затем поправить">Заполнить из изделий</button>
       <span style="flex:1"></span><button type="button" class="btn primary" data-act="wofSave" data-id="${o.id}">Сохранить список на весь объём</button>${on ? armBtn('wofd:' + o.id, 'Удалить список на весь объём', 'wofDelAll', o.id, 'btn danger') : ''}</div>`
     : `<ul class="stlist">${D.map(x => `<li>${esc(x.name)} — ${fmtQty(x.qty)} ${esc(x.unit || 'шт')}</li>`).join('')}</ul>`}
@@ -5748,12 +5770,12 @@ function renderDrawer(){
       ${o.writeoff ? `<p class="box" style="margin:0;border-color:var(--ok);background:var(--ok-soft)">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}</p>` : ''}
       ${bad.length ? `<p class="box" style="margin:0;border-color:var(--bad);background:var(--bad-soft);color:var(--bad)"><b>Не хватает в бухгалтерских остатках: ${bad.length}.</b> Такие строки выделены красным — сохранить список нельзя. Замените номенклатуру позиции (введите другую позицию склада) или обновите остатки из 1С.</p>` : L.length ? '<p class="ok-t" style="margin:0">✓ Все позиции есть в бухгалтерских остатках.</p>' : ''}
       ${L.length ? `      <div class="tscroll"><table class="wo"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Списать</th><th class="r">Бух. остаток</th><th>Состояние</th></tr></thead><tbody>
-        ${L.map((x, i) => `<tr class="${x.source === 'acct' ? 'acct' : 'short'}"><td>${i + 1}</td>
+        ${L.map((x, i) => `<tr class="${x.source === 'acct' ? 'acct' : 'short'} ${woSelHas('c', x.key) ? 'wosel' : ''}" data-selid="${esc(x.key)}"><td class="won" data-act="woSel" data-id="c|${esc(x.key)}" role="button" tabindex="0" title="Выделить строку — сумма количества внизу">${i + 1}</td>
           <td>${ed ? `<span data-keep style="display:contents"><input class="in wo-name" data-keys="${esc(x.keys.join('\n'))}" value="${esc(x.name)}" data-sugg="acct" autocomplete="off" aria-label="Номенклатура" style="min-width:240px"></span>` : esc(x.name)}
             <small class="dim">${esc(x.products.join(', '))}${x.replaced ? ` · <b>номенклатура заменена</b>${ed ? ` <button class="linkish" data-act="woReset" data-id="${esc(x.keys.join('\n'))}">вернуть</button>` : ''}` : ''}</small></td>
           <td>${esc(x.unit)}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${x.inStock ? fmtQty(x.acct) : '—'}</td>
           <td>${x.source === 'acct' ? 'Хватает' : x.source === 'none' ? '<b>Нет в бухгалтерских остатках</b>' : `<b>Не хватает ${fmtQty(x.shortage)}</b>`}</td></tr>`).join('')}
-      </tbody></table></div>` : `<p class="dim">${col === 'jobs' ? 'В работе нет материалов — добавьте их кнопкой «+ Материалы» в карточке работы.' : full ? 'Список на весь объём ещё не сохранён — заполните строки выше и нажмите «Сохранить список на весь объём».' : 'В изделиях заказа нет компонентов.'}</p>`}
+      </tbody></table></div>${woSumHtml('c', L)}` : `<p class="dim">${col === 'jobs' ? 'В работе нет материалов — добавьте их кнопкой «+ Материалы» в карточке работы.' : full ? 'Список на весь объём ещё не сохранён — заполните строки выше и нажмите «Сохранить список на весь объём».' : 'В изделиях заказа нет компонентов.'}</p>`}
       <div class="err" id="ferr"></div>
       <div class="row-g">${ed && L.length ? `<button class="btn primary" data-act="woSave" data-id="${col}|${src.id}" ${bad.length ? 'disabled title="Есть позиции, которых не хватает в бухгалтерских остатках"' : ''}>Сохранить список</button>` : ''}${L.length ? `<a class="btn" href="/api/${col}/${src.id}/writeoff.xlsx" data-dl title="Excel для загрузки в 1С: «Требование-накладная» → «Загрузить из файла»">Скачать для 1С${dirty ? ' (сохранённый)' : ''}</a>` : ''}${col === 'jobs' ? `<button class="btn" data-act="openJob" data-id="${src.id}">← К работе</button>` : ''}<button class="btn" type="button" data-act="close">Закрыть</button></div>
     </div>`;
@@ -7244,6 +7266,9 @@ async function act(el){
     case 'cpSave': return cpSave(id);
     case 'woSave': { clearTimeout(woDraftTimer); el.disabled = true; const [wcol, wid] = id.includes('|') ? id.split('|') : ['orders', id]; try { const r = await api('POST', `/api/${wcol}/${wid}/writeoff`, { map: ui.woMap || {} }); const o = wcol === 'jobs' ? jobOf(wid) : ord(wid); if (o) { o.writeoff = r.writeoff; o.woMap = { ...(ui.woMap || {}) }; if (o.woDraft) { delete o.woDraft.map; if (!o.woDraft.full) delete o.woDraft; } } await refresh(); renderDrawer(); toast('Список для списания сохранён'); } catch(e) { const f = $('ferr'); if (f) f.textContent = errText(e); el.disabled = false; } return; }
     case 'woMode': ui.woMode = id; ui.woFullDraft = null; return renderDrawer();
+    case 'woSel': { const [t, ...r] = id.split('|'), key = r.join('|'); ui.woSel = ui.woSel || {}; const L = ui.woSel[t] = ui.woSel[t] || [];
+      const i = L.indexOf(key); if (i >= 0) L.splice(i, 1); else L.push(key); return woSelPaint(t); }
+    case 'woSelClear': { if (ui.woSel) ui.woSel[id] = []; return woSelPaint(id); }
     case 'woDraftDrop': { const [col, wid] = id.split('|'); clearTimeout(woDraftTimer); try { await api('DELETE', `/api/${col}/${wid}/wodraft`); const src = woSrcOf(col, wid); if (src) { delete src.woDraft; ui.woMap = { ...(src.woMap || {}) }; ui.woMode = woFullOn(src) ? 'full' : 'prod'; } ui.woFullDraft = null; document.activeElement?.blur(); renderDrawer(); render(); toast('Возвращено как было до начала редактирования'); } catch(e) { toast(errText(e)); } return; }
     case 'wofAdd': { document.activeElement?.blur(); (ui.woFullDraft = ui.woFullDraft || []).push({ id: uid(), name: '', qty: '' }); woDraftSave(); renderDrawer(); const n = document.querySelectorAll('[data-wof$="|name"]'); n[n.length - 1]?.focus(); return; }
     case 'wofDel': { document.activeElement?.blur(); ui.woFullDraft.splice(Number(id), 1); if (!ui.woFullDraft.length) ui.woFullDraft.push({ id: uid(), name: '', qty: '' }); woDraftSave(); return renderDrawer(); }
@@ -7359,8 +7384,8 @@ async function act(el){
     case 'spAll': ui.spAll = !!id; return render();
     case 'acctImport': ui.acct = null; return openDrawer('acctImport');
     case 'pickStock': ui.pickQ = ''; return openDrawer('pickStock', id);
-    case 'writeoff': ui.woMap = null; ui.woMode = null; ui.woFullDraft = null; return openDrawer('writeoff', id);
-    case 'jobWo': ui.woMap = null; return openDrawer('writeoff', id, 'jobs');
+    case 'writeoff': ui.woMap = null; ui.woMode = null; ui.woFullDraft = null; ui.woSel = null; return openDrawer('writeoff', id);
+    case 'jobWo': ui.woMap = null; ui.woSel = null; return openDrawer('writeoff', id, 'jobs');
     case 'jobMat': { const j = jobOf(id); if (!j) return; return cpOpen('job', { name: j.title, components: j.materials || [] }, { jid: j.id }); }
     case 'newStock': return openDrawer('stockItem');
     case 'editStock': return openDrawer('stockItem', id);
@@ -7485,7 +7510,7 @@ document.addEventListener('input', e => {
   // «Количество» of the write-off list: only digits and one decimal comma — anything else is removed at once
   if (t.dataset && t.dataset.wof && t.dataset.wof.endsWith('|qty')) { const v = t.value, c = v.replace(/\./g, ',').replace(/[^\d,]/g, '').replace(/^,/, '0,').replace(/^([^,]*,)(.*)$/, (m0, a, b) => a + b.replace(/,/g, ''));
     if (c !== v) { const pos = Math.max(0, (t.selectionStart || 0) - (v.length - c.length)); t.value = c; try { t.setSelectionRange(pos, pos); } catch(err) {} } }
-  if (t.dataset && t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; if (k === 'name') x.stockId = stockByName(t.value)?.id || null; woDraftSave(); } return; }
+  if (t.dataset && t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; if (k === 'name') x.stockId = stockByName(t.value)?.id || null; woDraftSave(); if (k === 'qty' && woSelHas('f', x.id)) woSelPaint('f'); } return; }
   if (t.id === 'nsq') { ui.nsq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vNetshare(); const n = $('nsq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'vq') { ui.vq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vVault(); const n = $('vq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
