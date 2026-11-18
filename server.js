@@ -2650,10 +2650,9 @@ function xlsxBook(sheets) {
 function receiptXlsx(d) {
   const lines = (d.lines || []).filter(x => x && x.name);
   const nameOf = x => { const it = x.stockId && db.stock[x.stockId]; return it ? it.name : x.name; };
-  const skuOf = x => { const it = x.stockId && db.stock[x.stockId]; return (it && it.sku) || x.sku || ''; };
   const sumOf = x => Number(x.sum) > 0 ? r2(x.sum) : r2((Number(x.qty) || 0) * (Number(x.price) || 0));
-  const head = ['№', 'Артикул', 'Номенклатура', 'Единица', 'Количество', 'Цена', 'Сумма', 'Наименование в накладной'].map(v => ({ v, s: 1 }));
-  const goods = [head, ...lines.map((x, i) => [{ v: i + 1, s: 3 }, { v: skuOf(x), s: 2 }, { v: nameOf(x), s: 2 }, { v: x.unit || 'шт', s: 2 }, { v: Number(x.qty) || 0, s: 3 },
+  const head = ['№', 'Номенклатура', 'Единица', 'Количество', 'Цена', 'Сумма', 'Наименование в накладной'].map(v => ({ v, s: 1 }));
+  const goods = [head, ...lines.map((x, i) => [{ v: i + 1, s: 3 }, { v: nameOf(x), s: 2 }, { v: x.unit || 'шт', s: 2 }, { v: Number(x.qty) || 0, s: 3 },
     { v: Number(x.price) || 0, s: 3 }, { v: sumOf(x), s: 3 }, { v: x.name !== nameOf(x) ? x.name : '', s: 2 }])];
   const cp = d.inn ? null : Object.values(db.counterparties || {}).find(c => normName(c.name) === normName(d.supplier));
   const o = d.orderId && db.orders[d.orderId], u = d.income && d.income.by && users.find(x => x.id === d.income.by);
@@ -2678,7 +2677,7 @@ function receiptXlsx(d) {
     ['3. На вкладке «Товары» нажмите «Загрузить» (или «Ещё» → «Загрузить из файла») и выберите этот файл — данные на листе «Товары».'],
     ['4. Проверьте сопоставление номенклатуры и ставку НДС, проведите документ.'],
   ];
-  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 16, 50, 9, 12, 13, 14, 40] }, { name: 'Реквизиты', rows: info, widths: [30, 60] }]);
+  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 50, 9, 12, 13, 14, 40] }, { name: 'Реквизиты', rows: info, widths: [30, 60] }]);
 }
 /* the write-off list as an Excel file for 1C: sheet «Товары» — one header row and the materials (1С:Бухгалтерия 8:
    «Требование-накладная» → «Материалы» → «Загрузить» → «Из файла»; columns are recognized by their headers);
@@ -2692,8 +2691,8 @@ function writeoffXlsx(o) {
   // the lines of the saved list when it is saved (that is what was taken off the books), otherwise the current ones
   const out = wb && Array.isArray(wb.lines) && wb.lines.length ? wb.lines.map(L => { const it = L.stockId && db.stock[L.stockId]; return { name: it ? it.name : L.name, sku: (it && it.sku) || L.sku || '', unit: (it && it.unit) || L.unit || 'шт', qty: Number(L.qty) || 0 }; })
     : lines.map(L => ({ name: L.name, sku: L.sku || '', unit: L.unit || 'шт', qty: L.need }));
-  const goods = [['№', 'Артикул', 'Номенклатура', 'Единица', 'Количество'].map(v => ({ v, s: 1 })),
-    ...out.map((L, i) => [{ v: i + 1, s: 3 }, { v: L.sku, s: 2 }, { v: L.name, s: 2 }, { v: L.unit, s: 2 }, { v: L.qty, s: 3 }])];
+  const goods = [['№', 'Номенклатура', 'Единица', 'Количество'].map(v => ({ v, s: 1 })),
+    ...out.map((L, i) => [{ v: i + 1, s: 3 }, { v: L.name, s: 2 }, { v: L.unit, s: 2 }, { v: L.qty, s: 3 }])];
   const bad = lines.filter(L => L.source !== 'acct');
   const info = [
     [{ v: 'Списание материалов', s: 10 }],
@@ -2715,16 +2714,16 @@ function writeoffXlsx(o) {
   ];
   const st = { acct: [4, 5], short: [8, 9], none: [8, 9] };
   const check = [
-    ['№', 'Наименование', 'Артикул', 'Ед.', 'Списать', 'Бух. остаток', 'Факт. остаток', 'Состояние', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
+    ['№', 'Наименование', 'Ед.', 'Списать', 'Бух. остаток', 'Факт. остаток', 'Состояние', 'Не хватает', 'Изделия'].map(v => ({ v, s: 1 })),
     ...lines.map((L, i) => { const [ts, ns] = st[L.source]; return [
-      { v: i + 1, s: ns }, { v: L.name, s: ts }, { v: L.sku, s: ts }, { v: L.unit, s: ts }, { v: L.need, s: ns },
+      { v: i + 1, s: ns }, { v: L.name, s: ts }, { v: L.unit, s: ts }, { v: L.need, s: ns },
       L.inStock ? { v: L.acct, s: ns } : { v: '—', s: ts }, L.inStock ? { v: L.real, s: ns } : { v: '—', s: ts },
       { v: SOURCE_LABEL[L.source], s: ts }, L.shortage ? { v: L.shortage, s: ns } : { v: '', s: ts }, { v: L.products.join(', '), s: ts }]; }),
     [],
     [{ v: 'Хватает бухгалтерского остатка', s: 4 }],
     [{ v: 'Позиции нет в бухгалтерских остатках или её не хватает', s: 8 }],
   ];
-  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 16, 50, 9, 12] }, { name: 'Реквизиты', rows: info, widths: [30, 70] }, { name: 'Проверка остатков', rows: check, widths: [5, 42, 16, 7, 11, 13, 13, 30, 12, 30] }]);
+  return xlsxBook([{ name: 'Товары', rows: goods, widths: [5, 50, 9, 12] }, { name: 'Реквизиты', rows: info, widths: [30, 70] }, { name: 'Проверка остатков', rows: check, widths: [5, 42, 7, 11, 13, 13, 30, 12, 30] }]);
 }
 
 /* ---------- ZIP of invoices to pay (stored, no compression; no dependencies) ---------- */
