@@ -2113,6 +2113,17 @@ function suggPick(i){
   inp.value = it.name; SUG_QUIET = true; try { inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } finally { SUG_QUIET = false; } suggHide();
 }
 function suggMove(d){ const box = $('sugg'); if (!SUG || !box) return; SUG.i = Math.max(0, Math.min(SUG.L.length - 1, SUG.i + d)); box.querySelectorAll('.sg').forEach((x, k) => x.classList.toggle('on', k === SUG.i)); box.querySelector('.sg.on')?.scrollIntoView({ block: 'nearest' }); }
+/* the list «на весь объём»: Enter in «Количество» adds a new line (or goes to the next one) and puts the cursor into its name;
+   Enter in the name (when no suggestion is open) goes to the quantity of the same line */
+document.addEventListener('keydown', e => {
+  const t = e.target; if (e.key !== 'Enter' || !t?.dataset?.wof || !ui.woFullDraft || e.isComposing) return;
+  const [i, k] = t.dataset.wof.split('|'), n = Number(i), x = ui.woFullDraft[n]; if (!x) return;
+  if (k === 'name') { if (SUG) return; e.preventDefault(); document.querySelector(`[data-wof="${n}|qty"]`)?.focus(); return; }
+  e.preventDefault(); x.qty = t.value;
+  const last = n === ui.woFullDraft.length - 1; if (last) ui.woFullDraft.push({ id: uid(), name: '', qty: '' });
+  woDraftSave(); if (last) { t.blur(); renderDrawer(); }
+  const f = document.querySelector(`[data-wof="${n + 1}|name"]`); if (f) { f.focus(); f.scrollIntoView({ block: 'nearest' }); }
+});
 document.addEventListener('focusin', e => { if (e.target?.dataset?.sugg) suggShow(e.target); });
 document.addEventListener('input', e => { if (e.target?.dataset?.sugg && !SUG_QUIET) suggShow(e.target); });
 document.addEventListener('focusout', e => { if (e.target?.dataset?.sugg) setTimeout(() => { if (SUG && document.activeElement !== SUG.inp) suggHide(); }, 120); });
@@ -7529,7 +7540,9 @@ document.addEventListener('change', async e => {
     const M = { ...(j.minByWorker || {}) }; if (v === '' || n <= 0) delete M[uid]; else M[uid] = n;
     try { await upd('jobs', jid, { minByWorker: M }); toast(v === '' || n <= 0 ? `${who(uid)}: как для всех` : `${who(uid)}: минимум ${n} точ. в день`); t.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
   if (t.id === 'nf-restr') { nsKeep(); return renderDrawer(); }
-  if (t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; woDraftSave(); if (k === 'name') { x.stockId = stockByName(t.value)?.id || null; document.activeElement?.blur(); renderDrawer(); } } return; }
+  if (t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; woDraftSave(); if (k === 'name') { const it = stockByName(t.value); x.stockId = it?.id || null;
+      // only the cells of this line change — the cursor stays where it is
+      const tr = t.closest('tr'); if (tr) { tr.cells[2].textContent = (it && it.unit) || x.unit || 'шт'; tr.cells[4].innerHTML = it ? fmtQty(it.acctQty) : '<span class="bad-t">нет на складе</span>'; } } } return; }
   // the monthly rating of an employee (the last column of «Табель»)
   if (t.dataset.rate) { const [user, ym] = t.dataset.rate.split('|'), score = Number(t.value);
     try { const r = await api('PUT', '/api/staff-ratings', { user, ym, score }); STAFF_RATINGS = STAFF_RATINGS.filter(x => !(x.user === user && x.ym === ym)); if (r.rating) STAFF_RATINGS.push(r.rating);
