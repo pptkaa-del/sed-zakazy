@@ -5685,6 +5685,12 @@ const wofShortCell = (it, c, many) => `<td class="r mono wofsh">${!it ? '<span c
 // the names wrap: the field grows with its text
 const wofFit = el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; };
 const wofFitAll = () => document.querySelectorAll('#drawer .wofname').forEach(wofFit);
+// the saved write-off differs from the current lines (something was added, removed or changed after «Сохранить список»)
+function woStale(o, L){
+  if (!(o?.writeoff?.applied)) return false; const a = woTaken(o), b = {};
+  L.forEach(x => { if (x.stockId && x.take > 0) b[x.stockId] = Math.round(((b[x.stockId] || 0) + x.take) * 1000) / 1000; });
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].some(k => Math.abs((a[k] || 0) - (b[k] || 0)) > 1e-9);
+}
 // a split cell: what was entered and what will be written off (not more than the books)
 const woSplit = (need, take) => `<span class="wosplit"><span>ввели <b>${fmtQty(need)}</b></span><span>спишется <b>${fmtQty(take)}</b></span></span>`;
 // «На 1 шт» × «Количество продукции» → «Количество» of the line (the quantity can still be typed by hand)
@@ -5802,7 +5808,7 @@ function renderDrawer(){
     D.innerHTML = dh('Список для списания · ' + esc(col === 'jobs' ? `работа № ${jobNo(src)} · ${src.title}` : ordName(o))) + `<div class="d-body">
       <p class="dim" style="margin:0">Строки берутся из <b>бухгалтерских остатков</b> (${A ? 'загружены ' + esc(fmtDT(A.at)) + (A.file ? ', «' + esc(A.file) + '»' : '') : 'ещё не загружались'}). ${col === 'jobs' ? 'Количество — из списка материалов работы.' : full ? 'Количество — из списка <b>на весь объём</b>; изделия заказа не учитываются.' : 'Количество — сумма по всем изделиям заказа.'}</p>
       ${draftBox}${fullBox}
-      ${o.writeoff ? `<p class="box" style="margin:0;border-color:var(--ok);background:var(--ok-soft)">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}</p>` : ''}
+      ${o.writeoff ? `<p class="box" style="margin:0;border-color:${woStale(o, L) || dirty ? 'var(--warn)' : 'var(--ok)'};background:${woStale(o, L) || dirty ? 'var(--warn-soft)' : 'var(--ok-soft)'}">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}${woStale(o, L) ? '<br><b>Список изменён после сохранения списания</b> — нажмите «Сохранить список» внизу, чтобы списание с бухгалтерского склада совпало со списком (убранные позиции вернутся на остаток).' : ''}</p>` : ''}
       ${bad.length ? `<p class="box" style="margin:0;border-color:var(--bad);background:var(--bad-soft);color:var(--bad)"><b>Не хватает в бухгалтерских остатках: ${bad.length}.</b><span class="woshl">${bad.slice(0, 8).map(x => `<span>• ${esc(x.name)} — нужно ${fmtQty(x.need)}, ${x.inStock ? 'есть ' + fmtQty(x.acct) : 'нет на складе'}</span>`).join('')}${bad.length > 8 ? `<span>…и ещё ${bad.length - 8}</span>` : ''}</span> При сохранении такие позиции спишутся в размере бухгалтерского остатка (в ячейке «Списать» — «ввели» и «спишется»), остальное останется «не хватает». Можно также заменить номенклатуру или обновить остатки из 1С.</p>` : L.length ? '<p class="ok-t" style="margin:0">✓ Все позиции есть в бухгалтерских остатках.</p>' : ''}
       ${L.length ? `      <div class="tscroll"><table class="wo"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Списать</th><th class="r">Бух. остаток</th><th>Состояние</th></tr></thead><tbody>
         ${L.map((x, i) => `<tr class="${x.source === 'acct' ? 'acct' : 'short'} ${woSelHas('c', x.key) ? 'wosel' : ''}" data-selid="${esc(x.key)}"><td class="won" data-act="woSel" data-id="c|${esc(x.key)}" role="button" tabindex="0" title="Выделить строку — сумма количества внизу">${i + 1}</td>

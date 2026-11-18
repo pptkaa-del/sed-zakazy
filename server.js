@@ -2672,7 +2672,7 @@ function xlsxSheet(rows, widths) {
 function xlsxBook(sheets) {
   const fill = rgb => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.###"/></numFmts>
+<numFmts count="1"><numFmt numFmtId="164" formatCode="General"/></numFmts>
 <fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font></fonts>
 <fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fill('E3E8E5')}${fill('DFF2E4')}${fill('DDEBF8')}${fill('FBE1E1')}${fill('EDEFF2')}</fills>
 <borders count="2"><border/><border><left style="thin"><color rgb="FFC8CFCB"/></left><right style="thin"><color rgb="FFC8CFCB"/></right><top style="thin"><color rgb="FFC8CFCB"/></top><bottom style="thin"><color rgb="FFC8CFCB"/></bottom></border></borders>
@@ -2789,17 +2789,25 @@ function woSavedOrdered(o, lines) {
   const pos = new Map(lines.map((L, i) => [L.stockId || 'n:' + normName(L.name), i]));
   return o.writeoff.lines.map((L, i) => ({ L, k: pos.has(L.stockId || 'n:' + normName(L.name)) ? pos.get(L.stockId || 'n:' + normName(L.name)) : 1e6 + i })).sort((a, b) => a.k - b.k).map(x => x.L);
 }
+// the saved write-off does not match the list any more (lines added, removed or changed after «Сохранить список»)
+function woStale(o, lines) {
+  if (!(o.writeoff && o.writeoff.applied)) return false;
+  const a = woTaken(o), b = {}; lines.forEach(L => { if (L.stockId && L.take > 0) b[L.stockId] = r3((b[L.stockId] || 0) + L.take); });
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].some(k => Math.abs((a[k] || 0) - (b[k] || 0)) > 1e-9);
+}
 function writeoffPlainXlsx(o) {
-  const lines = writeoffLines(o), wb = o.writeoff, saved = !!(wb && wb.applied && Array.isArray(wb.lines));
+  const lines = writeoffLines(o), wb = o.writeoff, saved = !!(wb && wb.applied && Array.isArray(wb.lines)), stale = woStale(o, lines), took = saved ? woTaken(o) : {};
   const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : '';
-  const rows = saved ? woSavedOrdered(o, lines).map(L => { const it = L.stockId && db.stock[L.stockId], need = Number(L.need ?? L.qty) || 0, got = Number(L.qty) || 0; return { name: it ? it.name : L.name, unit: (it && it.unit) || L.unit || 'шт', need, got, short: r3(Math.max(0, need - got)) }; })
-    : lines.map(L => ({ name: L.name, unit: L.unit || 'шт', need: L.need, got: L.take, short: r3(Math.max(0, L.need - L.take)) }));
+  // exactly the lines of the list, in its order; «Списано» — what the saved write-off took (or what will be taken)
+  const left = { ...took };
+  const rows = lines.map(L => { let got = L.take; if (saved) { got = L.stockId ? r3(Math.min(L.need, left[L.stockId] || 0)) : 0; if (L.stockId) left[L.stockId] = r3((left[L.stockId] || 0) - got); }
+    return { name: L.name, unit: L.unit || 'шт', need: L.need, got, short: r3(Math.max(0, L.need - got)) }; });
   const what = /^работа/.test(o.number || '') ? `Работа ${String(o.number || '').replace(/^работа\s*/, '')} · ${o.title || ''}` : `Заказ ${o.number || ''} · ${o.title || ''}`;
   const sum = k => r3(rows.reduce((a, x) => a + x[k], 0));
   const t = [
     [{ v: 'Списание материалов — ' + what, s: 10 }],
-    [saved ? `Список сохранён ${fmt(wb.at)}` : 'Список ещё не сохранён — в столбце «Списано» показано, сколько спишется'],
-    [],
+    [saved ? `Списание сохранено ${fmt(wb.at)}` : 'Список ещё не сохранён — в столбце «Списано» показано, сколько спишется'],
+    stale ? [{ v: 'Внимание: список изменён после сохранения списания — в окне списка нажмите «Сохранить список», чтобы списание совпало со списком', s: 8 }] : [],
     ['№', 'Номенклатура', 'Ед.', 'Нужно списать', 'Списано', 'Не хватает'].map(v => ({ v, s: 1 })),
     ...rows.map((x, i) => [{ v: i + 1, s: x.short ? 9 : 3 }, { v: x.name, s: x.short ? 8 : 2 }, { v: x.unit, s: x.short ? 8 : 2 }, { v: x.need, s: x.short ? 9 : 3 }, { v: x.got, s: x.short ? 9 : 3 }, x.short ? { v: x.short, s: 9 } : { v: '', s: 2 }]),
     [{ v: '', s: 2 }, { v: 'Итого', s: 1 }, { v: '', s: 2 }, { v: sum('need'), s: 3 }, { v: sum('got'), s: 3 }, { v: sum('short') || '', s: 3 }],
