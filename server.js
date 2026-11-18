@@ -1746,8 +1746,9 @@ async function api(req, res, url) {
         seen.add(nid); created++;
       } else skipped++;
     }
-    for (const [id, it] of items) if (!seen.has(id)) it.acctQty = 0;   // not in the export: nothing on the books
-    db.meta.acct = { at: now, by: user.id, file: String(b.file || '').slice(0, 200), rows: agg.size, matched, created, skipped };
+    let zeroed = 0;
+    for (const [id, it] of items) if (!seen.has(id)) { if (Number(it.acctQty)) zeroed++; it.acctQty = 0; }   // not in the export: nothing on the books
+    db.meta.acct = { at: now, by: user.id, file: String(b.file || '').slice(0, 200), rows: agg.size, matched, created, skipped, zeroed };
     saveDb();
     return send(res, 200, db.meta.acct);
   }
@@ -1770,9 +1771,13 @@ async function api(req, res, url) {
     const bySku = new Map(items.filter(([, it]) => it.sku).map(([id, it]) => [normName(it.sku), id]));
     const byName = new Map(items.map(([id, it]) => [normName(it.name), id]));
     const now = new Date().toISOString(), file = String(b.file || '').slice(0, 200), seen = new Set();
-    let matched = 0, created = 0;
+    // the balances were already loaded: a repeated upload updates the accounting balance of every line of the file,
+    // the positions not in the file get 0 on the books, the actual balance of the existing positions stays
+    const again = !!(db.meta.acct || db.meta.initial);
+    let matched = 0, created = 0, zeroed = 0;
     for (const r of agg.values()) {
       let id = (r.sku && bySku.get(normName(r.sku))) || byName.get(normName(r.name));
+      if (id && again) { const it = db.stock[id]; if (!seen.has(id)) { matched++; it.acctQty = r.qty; } else it.acctQty = r3((Number(it.acctQty) || 0) + r.qty); seen.add(id); it.updatedAt = now; it.updatedBy = user.id; continue; }
       if (!id) { id = newId(); created++; db.stock[id] = { name: r.name, sku: r.sku, unit: r.unit || 'шт', location: '', minQty: 0, note: 'Добавлено из начальных остатков 1С', qty: 0, moves: [], acctQty: 0, createdAt: now, createdBy: user.id }; }
       else if (!seen.has(id)) matched++;
       const it = db.stock[id], q = seen.has(id) ? r3((Number(it.qty) || 0) + r.qty) : r.qty;
@@ -1781,7 +1786,9 @@ async function api(req, res, url) {
       it.moves.push({ id: newId(), type: 'init', qty: r.qty, acct: true, acctBalance: q, balance: q, note: 'Начальный остаток из 1С' + (file ? ' (' + file + ')' : ''), by: user.id, at: now });
       it.updatedAt = now; it.updatedBy = user.id;
     }
-    db.meta.initial = { at: now, by: user.id, file, rows: agg.size, matched, created };
+    if (again) for (const [id, it] of items) if (!seen.has(id) && Number(it.acctQty)) { it.acctQty = 0; zeroed++; }
+    db.meta.initial = { at: now, by: user.id, file, rows: agg.size, matched, created, again, zeroed };
+    if (again) db.meta.acct = { at: now, by: user.id, file, rows: agg.size, matched, created, skipped: 0, zeroed };
     saveDb();
     return send(res, 200, db.meta.initial);
   }
