@@ -504,7 +504,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .g-w{position:absolute;bottom:4px;font:11px var(--f-mono);color:var(--ink-2);padding-left:3px;white-space:nowrap}
 .g-proj .g-lab{font-weight:600;background:var(--paper)}
 .g-ppl{font-weight:400;color:var(--ink)!important}
-.g-span{position:absolute;top:50%;transform:translateY(-50%);height:22px;border:1px dashed var(--rule);border-radius:6px;background:var(--sheet);color:var(--ink-2);font:inherit;font-size:12px;padding:0 8px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;z-index:1}.g-span:hover{border-color:var(--ink-2);color:var(--ink)}
+
 .g-proj .g-track{background-color:var(--paper)}
 .g-ord .g-lab{font-size:13px;color:var(--ink-2);padding-left:20px}
 .g-task .g-lab{padding-left:28px;cursor:pointer}
@@ -5519,9 +5519,7 @@ function vPlan(){
     const jt = tasks.filter(t => t.jobId === j.id).sort(byStart); if (!jt.length) return;
     const dl = j.due && dnum(j.due) >= lo && dnum(j.due) <= hi ? `<i class="g-dl" style="left:${(dnum(j.due)-lo)*DW + DW - 1}px" title="Срок окончания работ ${fmtD(j.due)}"></i>` : '';
     const cp = cpOf(j.customerId)?.name, ppl = peopleTxt(j);
-    const js = Math.min(...jt.map(t => dnum(t.start))), je = Math.max(...jt.map(t => Math.max(dnum(t.start), dnum(t.end)))), jw = (je - js + 1) * DW;
-    const span = `<button class="g-span" style="left:${(js-lo)*DW}px;width:${jw}px" data-act="openJob" data-id="${j.id}" title="${esc('№ ' + jobNo(j) + ' · ' + j.title + (j.due ? ' · срок ' + fmtD(j.due) : ''))}"></button>`;
-    rows += `<div class="g-row g-proj"><div class="g-lab" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">№ ${jobNo(j)} · ${esc(j.title)}<small>${esc(WORK_KIND[j.kind || 'mount'])}</small></div>${track(span, dl)}</div>` + jt.map(taskRow).join('');
+    rows += `<div class="g-row g-proj"><div class="g-lab" data-act="openJob" data-id="${j.id}" role="button" tabindex="0">№ ${jobNo(j)} · ${esc(j.title)}<small>${esc(WORK_KIND[j.kind || 'mount'])}</small></div>${track('', dl)}</div>` + jt.map(taskRow).join('');
   });
   const rest = tasks.filter(t => !jobOf(t.jobId));
   ordersSorted().slice().reverse().forEach(o => {
