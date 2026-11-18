@@ -1826,25 +1826,9 @@ async function api(req, res, url) {
     const o = woDoc(p[1], p[2]); if (!o) return fail(res, 404, p[1] === 'jobs' ? 'Работа не найдена' : 'Заказ не найден');
     const b = await readJsonBody(req), map = {};
     for (const [k, v] of Object.entries(b.map || {})) if (/^(id|n):/.test(k) && db.stock[v]) map[k] = v;
-    const lines = writeoffLines(o, map);
-    if (!lines.length) return fail(res, 400, p[1] === 'jobs' ? 'В работе нет материалов' : 'В изделиях заказа нет компонентов');
-    if (!lines.some(L => L.take > 0)) return fail(res, 400, 'Нечего списывать: ни одной позиции нет в бухгалтерских остатках');
-    // lines that are short are written off as much as there is on the books (the rest is «не хватает»)
-    const target = p[1] === 'jobs' ? db.jobs[p[2]] : o, at = new Date().toISOString(), prev = woTaken(target), next = {};
-    lines.forEach(L => { if (L.stockId && L.take > 0) next[L.stockId] = r3((next[L.stockId] || 0) + L.take); });
-    const what = p[1] === 'jobs' ? `работе № ${target.no || ''} · ${target.title || ''}` : `заказу ${o.number || ''} · ${o.title || ''}`;
-    for (const sid of new Set([...Object.keys(prev), ...Object.keys(next)])) {
-      const it = db.stock[sid], d = r3((next[sid] || 0) - (prev[sid] || 0)); if (!it || !d) continue;
-      it.acctQty = r3((Number(it.acctQty) || 0) - d);
-      it.moves = Array.isArray(it.moves) ? it.moves : [];
-      it.moves.push({ id: newId(), type: 'wo', qty: d, acct: true, acctBalance: it.acctQty, balance: Number(it.qty) || 0, orderId: p[1] === 'orders' ? p[2] : (target.orderId || null), note: (prev[sid] ? 'Изменён список для списания по ' : 'Списание по ') + what, by: user.id, at });
-      it.updatedAt = at; it.updatedBy = user.id;
-    }
-    target.woMap = map;
-    if (target.woDraft) { delete target.woDraft.map; if (!target.woDraft.full) delete target.woDraft; }
-    target.writeoff = { at, by: user.id, applied: true, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.take, need: L.need })) };
+    const r = woApply(p[1], p[2], map, user); if (r.error) return fail(res, 400, r.error);
     saveDb();
-    return send(res, 200, { ok: true, writeoff: target.writeoff, rev: db.rev });
+    return send(res, 200, { ok: true, writeoff: r.writeoff, rev: db.rev });
   }
   /* the draft of a write-off list: kept on every change until «Сохранить»; «Вернуть как было» deletes it.
      full — the lines «на весь объём» being edited (orders), map — the replaced nomenclature */
@@ -1876,8 +1860,11 @@ async function api(req, res, url) {
     if (!lines.length) return fail(res, 400, 'Добавьте хотя бы одну строку');
     const units = Number(b.units); o.woFull = { lines, ...(units > 0 && units <= 1e9 ? { units: r3(units) } : {}), at: new Date().toISOString(), by: user.id };
     if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; }
+    // the write-off is already saved — it follows the list at once
+    let reapplied = null;
+    if (o.writeoff && o.writeoff.applied) { const r = woApply(p[1], p[2], o.woMap || {}, user); if (!r.error) reapplied = r.writeoff; }
     saveDb();
-    return send(res, 200, { ok: true, woFull: o.woFull, rev: db.rev });
+    return send(res, 200, { ok: true, woFull: o.woFull, writeoff: reapplied, rev: db.rev });
   }
   /* write-off list for an order: Excel with highlighting */
   if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff-table.xlsx' && m === 'GET') {
@@ -2603,6 +2590,30 @@ const woTaken = o => { const t = {}; if (o && o.writeoff && o.writeoff.applied) 
 // the write-off list «на весь объём» of an order: when it has lines the products of the order are not counted
 const woFullOn = o => !!(o && o.woFull && Array.isArray(o.woFull.lines) && o.woFull.lines.length);
 const woProducts = o => woFullOn(o) ? [{ name: 'Весь объём', qty: 1, components: o.woFull.lines }] : (o.products || []);
+/* writes the list off the books: the difference with what was written off before goes as a move of every position;
+   short lines — as much as there is on the books */
+function woApply(col, id, map, user) {
+  const o = woDoc(col, id); if (!o) return { error: 'Не найдено' };
+    const lines = writeoffLines(o, map);
+    if (!lines.length) return { error: col === 'jobs' ? 'В работе нет материалов' : 'В изделиях заказа нет компонентов' };
+    if (!lines.some(L => L.take > 0)) return { error: 'Нечего списывать: ни одной позиции нет в бухгалтерских остатках' };
+    // lines that are short are written off as much as there is on the books (the rest is «не хватает»)
+    const target = col === 'jobs' ? db.jobs[id] : o, at = new Date().toISOString(), prev = woTaken(target), next = {};
+    lines.forEach(L => { if (L.stockId && L.take > 0) next[L.stockId] = r3((next[L.stockId] || 0) + L.take); });
+    const what = col === 'jobs' ? `работе № ${target.no || ''} · ${target.title || ''}` : `заказу ${o.number || ''} · ${o.title || ''}`;
+    for (const sid of new Set([...Object.keys(prev), ...Object.keys(next)])) {
+      const it = db.stock[sid], d = r3((next[sid] || 0) - (prev[sid] || 0)); if (!it || !d) continue;
+      it.acctQty = r3((Number(it.acctQty) || 0) - d);
+      it.moves = Array.isArray(it.moves) ? it.moves : [];
+      it.moves.push({ id: newId(), type: 'wo', qty: d, acct: true, acctBalance: it.acctQty, balance: Number(it.qty) || 0, orderId: col === 'orders' ? id : (target.orderId || null), note: (prev[sid] ? 'Изменён список для списания по ' : 'Списание по ') + what, by: user.id, at });
+      it.updatedAt = at; it.updatedBy = user.id;
+    }
+    target.woMap = map;
+    if (target.woDraft) { delete target.woDraft.map; if (!target.woDraft.full) delete target.woDraft; }
+    target.writeoff = { at, by: user.id, applied: true, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.take, need: L.need })) };
+    saveDb();
+  return { writeoff: target.writeoff };
+}
 function writeoffLines(o, mapOverride) {
   const taken = woTaken(o);
   const byName = new Map(Object.entries(db.stock).map(([id, it]) => [normName(it.name), id]));
@@ -2799,9 +2810,8 @@ function writeoffPlainXlsx(o) {
   const lines = writeoffLines(o), wb = o.writeoff, saved = !!(wb && wb.applied && Array.isArray(wb.lines)), took = saved ? woTaken(o) : {};
   const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : '';
   // exactly the lines of the list, in its order; «Списано» — what the saved write-off took (or what will be taken)
-  const left = { ...took };
-  const rows = lines.map(L => { let got = L.take; if (saved) { got = L.stockId ? r3(Math.min(L.need, left[L.stockId] || 0)) : 0; if (L.stockId) left[L.stockId] = r3((left[L.stockId] || 0) - got); }
-    return { name: L.name, unit: L.unit || 'шт', need: L.need, got, short: r3(Math.max(0, L.need - got)) }; });
+  // by the current list and the books (with what this order already took): exactly what the window shows
+  const rows = lines.map(L => ({ name: L.name, unit: L.unit || 'шт', need: L.need, got: L.take, short: r3(Math.max(0, L.need - L.take)) }));
   const what = /^работа/.test(o.number || '') ? `Работа ${String(o.number || '').replace(/^работа\s*/, '')} · ${o.title || ''}` : `Заказ ${o.number || ''} · ${o.title || ''}`;
   const t = [
     [{ v: 'Списание материалов — ' + what, s: 10 }],
