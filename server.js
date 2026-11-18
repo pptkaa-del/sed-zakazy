@@ -112,6 +112,9 @@ function cleanJob(d){
   if ('report' in d) out.report = String(d.report || '').slice(0, 4000);
   // the key features of a work and what is happening with it now; the percent done by hand (when the work has no points)
   // the minimum of points a worker should do in a day on this work («Успеваемость» in «Сотрудники»)
+  // a personal minimum of points a day for chosen workers of the work (instead of the common one)
+  if ('minByWorker' in d) out.minByWorker = Object.fromEntries(Object.entries(d.minByWorker && typeof d.minByWorker === 'object' ? d.minByWorker : {})
+    .filter(([id, v]) => users.some(u => u.id === id) && Number(v) > 0).slice(0, 500).map(([id, v]) => [id, Math.min(10000, Math.round(Number(v)))]));
   if ('minPerDay' in d) out.minPerDay = d.minPerDay === null || d.minPerDay === '' || !(Number(d.minPerDay) > 0) ? null : Math.min(10000, Math.round(Number(d.minPerDay)));
   // the warranty after the work is done: its last day; when it passes the work goes to the archive
   if ('warrantyUntil' in d) out.warrantyUntil = /^\d{4}-\d{2}-\d{2}$/.test(d.warrantyUntil || '') ? d.warrantyUntil : '';
