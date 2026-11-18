@@ -1842,6 +1842,24 @@ async function api(req, res, url) {
     saveDb();
     return send(res, 200, { ok: true, writeoff: target.writeoff, rev: db.rev });
   }
+  /* the write-off list «на весь объём» of an order (production): the materials for the whole volume instead of the products */
+  if (p[1] === 'orders' && p[3] === 'wofull' && (m === 'PUT' || m === 'DELETE')) {
+    if (!canEdit(user)) return fail(res, 403, 'Список на весь объём ведёт администратор или руководитель');
+    const o = db.orders[p[2]]; if (!o) return fail(res, 404, 'Заказ не найден');
+    if (m === 'DELETE') { delete o.woFull; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    const b = await readJsonBody(req), lines = [];
+    for (const [i, x] of (Array.isArray(b.lines) ? b.lines : []).slice(0, 1000).entries()) {
+      const name = String(x && x.name || '').trim().slice(0, 300), qty = Number(x && x.qty);
+      if (!name && !(qty > 0)) continue;
+      if (!name) return fail(res, 400, `Строка ${i + 1}: укажите номенклатуру`);
+      if (!(qty > 0) || qty > 1e9) return fail(res, 400, `Строка ${i + 1}: укажите количество больше нуля`);
+      const sid = x.stockId && db.stock[x.stockId] && normName(db.stock[x.stockId].name) === normName(name) ? x.stockId : (Object.entries(db.stock).find(([, it]) => normName(it.name) === normName(name)) || [])[0] || null;
+      lines.push({ id: String(x.id || newId()).slice(0, 40), stockId: sid, name: sid ? db.stock[sid].name : name, unit: String((sid && db.stock[sid].unit) || x.unit || 'шт').slice(0, 20), qty: r3(qty) });
+    }
+    if (!lines.length) return fail(res, 400, 'Добавьте хотя бы одну строку');
+    o.woFull = { lines, at: new Date().toISOString(), by: user.id }; saveDb();
+    return send(res, 200, { ok: true, woFull: o.woFull, rev: db.rev });
+  }
   /* write-off list for an order: Excel with highlighting */
   if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'writeoff.xlsx' && m === 'GET') {
     const o = woDoc(p[1], p[2]);
@@ -2556,12 +2574,15 @@ const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace
 // a work's materials look like one product of quantity 1 for the write-off list
 const woDoc = (col, id) => { const x = db[col] && db[col][id]; if (!x) return null; return col === 'jobs' ? { ...x, number: 'работа № ' + (x.no || ''), products: [{ name: x.title, qty: 1, components: x.materials || [] }] } : x; };
 const woTaken = o => { const t = {}; if (o && o.writeoff && o.writeoff.applied) for (const L of o.writeoff.lines || []) if (L.stockId) t[L.stockId] = r3((t[L.stockId] || 0) + (Number(L.qty) || 0)); return t; };
+// the write-off list «на весь объём» of an order: when it has lines the products of the order are not counted
+const woFullOn = o => !!(o && o.woFull && Array.isArray(o.woFull.lines) && o.woFull.lines.length);
+const woProducts = o => woFullOn(o) ? [{ name: 'Весь объём', qty: 1, components: o.woFull.lines }] : (o.products || []);
 function writeoffLines(o, mapOverride) {
   const taken = woTaken(o);
   const byName = new Map(Object.entries(db.stock).map(([id, it]) => [normName(it.name), id]));
   const map = mapOverride || o.woMap || {};
   const lines = new Map();
-  for (const p of o.products || []) {
+  for (const p of woProducts(o)) {
     const k = Number(p.qty) || 0;
     for (const c of p.components || []) {
       const sid0 = (c.stockId && db.stock[c.stockId]) ? c.stockId : byName.get(normName(c.name));
@@ -2707,6 +2728,7 @@ function writeoffXlsx(o) {
     ['Основание', job ? `Работа ${String(o.number || '').replace(/^работа\s*/, '')} · ${o.title || ''}` : `Заказ на производство ${o.number || ''} · ${o.title || ''}`],
     ...(ord ? [['Заказ на производство', `${ord.number || ''} · ${ord.title || ''}`]] : []),
     ...(cp || o.customer ? [['Заказчик', cp ? cp.name : o.customer]] : []),
+    ...(woFullOn(o) ? [['Состав списка', 'на весь объём (изделия заказа не учитываются)']] : []),
     ['Список для списания', wb ? `сохранён ${fmt(wb.at)}${u ? ', ' + u.name : ''}` : 'ещё не сохранён — в файле текущие строки'],
     ['Строк', out.length],
     ['Бухгалтерские остатки', db.meta.acct ? `из 1С ${fmt(db.meta.acct.at)}${db.meta.acct.file ? ' (' + db.meta.acct.file + ')' : ''}` : 'выгрузка 1С не загружалась'],
