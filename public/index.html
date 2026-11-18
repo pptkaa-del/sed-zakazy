@@ -342,7 +342,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgall tr.sgt1 td,.sgall tr.sgt1 th{border-bottom:1px dashed var(--rule-2)}.sgall tr.sgt2 td,.sgall tr.sgt2 th{border-bottom:2px solid var(--rule)}.sgall td{height:34px}.sgall .sgname{border-bottom:2px solid var(--rule)}
 .sgt thead .sgsum small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}.sglg{font-size:12px;margin-right:2px}.sgrnote{margin:0 14px 10px;font-size:13px;background:var(--warn-soft, #FFF6D6)}
 .sgt .sgrate{min-width:150px;padding:4px 6px}.sgrate .rtsel{font-size:12px;padding:4px 6px;width:100%;max-width:200px}.sgrate .rtv{display:inline-block;min-width:26px;padding:2px 6px;border-radius:6px;color:#1F2633}.sgrate small{display:block;font-size:10px;color:var(--ink-2);white-space:normal}
-.wodraft{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border-color:var(--warn);background:var(--warn-soft)}.jminall{max-width:420px}.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
+.sugg{position:fixed;z-index:1000;background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:auto;overscroll-behavior:contain}.sugg .sg{padding:7px 12px;cursor:pointer;border-top:1px solid var(--rule-2);white-space:normal;overflow-wrap:anywhere;line-height:1.3}.sugg .sg:first-child{border-top:0}.sugg .sg b{display:block;font-weight:500;font-size:14px}.sugg .sg small{color:var(--ink-2);font-size:12px}.sugg .sg.on,.sugg .sg:hover{background:var(--stamp-soft)}.wodraft{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border-color:var(--warn);background:var(--warn-soft)}.wodraft>div{flex:1 1 260px;min-width:0;overflow-wrap:anywhere}.wodraft .btn{white-space:normal;text-align:left;max-width:100%}.jminall{max-width:420px}.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
 .nscard{padding:0;overflow:hidden;margin-bottom:8px}.nsroot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--rule-2);background:var(--paper)}
 .nshead span:first-child{grid-column:1/4}.nshead span:not(:first-child){text-align:right}.nshead{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;padding:6px 14px;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--rule-2)}
 .nstree{list-style:none;margin:0;padding:0}.nsrow{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;align-items:center;padding:5px 14px 5px calc(14px + var(--d,0) * 20px);font-size:14px;border-bottom:1px solid var(--rule-2)}
@@ -2093,6 +2093,34 @@ function acctRows(aoa, hdr, cols){
   }
   return out;
 }
+/* suggestions of the stock positions under a field (data-sugg="stock" — all, "acct" — with an accounting balance):
+   long names wrap to new lines (the browser datalist cuts them); ↑ ↓ Enter Esc, a click or a tap picks */
+let SUG = null, SUG_QUIET = false;
+function suggHide(){ const b = $('sugg'); if (b) b.hidden = true; SUG = null; }
+function suggShow(inp){
+  const q = inp.value.trim(), acct = inp.dataset.sugg === 'acct';
+  const L = S.stock.filter(it => (!acct || (Number(it.acctQty) || 0) > 0) && (!q || pickHit(normName(it.name), q))).sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 80);
+  let box = $('sugg'); if (!box) { box = document.createElement('div'); box.id = 'sugg'; box.className = 'sugg'; box.setAttribute('role', 'listbox'); document.body.appendChild(box);
+    box.addEventListener('pointerdown', e => { const o = e.target.closest('[data-sgi]'); e.preventDefault(); if (o && SUG) suggPick(Number(o.dataset.sgi)); }); }
+  if (!L.length) { box.hidden = true; SUG = null; return; }
+  const r = inp.getBoundingClientRect(), w = Math.min(Math.max(r.width, 380), innerWidth - 16), down = innerHeight - r.bottom, up = r.top, below = down > 240 || down >= up;
+  Object.assign(box.style, { left: Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px', width: w + 'px', maxHeight: Math.max(150, Math.min(380, (below ? down : up) - 14)) + 'px', top: below ? (r.bottom + 4) + 'px' : '', bottom: below ? '' : (innerHeight - r.top + 4) + 'px' });
+  box.innerHTML = L.map((it, i) => `<div class="sg ${i === 0 ? 'on' : ''}" role="option" data-sgi="${i}"><b>${esc(it.name)}</b><small>бух ${fmtQty(it.acctQty)} ${esc(it.unit || 'шт')}${it.location ? ' · ' + esc(it.location) : ''}</small></div>`).join('');
+  box.scrollTop = 0; box.hidden = false; SUG = { inp, L, i: 0 };
+}
+function suggPick(i){
+  const { inp, L } = SUG, it = L[i]; suggHide(); if (!it) return;
+  inp.value = it.name; SUG_QUIET = true; try { inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); } finally { SUG_QUIET = false; } suggHide();
+}
+function suggMove(d){ const box = $('sugg'); if (!SUG || !box) return; SUG.i = Math.max(0, Math.min(SUG.L.length - 1, SUG.i + d)); box.querySelectorAll('.sg').forEach((x, k) => x.classList.toggle('on', k === SUG.i)); box.querySelector('.sg.on')?.scrollIntoView({ block: 'nearest' }); }
+document.addEventListener('focusin', e => { if (e.target?.dataset?.sugg) suggShow(e.target); });
+document.addEventListener('input', e => { if (e.target?.dataset?.sugg && !SUG_QUIET) suggShow(e.target); });
+document.addEventListener('focusout', e => { if (e.target?.dataset?.sugg) setTimeout(() => { if (SUG && document.activeElement !== SUG.inp) suggHide(); }, 120); });
+document.addEventListener('keydown', e => { if (!SUG || e.target !== SUG.inp) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); suggMove(1); } else if (e.key === 'ArrowUp') { e.preventDefault(); suggMove(-1); }
+  else if (e.key === 'Enter') { e.preventDefault(); suggPick(SUG.i); } else if (e.key === 'Escape') { e.stopPropagation(); suggHide(); } }, true);
+window.addEventListener('scroll', e => { if (SUG && e.target !== $('sugg')) suggHide(); }, true);
+window.addEventListener('resize', () => SUG && suggHide());
 // every word of the query occurs in the (normalized) text
 const pickHit = (text, q) => normName(q).split(' ').filter(Boolean).every(w => text.includes(w));
 function acctMatch(row){
@@ -5612,9 +5640,8 @@ function woFullHtml(o, ed){
   const D = ui.woFullDraft;
   return seg + `<section class="box wofull"><h4>Список на весь объём${on ? ` <span class="dim">· сохранён ${esc(fmtDT(o.woFull.at))} · ${esc(who(o.woFull.by))}</span>` : ''}</h4>
     <small class="dim">Материалы на всё производство заказа. Пока этот список есть, списание по изделиям заказа не считается. Номенклатура — из бухгалтерских остатков склада.</small>
-    ${ed ? `<datalist id="wof-names">${S.stock.map(it => `<option value="${esc(it.name)}">${esc('бух ' + fmtQty(it.acctQty) + ' ' + (it.unit || 'шт'))}</option>`).join('')}</datalist>
-    <div class="tscroll"><table class="wo wofullt"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Количество</th><th class="r">Бух. остаток</th><th></th></tr></thead><tbody data-keep>
-      ${D.map((x, i) => { const it = stockByName(x.name); return `<tr><td>${i + 1}</td><td><input class="in" data-wof="${i}|name" value="${esc(x.name || '')}" list="wof-names" placeholder="Начните вводить название" aria-label="Номенклатура, строка ${i + 1}" style="min-width:240px"></td>
+    ${ed ? `    <div class="tscroll"><table class="wo wofullt"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Количество</th><th class="r">Бух. остаток</th><th></th></tr></thead><tbody data-keep>
+      ${D.map((x, i) => { const it = stockByName(x.name); return `<tr><td>${i + 1}</td><td><input class="in" data-wof="${i}|name" value="${esc(x.name || '')}" data-sugg="stock" autocomplete="off" placeholder="Начните вводить название" aria-label="Номенклатура, строка ${i + 1}" style="min-width:240px"></td>
         <td>${esc((it && it.unit) || x.unit || 'шт')}</td><td class="r"><input class="in mono" data-wof="${i}|qty" value="${esc(x.qty ?? '')}" inputmode="decimal" aria-label="Количество, строка ${i + 1}" style="width:110px;text-align:right"></td>
         <td class="r mono">${it ? fmtQty(it.acctQty) : '<span class="bad-t">нет на складе</span>'}</td><td><button type="button" class="btn sm ghost" data-act="wofDel" data-id="${i}" aria-label="Убрать строку">✕</button></td></tr>`; }).join('')}</tbody></table></div>
     <div class="row-g"><button type="button" class="btn sm" data-act="wofAdd">+ Строка</button><button type="button" class="btn sm" data-act="wofFromProd" data-id="${o.id}" title="Заполнить суммой по изделиям заказа — затем поправить">Заполнить из изделий</button>
@@ -5707,10 +5734,9 @@ function renderDrawer(){
       ${draftBox}${fullBox}
       ${o.writeoff ? `<p class="box" style="margin:0;border-color:var(--ok);background:var(--ok-soft)">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}</p>` : ''}
       ${bad.length ? `<p class="box" style="margin:0;border-color:var(--bad);background:var(--bad-soft);color:var(--bad)"><b>Не хватает в бухгалтерских остатках: ${bad.length}.</b> Такие строки выделены красным — сохранить список нельзя. Замените номенклатуру позиции (введите другую позицию склада) или обновите остатки из 1С.</p>` : L.length ? '<p class="ok-t" style="margin:0">✓ Все позиции есть в бухгалтерских остатках.</p>' : ''}
-      ${L.length ? `<datalist id="wo-names">${S.stock.filter(it => (Number(it.acctQty) || 0) > 0).map(it => `<option value="${esc(it.name)}">${esc('бух ' + fmtQty(it.acctQty) + ' ' + (it.unit || 'шт'))}</option>`).join('')}</datalist>
-      <div class="tscroll"><table class="wo"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Списать</th><th class="r">Бух. остаток</th><th>Состояние</th></tr></thead><tbody>
+      ${L.length ? `      <div class="tscroll"><table class="wo"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Списать</th><th class="r">Бух. остаток</th><th>Состояние</th></tr></thead><tbody>
         ${L.map((x, i) => `<tr class="${x.source === 'acct' ? 'acct' : 'short'}"><td>${i + 1}</td>
-          <td>${ed ? `<span data-keep style="display:contents"><input class="in wo-name" data-keys="${esc(x.keys.join('\n'))}" value="${esc(x.name)}" list="wo-names" aria-label="Номенклатура" style="min-width:240px"></span>` : esc(x.name)}
+          <td>${ed ? `<span data-keep style="display:contents"><input class="in wo-name" data-keys="${esc(x.keys.join('\n'))}" value="${esc(x.name)}" data-sugg="acct" autocomplete="off" aria-label="Номенклатура" style="min-width:240px"></span>` : esc(x.name)}
             <small class="dim">${esc(x.products.join(', '))}${x.replaced ? ` · <b>номенклатура заменена</b>${ed ? ` <button class="linkish" data-act="woReset" data-id="${esc(x.keys.join('\n'))}">вернуть</button>` : ''}` : ''}</small></td>
           <td>${esc(x.unit)}</td><td class="r mono">${fmtQty(x.need)}</td><td class="r mono">${x.inStock ? fmtQty(x.acct) : '—'}</td>
           <td>${x.source === 'acct' ? 'Хватает' : x.source === 'none' ? '<b>Нет в бухгалтерских остатках</b>' : `<b>Не хватает ${fmtQty(x.shortage)}</b>`}</td></tr>`).join('')}
