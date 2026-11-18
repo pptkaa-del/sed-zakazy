@@ -2631,7 +2631,7 @@ function writeoffLines(o, mapOverride) {
     // what will be written off: the quantity, but not more than the accounting balance
     const take = L.inStock ? r3(Math.max(0, Math.min(L.need, L.acct))) : 0;
     return { ...L, source, shortage, take };
-  }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  });   // in the order the lines were added to the list (not by name)
 }
 const SOURCE_LABEL = { acct: 'Хватает', short: 'Не хватает', none: 'Нет в бухгалтерских остатках' };
 function zipStore(entries) {
@@ -2745,7 +2745,7 @@ function writeoffXlsx(o) {
   const ord = job && o.orderId && db.orders[o.orderId];
   const wb = o.writeoff, u = wb && users.find(x => x.id === wb.by);
   // the lines of the saved list when it is saved (that is what was taken off the books), otherwise the current ones
-  const out = (wb && Array.isArray(wb.lines) && wb.lines.length ? wb.lines.map(L => { const it = L.stockId && db.stock[L.stockId]; return { name: it ? it.name : L.name, sku: (it && it.sku) || L.sku || '', unit: (it && it.unit) || L.unit || 'шт', qty: Number(L.qty) || 0 }; })
+  const out = (wb && Array.isArray(wb.lines) && wb.lines.length ? woSavedOrdered(o, lines).map(L => { const it = L.stockId && db.stock[L.stockId]; return { name: it ? it.name : L.name, sku: (it && it.sku) || L.sku || '', unit: (it && it.unit) || L.unit || 'шт', qty: Number(L.qty) || 0 }; })
     : lines.map(L => ({ name: L.name, sku: L.sku || '', unit: L.unit || 'шт', qty: L.take }))).filter(L => L.qty > 0);
   const goods = [['№', 'Номенклатура', 'Единица', 'Количество'].map(v => ({ v, s: 1 })),
     ...out.map((L, i) => [{ v: i + 1, s: 3 }, { v: L.name, s: 2 }, { v: L.unit, s: 2 }, { v: L.qty, s: 3 }])];
@@ -2784,10 +2784,15 @@ function writeoffXlsx(o) {
 }
 
 /* the plain table of a write-off: what had to be written off, what is written off (not more than the books), what is short */
+// the lines of a saved write-off in the order of the list (older saves were sorted by name)
+function woSavedOrdered(o, lines) {
+  const pos = new Map(lines.map((L, i) => [L.stockId || 'n:' + normName(L.name), i]));
+  return o.writeoff.lines.map((L, i) => ({ L, k: pos.has(L.stockId || 'n:' + normName(L.name)) ? pos.get(L.stockId || 'n:' + normName(L.name)) : 1e6 + i })).sort((a, b) => a.k - b.k).map(x => x.L);
+}
 function writeoffPlainXlsx(o) {
   const lines = writeoffLines(o), wb = o.writeoff, saved = !!(wb && wb.applied && Array.isArray(wb.lines));
   const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : '';
-  const rows = saved ? wb.lines.map(L => { const it = L.stockId && db.stock[L.stockId], need = Number(L.need ?? L.qty) || 0, got = Number(L.qty) || 0; return { name: it ? it.name : L.name, unit: (it && it.unit) || L.unit || 'шт', need, got, short: r3(Math.max(0, need - got)) }; })
+  const rows = saved ? woSavedOrdered(o, lines).map(L => { const it = L.stockId && db.stock[L.stockId], need = Number(L.need ?? L.qty) || 0, got = Number(L.qty) || 0; return { name: it ? it.name : L.name, unit: (it && it.unit) || L.unit || 'шт', need, got, short: r3(Math.max(0, need - got)) }; })
     : lines.map(L => ({ name: L.name, unit: L.unit || 'шт', need: L.need, got: L.take, short: r3(Math.max(0, L.need - L.take)) }));
   const what = /^работа/.test(o.number || '') ? `Работа ${String(o.number || '').replace(/^работа\s*/, '')} · ${o.title || ''}` : `Заказ ${o.number || ''} · ${o.title || ''}`;
   const sum = k => r3(rows.reduce((a, x) => a + x[k], 0));
