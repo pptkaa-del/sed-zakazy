@@ -2099,7 +2099,9 @@ let SUG = null, SUG_QUIET = false;
 function suggHide(){ const b = $('sugg'); if (b) b.hidden = true; SUG = null; }
 function suggShow(inp){
   const q = inp.value.trim(), acct = inp.dataset.sugg === 'acct';
-  const L = S.stock.filter(it => (!acct || (Number(it.acctQty) || 0) > 0) && (!q || pickHit(normName(it.name), q))).sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 80);
+  // the positions already in other lines of the same list are not offered again
+  const used = new Set([...document.querySelectorAll(inp.dataset.wof ? '[data-wof$="|name"]' : '.wo-name')].filter(x => x !== inp).map(x => normName(x.value)).filter(Boolean));
+  const L = S.stock.filter(it => (!acct || (Number(it.acctQty) || 0) > 0) && !used.has(normName(it.name)) && (!q || pickHit(normName(it.name), q))).sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 80);
   let box = $('sugg'); if (!box) { box = document.createElement('div'); box.id = 'sugg'; box.className = 'sugg'; box.setAttribute('role', 'listbox'); document.body.appendChild(box);
     box.addEventListener('pointerdown', e => { const o = e.target.closest('[data-sgi]'); e.preventDefault(); if (o && SUG) suggPick(Number(o.dataset.sgi)); }); }
   if (!L.length) { box.hidden = true; SUG = null; return; }
