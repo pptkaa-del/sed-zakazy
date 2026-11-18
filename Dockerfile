@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package.json server.js upr-reports.js ./
 COPY upr-templates ./upr-templates
 COPY public ./public
+# «SSH-консоль» runs the OpenSSH client
+RUN apk add --no-cache openssh-client
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME ["/data"]

@@ -30,6 +30,7 @@ const crypto = require('node:crypto');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const readline = require('node:readline');
 const os = require('node:os');
+const { spawn } = require('node:child_process');
 
 /* sed.env: optional KEY=value file next to server.js (panel hosting without env settings) */
 try {
@@ -352,7 +353,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare'] };
+const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -447,6 +448,58 @@ function orgState(o) {
 let secret;
 try { secret = fs.readFileSync(SECRET_FILE); } catch {
   secret = crypto.randomBytes(32); fs.writeFileSync(SECRET_FILE, secret, { mode: 0o600 });
+}
+/* «SSH-консоль»: the manager or the administrator keeps his servers and commands (encrypted, only for himself) and connects;
+   the server of the program runs the OpenSSH client («ssh -tt»), its output goes to the browser as a stream (SSE), the keys come back by POST */
+const SSH_BIN = process.env.SSH_BIN || 'ssh';
+const SSH_SESS = new Map();   // sid → a running connection
+try { for (const f of fs.readdirSync(path.join(DATA_DIR, 'ssh-tmp'))) fs.unlinkSync(path.join(DATA_DIR, 'ssh-tmp', f)); } catch {}
+const sshTmp = () => { const d = path.join(DATA_DIR, 'ssh-tmp'); fs.mkdirSync(d, { recursive: true, mode: 0o700 }); return d; };
+const sshHome = () => { const d = path.join(DATA_DIR, 'ssh-home'); fs.mkdirSync(path.join(d, '.ssh'), { recursive: true, mode: 0o700 }); return d; };
+function sshEmit(S, ev, data) { const msg = (ev ? `event: ${ev}\n` : '') + (ev ? '' : `id: ${S.seq}\n`) + `data: ${data}\n\n`; for (const r of S.subs) { try { r.write(msg); } catch {} } }
+function sshPush(S, buf) {
+  S.seq++; const b64 = buf.toString('base64'); S.chunks.push([S.seq, b64]); S.size += b64.length;
+  while (S.size > 2e6 && S.chunks.length > 1) S.size -= S.chunks.shift()[1].length;   // the last ~1.5 MB of the output for a reconnect
+  sshEmit(S, null, b64);
+}
+function sshCleanup(S) { for (const f of S.tmp) { try { fs.unlinkSync(f); } catch {} } S.tmp = []; }
+function sshClose(S, why) { if (S.closed) return; S.why = why || ''; sshCleanup(S); try { process.kill(-S.proc.pid, 'SIGTERM'); } catch { try { S.proc.kill('SIGTERM'); } catch {} } setTimeout(() => { if (!S.closed) { try { process.kill(-S.proc.pid, 'SIGKILL'); } catch {} } }, 3000).unref(); }
+setInterval(() => { const now = Date.now();
+  for (const [sid, S] of SSH_SESS) {
+    if (!S.closed && !S.subs.size && now - S.last > 30 * 60e3) sshClose(S, 'нет активности 30 минут');
+    if (S.closed && now - S.closedAt > 10 * 60e3) SSH_SESS.delete(sid);
+  } }, 60e3).unref();
+function sshStart(user, srv, cols, rows) {
+  const host = String(srv.host || '').trim(), login = String(srv.user || '').trim(), port = Number(srv.port) || 22;
+  if (!/^[A-Za-z0-9.:\[\]_-]+$/.test(host) || host.startsWith('-')) throw new Error('Неверный адрес сервера');
+  if (!/^[A-Za-z0-9._@\\-]+$/.test(login) || login.startsWith('-')) throw new Error('Неверное имя пользователя');
+  if (!(port >= 1 && port <= 65535)) throw new Error('Неверный порт');
+  const c = Math.max(20, Math.min(400, Math.round(Number(cols) || 120))), r = Math.max(5, Math.min(200, Math.round(Number(rows) || 32)));
+  const tmp = [], args = ['-tt', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'UserKnownHostsFile=' + path.join(DATA_DIR, 'ssh_known_hosts'), '-o', 'ServerAliveInterval=30', '-o', 'ConnectTimeout=15', '-p', String(port)];
+  const env = { PATH: process.env.PATH || '/usr/bin:/bin', HOME: sshHome(), TERM: 'xterm-256color', LANG: 'C.UTF-8' };
+  if (srv.auth === 'key' && srv.key) {
+    const f = path.join(sshTmp(), 'k-' + crypto.randomBytes(8).toString('hex')); fs.writeFileSync(f, String(srv.key).replace(/\r\n/g, '\n').trim() + '\n', { mode: 0o600 }); tmp.push(f);
+    args.push('-i', f, '-o', 'IdentitiesOnly=yes', '-o', 'PreferredAuthentications=publickey');
+    if (srv.password) { const a = path.join(sshTmp(), 'a-' + crypto.randomBytes(8).toString('hex') + '.sh'); fs.writeFileSync(a, '#!/bin/sh\nprintf \'%s\\n\' "$SED_SSH_PW"\n', { mode: 0o700 }); tmp.push(a); Object.assign(env, { SSH_ASKPASS: a, SSH_ASKPASS_REQUIRE: 'force', DISPLAY: ':0', SED_SSH_PW: String(srv.password) }); }
+  } else if (srv.password) {
+    // the password is given by an askpass script from the environment of this process only (it is not written to a file)
+    const a = path.join(sshTmp(), 'a-' + crypto.randomBytes(8).toString('hex') + '.sh'); fs.writeFileSync(a, '#!/bin/sh\nprintf \'%s\\n\' "$SED_SSH_PW"\n', { mode: 0o700 }); tmp.push(a);
+    Object.assign(env, { SSH_ASKPASS: a, SSH_ASKPASS_REQUIRE: 'force', DISPLAY: ':0', SED_SSH_PW: String(srv.password) });
+    args.push('-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'NumberOfPasswordPrompts=1', '-o', 'PubkeyAuthentication=no');
+  }
+  args.push('--', login + '@' + host);
+  // Linux and other Unix servers: the size of the terminal of the browser (ssh without a local terminal cannot pass it)
+  if (srv.os !== 'other') args.push(`stty cols ${c} rows ${r} 2>/dev/null; exec "\${SHELL:-/bin/sh}" -l`);
+  const proc = spawn(SSH_BIN, args, { env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+  const sid = crypto.randomBytes(12).toString('base64url');
+  const S = { sid, uid: user.id, orgId: user.orgId, name: srv.name || host, host, proc, chunks: [], size: 0, seq: 0, subs: new Set(), last: Date.now(), closed: false, code: null, tmp, at: new Date().toISOString() };
+  SSH_SESS.set(sid, S);
+  proc.stdout.on('data', b => sshPush(S, b)); proc.stderr.on('data', b => sshPush(S, b));
+  proc.on('error', e => { sshPush(S, Buffer.from(e.code === 'ENOENT' ? '\r\n[На сервере программы не установлен клиент SSH (OpenSSH). Установите пакет openssh-client.]\r\n' : '\r\n[Ошибка запуска ssh: ' + e.message + ']\r\n')); });
+  proc.on('close', code => { S.closed = true; S.closedAt = Date.now(); S.code = code; sshCleanup(S); sshEmit(S, 'exit', JSON.stringify({ code, why: S.why || '' })); for (const r of S.subs) { try { r.end(); } catch {} } S.subs.clear(); });
+  // the key and the askpass script are needed only at the login
+  setTimeout(() => { for (const f of S.tmp) { try { fs.unlinkSync(f); } catch {} } S.tmp = []; }, 60e3).unref();
+  return S;
 }
 /* «Сетевая папка»: a file server in another network runs a small agent (public/netshare/) on its own 127.0.0.1 and opens a reverse SSH tunnel
    «ssh -N -R 127.0.0.1:<port>:127.0.0.1:<agent port> user@<this server>»; the program asks the agent through 127.0.0.1:<port> for the list of files.
@@ -998,6 +1051,66 @@ async function api(req, res, url) {
   }
   /* «Справочники»: a manager adds files or text, says what it belongs to (a work, a name typed by hand, or general information)
      and who sees it (everyone or chosen employees); the others only read */
+  /* «SSH-консоль»: servers and commands of the user (encrypted), connections */
+  if (p[1] === 'ssh') {
+    if (orgType(user) === 'requests' || !HEAD(user) || !sees(user, 'refs:ssh')) return fail(res, 403, 'SSH-консоль доступна руководителю и администратору');
+    if (!db.sshVault || typeof db.sshVault !== 'object') db.sshVault = {};
+    const V = db.sshVault[user.id] = db.sshVault[user.id] || { servers: [], cmds: [] }, now = new Date().toISOString(), t = (v, n) => String(v ?? '').slice(0, n);
+    const srvOf = x => ({ id: x.id, at: x.at, ...(vaultDec(x.data) || {}) });
+    const srvPublic = x => { const v = srvOf(x); return { id: v.id, name: v.name, host: v.host, port: v.port, user: v.user, auth: v.auth, os: v.os, hasPassword: !!v.password, hasKey: !!v.key }; };
+    const cmdOf = x => ({ id: x.id, at: x.at, ...(vaultDec(x.data) || {}) });
+    const mine = S => S && S.uid === user.id && S.orgId === user.orgId;
+    if (m === 'GET' && !p[2]) return send(res, 200, { servers: V.servers.map(srvPublic), cmds: V.cmds.map(cmdOf), sessions: [...SSH_SESS.values()].filter(mine).map(S => ({ sid: S.sid, name: S.name, closed: S.closed, at: S.at })) });
+    if (p[2] === 'servers') {
+      const x = p[3] && V.servers.find(e => e.id === p[3]);
+      if (m === 'DELETE' && x) { V.servers = V.servers.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+      if (m === 'POST' || m === 'PUT') {
+        const b = await readJsonBody(req), old = x ? srvOf(x) : {};
+        const v = { name: t(b.name, 200).trim(), host: t(b.host, 255).trim(), port: Number(b.port) || 22, user: t(b.user, 100).trim(), auth: b.auth === 'key' ? 'key' : 'password', os: b.os === 'other' ? 'other' : 'linux',
+          password: b.password != null && b.password !== '' ? t(b.password, 500) : b.clearPassword ? '' : old.password || '', key: b.key != null && String(b.key).trim() ? t(b.key, 20000) : old.key || '' };
+        if (!v.host) return fail(res, 400, 'Укажите адрес сервера'); if (!/^[A-Za-z0-9.:\[\]_-]+$/.test(v.host) || v.host.startsWith('-')) return fail(res, 400, 'Адрес сервера: только буквы, цифры, точки, двоеточия и дефисы');
+        if (!v.user) return fail(res, 400, 'Укажите пользователя'); if (!/^[A-Za-z0-9._@\\-]+$/.test(v.user) || v.user.startsWith('-')) return fail(res, 400, 'Пользователь: только латиница, цифры, точка, дефис, @ и \\');
+        if (!(v.port >= 1 && v.port <= 65535)) return fail(res, 400, 'Порт — от 1 до 65535');
+        if (v.auth === 'key' && !v.key) return fail(res, 400, 'Вставьте закрытый ключ');
+        if (!v.name) v.name = v.user + '@' + v.host;
+        if (x) { x.data = vaultEnc(v); x.updatedAt = now; } else { if (V.servers.length >= 200) return fail(res, 400, 'Слишком много серверов'); V.servers.push({ id: newId(), at: now, data: vaultEnc(v) }); }
+        saveDb(); const it = x || V.servers[V.servers.length - 1]; return send(res, 200, { ok: true, server: srvPublic(it), rev: db.rev });
+      }
+      return fail(res, 404, 'Сервер не найден');
+    }
+    if (p[2] === 'cmds') {
+      const x = p[3] && V.cmds.find(e => e.id === p[3]);
+      if (m === 'DELETE' && x) { V.cmds = V.cmds.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+      if (m === 'POST' || m === 'PUT') {
+        const b = await readJsonBody(req), v = { title: t(b.title, 200).trim(), cmd: t(b.cmd, 10000), serverId: t(b.serverId, 40) || '' };
+        if (!v.cmd.trim()) return fail(res, 400, 'Напишите команду'); if (!v.title) v.title = v.cmd.split('\n')[0].slice(0, 80);
+        if (x) { x.data = vaultEnc(v); x.updatedAt = now; } else { if (V.cmds.length >= 500) return fail(res, 400, 'Слишком много команд'); V.cmds.push({ id: newId(), at: now, data: vaultEnc(v) }); }
+        saveDb(); const it = x || V.cmds[V.cmds.length - 1]; return send(res, 200, { ok: true, cmd: cmdOf(it), rev: db.rev });
+      }
+      return fail(res, 404, 'Команда не найдена');
+    }
+    if (p[2] === 'connect' && m === 'POST') {
+      const b = await readJsonBody(req), x = V.servers.find(e => e.id === b.serverId); if (!x) return fail(res, 404, 'Сервер не найден');
+      if ([...SSH_SESS.values()].filter(S => mine(S) && !S.closed).length >= 5) return fail(res, 400, 'Открыто уже 5 подключений — закройте лишние');
+      try { const S = sshStart(user, srvOf(x), b.cols, b.rows); return send(res, 200, { ok: true, sid: S.sid, name: S.name }); } catch (e) { return fail(res, 400, e.message); }
+    }
+    if (p[2] === 's' && p[3]) {
+      const S = SSH_SESS.get(p[3]); if (!mine(S)) return fail(res, 404, 'Подключение не найдено — подключитесь заново');
+      if (p[4] === 'stream' && m === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no', Connection: 'keep-alive' });
+        const since = Number(req.headers['last-event-id'] || url.searchParams.get('since') || 0);
+        res.write('retry: 2000\n\n'); for (const [i, b64] of S.chunks) if (i > since) res.write(`id: ${i}\ndata: ${b64}\n\n`);
+        if (S.closed) { res.write(`event: exit\ndata: ${JSON.stringify({ code: S.code, why: S.why || '' })}\n\n`); return res.end(); }
+        S.subs.add(res); S.last = Date.now();
+        const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25e3);
+        req.on('close', () => { clearInterval(ping); S.subs.delete(res); S.last = Date.now(); });
+        return;
+      }
+      if (p[4] === 'input' && m === 'POST') { const b = await readJsonBody(req); if (S.closed) return fail(res, 409, 'Соединение закрыто'); const d = String(b.d ?? ''); if (d.length > 100000) return fail(res, 400, 'Слишком много текста за раз'); S.proc.stdin.write(d); S.last = Date.now(); return send(res, 200, { ok: true }); }
+      if (p[4] === 'close' && m === 'POST') { sshClose(S, 'закрыто пользователем'); if (S.closed) SSH_SESS.delete(S.sid); return send(res, 200, { ok: true }); }
+    }
+    return fail(res, 404, 'Не найдено');
+  }
   /* «Сетевая папка»: the administrator and the manager set up the connections; the chosen users browse the tree of folders */
   if (p[1] === 'netshare') {
     if (orgType(user) === 'requests' || !sees(user, 'refs:netshare')) return fail(res, 403, 'Этот раздел для вас закрыт');
