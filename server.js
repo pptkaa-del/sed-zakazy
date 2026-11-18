@@ -336,7 +336,6 @@ const orgType = u => { const o = u && orgById(u.orgId); return o && ORG_TYPES.in
 const REQ_ROLES = ['admin', 'head', 'executor', 'worker'];
 // «time» — late and/or left early in one mark (the old «late» and «early» are still read)
 const STAFF_MARKS = ['sick', 'vacation', 'time', 'late', 'early', 'absent'];
-const minPointsOf = () => { const c = db.minPoints && typeof db.minPoints === 'object' ? db.minPoints : {}; return { all: Number(c.all) > 0 ? c.all : null, users: c.users && typeof c.users === 'object' ? c.users : {} }; };
 const workCalOf = () => { const c = db.workCal && typeof db.workCal === 'object' ? db.workCal : {}; return { from: c.from || '09:00', to: c.to || '18:00', off: c.off || [], work: c.work || [] }; };
 /* «ФКУ Упрдор»: systems of a request, replaced equipment, monthly report documents */
 const UPR = require('./upr-reports.js');
@@ -721,8 +720,6 @@ async function api(req, res, url) {
     // the monthly ratings 1–5 the manager gives: a manager sees all, an employee only his own
     out.staffRatings = (Array.isArray(db.staffRatings) ? db.staffRatings : []).filter(x => HEAD(user) || x.user === user.id);
     out.workCal = workCalOf();
-    // the minimum of points a day for all employees and for each of them (works without their own minimum use it)
-    out.minPoints = minPointsOf();
     // «Справочники»: a manager sees all; the others — the open ones and those he is chosen for
     // «Сетевая папка»: the connections the user may browse (without the key of the agent)
     if (orgType(user) !== 'requests' && sees(user, 'refs:netshare')) out.netshares = (Array.isArray(db.netshares) ? db.netshares : []).filter(x => nsSees(user, x)).map(nsPublic);
@@ -1340,14 +1337,6 @@ async function api(req, res, url) {
     let x = null;
     if (score) { x = { user: b.user, ym, score, note: String(b.note || '').trim().slice(0, 500), by: user.id, at: new Date().toISOString() }; db.staffRatings.push(x); }
     saveDb(); return send(res, 200, { ok: true, rating: x, rev: db.rev });
-  }
-  if (p[1] === 'min-points' && m === 'PUT') {
-    if (!HEAD(user)) return fail(res, 403, 'Минимум точек задаёт руководитель или администратор');
-    const b = await readJsonBody(req), num = v => v === null || v === '' || v === undefined ? null : Number(v);
-    const all = num(b.all); if (all !== null && !(Number.isFinite(all) && all >= 0 && all <= 10000)) return fail(res, 400, 'Минимум — от 0 до 10000');
-    const U = {}; for (const [id, v] of Object.entries(b.users && typeof b.users === 'object' ? b.users : {})) { const n = num(v); if (n === null || n <= 0) continue; if (!(Number.isFinite(n) && n <= 10000)) return fail(res, 400, 'Минимум — от 0 до 10000'); if (orgUsers().some(u => u.id === id && !u.sys)) U[id] = Math.round(n); }
-    db.minPoints = { all: all > 0 ? Math.round(all) : null, users: U }; saveDb();
-    return send(res, 200, { ok: true, minPoints: minPointsOf(), rev: db.rev });
   }
   if (p[1] === 'workcal' && m === 'PUT') {
     if (!HEAD(user)) return fail(res, 403, 'График меняет руководитель или администратор');

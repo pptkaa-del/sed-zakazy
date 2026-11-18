@@ -342,7 +342,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgall tr.sgt1 td,.sgall tr.sgt1 th{border-bottom:1px dashed var(--rule-2)}.sgall tr.sgt2 td,.sgall tr.sgt2 th{border-bottom:2px solid var(--rule)}.sgall td{height:34px}.sgall .sgname{border-bottom:2px solid var(--rule)}
 .sgt thead .sgsum small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}.sglg{font-size:12px;margin-right:2px}.sgrnote{margin:0 14px 10px;font-size:13px;background:var(--warn-soft, #FFF6D6)}
 .sgt .sgrate{min-width:150px;padding:4px 6px}.sgrate .rtsel{font-size:12px;padding:4px 6px;width:100%;max-width:200px}.sgrate .rtv{display:inline-block;min-width:26px;padding:2px 6px;border-radius:6px;color:#1F2633}.sgrate small{display:block;font-size:10px;color:var(--ink-2);white-space:normal}
-.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
+.jminall{max-width:420px}.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
 .nscard{padding:0;overflow:hidden;margin-bottom:8px}.nsroot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--rule-2);background:var(--paper)}
 .nshead span:first-child{grid-column:1/4}.nshead span:not(:first-child){text-align:right}.nshead{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;padding:6px 14px;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--rule-2)}
 .nstree{list-style:none;margin:0;padding:0}.nsrow{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;align-items:center;padding:5px 14px 5px calc(14px + var(--d,0) * 20px);font-size:14px;border-bottom:1px solid var(--rule-2)}
@@ -1479,7 +1479,7 @@ async function refresh(){
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   // the names of old points kept the reminder «(замена 2 модемов)» — it is not shown any more
   S.jobs.forEach(j => (j.places || []).forEach(x => { if (x.label && /\(замена \d+ модем/.test(x.label)) x.label = x.label.replace(/ ?\(замена \d+ модем[а-я]*\)/g, ''); }));
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal; MIN_POINTS = d.minPoints || { all: null, users: {} };
+  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || transMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -2529,31 +2529,20 @@ const WORK_KIND = { prod:'Производство', mount:'Монтаж', both:
 const WORK_CHIP = { prod:'c-mute', mount:'c-info', both:'c-work' };
 const isMount = j => (j.kind || 'mount') !== 'prod';
 // the minimum of points a day for a worker on a work: his personal one, otherwise the common one of the work
-const empMinOf = uid => (MIN_POINTS.users || {})[uid] > 0 ? MIN_POINTS.users[uid] : MIN_POINTS.all > 0 ? MIN_POINTS.all : 0;
-const jobMinOf = (j, uid) => !isMount(j) ? 0 : (j.minByWorker || {})[uid] > 0 ? j.minByWorker[uid] : j.minPerDay > 0 ? j.minPerDay : empMinOf(uid);
+const jobMinOf = (j, uid) => !isMount(j) ? 0 : (j.minByWorker || {})[uid] > 0 ? j.minByWorker[uid] : j.minPerDay > 0 ? j.minPerDay : 0;
 // where the minimum of a worker on a work comes from
-const jobMinSrc = (j, uid) => (j.minByWorker || {})[uid] > 0 ? 'личный в работе' : j.minPerDay > 0 ? 'работы' : (MIN_POINTS.users || {})[uid] > 0 ? 'личный сотрудника' : MIN_POINTS.all > 0 ? 'общий для всех' : '';
-/* «Работы → 🎯 Минимум точек»: the minimum for all employees and the individual one; a work can set its own (common or per worker) */
-function minPointsHtml(){
-  const P = STAFF.filter(u => !u.blocked).sort((a, b) => (['worker', 'contractor'].includes(b.role) - ['worker', 'contractor'].includes(a.role)) || a.name.localeCompare(b.name, 'ru')), U = MIN_POINTS.users || {};
-  return `<div class="d-body"><div class="form" data-keep>
-    <label class="wide"><span>Для всех сотрудников, точек в день</span><input class="in mono" type="number" min="0" max="10000" step="1" id="mp-all" value="${MIN_POINTS.all || ''}" placeholder="не задан" style="max-width:160px"></label></div>
-    <div class="box"><h4>Индивидуально</h4><small class="dim">Пусто — действует минимум для всех.</small>
-      <div class="jminrows" data-keep>${P.map(u => `<label class="jminrow"><span>${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></span><input class="in mono" type="number" min="0" max="10000" step="1" data-mpu="${u.id}" value="${U[u.id] > 0 ? U[u.id] : ''}" placeholder="${MIN_POINTS.all || '—'}" aria-label="Минимум: ${esc(u.name)}"><small class="dim"></small></label>`).join('') || '<span class="dim">Сотрудников нет</span>'}</div></div>
-    <p class="dim" style="margin:0;font-size:13px">Какой минимум действует: личный минимум сотрудника в карточке работы → «Минимум точек в день» работы → индивидуальный здесь → для всех. Учитывается в «Планирование и аналитика → Сотрудники» (строка «Успеваемость»), для монтажных работ, назначенных сотруднику в этот рабочий день.</p>
-    <div class="err" id="ferr"></div>
-    <div class="row-g"><button class="btn primary" data-act="mpSave">Сохранить</button><button class="btn" data-act="close">Отмена</button></div></div>`;
-}
+const jobMinSrc = (j, uid) => (j.minByWorker || {})[uid] > 0 ? 'индивидуальный' : j.minPerDay > 0 ? 'для всех в работе' : '';
 // the block «Минимум точек в день по сотрудникам» in the card of a work
 function jobMinBox(j){
   if (!isMount(j)) return '';
   const ids = [...new Set([...(j.workers || []), ...(j.places || []).map(x => x.assignee).filter(Boolean)])], ed = mayEditJob(j), M = j.minByWorker || {};
-  if (!ids.length) return ed ? `<div class="box jminbox"><b>Минимум точек в день по сотрудникам</b><small class="dim">Появится, когда на работу назначат сотрудников или исполнителей точек.</small></div>` : '';
-  if (!ed && !Object.keys(M).length) return '';
+  if (!ed && !j.minPerDay && !Object.keys(M).length) return '';
   const rows = ids.map(id => ({ id, name: who(id) })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  return `<div class="box jminbox"><b>Минимум точек в день по сотрудникам</b>
-    <small class="dim">Учитывается в «Планирование и аналитика → Сотрудники» (строка «Успеваемость»). Пусто — общий минимум работы${j.minPerDay ? ` (${j.minPerDay})` : ', а если его нет — минимум из «Работы → 🎯 Минимум точек»'}.</small>
-    <div class="jminrows">${rows.map(r => `<label class="jminrow"><span>${esc(r.name)}</span>${ed ? `<input class="in mono" type="number" min="0" max="10000" step="1" data-jmin="${j.id}|${r.id}" value="${M[r.id] > 0 ? M[r.id] : ''}" placeholder="${j.minPerDay || empMinOf(r.id) || '—'}" aria-label="Минимум точек в день: ${esc(r.name)}">` : `<b class="mono">${jobMinOf(j, r.id) || '—'}</b>`}<small class="dim">${jobMinSrc(j, r.id) || 'не задан'}</small></label>`).join('')}</div></div>`;
+  return `<div class="box jminbox"><b>Минимум точек в день</b>
+    <label class="jminrow jminall"><span>Для всех сотрудников этой работы</span>${ed ? `<input class="in mono" type="number" min="0" max="10000" step="1" data-jminall="${j.id}" value="${j.minPerDay || ''}" placeholder="не задан" aria-label="Минимум точек в день для всех сотрудников работы">` : `<b class="mono">${j.minPerDay || '—'}</b>`}<small class="dim"></small></label>
+    ${rows.length ? `<small class="dim">Индивидуально — пусто: как для всех.</small><div class="jminrows">${rows.map(r => `<label class="jminrow"><span>${esc(r.name)}</span>${ed ? `<input class="in mono" type="number" min="0" max="10000" step="1" data-jmin="${j.id}|${r.id}" value="${M[r.id] > 0 ? M[r.id] : ''}" placeholder="${j.minPerDay || '—'}" aria-label="Минимум точек в день: ${esc(r.name)}">` : `<b class="mono">${jobMinOf(j, r.id) || '—'}</b>`}<small class="dim">${M[r.id] > 0 ? 'индивидуально' : ''}</small></label>`).join('')}</div>`
+      : `<small class="dim">Индивидуальный минимум можно задать, когда на работу назначат сотрудников или исполнителей точек.</small>`}
+    <small class="dim">Учитывается в «Планирование и аналитика → Сотрудники» (строка «Успеваемость»).</small></div>`;
 }
 /* the report of a work: closed points per executor — for a chosen day and for all time, and day by day */
 const localDay = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -2590,7 +2579,7 @@ function vWorkList(){
     <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
     <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['warranty', 'На гарантии'], ['archive', 'Архив'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => jobStOk(j, k)).length}</span></button>`).join('')}</div>
-    ${canEdit() ? `<button class="btn" data-act="minPoints" title="Минимум точек в день для всех сотрудников и для каждого">🎯 Минимум точек${MIN_POINTS.all ? ` <span class="dim">${MIN_POINTS.all}</span>` : ''}</button><button class="btn primary" data-act="newJob">+ Работа</button>` : ''}</div>`;
+    ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   const WP = canEdit() ? S.jobs.filter(warrantyPending) : [];
   const warn = WP.length ? `<div class="box wpend"><b>Выполнены работы — установите гарантийный срок:</b>${WP.map(j => ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">№ ${jobNo(j)} · ${esc(j.title)}</button>`).join('')}</div>` : '';
@@ -4128,7 +4117,7 @@ function otStaffBlock(u, day){
   return h;
 }
 /* ---------- the working schedule: weekdays from 9:00 to 18:00, weekends and public holidays are days off ---------- */
-let MIN_POINTS = { all: null, users: {} }, STAFF_RATINGS = [], STAFF_MARKS = [], WORK_CAL = { from: '09:00', to: '18:00', off: [], work: [] };
+let STAFF_RATINGS = [], STAFF_MARKS = [], WORK_CAL = { from: '09:00', to: '18:00', off: [], work: [] };
 // public holidays of Russia (Labour Code, art. 112); a holiday on a weekend moves to the next working day (except 1–8 January)
 const HOL_FIXED = ['01-01', '01-02', '01-03', '01-04', '01-05', '01-06', '01-07', '01-08', '02-23', '03-08', '05-01', '05-09', '06-12', '11-04'];
 const HOL_NAMES = { '01-01': 'Новогодние каникулы', '01-07': 'Рождество Христово', '02-23': 'День защитника Отечества', '03-08': 'Международный женский день', '05-01': 'Праздник Весны и Труда', '05-09': 'День Победы', '06-12': 'День России', '11-04': 'День народного единства' };
@@ -5998,7 +5987,6 @@ function renderDrawer(){
   if (d.kind === 'vehicle') { const v = VEHICLES.find(x => x.id === d.id); D.innerHTML = dh(v ? esc(vName(v)) : 'Новый транспорт') + vehicleHtml(v || {}); return; }
   if (d.kind === 'staffDay') { const u = STAFF.find(x => x.id === d.id); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + staffDayHtml(d.id, d.ctx); return; }
   if (d.kind === 'staffCard') { const u = STAFF.find(x => x.id === d.id), day = ui.stDay || today(); D.innerHTML = dh(esc(u ? u.name : 'Сотрудник')) + (u ? `<div class="d-body staffd">${staffCardHtml(staffRow(u, day), day)}<div class="row-g"><button class="btn" data-act="close">Закрыть</button></div></div>` : ''); return; }
-  if (d.kind === 'minPoints') { D.innerHTML = dh('Минимум точек в день') + minPointsHtml(); return; }
   if (d.kind === 'nsForm') { const x = d.id && NETSHARES.find(e => e.id === d.id); D.innerHTML = dh(x ? 'Подключение · ' + x.name : 'Новое подключение к сетевой папке') + nsFormHtml(x || null); return; }
   if (d.kind === 'vaultPw') { const x = d.id && VAULT?.pw.find(e => e.id === d.id); D.innerHTML = dh(x ? x.title : 'Новый пароль') + vaultPwHtml(x || null); return; }
   if (d.kind === 'vaultNote') { const x = d.id && VAULT?.notes.find(e => e.id === d.id); D.innerHTML = dh(x ? (x.title || 'Заметка') : 'Новая заметка') + vaultNoteHtml(x || null); return; }
@@ -6078,7 +6066,6 @@ function renderDrawer(){
       <dl class="kv">
         <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
-        ${isMount(j) ? `<dt>Минимум в день</dt><dd>${j.minPerDay ? j.minPerDay + ' точ. на сотрудника' : '<span class="dim">не задан</span>'}${Object.keys(j.minByWorker || {}).length ? ` <small class="dim">· личный у ${Object.keys(j.minByWorker).length}</small>` : ''}</dd>` : ''}
         ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
@@ -6831,10 +6818,6 @@ async function act(el){
     case 'drAttach': return drAttach();
     case 'drSave': { const c = $('drawc'); if (!c) return; c.toBlob(b => { const u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = `Рисунок ${today()}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }, 'image/png'); return; }
     case 'vTab': ui.vtab = id; return render();
-    case 'minPoints': return openDrawer('minPoints');
-    case 'mpSave': { const fe = $('ferr'); if (fe) fe.textContent = ''; const users = {}; document.querySelectorAll('[data-mpu]').forEach(x => { if (x.value.trim() !== '') users[x.dataset.mpu] = Number(x.value); });
-      try { const r = await api('PUT', '/api/min-points', { all: $('mp-all').value.trim() === '' ? null : Number($('mp-all').value), users }); MIN_POINTS = r.minPoints; document.activeElement?.blur(); closeDrawer(); render(); toast('Минимум точек сохранён'); }
-      catch(e) { if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
     case 'nsPick': ui.nsId = id; return render();
     case 'nsToggle': { const [sid, ...rest] = id.split('|'), pth = rest.join('|'), k = nsKey(sid, pth); ui.nsOpen = ui.nsOpen || {}; ui.nsOpen[k] = !ui.nsOpen[k]; if (ui.nsOpen[k] && !(ui.nsCache || {})[k]) return nsLoad(sid, pth); return render(); }
     case 'nsReload': { const [sid, ...rest] = id.split('|'); return nsLoad(sid, rest.join('|')); }
@@ -7432,11 +7415,15 @@ document.addEventListener('click', e => { if (ui.dtMenu && !e.target.closest('de
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'rf-restr') { refKeep(); return renderDrawer(); }
+  // the minimum of a work for all its workers (the card of the work)
+  if (t.dataset.jminall) { const j = jobOf(t.dataset.jminall); if (!j) return; const v = t.value.trim(), n = Math.round(Number(v));
+    if (v !== '' && !(n >= 0 && n <= 10000)) { toast('Минимум — от 0 до 10000'); return; }
+    try { await upd('jobs', j.id, { minPerDay: v === '' || n <= 0 ? null : n }); toast(v === '' || n <= 0 ? 'Минимум для всех снят' : `Минимум для всех: ${n} точ. в день`); t.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
   // the personal minimum of a worker on a work (the card of the work)
   if (t.dataset.jmin) { const [jid, uid] = t.dataset.jmin.split('|'), j = jobOf(jid); if (!j) return;
     const v = t.value.trim(), n = Math.round(Number(v)); if (v !== '' && !(n >= 0 && n <= 10000)) { toast('Минимум — от 0 до 10000'); return; }
     const M = { ...(j.minByWorker || {}) }; if (v === '' || n <= 0) delete M[uid]; else M[uid] = n;
-    try { await upd('jobs', jid, { minByWorker: M }); toast(v === '' || n <= 0 ? `${who(uid)}: общий минимум` : `${who(uid)}: минимум ${n} точ. в день`); t.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    try { await upd('jobs', jid, { minByWorker: M }); toast(v === '' || n <= 0 ? `${who(uid)}: как для всех` : `${who(uid)}: минимум ${n} точ. в день`); t.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
   if (t.id === 'nf-restr') { nsKeep(); return renderDrawer(); }
   // the monthly rating of an employee (the last column of «Табель»)
   if (t.dataset.rate) { const [user, ym] = t.dataset.rate.split('|'), score = Number(t.value);
