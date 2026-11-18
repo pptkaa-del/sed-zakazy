@@ -7482,6 +7482,9 @@ document.addEventListener('input', e => {
   if (t.id === 'ck-date') ui.ckDateSet = true;
   if (['ck-veh', 'ck-date', 'ck-liters', 'ck-sum', 'ck-seller', 'ck-work'].includes(t.id)) { ui[{ 'ck-veh': 'ckVeh', 'ck-date': 'ckDate', 'ck-liters': 'ckLiters', 'ck-sum': 'ckSum', 'ck-seller': 'ckSeller', 'ck-work': 'ckWork' }[t.id]] = t.value; return; }
   if (t.id === 'ck-job') { ui.ckJob = t.value; document.activeElement?.blur(); return render(); }
+  // «Количество» of the write-off list: only digits and one decimal comma — anything else is removed at once
+  if (t.dataset && t.dataset.wof && t.dataset.wof.endsWith('|qty')) { const v = t.value, c = v.replace(/\./g, ',').replace(/[^\d,]/g, '').replace(/^,/, '0,').replace(/^([^,]*,)(.*)$/, (m0, a, b) => a + b.replace(/,/g, ''));
+    if (c !== v) { const pos = Math.max(0, (t.selectionStart || 0) - (v.length - c.length)); t.value = c; try { t.setSelectionRange(pos, pos); } catch(err) {} } }
   if (t.dataset && t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; if (k === 'name') x.stockId = stockByName(t.value)?.id || null; woDraftSave(); } return; }
   if (t.id === 'nsq') { ui.nsq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vNetshare(); const n = $('nsq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'vq') { ui.vq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vVault(); const n = $('vq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
