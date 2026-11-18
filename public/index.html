@@ -2350,7 +2350,7 @@ function writeoffLines(o, map){
     const source = !L.inStock ? 'none' : L.acct >= L.need - 1e-9 ? 'acct' : 'short';
     // what will be written off: the quantity, but not more than the accounting balance
     return { ...L, source, shortage: source === 'acct' ? 0 : Math.round((L.need - (L.inStock ? L.acct : 0)) * 1000) / 1000, take: L.inStock ? Math.round(Math.max(0, Math.min(L.need, L.acct)) * 1000) / 1000 : 0 };
-  }).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  });   // in the order the lines were added to the list (not by name)
 }
 const stockByName = n => { const k = normName(n); return k ? S.stock.find(x => normName(x.name) === k) : null; };
 const fmtQty = n => (Math.round((Number(n) || 0) * 1000) / 1000).toLocaleString('ru-RU');
