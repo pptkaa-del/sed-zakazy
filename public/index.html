@@ -5613,7 +5613,7 @@ function renderDrawer(){
         <label>Наименование<select class="in" id="acct-c-name">${opts(A.cols.name)}</select></label>
         <label>Количество (остаток)<select class="in" id="acct-c-qty">${opts(A.cols.qty)}</select></label>
         <label>Единица<select class="in" id="acct-c-unit">${opts(A.cols.unit)}</select></label></div>
-        <p class="parsed ${rows.length ? '' : 'warn'}" style="margin:0">${rows.length ? `Найдено строк с остатками: <b>${rows.length}</b>. Есть на складе: <b>${matched}</b>, новых: <b>${rows.length - matched}</b>. ${d.ctx === 'initial' ? 'Позиции склада, которых нет в файле, не изменятся.' : 'Позиции склада, которых нет в файле, получат бухгалтерский остаток 0.'}` : 'Не нашлось строк, где есть и наименование, и количество. Проверьте выбор колонок.'}</p>
+        <p class="parsed ${rows.length ? '' : 'warn'}" style="margin:0">${rows.length ? `Найдено строк с остатками: <b>${rows.length}</b>. Есть на складе: <b>${matched}</b>, новых: <b>${rows.length - matched}</b>. ${d.ctx === 'initial' && !(META.acct || META.initial) ? 'Позиции склада, которых нет в файле, не изменятся.' : `Остатки уже загружались${META.acct ? ' (' + esc(fmtDT(META.acct.at)) + ')' : ''}: бухгалтерский остаток обновится у всех строк файла, а позиции склада, которых нет в файле, получат бухгалтерский остаток 0.${d.ctx === 'initial' ? ' Фактический остаток уже существующих позиций не изменится.' : ''}`}` : 'Не нашлось строк, где есть и наименование, и количество. Проверьте выбор колонок.'}</p>
         ${rows.length ? `<div class="tscroll"><table class="prev"><thead><tr><th>Наименование</th><th>Ед.</th><th style="text-align:right">Количество</th><th>Склад</th></tr></thead><tbody>${rows.slice(0, 12).map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td style="text-align:right" class="mono">${fmtQty(r.qty)}</td><td>${acctMatch(r) ? '<span class="ok-t">есть</span>' : '<span class="dim">новая</span>'}</td></tr>`).join('')}</tbody></table></div>${rows.length > 12 ? `<small class="dim">…и ещё ${rows.length - 12}</small>` : ''}` : ''}
         ${d.ctx === 'initial' ? '<p class="dim" style="margin:0;font-size:13px">Позиции, которых нет на складе, будут созданы. Количество станет и фактическим, и бухгалтерским остатком.</p>' : `<label class="chk" style="flex-direction:row;display:flex;gap:8px;font-size:14px"><input type="checkbox" id="acct-create" ${A.create !== false ? 'checked' : ''}> Добавить на склад позиции, которых там нет</label>`}`;
     }
@@ -6292,10 +6292,10 @@ async function onSubmit(e){
       if (!rows.length) return fail('Не нашлось строк с наименованием и количеством. Проверьте выбор колонок.');
       fail('Загружаем…');
       if (d.ctx === 'initial') { const r = await api('POST', '/api/stock-initial', { file: A.file, rows }); ui.acct = null; await refresh(); closeDrawer(); render();
-        return toast(`Начальные остатки загружены: строк ${r.rows}, найдено на складе ${r.matched}, создано ${r.created}`); }
+        return toast(r.again ? `Бухгалтерские остатки обновлены: найдено ${r.matched}, создано ${r.created}, обнулено (нет в файле) ${r.zeroed}` : `Начальные остатки загружены: строк ${r.rows}, найдено на складе ${r.matched}, создано ${r.created}`); }
       const r = await api('POST', '/api/stock-acct', { file: A.file, rows, createMissing: $('acct-create')?.checked });
       ui.acct = null; await refresh(); closeDrawer();
-      toast(`Бухгалтерские остатки обновлены: сопоставлено ${r.matched}${r.created ? ', добавлено ' + r.created : ''}${r.skipped ? ', пропущено ' + r.skipped : ''}`);
+      toast(`Бухгалтерские остатки обновлены: сопоставлено ${r.matched}${r.created ? ', добавлено ' + r.created : ''}${r.skipped ? ', пропущено ' + r.skipped : ''}${r.zeroed ? ', обнулено (нет в файле) ' + r.zeroed : ''}`);
     }
     if (kind === 'pickStock') {
       const [oid, pid] = String(d.id).split('|');
