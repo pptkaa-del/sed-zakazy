@@ -2794,12 +2794,12 @@ function jobGrid(list){
 // «Фото на каждой точке»: the list the workers see in every point window; editable right in the card
 /* materials of a montage work: what is written off, and what the warehouse does not have */
 function jobMatBox(j){
-  const M = j.materials || [], L = M.length ? writeoffLines(jobWoDoc(j)) : [], bad = L.filter(x => x.source !== 'acct').length, need = shortOf(M, () => 1);
-  return `<div class="box"><div class="ch"><h4>Материалы на списание${M.length ? ' · ' + M.length : ''}</h4><div class="row-g">${canEdit() ? `<button class="btn sm" data-act="jobMat" data-id="${j.id}">${M.length ? 'Изменить материалы' : '+ Материалы'}</button>` : ''}${M.length ? `<button class="btn sm ${j.writeoff ? '' : 'primary'}" data-act="jobWo" data-id="${j.id}">Список для списания${j.writeoff ? ' ✓' : ''}</button>` : ''}</div></div>
+  const M = j.materials || [], full = woFullOn(j), L = M.length || full ? writeoffLines(jobWoDoc(j)) : [], bad = L.filter(x => x.source !== 'acct').length, need = shortOf(M, () => 1);
+  return `<div class="box"><div class="ch"><h4>Материалы на списание${M.length ? ' · ' + M.length : ''}</h4><div class="row-g">${canEdit() ? `<button class="btn sm" data-act="jobMat" data-id="${j.id}">${M.length ? 'Изменить материалы' : '+ Материалы'}</button>` : ''}${canEdit() || M.length || full ? `<button class="btn sm ${j.writeoff ? '' : 'primary'}" data-act="jobWo" data-id="${j.id}">Список для списания${j.writeoff ? ' ✓' : ''}</button>` : ''}</div></div>
     ${M.length ? `<div class="tscroll"><table class="comp"><thead><tr><th>Материал</th><th class="r">Кол-во</th><th>Ед.</th><th class="r">Бух. остаток</th></tr></thead><tbody>${M.map(x => { const st = stockFor(x); return `<tr><td>${esc(x.name)}</td><td class="r mono">${fmtQty(x.qty)}</td><td>${esc(x.unit || 'шт')}</td><td class="r mono ${st && (Number(st.acctQty) || 0) >= x.qty ? 'ok-t' : 'warn-t'}">${st ? fmtQty(st.acctQty) : '—'}</td></tr>`; }).join('')}</tbody></table></div>
-      ${j.writeoff ? `<small class="ok-t">✓ Список для списания сохранён ${esc(fmtDT(j.writeoff.at))} · ${esc(who(j.writeoff.by))}</small>` : bad ? `<small style="color:var(--bad)">Не хватает в бухгалтерских остатках: ${bad} — список для списания пока не сохранить.</small>` : ''}
+      ${j.writeoff ? `<small class="ok-t">✓ Список для списания сохранён ${esc(fmtDT(j.writeoff.at))} · ${esc(who(j.writeoff.by))}</small>` : bad ? `<small style="color:var(--bad)">Не хватает в бухгалтерских остатках: ${bad} — при сохранении спишется столько, сколько есть.</small>` : ''}${full ? `<small class="dim">Списание — по списку «на весь объём работы» (строк: ${j.woFull.lines.length}); материалы ниже при списании не учитываются.</small>` : ''}
       ${need.length ? `<div class="shortbox" style="margin-top:8px"><b>Необходимо (нет на складе) · ${need.length}</b>${need.map(x => `<small>${esc(x.name)} — не хватает <b style="color:var(--bad)">${fmtQty(x.short)} ${esc(x.unit)}</b>${x.inStock ? '' : ' · нет позиции на складе'}</small>`).join('')}</div>` : ''}`
-      : '<p class="dim" style="margin:0">Материалов пока нет. Добавьте их со склада — по ним формируется список для списания.</p>'}</div>`;
+      : full ? `<p class="dim" style="margin:0">Списание — по списку «на весь объём работы» (строк: ${j.woFull.lines.length})${j.writeoff ? ` · ✓ сохранено ${esc(fmtDT(j.writeoff.at))}` : ''}.</p>` : '<p class="dim" style="margin:0">Материалов пока нет. Добавьте их со склада или откройте «Список для списания» → «Список на весь объём работы».</p>'}</div>`;
 }
 /* the work's tasks in the plan-schedule */
 function jobPlanBox(j){
@@ -5241,7 +5241,7 @@ function vStaffProj(){
 function vWoList(){
   const f = ui.woF || 'all';
   const rows = [
-    ...S.jobs.filter(j => isMount(j) && (j.materials || []).length).map(j => ({ col: 'jobs', id: j.id, src: j, kind: 'Работа', title: `№ ${jobNo(j)} · ${j.title}`, sub: cpOf(j.customerId)?.name || '', doc: jobWoDoc(j) })),
+    ...S.jobs.filter(j => isMount(j) && ((j.materials || []).length || woFullOn(j))).map(j => ({ col: 'jobs', id: j.id, src: j, kind: 'Работа', title: `№ ${jobNo(j)} · ${j.title}`, sub: cpOf(j.customerId)?.name || '', doc: jobWoDoc(j) })),
     ...S.orders.filter(o => woFullOn(o) || (o.products || []).some(p => (p.components || []).length)).map(o => ({ col: 'orders', id: o.id, src: o, kind: 'Производство', title: ordName(o), sub: custName(o) || '', doc: o })),
   ].map(r => { const L = writeoffLines(r.doc); return { ...r, n: L.length, bad: L.filter(x => x.source !== 'acct').length }; })
    .filter(r => f === 'all' || (f === 'saved' ? r.src.writeoff : !r.src.writeoff))
@@ -5250,7 +5250,7 @@ function vWoList(){
     <span class="dim">Списки строятся по бухгалтерским остаткам${META.acct ? ' (загружены ' + esc(fmtDT(META.acct.at)) + ')' : ''}.</span></div>`;
   if (!rows.length) return head + '<div class="empty"><h3>Списков для списания нет</h3>Они появляются у работ с монтажом (материалы) и у заказов на производство (изделия).</div>';
   return head + `<section class="card" style="padding:0;overflow:hidden">${rows.map(r => `<div class="worow">
-      <div><span class="chip ${r.col === 'jobs' ? 'c-info' : 'c-mute'}">${r.kind}</span> <b>${esc(r.title)}</b>${r.col === 'orders' && woFullOn(r.src) ? ' <span class="chip c-info">на весь объём</span>' : ''}${r.sub ? `<small class="dim">${esc(r.sub)}</small>` : ''}</div>
+      <div><span class="chip ${r.col === 'jobs' ? 'c-info' : 'c-mute'}">${r.kind}</span> <b>${esc(r.title)}</b>${woFullOn(r.src) ? ' <span class="chip c-info">на весь объём</span>' : ''}${r.sub ? `<small class="dim">${esc(r.sub)}</small>` : ''}</div>
       <div><small class="dim">позиций</small>${r.n}</div>
       <div>${r.src.writeoff ? `<span class="chip c-ok">Сохранён</span><small class="dim">${esc(fmtDT(r.src.writeoff.at))} · ${esc(who(r.src.writeoff.by))}</small>` : r.bad ? `<span class="chip c-bad">Не хватает: ${r.bad}</span>` : '<span class="chip c-warn">Не сохранён</span>'}</div>
       <div class="row-g"><button class="btn sm" data-act="${r.col === 'jobs' ? 'jobWo' : 'writeoff'}" data-id="${r.id}">Открыть</button><a class="btn sm" href="/api/${r.col}/${r.id}/writeoff.xlsx" data-dl title="Excel для загрузки в 1С: «Требование-накладная» → «Загрузить из файла»">Для 1С</a></div></div>`).join('')}</section>`;
@@ -5639,11 +5639,11 @@ function woDraftSave(now){
     const was = (src.woFull?.lines || []).map(x => ({ name: x.name, qty: String(x.qty) }));
     const curU = String(ui.woFullUnits ?? '').trim(), wasU = src.woFull?.units != null ? String(src.woFull.units) : '';
     const curP = (ui.woFullDraft || []).map(x => String(x.per ?? '').trim()), wasP = (src.woFull?.lines || []).map(x => x.per != null ? String(x.per) : '');
-    if (col === 'orders' && ui.woFullDraft && (JSON.stringify(cur) !== JSON.stringify(was) || woQtyNum(curU) !== woQtyNum(wasU) || JSON.stringify(curP.map(woQtyNum)) !== JSON.stringify(wasP.map(woQtyNum)))) { body.full = ui.woFullDraft; body.units = curU; }
+    if (ui.woFullDraft && (JSON.stringify(cur) !== JSON.stringify(was) || woQtyNum(curU) !== woQtyNum(wasU) || JSON.stringify(curP.map(woQtyNum)) !== JSON.stringify(wasP.map(woQtyNum)))) { body.full = ui.woFullDraft; body.units = curU; }
     try { const r = await api('PUT', `/api/${col}/${id}/wodraft`, body); const had = !!src.woDraft; if (r.woDraft) src.woDraft = r.woDraft; else delete src.woDraft;
       // the banner «Черновик» is put in place without redrawing (the cursor may stay in a field)
       const box = document.querySelector('#drawer .wodraft');
-      if (!src.woDraft) { if (box) box.remove(); if (had && col === 'orders' && !woFullOn(src) && !document.activeElement?.closest('#drawer [data-keep]')) renderDrawer(); }
+      if (!src.woDraft) { if (box) box.remove(); if (had && !woFullOn(src) && !document.activeElement?.closest('#drawer [data-keep]')) renderDrawer(); }
       else if (box) box.outerHTML = woDraftBox(col, src);
       else document.querySelector('#drawer .d-body > p')?.insertAdjacentHTML('afterend', woDraftBox(col, src)); }
     catch(e) { toast('Черновик не сохранён: ' + errText(e)); }
@@ -5673,7 +5673,7 @@ function woSelPaint(t){
 // after a quantity or a name changes: the states of the lines (short / enough) are redrawn in place
 let woRecheckTimer = null;
 function woFullRecheck(){ clearTimeout(woRecheckTimer); woRecheckTimer = setTimeout(() => {
-  const d = ui.drawer; if (!d || d.kind !== 'writeoff' || d.ctx === 'jobs') return; const o = ord(d.id), D = ui.woFullDraft; if (!o || !D) return;
+  const d = ui.drawer; if (!d || d.kind !== 'writeoff') return; const src = woSrcOf(d.ctx === 'jobs' ? 'jobs' : 'orders', d.id), o = src && (d.ctx === 'jobs' ? jobWoDoc(src) : src), D = ui.woFullDraft; if (!o || !D) return;
   const CH = writeoffLines({ ...o, woFull: { lines: D.filter(x => String(x.name || '').trim()).map(x => ({ stockId: x.stockId, name: x.name, unit: x.unit, qty: woQtyNum(x.qty) })) } }, {});
   document.querySelectorAll('#drawer .wofullt tbody tr[data-selid]').forEach(tr => { const x = D.find(y => y.id === tr.dataset.selid); if (!x) return; const it = stockByName(x.name), c = it && CH.find(L => L.key === 'id:' + it.id), sh = c && c.source !== 'acct';
     tr.classList.toggle('wofshort', !!sh); const many = it && D.filter(y => stockByName(y.name)?.id === it.id).length > 1;
@@ -5701,9 +5701,10 @@ function wofCalc(i){
     const el = document.querySelector(`[data-wof="${k}|qty"]`); if (el) el.value = x.qty; });
   woFullRecheck(); if (ui.woSel?.f?.length) woSelPaint('f');
 }
-function woFullHtml(o, ed){
+function woFullHtml(o, ed, col = 'orders'){
+  const job = col === 'jobs', ref = col + '|' + o.id;
   const on = woFullOn(o), dr = o.woDraft && o.woDraft.full, mode = on || dr || ui.woMode === 'full' ? 'full' : 'prod';
-  const seg = `<div class="seg" role="group" aria-label="Из чего строится список"><button type="button" data-act="woMode" data-id="prod" class="${mode === 'prod' ? 'on' : ''}" ${on || dr ? 'disabled title="Сначала удалите список на весь объём или верните как было"' : ''}>По изделиям заказа</button><button type="button" data-act="woMode" data-id="full" class="${mode === 'full' ? 'on' : ''}">На весь объём</button></div>`;
+  const seg = `<div class="seg" role="group" aria-label="Из чего строится список"><button type="button" data-act="woMode" data-id="prod" class="${mode === 'prod' ? 'on' : ''}" ${on || dr ? 'disabled title="Сначала удалите список или верните как было"' : ''}>${job ? 'По материалам работы' : 'По изделиям заказа'}</button><button type="button" data-act="woMode" data-id="full" class="${mode === 'full' ? 'on' : ''}">${job ? 'Список на весь объём работы' : 'На весь объём'}</button></div>`;
   if (mode !== 'full') return seg;
   if (!ui.woFullDraft) { ui.woFullDraft = dr ? dr.map(x => ({ ...x })) : on ? o.woFull.lines.map(x => ({ ...x })) : [{ id: uid(), name: '', qty: '', per: '' }];
     ui.woFullUnits = String((o.woDraft && o.woDraft.full && o.woDraft.units != null ? o.woDraft.units : on ? o.woFull.units : '') ?? ''); }
@@ -5711,17 +5712,17 @@ function woFullHtml(o, ed){
   const CH = writeoffLines({ ...o, woFull: { lines: D.filter(x => String(x.name || '').trim()).map(x => ({ stockId: x.stockId, name: x.name, unit: x.unit, qty: woQtyNum(x.qty) })) } }, {});
   const chOf = x => { const it = stockByName(x.name); return it ? CH.find(L => L.key === 'id:' + it.id) : null; };
   const twice = x => { const it = stockByName(x.name); return it && D.filter(y => stockByName(y.name)?.id === it.id).length > 1; };
-  return seg + `<section class="box wofull"><h4>Список на весь объём${on ? ` <span class="dim">· сохранён ${esc(fmtDT(o.woFull.at))} · ${esc(who(o.woFull.by))}</span>` : ''}</h4>
-    <small class="dim">Материалы на всё производство заказа. Пока этот список есть, списание по изделиям заказа не считается. Номенклатура — из бухгалтерских остатков склада.</small>
-    ${ed ? `    <div class="wofunits" data-keep><label>Количество продукции, шт <input class="in mono" id="wof-units" value="${esc(ui.woFullUnits || '')}" inputmode="decimal" placeholder="например, 27"></label><small class="dim">Заполните «На 1 шт» — количество посчитается: продукция × на 1 шт. Количество можно ввести и вручную.</small></div>
+  return seg + `<section class="box wofull"><h4>${job ? 'Список на весь объём работы' : 'Список на весь объём'}${on ? ` <span class="dim">· сохранён ${esc(fmtDT(o.woFull.at))} · ${esc(who(o.woFull.by))}</span>` : ''}</h4>
+    <small class="dim">${job ? 'Материалы на весь объём работы. Пока этот список есть, материалы работы («+ Материалы» в карточке) при списании не считаются.' : 'Материалы на всё производство заказа. Пока этот список есть, списание по изделиям заказа не считается.'} Номенклатура — из бухгалтерских остатков склада.</small>
+    ${ed ? `    <div class="wofunits" data-keep><label>${job ? 'Объём работ, шт' : 'Количество продукции, шт'} <input class="in mono" id="wof-units" value="${esc(ui.woFullUnits || '')}" inputmode="decimal" placeholder="например, 27"></label><small class="dim">Заполните «На 1 шт» — количество посчитается: ${job ? 'объём' : 'продукция'} × на 1 шт. Количество можно ввести и вручную.</small></div>
     <div class="tscroll"><table class="wo wofullt"><thead><tr><th>№</th><th>Номенклатура</th><th>Ед.</th><th class="r">Количество</th><th class="r">Бух. остаток</th><th class="r">На 1 шт</th><th class="r">Не хватает</th><th></th></tr></thead><tbody data-keep>
       ${D.map((x, i) => { const it = stockByName(x.name), c = chOf(x), sh = c && c.source !== 'acct'; return `<tr class="${woSelHas('f', x.id) ? 'wosel' : ''} ${sh ? 'wofshort' : ''}" data-selid="${esc(x.id)}"><td class="won" data-act="woSel" data-id="f|${esc(x.id)}" role="button" tabindex="0" title="Выделить строку — сумма количества внизу">${i + 1}</td><td><textarea class="in wofname" data-wof="${i}|name" rows="1" data-sugg="acct" autocomplete="off" spellcheck="false" placeholder="Начните вводить название" aria-label="Номенклатура, строка ${i + 1}">${esc(x.name || '')}</textarea></td>
         <td>${esc((it && it.unit) || x.unit || 'шт')}</td><td class="r"><input class="in mono" data-wof="${i}|qty" value="${esc(x.qty ?? '')}" inputmode="decimal" aria-label="Количество, строка ${i + 1}" style="width:110px;text-align:right">${sh ? `<small class="wofwill">спишется <b>${fmtQty(c.take)}</b></small>` : ''}</td>
         <td class="r mono">${it ? fmtQty(c ? c.acct : it.acctQty) : '<span class="bad-t">нет на складе</span>'}</td><td class="r wofpert"><input class="in mono wofper" data-wof="${i}|per" value="${esc(x.per ?? '')}" inputmode="decimal" aria-label="На 1 штуку продукции, строка ${i + 1}" title="Сколько нужно на 1 штуку продукции"></td>${wofShortCell(it, c, twice(x))}
         <td class="wofacts"><button type="button" class="btn sm ghost" data-act="wofMove" data-id="${i}|-1" ${i ? '' : 'disabled'} aria-label="Поднять строку ${i + 1}" title="Выше">↑</button><button type="button" class="btn sm ghost" data-act="wofMove" data-id="${i}|1" ${i < D.length - 1 ? '' : 'disabled'} aria-label="Опустить строку ${i + 1}" title="Ниже">↓</button><button type="button" class="btn sm ghost" data-act="wofDel" data-id="${i}" aria-label="Убрать строку">✕</button></td></tr>`; }).join('')}</tbody></table></div>
     ${woSumHtml('f')}
-    <div class="row-g"><button type="button" class="btn sm" data-act="wofAdd">+ Строка</button><button type="button" class="btn sm" data-act="wofFromProd" data-id="${o.id}" title="Заполнить суммой по изделиям заказа — затем поправить">Заполнить из изделий</button>
-      <span style="flex:1"></span><button type="button" class="btn primary" data-act="wofSave" data-id="${o.id}">Сохранить список на весь объём</button>${on ? armBtn('wofd:' + o.id, 'Удалить список на весь объём', 'wofDelAll', o.id, 'btn danger') : ''}</div>`
+    <div class="row-g"><button type="button" class="btn sm" data-act="wofAdd">+ Строка</button><button type="button" class="btn sm" data-act="wofFromProd" data-id="${ref}" title="${job ? 'Заполнить материалами работы — затем поправить' : 'Заполнить суммой по изделиям заказа — затем поправить'}">${job ? 'Заполнить из материалов работы' : 'Заполнить из изделий'}</button>
+      <span style="flex:1"></span><button type="button" class="btn primary" data-act="wofSave" data-id="${ref}">Сохранить список на весь объём</button>${on ? armBtn('wofd:' + o.id, 'Удалить список на весь объём', 'wofDelAll', ref, 'btn danger') : ''}</div>`
     : `<ul class="stlist">${D.map(x => `<li>${esc(x.name)} — ${fmtQty(x.qty)} ${esc(x.unit || 'шт')}</li>`).join('')}</ul>`}
     <small class="dim">После сохранения ниже — проверка по бухгалтерским остаткам, «Сохранить список» (списать с бухгалтерского склада) и «Excel для 1С» — таблица для загрузки в 1С («Требование-накладная» → «Материалы» → «Загрузить»).</small></section>`;
 }
@@ -5804,9 +5805,9 @@ function renderDrawer(){
     ui.woMap = ui.woMap || { ...((src.woDraft && src.woDraft.map) || o.woMap || {}) };
     const L = writeoffLines(o, ui.woMap), A = META.acct, bad = L.filter(x => x.source !== 'acct'), ed = canEdit();
     const dirty = JSON.stringify(ui.woMap) !== JSON.stringify(o.woMap || {});
-    const full = col === 'orders' && (woFullOn(o) || ui.woMode === 'full' || !!(o.woDraft && o.woDraft.full)), fullBox = col === 'orders' ? woFullHtml(o, ed) : '', draftBox = ed ? woDraftBox(col, src) : '';
+    const full = woFullOn(o) || ui.woMode === 'full' || !!(o.woDraft && o.woDraft.full), fullBox = woFullHtml(o, ed, col), draftBox = ed ? woDraftBox(col, src) : '';
     D.innerHTML = dh('Список для списания · ' + esc(col === 'jobs' ? `работа № ${jobNo(src)} · ${src.title}` : ordName(o))) + `<div class="d-body">
-      <p class="dim" style="margin:0">Строки берутся из <b>бухгалтерских остатков</b> (${A ? 'загружены ' + esc(fmtDT(A.at)) + (A.file ? ', «' + esc(A.file) + '»' : '') : 'ещё не загружались'}). ${col === 'jobs' ? 'Количество — из списка материалов работы.' : full ? 'Количество — из списка <b>на весь объём</b>; изделия заказа не учитываются.' : 'Количество — сумма по всем изделиям заказа.'}</p>
+      <p class="dim" style="margin:0">Строки берутся из <b>бухгалтерских остатков</b> (${A ? 'загружены ' + esc(fmtDT(A.at)) + (A.file ? ', «' + esc(A.file) + '»' : '') : 'ещё не загружались'}). ${full ? (col === 'jobs' ? 'Количество — из списка <b>на весь объём работы</b>; материалы из карточки работы не учитываются.' : 'Количество — из списка <b>на весь объём</b>; изделия заказа не учитываются.') : col === 'jobs' ? 'Количество — из списка материалов работы.' : 'Количество — сумма по всем изделиям заказа.'}</p>
       ${draftBox}${fullBox}
       ${o.writeoff ? `<p class="box" style="margin:0;border-color:${woStale(o, L) || dirty ? 'var(--warn)' : 'var(--ok)'};background:${woStale(o, L) || dirty ? 'var(--warn-soft)' : 'var(--ok-soft)'}">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}${woStale(o, L) ? '<br><b>Список изменён после сохранения списания</b> — нажмите «Сохранить список» внизу, чтобы списание с бухгалтерского склада совпало со списком (убранные позиции вернутся на остаток).' : ''}</p>` : ''}
       ${bad.length ? `<p class="box" style="margin:0;border-color:var(--bad);background:var(--bad-soft);color:var(--bad)"><b>Не хватает в бухгалтерских остатках: ${bad.length}.</b><span class="woshl">${bad.slice(0, 8).map(x => `<span>• ${esc(x.name)} — нужно ${fmtQty(x.need)}, ${x.inStock ? 'есть ' + fmtQty(x.acct) : 'нет на складе'}</span>`).join('')}${bad.length > 8 ? `<span>…и ещё ${bad.length - 8}</span>` : ''}</span> При сохранении такие позиции спишутся в размере бухгалтерского остатка (в ячейке «Списать» — «ввели» и «спишется»), остальное останется «не хватает». Можно также заменить номенклатуру или обновить остатки из 1С.</p>` : L.length ? '<p class="ok-t" style="margin:0">✓ Все позиции есть в бухгалтерских остатках.</p>' : ''}
@@ -7315,13 +7316,13 @@ async function act(el){
       document.activeElement?.blur(); [D[i], D[j]] = [D[j], D[i]]; woDraftSave(); renderDrawer(); document.querySelector(`[data-act=wofMove][data-id="${j}|${d}"]`)?.focus(); return; }
     case 'wofAdd': { document.activeElement?.blur(); (ui.woFullDraft = ui.woFullDraft || []).push({ id: uid(), name: '', qty: '', per: '' }); woDraftSave(); renderDrawer(); const n = document.querySelectorAll('[data-wof$="|name"]'); n[n.length - 1]?.focus(); return; }
     case 'wofDel': { document.activeElement?.blur(); ui.woFullDraft.splice(Number(id), 1); if (!ui.woFullDraft.length) ui.woFullDraft.push({ id: uid(), name: '', qty: '' }); woDraftSave(); return renderDrawer(); }
-    case 'wofFromProd': { const o = ord(id); if (!o) return; document.activeElement?.blur(); const L = writeoffLines({ ...o, woFull: null, writeoff: null });
-      if (!L.length) return toast('В изделиях заказа нет компонентов'); ui.woFullDraft = L.map(x => ({ id: uid(), stockId: x.stockId || null, name: x.name, unit: x.unit, qty: x.need })); woDraftSave(); return renderDrawer(); }
-    case 'wofSave': { document.activeElement?.blur(); const fe = $('ferr'); if (fe) fe.textContent = '';
-      try { const r = await api('PUT', `/api/orders/${id}/wofull`, { units: woQtyNum(ui.woFullUnits) || null, lines: (ui.woFullDraft || []).map(x => ({ id: x.id, stockId: x.stockId, name: String(x.name || '').trim(), unit: x.unit, qty: Number(String(x.qty).replace(',', '.').replace(/\s/g, '')), per: String(x.per ?? '').trim() === '' ? null : woQtyNum(x.per) })) });
-        clearTimeout(woDraftTimer); const o = ord(id); if (o) { o.woFull = r.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } } ui.woFullDraft = null; ui.woMode = 'full'; renderDrawer(); render(); toast('Список на весь объём сохранён — проверьте строки ниже и сохраните список для списания'); refresh().catch(() => {}); }
+    case 'wofFromProd': { const [wc, wid] = id.split('|'), src = woSrcOf(wc, wid); if (!src) return; document.activeElement?.blur(); const doc = wc === 'jobs' ? jobWoDoc({ ...src, woFull: null }) : src; const L = writeoffLines({ ...doc, woFull: null, writeoff: null });
+      if (!L.length) return toast(wc === 'jobs' ? 'В работе нет материалов — добавьте их в карточке работы или введите строки здесь' : 'В изделиях заказа нет компонентов'); ui.woFullDraft = L.map(x => ({ id: uid(), stockId: x.stockId || null, name: x.name, unit: x.unit, qty: x.need })); woDraftSave(); return renderDrawer(); }
+    case 'wofSave': { document.activeElement?.blur(); const fe = $('ferr'); if (fe) fe.textContent = ''; const [wc, wid] = id.split('|');
+      try { const r = await api('PUT', `/api/${wc}/${wid}/wofull`, { units: woQtyNum(ui.woFullUnits) || null, lines: (ui.woFullDraft || []).map(x => ({ id: x.id, stockId: x.stockId, name: String(x.name || '').trim(), unit: x.unit, qty: Number(String(x.qty).replace(',', '.').replace(/\s/g, '')), per: String(x.per ?? '').trim() === '' ? null : woQtyNum(x.per) })) });
+        clearTimeout(woDraftTimer); const o = woSrcOf(wc, wid); if (o) { o.woFull = r.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } } ui.woFullDraft = null; ui.woMode = 'full'; renderDrawer(); render(); toast('Список на весь объём сохранён — проверьте строки ниже и сохраните список для списания'); refresh().catch(() => {}); }
       catch(e) { if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
-    case 'wofDelAll': try { await api('DELETE', `/api/orders/${id}/wofull`); clearTimeout(woDraftTimer); const o = ord(id); if (o) { delete o.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } } ui.woFullDraft = null; ui.woMode = 'prod'; renderDrawer(); render(); toast('Список на весь объём удалён — снова считается по изделиям. Если списание уже сохранено, сохраните список заново'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return;
+    case 'wofDelAll': try { const [wc, wid] = id.split('|'); await api('DELETE', `/api/${wc}/${wid}/wofull`); clearTimeout(woDraftTimer); const o = woSrcOf(wc, wid); if (o) { delete o.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } } ui.woFullDraft = null; ui.woMode = 'prod'; renderDrawer(); render(); toast(`Список на весь объём удалён — снова считается по ${id.startsWith('jobs|') ? 'материалам работы' : 'изделиям'}. Если списание уже сохранено, сохраните список заново`); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return;
     case 'woReset': { String(id).split('\n').forEach(k => delete ui.woMap[k]); woDraftSave(); return renderDrawer(); }
     case 'editProduct': return openDrawer('product', id);
     case 'delProduct': { const [oid, pid] = id.split('|'); await guard(updProduct(oid, pid, () => null)); render(); return toast('Изделие удалено'); }
@@ -7428,7 +7429,7 @@ async function act(el){
     case 'acctImport': ui.acct = null; return openDrawer('acctImport');
     case 'pickStock': ui.pickQ = ''; return openDrawer('pickStock', id);
     case 'writeoff': ui.woMap = null; ui.woMode = null; ui.woFullDraft = null; ui.woFullUnits = ''; ui.woSel = null; return openDrawer('writeoff', id);
-    case 'jobWo': ui.woMap = null; ui.woSel = null; return openDrawer('writeoff', id, 'jobs');
+    case 'jobWo': ui.woMap = null; ui.woMode = null; ui.woFullDraft = null; ui.woFullUnits = ''; ui.woSel = null; return openDrawer('writeoff', id, 'jobs');
     case 'jobMat': { const j = jobOf(id); if (!j) return; return cpOpen('job', { name: j.title, components: j.materials || [] }, { jid: j.id }); }
     case 'newStock': return openDrawer('stockItem');
     case 'editStock': return openDrawer('stockItem', id);

@@ -1853,16 +1853,16 @@ async function api(req, res, url) {
     const target = db[p[1]] && db[p[1]][p[2]]; if (!target) return fail(res, 404, p[1] === 'jobs' ? 'Работа не найдена' : 'Заказ не найден');
     if (m === 'DELETE') { delete target.woDraft; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     const b = await readJsonBody(req), d = { at: new Date().toISOString(), by: user.id };
-    if (Array.isArray(b.full) && p[1] === 'orders') d.full = b.full.slice(0, 1000).map(x => ({ id: String(x && x.id || newId()).slice(0, 40), stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null, name: String(x && x.name || '').slice(0, 300), unit: String(x && x.unit || '').slice(0, 20), qty: String((x && x.qty) ?? '').slice(0, 30), per: String((x && x.per) ?? '').slice(0, 30) }));
-    if (b.units !== undefined && p[1] === 'orders') d.units = String(b.units ?? '').slice(0, 30);
+    if (Array.isArray(b.full)) d.full = b.full.slice(0, 1000).map(x => ({ id: String(x && x.id || newId()).slice(0, 40), stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null, name: String(x && x.name || '').slice(0, 300), unit: String(x && x.unit || '').slice(0, 20), qty: String((x && x.qty) ?? '').slice(0, 30), per: String((x && x.per) ?? '').slice(0, 30) }));
+    if (b.units !== undefined) d.units = String(b.units ?? '').slice(0, 30);
     if (b.map && typeof b.map === 'object') { d.map = {}; for (const [k, v] of Object.entries(b.map)) if (/^(id|n):/.test(k) && db.stock[v]) d.map[k] = v; }
     if (!d.full && !d.map) { delete target.woDraft; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     target.woDraft = d; saveDb(); return send(res, 200, { ok: true, woDraft: d, rev: db.rev });
   }
   /* the write-off list «на весь объём» of an order (production): the materials for the whole volume instead of the products */
-  if (p[1] === 'orders' && p[3] === 'wofull' && (m === 'PUT' || m === 'DELETE')) {
-    if (!canEdit(user)) return fail(res, 403, 'Список на весь объём ведёт администратор или руководитель');
-    const o = db.orders[p[2]]; if (!o) return fail(res, 404, 'Заказ не найден');
+  if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'wofull' && (m === 'PUT' || m === 'DELETE')) {
+    if (!canEdit(user)) return fail(res, 403, 'Список для списания ведёт администратор или руководитель');
+    const o = db[p[1]] && db[p[1]][p[2]]; if (!o) return fail(res, 404, p[1] === 'jobs' ? 'Работа не найдена' : 'Заказ не найден');
     if (m === 'DELETE') { delete o.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     const b = await readJsonBody(req), lines = [];
     for (const [i, x] of (Array.isArray(b.lines) ? b.lines : []).slice(0, 1000).entries()) {
@@ -2796,7 +2796,7 @@ function woStale(o, lines) {
   return [...new Set([...Object.keys(a), ...Object.keys(b)])].some(k => Math.abs((a[k] || 0) - (b[k] || 0)) > 1e-9);
 }
 function writeoffPlainXlsx(o) {
-  const lines = writeoffLines(o), wb = o.writeoff, saved = !!(wb && wb.applied && Array.isArray(wb.lines)), stale = woStale(o, lines), took = saved ? woTaken(o) : {};
+  const lines = writeoffLines(o), wb = o.writeoff, saved = !!(wb && wb.applied && Array.isArray(wb.lines)), took = saved ? woTaken(o) : {};
   const fmt = iso => iso ? new Date(iso).toLocaleString('ru-RU', { timeZone: process.env.TZ || 'Europe/Moscow' }) : '';
   // exactly the lines of the list, in its order; «Списано» — what the saved write-off took (or what will be taken)
   const left = { ...took };
@@ -2807,7 +2807,7 @@ function writeoffPlainXlsx(o) {
   const t = [
     [{ v: 'Списание материалов — ' + what, s: 10 }],
     [saved ? `Списание сохранено ${fmt(wb.at)}` : 'Список ещё не сохранён — в столбце «Списано» показано, сколько спишется'],
-    stale ? [{ v: 'Внимание: список изменён после сохранения списания — в окне списка нажмите «Сохранить список», чтобы списание совпало со списком', s: 8 }] : [],
+    [],
     ['№', 'Номенклатура', 'Ед.', 'Нужно списать', 'Списано', 'Не хватает'].map(v => ({ v, s: 1 })),
     ...rows.map((x, i) => [{ v: i + 1, s: x.short ? 9 : 3 }, { v: x.name, s: x.short ? 8 : 2 }, { v: x.unit, s: x.short ? 8 : 2 }, { v: x.need, s: x.short ? 9 : 3 }, { v: x.got, s: x.short ? 9 : 3 }, x.short ? { v: x.short, s: 9 } : { v: '', s: 2 }]),
     [{ v: '', s: 2 }, { v: 'Итого', s: 1 }, { v: '', s: 2 }, { v: sum('need'), s: 3 }, { v: sum('got'), s: 3 }, { v: sum('short') || '', s: 3 }],
