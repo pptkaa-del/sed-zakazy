@@ -1838,15 +1838,28 @@ async function api(req, res, url) {
       it.updatedAt = at; it.updatedBy = user.id;
     }
     target.woMap = map;
+    if (target.woDraft) { delete target.woDraft.map; if (!target.woDraft.full) delete target.woDraft; }
     target.writeoff = { at, by: user.id, applied: true, lines: lines.map(L => ({ stockId: L.stockId, name: L.name, sku: L.sku, unit: L.unit, qty: L.need })) };
     saveDb();
     return send(res, 200, { ok: true, writeoff: target.writeoff, rev: db.rev });
+  }
+  /* the draft of a write-off list: kept on every change until «Сохранить»; «Вернуть как было» deletes it.
+     full — the lines «на весь объём» being edited (orders), map — the replaced nomenclature */
+  if ((p[1] === 'orders' || p[1] === 'jobs') && p[3] === 'wodraft' && (m === 'PUT' || m === 'DELETE')) {
+    if (!canEdit(user)) return fail(res, 403, 'Список для списания ведёт администратор или руководитель');
+    const target = db[p[1]] && db[p[1]][p[2]]; if (!target) return fail(res, 404, p[1] === 'jobs' ? 'Работа не найдена' : 'Заказ не найден');
+    if (m === 'DELETE') { delete target.woDraft; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    const b = await readJsonBody(req), d = { at: new Date().toISOString(), by: user.id };
+    if (Array.isArray(b.full) && p[1] === 'orders') d.full = b.full.slice(0, 1000).map(x => ({ id: String(x && x.id || newId()).slice(0, 40), stockId: x && x.stockId && db.stock[x.stockId] ? x.stockId : null, name: String(x && x.name || '').slice(0, 300), unit: String(x && x.unit || '').slice(0, 20), qty: String((x && x.qty) ?? '').slice(0, 30) }));
+    if (b.map && typeof b.map === 'object') { d.map = {}; for (const [k, v] of Object.entries(b.map)) if (/^(id|n):/.test(k) && db.stock[v]) d.map[k] = v; }
+    if (!d.full && !d.map) { delete target.woDraft; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    target.woDraft = d; saveDb(); return send(res, 200, { ok: true, woDraft: d, rev: db.rev });
   }
   /* the write-off list «на весь объём» of an order (production): the materials for the whole volume instead of the products */
   if (p[1] === 'orders' && p[3] === 'wofull' && (m === 'PUT' || m === 'DELETE')) {
     if (!canEdit(user)) return fail(res, 403, 'Список на весь объём ведёт администратор или руководитель');
     const o = db.orders[p[2]]; if (!o) return fail(res, 404, 'Заказ не найден');
-    if (m === 'DELETE') { delete o.woFull; saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    if (m === 'DELETE') { delete o.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     const b = await readJsonBody(req), lines = [];
     for (const [i, x] of (Array.isArray(b.lines) ? b.lines : []).slice(0, 1000).entries()) {
       const name = String(x && x.name || '').trim().slice(0, 300), qty = Number(x && x.qty);
@@ -1857,7 +1870,9 @@ async function api(req, res, url) {
       lines.push({ id: String(x.id || newId()).slice(0, 40), stockId: sid, name: sid ? db.stock[sid].name : name, unit: String((sid && db.stock[sid].unit) || x.unit || 'шт').slice(0, 20), qty: r3(qty) });
     }
     if (!lines.length) return fail(res, 400, 'Добавьте хотя бы одну строку');
-    o.woFull = { lines, at: new Date().toISOString(), by: user.id }; saveDb();
+    o.woFull = { lines, at: new Date().toISOString(), by: user.id };
+    if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; }
+    saveDb();
     return send(res, 200, { ok: true, woFull: o.woFull, rev: db.rev });
   }
   /* write-off list for an order: Excel with highlighting */

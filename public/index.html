@@ -342,7 +342,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sgall tr.sgt1 td,.sgall tr.sgt1 th{border-bottom:1px dashed var(--rule-2)}.sgall tr.sgt2 td,.sgall tr.sgt2 th{border-bottom:2px solid var(--rule)}.sgall td{height:34px}.sgall .sgname{border-bottom:2px solid var(--rule)}
 .sgt thead .sgsum small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}.sglg{font-size:12px;margin-right:2px}.sgrnote{margin:0 14px 10px;font-size:13px;background:var(--warn-soft, #FFF6D6)}
 .sgt .sgrate{min-width:150px;padding:4px 6px}.sgrate .rtsel{font-size:12px;padding:4px 6px;width:100%;max-width:200px}.sgrate .rtv{display:inline-block;min-width:26px;padding:2px 6px;border-radius:6px;color:#1F2633}.sgrate small{display:block;font-size:10px;color:var(--ink-2);white-space:normal}
-.jminall{max-width:420px}.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
+.wodraft{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border-color:var(--warn);background:var(--warn-soft)}.jminall{max-width:420px}.jminbox{display:flex;flex-direction:column;gap:6px;padding:10px 12px}.jminrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px}.jminrow{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;font-size:14px}.jminrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jminrow .in{padding:4px 6px}
 .nscard{padding:0;overflow:hidden;margin-bottom:8px}.nsroot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--rule-2);background:var(--paper)}
 .nshead span:first-child{grid-column:1/4}.nshead span:not(:first-child){text-align:right}.nshead{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;padding:6px 14px;font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--rule-2)}
 .nstree{list-style:none;margin:0;padding:0}.nsrow{display:grid;grid-template-columns:16px 22px minmax(0,1fr) 90px 130px;gap:4px 8px;align-items:center;padding:5px 14px 5px calc(14px + var(--d,0) * 20px);font-size:14px;border-bottom:1px solid var(--rule-2)}
@@ -5576,11 +5576,39 @@ const orderOpts = sel => ordersSorted().map(o => `<option value="${o.id}" ${o.id
 const targetOpts = sel => `<option value="" ${!sel?'selected':''}>Общие работы (без заказа)</option>` + orderOpts(sel);
 
 /* «Список на весь объём» in the write-off list of an order: materials for the whole production instead of the products */
+/* the draft of the write-off list: saved on the server at every change until «Сохранить»; «Вернуть» drops it */
+const woSrcOf = (col, id) => col === 'jobs' ? jobOf(id) : ord(id);
+function woDraftBox(col, src){
+  const d = src.woDraft; if (!d) return '';
+  return `<div class="box wodraft"><div><b>✎ Черновик</b> — изменения сохраняются сразу${d.at ? ` <small class="dim">(${esc(fmtDT(d.at))}${d.by && d.by !== me.id ? ', ' + esc(who(d.by)) : ''})</small>` : ''}. Основной список не изменится, пока не нажата кнопка «Сохранить…».</div>
+    <button type="button" class="btn sm" data-act="woDraftDrop" data-id="${col}|${src.id}">↩ Вернуть как было до начала редактирования</button></div>`;
+}
+let woDraftTimer = null;
+function woDraftSave(now){
+  const d = ui.drawer; if (!d || d.kind !== 'writeoff') return;
+  const col = d.ctx === 'jobs' ? 'jobs' : 'orders', id = d.id;
+  clearTimeout(woDraftTimer);
+  woDraftTimer = setTimeout(async () => {
+    const src = woSrcOf(col, id); if (!src) return;
+    const body = {}, same = (a, b) => JSON.stringify(a || {}) === JSON.stringify(b || {});
+    if (ui.woMap && !same(ui.woMap, src.woMap)) body.map = ui.woMap;
+    const cur = (ui.woFullDraft || []).map(x => ({ name: String(x.name || '').trim(), qty: String(x.qty ?? '').trim() })).filter(x => x.name || x.qty);
+    const was = (src.woFull?.lines || []).map(x => ({ name: x.name, qty: String(x.qty) }));
+    if (col === 'orders' && ui.woFullDraft && JSON.stringify(cur) !== JSON.stringify(was)) body.full = ui.woFullDraft;
+    try { const r = await api('PUT', `/api/${col}/${id}/wodraft`, body); const had = !!src.woDraft; if (r.woDraft) src.woDraft = r.woDraft; else delete src.woDraft;
+      // the banner «Черновик» is put in place without redrawing (the cursor may stay in a field)
+      const box = document.querySelector('#drawer .wodraft');
+      if (!src.woDraft) { if (box) box.remove(); if (had && col === 'orders' && !woFullOn(src) && !document.activeElement?.closest('#drawer [data-keep]')) renderDrawer(); }
+      else if (box) box.outerHTML = woDraftBox(col, src);
+      else document.querySelector('#drawer .d-body > p')?.insertAdjacentHTML('afterend', woDraftBox(col, src)); }
+    catch(e) { toast('Черновик не сохранён: ' + errText(e)); }
+  }, now ? 0 : 500);
+}
 function woFullHtml(o, ed){
-  const on = woFullOn(o), mode = on || ui.woMode === 'full' ? 'full' : 'prod';
-  const seg = `<div class="seg" role="group" aria-label="Из чего строится список"><button type="button" data-act="woMode" data-id="prod" class="${mode === 'prod' ? 'on' : ''}" ${on ? 'disabled title="Сначала удалите список на весь объём"' : ''}>По изделиям заказа</button><button type="button" data-act="woMode" data-id="full" class="${mode === 'full' ? 'on' : ''}">На весь объём</button></div>`;
+  const on = woFullOn(o), dr = o.woDraft && o.woDraft.full, mode = on || dr || ui.woMode === 'full' ? 'full' : 'prod';
+  const seg = `<div class="seg" role="group" aria-label="Из чего строится список"><button type="button" data-act="woMode" data-id="prod" class="${mode === 'prod' ? 'on' : ''}" ${on || dr ? 'disabled title="Сначала удалите список на весь объём или верните как было"' : ''}>По изделиям заказа</button><button type="button" data-act="woMode" data-id="full" class="${mode === 'full' ? 'on' : ''}">На весь объём</button></div>`;
   if (mode !== 'full') return seg;
-  if (!ui.woFullDraft) ui.woFullDraft = on ? o.woFull.lines.map(x => ({ ...x })) : [{ id: uid(), name: '', qty: '' }];
+  if (!ui.woFullDraft) ui.woFullDraft = dr ? dr.map(x => ({ ...x })) : on ? o.woFull.lines.map(x => ({ ...x })) : [{ id: uid(), name: '', qty: '' }];
   const D = ui.woFullDraft;
   return seg + `<section class="box wofull"><h4>Список на весь объём${on ? ` <span class="dim">· сохранён ${esc(fmtDT(o.woFull.at))} · ${esc(who(o.woFull.by))}</span>` : ''}</h4>
     <small class="dim">Материалы на всё производство заказа. Пока этот список есть, списание по изделиям заказа не считается. Номенклатура — из бухгалтерских остатков склада.</small>
@@ -5670,13 +5698,13 @@ function renderDrawer(){
   if (d.kind === 'writeoff') {
     const col = d.ctx === 'jobs' ? 'jobs' : 'orders', src = col === 'jobs' ? jobOf(d.id) : ord(d.id); if (!src) return closeDrawer();
     const o = col === 'jobs' ? jobWoDoc(src) : src;
-    ui.woMap = ui.woMap || { ...(o.woMap || {}) };
+    ui.woMap = ui.woMap || { ...((src.woDraft && src.woDraft.map) || o.woMap || {}) };
     const L = writeoffLines(o, ui.woMap), A = META.acct, bad = L.filter(x => x.source !== 'acct'), ed = canEdit();
     const dirty = JSON.stringify(ui.woMap) !== JSON.stringify(o.woMap || {});
-    const full = col === 'orders' && (woFullOn(o) || ui.woMode === 'full'), fullBox = col === 'orders' ? woFullHtml(o, ed) : '';
+    const full = col === 'orders' && (woFullOn(o) || ui.woMode === 'full' || !!(o.woDraft && o.woDraft.full)), fullBox = col === 'orders' ? woFullHtml(o, ed) : '', draftBox = ed ? woDraftBox(col, src) : '';
     D.innerHTML = dh('Список для списания · ' + esc(col === 'jobs' ? `работа № ${jobNo(src)} · ${src.title}` : ordName(o))) + `<div class="d-body">
       <p class="dim" style="margin:0">Строки берутся из <b>бухгалтерских остатков</b> (${A ? 'загружены ' + esc(fmtDT(A.at)) + (A.file ? ', «' + esc(A.file) + '»' : '') : 'ещё не загружались'}). ${col === 'jobs' ? 'Количество — из списка материалов работы.' : full ? 'Количество — из списка <b>на весь объём</b>; изделия заказа не учитываются.' : 'Количество — сумма по всем изделиям заказа.'}</p>
-      ${fullBox}
+      ${draftBox}${fullBox}
       ${o.writeoff ? `<p class="box" style="margin:0;border-color:var(--ok);background:var(--ok-soft)">Список сохранён ${esc(fmtDT(o.writeoff.at))} · ${esc(who(o.writeoff.by))}${dirty ? ' — <b>есть несохранённые изменения</b>' : ''}</p>` : ''}
       ${bad.length ? `<p class="box" style="margin:0;border-color:var(--bad);background:var(--bad-soft);color:var(--bad)"><b>Не хватает в бухгалтерских остатках: ${bad.length}.</b> Такие строки выделены красным — сохранить список нельзя. Замените номенклатуру позиции (введите другую позицию склада) или обновите остатки из 1С.</p>` : L.length ? '<p class="ok-t" style="margin:0">✓ Все позиции есть в бухгалтерских остатках.</p>' : ''}
       ${L.length ? `<datalist id="wo-names">${S.stock.filter(it => (Number(it.acctQty) || 0) > 0).map(it => `<option value="${esc(it.name)}">${esc('бух ' + fmtQty(it.acctQty) + ' ' + (it.unit || 'шт'))}</option>`).join('')}</datalist>
@@ -7175,18 +7203,19 @@ async function act(el){
     case 'cpNew': { cpRead(); const nm = ($('cp-q')?.value || '').trim(); if (!nm) return; ui.cp.components.push({ id: uid(), stockId: null, name: nm, qty: 1, unit: 'шт' }); renderDrawer(); $('cp-q')?.focus(); return; }
     case 'cpDel': cpRead(); ui.cp.components.splice(Number(id), 1); return renderDrawer();
     case 'cpSave': return cpSave(id);
-    case 'woSave': { el.disabled = true; const [wcol, wid] = id.includes('|') ? id.split('|') : ['orders', id]; try { const r = await api('POST', `/api/${wcol}/${wid}/writeoff`, { map: ui.woMap || {} }); const o = wcol === 'jobs' ? jobOf(wid) : ord(wid); if (o) { o.writeoff = r.writeoff; o.woMap = { ...(ui.woMap || {}) }; } await refresh(); renderDrawer(); toast('Список для списания сохранён'); } catch(e) { const f = $('ferr'); if (f) f.textContent = errText(e); el.disabled = false; } return; }
+    case 'woSave': { clearTimeout(woDraftTimer); el.disabled = true; const [wcol, wid] = id.includes('|') ? id.split('|') : ['orders', id]; try { const r = await api('POST', `/api/${wcol}/${wid}/writeoff`, { map: ui.woMap || {} }); const o = wcol === 'jobs' ? jobOf(wid) : ord(wid); if (o) { o.writeoff = r.writeoff; o.woMap = { ...(ui.woMap || {}) }; if (o.woDraft) { delete o.woDraft.map; if (!o.woDraft.full) delete o.woDraft; } } await refresh(); renderDrawer(); toast('Список для списания сохранён'); } catch(e) { const f = $('ferr'); if (f) f.textContent = errText(e); el.disabled = false; } return; }
     case 'woMode': ui.woMode = id; ui.woFullDraft = null; return renderDrawer();
-    case 'wofAdd': { document.activeElement?.blur(); (ui.woFullDraft = ui.woFullDraft || []).push({ id: uid(), name: '', qty: '' }); renderDrawer(); const n = document.querySelectorAll('[data-wof$="|name"]'); n[n.length - 1]?.focus(); return; }
-    case 'wofDel': { document.activeElement?.blur(); ui.woFullDraft.splice(Number(id), 1); if (!ui.woFullDraft.length) ui.woFullDraft.push({ id: uid(), name: '', qty: '' }); return renderDrawer(); }
+    case 'woDraftDrop': { const [col, wid] = id.split('|'); clearTimeout(woDraftTimer); try { await api('DELETE', `/api/${col}/${wid}/wodraft`); const src = woSrcOf(col, wid); if (src) { delete src.woDraft; ui.woMap = { ...(src.woMap || {}) }; ui.woMode = woFullOn(src) ? 'full' : 'prod'; } ui.woFullDraft = null; document.activeElement?.blur(); renderDrawer(); render(); toast('Возвращено как было до начала редактирования'); } catch(e) { toast(errText(e)); } return; }
+    case 'wofAdd': { document.activeElement?.blur(); (ui.woFullDraft = ui.woFullDraft || []).push({ id: uid(), name: '', qty: '' }); woDraftSave(); renderDrawer(); const n = document.querySelectorAll('[data-wof$="|name"]'); n[n.length - 1]?.focus(); return; }
+    case 'wofDel': { document.activeElement?.blur(); ui.woFullDraft.splice(Number(id), 1); if (!ui.woFullDraft.length) ui.woFullDraft.push({ id: uid(), name: '', qty: '' }); woDraftSave(); return renderDrawer(); }
     case 'wofFromProd': { const o = ord(id); if (!o) return; document.activeElement?.blur(); const L = writeoffLines({ ...o, woFull: null, writeoff: null });
-      if (!L.length) return toast('В изделиях заказа нет компонентов'); ui.woFullDraft = L.map(x => ({ id: uid(), stockId: x.stockId || null, name: x.name, unit: x.unit, qty: x.need })); return renderDrawer(); }
+      if (!L.length) return toast('В изделиях заказа нет компонентов'); ui.woFullDraft = L.map(x => ({ id: uid(), stockId: x.stockId || null, name: x.name, unit: x.unit, qty: x.need })); woDraftSave(); return renderDrawer(); }
     case 'wofSave': { document.activeElement?.blur(); const fe = $('ferr'); if (fe) fe.textContent = '';
       try { const r = await api('PUT', `/api/orders/${id}/wofull`, { lines: (ui.woFullDraft || []).map(x => ({ id: x.id, stockId: x.stockId, name: String(x.name || '').trim(), unit: x.unit, qty: Number(String(x.qty).replace(',', '.').replace(/\s/g, '')) })) });
-        const o = ord(id); if (o) o.woFull = r.woFull; ui.woFullDraft = null; ui.woMode = 'full'; renderDrawer(); render(); toast('Список на весь объём сохранён — проверьте строки ниже и сохраните список для списания'); refresh().catch(() => {}); }
+        clearTimeout(woDraftTimer); const o = ord(id); if (o) { o.woFull = r.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } } ui.woFullDraft = null; ui.woMode = 'full'; renderDrawer(); render(); toast('Список на весь объём сохранён — проверьте строки ниже и сохраните список для списания'); refresh().catch(() => {}); }
       catch(e) { if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
-    case 'wofDelAll': try { await api('DELETE', `/api/orders/${id}/wofull`); const o = ord(id); if (o) delete o.woFull; ui.woFullDraft = null; ui.woMode = 'prod'; renderDrawer(); render(); toast('Список на весь объём удалён — снова считается по изделиям. Если списание уже сохранено, сохраните список заново'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return;
-    case 'woReset': { String(id).split('\n').forEach(k => delete ui.woMap[k]); return renderDrawer(); }
+    case 'wofDelAll': try { await api('DELETE', `/api/orders/${id}/wofull`); clearTimeout(woDraftTimer); const o = ord(id); if (o) { delete o.woFull; if (o.woDraft) { delete o.woDraft.full; if (!o.woDraft.map) delete o.woDraft; } } ui.woFullDraft = null; ui.woMode = 'prod'; renderDrawer(); render(); toast('Список на весь объём удалён — снова считается по изделиям. Если списание уже сохранено, сохраните список заново'); refresh().catch(() => {}); } catch(e) { toast(errText(e)); } return;
+    case 'woReset': { String(id).split('\n').forEach(k => delete ui.woMap[k]); woDraftSave(); return renderDrawer(); }
     case 'editProduct': return openDrawer('product', id);
     case 'delProduct': { const [oid, pid] = id.split('|'); await guard(updProduct(oid, pid, () => null)); render(); return toast('Изделие удалено'); }
     case 'addPComp': { const [oid, pid] = id.split('|'); await guard(updProduct(oid, pid, p => ({ ...p, components: [...(p.components || []), { id: uid(), name: '', qty: 1, unit: 'шт' }] }))); render(); const t = document.querySelector(`table[data-pid="${pid}"] tbody tr:last-child input`); t && t.focus(); return; }
@@ -7414,6 +7443,7 @@ document.addEventListener('input', e => {
   if (t.id === 'ck-date') ui.ckDateSet = true;
   if (['ck-veh', 'ck-date', 'ck-liters', 'ck-sum', 'ck-seller', 'ck-work'].includes(t.id)) { ui[{ 'ck-veh': 'ckVeh', 'ck-date': 'ckDate', 'ck-liters': 'ckLiters', 'ck-sum': 'ckSum', 'ck-seller': 'ckSeller', 'ck-work': 'ckWork' }[t.id]] = t.value; return; }
   if (t.id === 'ck-job') { ui.ckJob = t.value; document.activeElement?.blur(); return render(); }
+  if (t.dataset && t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; if (k === 'name') x.stockId = stockByName(t.value)?.id || null; woDraftSave(); } return; }
   if (t.id === 'nsq') { ui.nsq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vNetshare(); const n = $('nsq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'vq') { ui.vq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vVault(); const n = $('vq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -7473,7 +7503,7 @@ document.addEventListener('change', async e => {
     const M = { ...(j.minByWorker || {}) }; if (v === '' || n <= 0) delete M[uid]; else M[uid] = n;
     try { await upd('jobs', jid, { minByWorker: M }); toast(v === '' || n <= 0 ? `${who(uid)}: как для всех` : `${who(uid)}: минимум ${n} точ. в день`); t.blur(); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
   if (t.id === 'nf-restr') { nsKeep(); return renderDrawer(); }
-  if (t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; if (k === 'name') { x.stockId = stockByName(t.value)?.id || null; document.activeElement?.blur(); renderDrawer(); } } return; }
+  if (t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; woDraftSave(); if (k === 'name') { x.stockId = stockByName(t.value)?.id || null; document.activeElement?.blur(); renderDrawer(); } } return; }
   // the monthly rating of an employee (the last column of «Табель»)
   if (t.dataset.rate) { const [user, ym] = t.dataset.rate.split('|'), score = Number(t.value);
     try { const r = await api('PUT', '/api/staff-ratings', { user, ym, score }); STAFF_RATINGS = STAFF_RATINGS.filter(x => !(x.user === user && x.ym === ym)); if (r.rating) STAFF_RATINGS.push(r.rating);
@@ -7495,7 +7525,7 @@ document.addEventListener('change', async e => {
   if (t.classList.contains('pqty')) { const [oid, pid] = t.dataset.id.split('|'), q = num(t.value); if (!(q > 0)) { toast('Количество должно быть больше нуля'); t.value = prodOf(oid, pid)?.qty ?? 1; return; }
     await guard(updProduct(oid, pid, p => ({ ...p, qty: q }))); render(); return toast('Количество изменено'); }
   if (t.classList.contains('wo-name')) { const it = stockByName(t.value); if (!it) { toast('Нет такой позиции на складе — выберите из списка'); return renderDrawer(); }
-    t.dataset.keys.split('\n').forEach(k => { if (k === 'id:' + it.id) delete ui.woMap[k]; else ui.woMap[k] = it.id; }); return renderDrawer(); }
+    t.dataset.keys.split('\n').forEach(k => { if (k === 'id:' + it.id) delete ui.woMap[k]; else ui.woMap[k] = it.id; }); woDraftSave(); return renderDrawer(); }
   if (t.dataset.ndcolor) { try { await api('PATCH', '/api/dt/needs/' + t.dataset.ndcolor, { color: t.value }); await refresh(); renderDt(); } catch(err) { toast(errText(err)); } return; }
   if (t.id === 'st-day') { ui.stDay = t.value || today(); ui.stMonth = ui.stDay.slice(0, 7); return render(); }
   if (t.id === 'dr-w') { DRAW.width = Number(t.value) || 4; return; }
