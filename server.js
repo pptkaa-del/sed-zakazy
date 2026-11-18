@@ -1742,7 +1742,10 @@ async function api(req, res, url) {
       if (id) { if (!seen.has(id)) { db.stock[id].acctQty = r.qty; seen.add(id); matched++; } else db.stock[id].acctQty = Math.round((db.stock[id].acctQty + r.qty) * 1000) / 1000; }
       else if (b.createMissing) {
         const nid = newId();
-        db.stock[nid] = { name: r.name, sku: r.sku, unit: r.unit || 'шт', location: '', minQty: 0, note: 'Добавлено из выгрузки 1С', qty: 0, moves: [], acctQty: r.qty, createdAt: now, createdBy: user.id };
+        // a new position: the quantity of the file goes to the accounting and to the actual balance
+        const q0 = r3(Math.max(0, r.qty));
+        db.stock[nid] = { name: r.name, sku: r.sku, unit: r.unit || 'шт', location: '', minQty: 0, note: 'Добавлено из выгрузки 1С', qty: q0, acctQty: r.qty, createdAt: now, createdBy: user.id,
+          moves: q0 > 0 ? [{ id: newId(), type: 'init', qty: q0, acct: true, acctBalance: r.qty, balance: q0, note: 'Новая позиция из выгрузки 1С' + (b.file ? ' (' + String(b.file).slice(0, 200) + ')' : ''), by: user.id, at: now }] : [] };
         seen.add(nid); created++;
       } else skipped++;
     }
