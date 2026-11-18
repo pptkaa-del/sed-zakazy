@@ -1506,7 +1506,7 @@ async function refresh(){
 }
 async function add(col, data){ const r = await api('POST', '/api/'+col, data); await refresh(); return r.id; }
 async function upd(col, id, patch){
-  const o = S[col].find(x => x.id === id); if (o) Object.assign(o, patch);
+  const o = S[col].find(x => x.id === id); if (o) Object.assign(o, patch); if (col === 'stock') STOCK_IX = null;
   try { return await api('PATCH', `/api/${col}/${id}`, patch); }
   finally { refresh().catch(() => {}); }
 }
@@ -2098,12 +2098,12 @@ function acctRows(aoa, hdr, cols){
 let SUG = null, SUG_QUIET = false;
 function suggHide(){ const b = $('sugg'); if (b) b.hidden = true; SUG = null; }
 function suggShow(inp){
-  const q = inp.value.trim(), acct = inp.dataset.sugg === 'acct';
+  const q = inp.value.trim(), acct = inp.dataset.sugg === 'acct', qw = normName(q).split(' ').filter(Boolean);   // the words of the query — once, not per position
   // the positions already in other lines of the same list are not offered again
   const used = new Set([...document.querySelectorAll(inp.dataset.wof ? '[data-wof$="|name"]' : '.wo-name')].filter(x => x !== inp).map(x => normName(x.value)).filter(Boolean));
   // for a write-off: what this order already took is available to it again
   const dr = ui.drawer, src = dr && dr.kind === 'writeoff' ? woSrcOf(dr.ctx === 'jobs' ? 'jobs' : 'orders', dr.id) : null, took = src ? woTaken(src) : {};
-  const L = S.stock.filter(it => (!acct || (Number(it.acctQty) || 0) + (took[it.id] || 0) > 0) && !used.has(normName(it.name)) && (!q || pickHit(normName(it.name), q))).sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 80);
+  const L = S.stock.filter(it => (!acct || (Number(it.acctQty) || 0) + (took[it.id] || 0) > 0) && !used.has(stockNN(it)) && (!qw.length || qw.every(w => stockNN(it).includes(w)))).sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 80);
   let box = $('sugg'); if (!box) { box = document.createElement('div'); box.id = 'sugg'; box.className = 'sugg'; box.setAttribute('role', 'listbox'); document.body.appendChild(box);
     box.addEventListener('pointerdown', e => { const o = e.target.closest('[data-sgi]'); e.preventDefault(); if (o && SUG) suggPick(Number(o.dataset.sgi)); }); }
   if (!L.length) { box.hidden = true; SUG = null; return; }
@@ -2317,7 +2317,7 @@ function orderDetail(o){
 }
 /* ===== Products of an order: components per unit, totals, stock, files ===== */
 const normName = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/["«»'“”„]/g, '').replace(/(\d)\s*[x×х*]\s*(?=\d)/g, '$1х').replace(/\s+/g, ' ').trim();
-const stockFor = c => (c.stockId && S.stock.find(x => x.id === c.stockId)) || stockByName(c.name);
+const stockFor = c => (c.stockId && stockIx().byId.get(c.stockId)) || stockByName(c.name);
 // the 1C export of balances is loaded by the administrator only
 const canAcct = () => me && me.role === 'admin';
 const SOURCE_LABEL = { acct: 'Хватает', short: 'Не хватает', none: 'Нет в бухгалтерских остатках' };
@@ -2352,7 +2352,15 @@ function writeoffLines(o, map){
     return { ...L, source, shortage: source === 'acct' ? 0 : Math.round((L.need - (L.inStock ? L.acct : 0)) * 1000) / 1000, take: L.inStock ? Math.round(Math.max(0, Math.min(L.need, L.acct)) * 1000) / 1000 : 0 };
   });   // in the order the lines were added to the list (not by name)
 }
-const stockByName = n => { const k = normName(n); return k ? S.stock.find(x => normName(x.name) === k) : null; };
+let STOCK_IX = null;
+function stockIx(){
+  if (STOCK_IX && STOCK_IX.src === S.stock && STOCK_IX.n === S.stock.length) return STOCK_IX;
+  const byName = new Map(), byId = new Map(), nn = new Map();
+  for (const it of S.stock) { const k = normName(it.name); nn.set(it, k); byId.set(it.id, it); if (k && !byName.has(k)) byName.set(k, it); }
+  return STOCK_IX = { src: S.stock, n: S.stock.length, byName, byId, nn };
+}
+const stockByName = n => { const k = normName(n); return k ? stockIx().byName.get(k) || null : null; };
+const stockNN = it => stockIx().nn.get(it) ?? normName(it.name);
 const fmtQty = n => (Math.round((Number(n) || 0) * 1000) / 1000).toLocaleString('ru-RU');
 function productsPane(o){
   const ps = o.products || [];
@@ -2388,7 +2396,7 @@ function cpResults(){
   const q = normName($('cp-q')?.value || '');
   if (!q) { box.innerHTML = '<small class="dim">Начните вводить — появятся позиции склада. Если позиции нет, её можно добавить: она появится на складе при сохранении изделия.</small>'; return; }
   const hits = S.stock.filter(it => normName(it.name + ' ' + (it.sku || '')).includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'ru')).slice(0, 30);
-  const exact = S.stock.some(it => normName(it.name) === q);
+  const exact = !!stockIx().byName.get(q);
   box.innerHTML = hits.map(it => `<button type="button" class="cphit" data-act="cpAdd" data-id="${it.id}"><span><b style="font-weight:500">${esc(it.name)}</b><small class="dim">${esc(['факт ' + fmtQty(it.qty), 'бух ' + fmtQty(it.acctQty), it.unit].filter(Boolean).join(' · '))}</small></span><span>+</span></button>`).join('')
     + (exact ? '' : `<button type="button" class="cphit new" data-act="cpNew"><span><b style="font-weight:500">+ Новая позиция склада «${esc($('cp-q').value.trim())}»</b><small class="dim">будет добавлена на склад при сохранении</small></span></button>`);
 }
@@ -5675,8 +5683,10 @@ let woRecheckTimer = null;
 function woFullRecheck(){ clearTimeout(woRecheckTimer); woRecheckTimer = setTimeout(() => {
   const d = ui.drawer; if (!d || d.kind !== 'writeoff') return; const src = woSrcOf(d.ctx === 'jobs' ? 'jobs' : 'orders', d.id), o = src && (d.ctx === 'jobs' ? jobWoDoc(src) : src), D = ui.woFullDraft; if (!o || !D) return;
   const CH = writeoffLines({ ...o, woFull: { lines: D.filter(x => String(x.name || '').trim()).map(x => ({ stockId: x.stockId, name: x.name, unit: x.unit, qty: woQtyNum(x.qty) })) } }, {});
-  document.querySelectorAll('#drawer .wofullt tbody tr[data-selid]').forEach(tr => { const x = D.find(y => y.id === tr.dataset.selid); if (!x) return; const it = stockByName(x.name), c = it && CH.find(L => L.key === 'id:' + it.id), sh = c && c.source !== 'acct';
-    tr.classList.toggle('wofshort', !!sh); const many = it && D.filter(y => stockByName(y.name)?.id === it.id).length > 1;
+  const chMap = new Map(CH.map(L => [L.key, L])), byId = new Map(D.map(y => [y.id, y])), cnt = new Map();
+  D.forEach(y => { const it = stockByName(y.name); if (it) cnt.set(it.id, (cnt.get(it.id) || 0) + 1); });
+  document.querySelectorAll('#drawer .wofullt tbody tr[data-selid]').forEach(tr => { const x = byId.get(tr.dataset.selid); if (!x) return; const it = stockByName(x.name), c = it && chMap.get('id:' + it.id), sh = c && c.source !== 'acct';
+    tr.classList.toggle('wofshort', !!sh); const many = it && cnt.get(it.id) > 1;
     tr.cells[4].innerHTML = it ? fmtQty(c ? c.acct : it.acctQty) : '<span class="bad-t">нет на складе</span>'; tr.cells[6].outerHTML = wofShortCell(it, c, many);
     const qc = tr.cells[3]; qc.querySelector('.wofwill')?.remove(); if (sh) qc.insertAdjacentHTML('beforeend', `<small class="wofwill">спишется <b>${fmtQty(c.take)}</b></small>`); });
 }, 250); }
@@ -5684,7 +5694,7 @@ function woFullRecheck(){ clearTimeout(woRecheckTimer); woRecheckTimer = setTime
 const wofShortCell = (it, c, many) => `<td class="r mono wofsh">${!it ? '<span class="bad-t">—</span>' : c && c.source !== 'acct' ? `<b class="bad-t">${fmtQty(c.shortage)}</b>${many ? '<small class="bad-t">позиция в нескольких строках — количество сложено</small>' : ''}` : '<span class="dim">—</span>'}</td>`;
 // the names wrap: the field grows with its text
 const wofFit = el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; };
-const wofFitAll = () => document.querySelectorAll('#drawer .wofname').forEach(wofFit);
+const wofFitAll = () => { const L = [...document.querySelectorAll('#drawer .wofname')]; L.forEach(el => { el.style.height = 'auto'; }); const H = L.map(el => el.scrollHeight); L.forEach((el, i) => { el.style.height = H[i] + 2 + 'px'; }); };
 // the saved write-off differs from the current lines (something was added, removed or changed after «Сохранить список»)
 function woStale(o, L){
   if (!(o?.writeoff?.applied)) return false; const a = woTaken(o), b = {};
@@ -5710,8 +5720,10 @@ function woFullHtml(o, ed, col = 'orders'){
     ui.woFullUnits = String((o.woDraft && o.woDraft.full && o.woDraft.units != null ? o.woDraft.units : on ? o.woFull.units : '') ?? ''); }
   const D = ui.woFullDraft;
   const CH = writeoffLines({ ...o, woFull: { lines: D.filter(x => String(x.name || '').trim()).map(x => ({ stockId: x.stockId, name: x.name, unit: x.unit, qty: woQtyNum(x.qty) })) } }, {});
-  const chOf = x => { const it = stockByName(x.name); return it ? CH.find(L => L.key === 'id:' + it.id) : null; };
-  const twice = x => { const it = stockByName(x.name); return it && D.filter(y => stockByName(y.name)?.id === it.id).length > 1; };
+  const chMap = new Map(CH.map(L => [L.key, L])), cnt = new Map();
+  D.forEach(y => { const it = stockByName(y.name); if (it) cnt.set(it.id, (cnt.get(it.id) || 0) + 1); });
+  const chOf = x => { const it = stockByName(x.name); return it ? chMap.get('id:' + it.id) || null : null; };
+  const twice = x => { const it = stockByName(x.name); return !!it && cnt.get(it.id) > 1; };
   return seg + `<section class="box wofull"><h4>${job ? 'Список на весь объём работы' : 'Список на весь объём'}${on ? ` <span class="dim">· сохранён ${esc(fmtDT(o.woFull.at))} · ${esc(who(o.woFull.by))}</span>` : ''}</h4>
     <small class="dim">${job ? 'Материалы на весь объём работы. Пока этот список есть, материалы работы («+ Материалы» в карточке) при списании не считаются.' : 'Материалы на всё производство заказа. Пока этот список есть, списание по изделиям заказа не считается.'} Номенклатура — из бухгалтерских остатков склада.</small>
     ${ed ? `    <div class="wofunits" data-keep><label>${job ? 'Объём работ, шт' : 'Количество продукции, шт'} <input class="in mono" id="wof-units" value="${esc(ui.woFullUnits || '')}" inputmode="decimal" placeholder="например, 27"></label><small class="dim">Заполните «На 1 шт» — количество посчитается: ${job ? 'объём' : 'продукция'} × на 1 шт. Количество можно ввести и вручную.</small></div>
