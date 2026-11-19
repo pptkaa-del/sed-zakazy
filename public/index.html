@@ -3847,6 +3847,11 @@ const lblPage = t => [t.w, t.h];
 /* the transform of the drawing on the page: «Поворот рисунка» (90°/270° — sideways, made smaller to fit the same label, centered)
    plus «Принтер печатает вверх ногами» (another 180°), plus the shifts */
 function lblTf(t, k0 = 1){
+  const sc = Math.max(30, Math.min(200, Number(t.scale) || 100)) / 100, u = k0 === 1 ? 'mm' : 'px', W0 = t.w * k0, H0 = t.h * k0;
+  const base = lblTf0({ ...t, dx: 0, dy: 0 }, k0), dx = (Number(t.dx) || 0) * k0, dy = (Number(t.dy) || 0) * k0;
+  return (dx || dy ? `translate(${dx}${u},${dy}${u}) ` : '') + (sc !== 1 ? `translate(${W0 / 2}${u},${H0 / 2}${u}) scale(${sc}) translate(${-W0 / 2}${u},${-H0 / 2}${u}) ` : '') + base;
+}
+function lblTf0(t, k0 = 1){
   const w = t.w, h = t.h, a = ((Number(t.rot) || 0) + (t.flip ? 180 : 0)) % 360, dx = (Number(t.dx) || 0) * k0, dy = (Number(t.dy) || 0) * k0, u = k0 === 1 ? 'mm' : 'px';
   const W = w * k0, H = h * k0;
   if (a === 90 || a === 270) { const k = Math.min(w / h, h / w), ox = (W - H * k) / 2, oy = (H - W * k) / 2;
@@ -3983,6 +3988,9 @@ function lblForm(t){
       <div class="lblshrow"><button type="button" class="btn sm" data-act="lblShift" data-id="dx|-0.5" title="Сдвинуть влево на 0,5 мм">← влево</button>${n('dx', t.dx || 0, 'aria-label="Сдвиг по горизонтали, мм: плюс — вправо, минус — влево"')}<button type="button" class="btn sm" data-act="lblShift" data-id="dx|0.5" title="Сдвинуть вправо на 0,5 мм">вправо →</button></div>
       <div class="lblshrow"><button type="button" class="btn sm" data-act="lblShift" data-id="dy|-0.5" title="Сдвинуть вверх на 0,5 мм">↑ вверх</button>${n('dy', t.dy || 0, 'aria-label="Сдвиг по вертикали, мм: плюс — вниз, минус — вверх"')}<button type="button" class="btn sm" data-act="lblShift" data-id="dy|0.5" title="Сдвинуть вниз на 0,5 мм">вниз ↓</button></div>
       <small class="dim" id="lbl-shtxt">${lblShiftTxt(t)}</small></div>
+    <div class="wide lblshift"><span class="flab">Масштаб печати, %</span>
+      <div class="lblshrow"><button type="button" class="btn sm" data-act="lblShift" data-id="scale|-5" title="Уменьшить на 5 %">− 5 %</button>${n('scale', t.scale || 100, 'aria-label="Масштаб печати, %"')}<button type="button" class="btn sm" data-act="lblShift" data-id="scale|5" title="Увеличить на 5 %">+ 5 %</button><button type="button" class="btn sm ghost" data-act="lblShift" data-id="scale|=100">100 %</button></div>
+      <small class="dim">Увеличивает или уменьшает всё, что нарисовано, от центра этикетки — если надпись не помещается или слишком мелкая. От 30 до 200 %.</small></div>
     <div class="wide lblturn"><span class="flab">Как ляжет на этикетку</span><div id="lbl-turn">${lblTurnHtml(t)}</div></div>
     <small class="wide dim">«Поворот рисунка» 90° кладёт всё, что нарисовано, на ту же этикетку боком (рисунок уменьшается, чтобы поместиться). Если этикетка выходит из принтера вверх ногами — отметьте «Принтер печатает вверх ногами». Настройки запоминаются для этой этикетки сразу и действуют на всех компьютерах. На принтер уходит страница <b class="mono" id="lbl-pagesz">${lblPage(t)[0]}×${lblPage(t)[1]} мм</b> — такой же размер бумаги поставьте в настройках принтера. Сдвиг поправляет печать, если она смещена относительно этикетки.</small></div>
   <h4 class="sub-h">Серийный номер</h4>
@@ -4027,13 +4035,14 @@ function lblChange(key, el){
   else if (key === 'w' || key === 'h') { if (nv > 0) t[key] = nv; }
   else if (key === 'rot') t.rot = Number(v) || 0;
   else if (key === 'flip') t.flip = !!v;
+  else if (key === 'scale') { if (nv > 0) t.scale = Math.max(30, Math.min(200, Math.round(nv))); }
   else if (key === 'dx' || key === 'dy') { t[key] = Number.isFinite(nv) ? Math.max(-30, Math.min(30, nv)) : 0; }
   else if (key.startsWith('serial.')) { const k = key.slice(7); t.serial[k] = k === 'digits' ? Math.max(1, Math.min(12, nv | 0 || 1)) : v; }
   else if (key.startsWith('it.e:') && sel) { const k = key.slice(5), E = qrEls(sel, t).filter(x => x !== k); sel.els = (t.items || []).map(e => e.id).filter(id => id === k ? v : E.includes(id)); }
   else if (key.startsWith('it.f:') && sel) { const k = key.slice(5), F = (sel.fields || []).filter(x => x !== k); sel.fields = v ? QR_FIELDS.map(f => f[0]).filter(f => f === k || F.includes(f)) : F; }
   else if (key.startsWith('it.') && sel) { const k = key.slice(3); sel[k] = ['text', 'align', 'bold', 'mode', 'sep', 'ec', 'lock', 'bw'].includes(k) ? v : (Number.isFinite(nv) ? nv : sel[k]); if (sel.type === 'qr' && k === 'w') sel.h = sel.w;
     if (sel.type === 'image' && sel.lock !== false && (k === 'w' || k === 'h') && sel.ar) { if (k === 'w') sel.h = Math.round(sel.w / sel.ar * 10) / 10; else sel.w = Math.round(sel.h * sel.ar * 10) / 10; const o = document.querySelector(`[data-lb="it.${k === 'w' ? 'h' : 'w'}"]`); if (o) o.value = k === 'w' ? sel.h : sel.w; } }
-  if ((key === 'rot' || key === 'flip' || key === 'dx' || key === 'dy') && ui.lblId && canEdit()) { clearTimeout(ui.lblRotT); ui.lblRotT = setTimeout(async () => { if (await lblSave()) toast(key === 'rot' ? `Поворот рисунка: ${({ 0: 'нет', 90: '90° по часовой', 180: '180°', 270: '90° против часовой' })[t.rot] || t.rot} — сохранено` : key === 'flip' ? (t.flip ? 'Печать перевёрнута на 180° — сохранено' : 'Переворот снят — сохранено') : 'Сдвиг сохранён'); }, key === 'rot' ? 0 : 600); }
+  if ((key === 'rot' || key === 'flip' || key === 'dx' || key === 'dy' || key === 'scale') && ui.lblId && canEdit()) { clearTimeout(ui.lblRotT); ui.lblRotT = setTimeout(async () => { if (await lblSave()) toast(key === 'rot' ? `Поворот рисунка: ${({ 0: 'нет', 90: '90° по часовой', 180: '180°', 270: '90° против часовой' })[t.rot] || t.rot} — сохранено` : key === 'flip' ? (t.flip ? 'Печать перевёрнута на 180° — сохранено' : 'Переворот снят — сохранено') : key === 'scale' ? `Масштаб ${t.scale || 100} % — сохранено` : 'Сдвиг сохранён'); }, key === 'rot' ? 0 : 600); }
   ui.lblDirty = true; lblRedraw(key === 'size' || key === 'serial.prefix' || key === 'serial.suffix' || key === 'serial.digits' || key === 'it.mode' || key.startsWith('it.f:') || key.startsWith('it.e:'));
   const qn = $('qr-now'); if (qn && sel && sel.type === 'qr') qn.textContent = qrValue(sel, t, ui.lblMan || t.serial.next, { ...lblCtx(t), scan: ui.lblScan || '‹скан›', date: ui.lblDate }) || '—';
 }
@@ -4050,7 +4059,7 @@ function lblRedraw(full){
 }
 async function lblSave(){
   const t = lblDraft(); if (!t || !canEdit()) return true;
-  const body = { name: t.name, w: t.w, h: t.h, ref: t.ref, rot: Number(t.rot) || 0, flip: !!t.flip, dx: Number(t.dx) || 0, dy: Number(t.dy) || 0, serial: { prefix: t.serial.prefix, suffix: t.serial.suffix, digits: t.serial.digits }, items: t.items };
+  const body = { name: t.name, w: t.w, h: t.h, ref: t.ref, rot: Number(t.rot) || 0, flip: !!t.flip, scale: Number(t.scale) || 100, dx: Number(t.dx) || 0, dy: Number(t.dy) || 0, serial: { prefix: t.serial.prefix, suffix: t.serial.suffix, digits: t.serial.digits }, items: t.items };
   try {
     const r = ui.lblId ? await api('PUT', '/api/labels/' + ui.lblId, body) : await api('POST', '/api/labels', { ...body, serial: { ...body.serial, next: t.serial.next } });
     const L = r.label, i = LABELS.findIndex(x => x.id === L.id); if (i >= 0) LABELS[i] = L; else LABELS.push(L);
@@ -7443,7 +7452,8 @@ async function act(el){
     case 'lblDel': { const t = lblDraft(); t.items = t.items.filter(x => x.id !== id); if (ui.lblSel === id) ui.lblSel = t.items[0]?.id || null; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); return; }
     case 'lblUp': { const t = lblDraft(), i = t.items.findIndex(x => x.id === id); if (i > 0) { [t.items[i - 1], t.items[i]] = [t.items[i], t.items[i - 1]]; ui.lblDirty = true; lblRedraw(); document.querySelector('.lblform').innerHTML = lblForm(t); } return; }
     case 'lblShift': { const [k, d] = id.split('|'), t = lblDraft(), inp = document.querySelector(`[data-lb="${k}"]`); if (!t || !inp) return;
-      const v = Math.max(-30, Math.min(30, Math.round(((Number(t[k]) || 0) + Number(d)) * 10) / 10)); inp.value = String(v); lblChange(k, inp); return; }
+      const v = k === 'scale' ? (d.startsWith('=') ? Number(d.slice(1)) : Math.max(30, Math.min(200, Math.round((Number(t.scale) || 100) + Number(d)))))
+        : Math.max(-30, Math.min(30, Math.round(((Number(t[k]) || 0) + Number(d)) * 10) / 10)); inp.value = String(v); lblChange(k, inp); return; }
     case 'lblIns': { const ta = document.querySelector('[data-lb="it.text"]'); if (!ta) return; ta.value += id; lblChange('it.text', ta); ta.focus(); return; }
     case 'lblSave': if (await lblSave()) { toast('Этикетка сохранена'); $('view').innerHTML = refTabs() + vLabels(); } return;
     case 'lblRemove': try { await api('DELETE', '/api/labels/' + id); LABELS = LABELS.filter(x => x.id !== id); lblPick(null); render(); toast('Этикетка удалена'); } catch(e) { toast(errText(e)); } return;
