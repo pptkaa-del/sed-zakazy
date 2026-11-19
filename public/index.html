@@ -3964,7 +3964,7 @@ function lblForm(t){
   <h4 class="sub-h">Как этикетка лежит в принтере</h4>
   <div class="form"><label>Поворот при печати<select class="in" data-lb="rot">${[[0, 'нет — как на экране'], [90, '90° по часовой'], [180, '180°'], [270, '90° против часовой']].map(([r, l]) => `<option value="${r}" ${(Number(t.rot) || 0) === r ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <span class="lblwh"><label>Сдвиг вправо, мм${n('dx', t.dx || 0)}</label><label>Сдвиг вниз, мм${n('dy', t.dy || 0)}</label></span>
-    <small class="wide dim">Если надпись уходит на соседнюю этикетку или печатается боком — этикетка лежит в принтере поперёк: выберите поворот 90°. На принтер уходит страница <b class="mono" id="lbl-pagesz">${lblPage(t)[0]}×${lblPage(t)[1]} мм</b> — такой же размер бумаги и ориентацию поставьте в настройках принтера. Сдвиг поправляет печать, если она смещена относительно этикетки.</small></div>
+    <small class="wide dim"><b>Этикетка выходит вверх ногами — выберите «180°».</b> Поворот запоминается для этой этикетки сразу и действует на всех компьютерах. Если надпись уходит на соседнюю этикетку или печатается боком — этикетка лежит в принтере поперёк: выберите поворот 90°. На принтер уходит страница <b class="mono" id="lbl-pagesz">${lblPage(t)[0]}×${lblPage(t)[1]} мм</b> — такой же размер бумаги и ориентацию поставьте в настройках принтера. Сдвиг поправляет печать, если она смещена относительно этикетки.</small></div>
   <h4 class="sub-h">Серийный номер</h4>
   <div class="form"><label>Префикс${`<input class="in mono" data-lb="serial.prefix" value="${esc(t.serial.prefix)}" maxlength="30">`}</label><label>Цифр${n('serial.digits', t.serial.digits)}</label>
     <label>Суффикс<input class="in mono" data-lb="serial.suffix" value="${esc(t.serial.suffix)}" maxlength="30"></label>
@@ -4012,6 +4012,7 @@ function lblChange(key, el){
   else if (key.startsWith('it.f:') && sel) { const k = key.slice(5), F = (sel.fields || []).filter(x => x !== k); sel.fields = v ? QR_FIELDS.map(f => f[0]).filter(f => f === k || F.includes(f)) : F; }
   else if (key.startsWith('it.') && sel) { const k = key.slice(3); sel[k] = ['text', 'align', 'bold', 'mode', 'sep', 'ec', 'lock', 'bw'].includes(k) ? v : (Number.isFinite(nv) ? nv : sel[k]); if (sel.type === 'qr' && k === 'w') sel.h = sel.w;
     if (sel.type === 'image' && sel.lock !== false && (k === 'w' || k === 'h') && sel.ar) { if (k === 'w') sel.h = Math.round(sel.w / sel.ar * 10) / 10; else sel.w = Math.round(sel.h * sel.ar * 10) / 10; const o = document.querySelector(`[data-lb="it.${k === 'w' ? 'h' : 'w'}"]`); if (o) o.value = k === 'w' ? sel.h : sel.w; } }
+  if ((key === 'rot' || key === 'dx' || key === 'dy') && ui.lblId && canEdit()) { clearTimeout(ui.lblRotT); ui.lblRotT = setTimeout(async () => { if (await lblSave()) toast(key === 'rot' ? `Поворот при печати: ${({ 0: 'нет', 90: '90° по часовой', 180: '180°', 270: '90° против часовой' })[t.rot] || t.rot} — сохранено` : 'Сдвиг сохранён'); }, key === 'rot' ? 0 : 600); }
   ui.lblDirty = true; lblRedraw(key === 'size' || key === 'serial.prefix' || key === 'serial.suffix' || key === 'serial.digits' || key === 'it.mode' || key.startsWith('it.f:') || key.startsWith('it.e:'));
   const qn = $('qr-now'); if (qn && sel && sel.type === 'qr') qn.textContent = qrValue(sel, t, ui.lblMan || t.serial.next, { ...lblCtx(t), scan: ui.lblScan || '‹скан›', date: ui.lblDate }) || '—';
 }
@@ -4027,7 +4028,7 @@ function lblRedraw(full){
 }
 async function lblSave(){
   const t = lblDraft(); if (!t || !canEdit()) return true;
-  const body = { name: t.name, w: t.w, h: t.h, ref: t.ref, serial: { prefix: t.serial.prefix, suffix: t.serial.suffix, digits: t.serial.digits }, items: t.items };
+  const body = { name: t.name, w: t.w, h: t.h, ref: t.ref, rot: Number(t.rot) || 0, dx: Number(t.dx) || 0, dy: Number(t.dy) || 0, serial: { prefix: t.serial.prefix, suffix: t.serial.suffix, digits: t.serial.digits }, items: t.items };
   try {
     const r = ui.lblId ? await api('PUT', '/api/labels/' + ui.lblId, body) : await api('POST', '/api/labels', { ...body, serial: { ...body.serial, next: t.serial.next } });
     const L = r.label, i = LABELS.findIndex(x => x.id === L.id); if (i >= 0) LABELS[i] = L; else LABELS.push(L);
