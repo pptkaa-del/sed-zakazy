@@ -353,7 +353,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh'] };
+const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'sn'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -663,7 +663,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -1178,6 +1178,29 @@ async function api(req, res, url) {
     const x = p[3] && L.find(e => e.id === p[3]); if (!x) return fail(res, 404, 'Запись не найдена — обновите страницу');
     if (m === 'PUT') { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); x.data = vaultEnc(v); x.updatedAt = now; saveDb(); return send(res, 200, { ok: true, item: open(x), rev: db.rev }); }
     if (m === 'DELETE') { V[kind] = L.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Сопоставление SN»: IMEI and SN of a device (from the scanner) with the ICCID of its SIM card; each number may be recorded only once */
+  if (p[1] === 'snmap') {
+    if (orgType(user) === 'requests' || !sees(user, 'refs:sn')) return fail(res, 403, 'Этот раздел для вас закрыт');
+    if (!Array.isArray(db.snmap)) db.snmap = [];
+    const L = db.snmap, F = { imei: 'IMEI', sn: 'SN', iccid: 'ICCID' }, num = v => String(v ?? '').replace(/\s+/g, '').toUpperCase().slice(0, 40);
+    const pub = x => ({ id: x.id, imei: x.imei, sn: x.sn, iccid: x.iccid, at: x.at, by: x.by, updatedAt: x.updatedAt || null });
+    const dup = (k, v, self) => v && L.find(e => e !== self && e[k] === v);
+    if (m === 'GET' && !p[2]) return send(res, 200, { list: L.map(pub) });
+    if (m === 'POST' && !p[2]) {
+      const b = await readJsonBody(req) || {}, x = { imei: num(b.imei), sn: num(b.sn), iccid: num(b.iccid) };
+      for (const k of Object.keys(F)) { if (!x[k]) return fail(res, 400, 'Не указан ' + F[k]); const d = dup(k, x[k]); if (d) return fail(res, 409, `${F[k]} ${x[k]} уже записан (${new Date(d.at).toLocaleDateString('ru-RU')})`); }
+      if (L.length >= 100000) return fail(res, 400, 'Слишком много записей');
+      const it = { id: newId(), ...x, at: new Date().toISOString(), by: user.id }; L.push(it); saveDb(); return send(res, 200, { ok: true, item: pub(it), rev: db.rev });
+    }
+    const x = p[2] && L.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Запись не найдена — обновите страницу');
+    if (m === 'PUT') {
+      const b = await readJsonBody(req) || {}, upd = {};
+      for (const k of Object.keys(F)) if (b[k] !== undefined) { const v = num(b[k]); if (!v) return fail(res, 400, F[k] + ' не может быть пустым'); const d = dup(k, v, x); if (d) return fail(res, 409, `${F[k]} ${v} уже записан в другой строке`); upd[k] = v; }
+      Object.assign(x, upd, { updatedAt: new Date().toISOString() }); saveDb(); return send(res, 200, { ok: true, item: pub(x), rev: db.rev });
+    }
+    if (m === 'DELETE') { if (!HEAD(user) && x.by !== user.id) return fail(res, 403, 'Удалить строку может тот, кто её записал, или руководитель'); db.snmap = L.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'refs') {
