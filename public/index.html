@@ -357,6 +357,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .nsmsg{padding:6px 14px 6px calc(52px + var(--d,0) * 20px);font-size:13px;border-bottom:1px solid var(--rule-2)}
 .nscmdw{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0}.nscmdw .nscmd{margin:0;align-self:stretch}.nscmd{margin:6px 0;padding:8px 10px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-all;font-family:var(--f-mono,ui-monospace,monospace)}.nssteps{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 @media (max-width:640px){.nshead{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nshead span:last-child{display:none}.nsrow{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nsrow .nsmeta:last-child{display:none}}
+.snbox{max-width:760px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:center;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:140px;height:140px;background:#fff;flex:none}.snqrimg svg{width:100%;height:100%}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
 .vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
 .sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
@@ -1462,7 +1463,7 @@ function errText(err){
 }
 /* ---------- editing a text right where it is shown: double click, Enter saves (Shift+Enter — a new line in long texts), Esc cancels ---------- */
 const edAttr = (col, id, field, multi) => canEdit() || col === 'notes' ? `data-ed="${col}|${esc(id)}|${field}${multi ? '|m' : ''}" title="Дважды щёлкните, чтобы изменить"` : '';
-const edValue = (col, id, field) => { const x = col === 'notes' ? NOTES.find(n => n.id === id) : (S[col] || []).find(d => d.id === id); return x ? String(x[field] ?? '') : ''; };
+const edValue = (col, id, field) => { const x = col === 'snmap' ? (Array.isArray(SNMAP) ? SNMAP : []).find(n => n.id === id) : col === 'notes' ? NOTES.find(n => n.id === id) : (S[col] || []).find(d => d.id === id); return x ? String(x[field] ?? '') : ''; };
 let edActive = null;
 document.addEventListener('dblclick', e => {
   const el = e.target.closest('[data-ed]'); if (!el || edActive) return;
@@ -1477,7 +1478,8 @@ document.addEventListener('dblclick', e => {
     if (!save || v === old.trim()) { inp.blur(); render(); if (ui.drawer) renderDrawer(); return; }
     if (!v && ['title', 'name', 'text'].includes(field)) { toast('Поле не может быть пустым'); render(); if (ui.drawer) renderDrawer(); return; }
     try {
-      if (col === 'notes') { const r = await api('PATCH', '/api/notes/' + id, { [field]: v }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); }
+      if (col === 'snmap') { const r = await api('PUT', '/api/snmap/' + id, { [field]: v }); const i = SNMAP.findIndex(x => x.id === id); if (i >= 0) SNMAP[i] = r.item; }
+      else if (col === 'notes') { const r = await api('PATCH', '/api/notes/' + id, { [field]: v }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); }
       else await upd(col, id, { [field]: v });
       toast('Сохранено');
     } catch(err) { toast(errText(err)); }
@@ -1554,11 +1556,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['sn', 'Сопоставление SN']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
-const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh' };
+const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:sn' };
 const viewOk = v => !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
 // the checkbox tree of the organization and user forms: checked — shown; what the organization hides is not offered to its users
 function secTree(hide, orgHide){
@@ -1654,7 +1656,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? vSnmap() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -4719,8 +4721,96 @@ const refGroupKey = r => r.scope?.type === 'job' ? 'j:' + r.scope.jobId : r.scop
 const refGroupName = r => r.scope?.type === 'job' ? (jobOf(r.scope.jobId) ? `№ ${jobNo(jobOf(r.scope.jobId))} · ${jobOf(r.scope.jobId).title}` : r.scope.name) : r.scope?.type === 'other' ? r.scope.name : 'Общая информация';
 const fileIco = f => { const e = ((f.name || '').split('.').pop() || '').toLowerCase(); return /^image\//.test(f.type || '') ? '🖼' : e === 'pdf' ? '📕' : /^(xlsx?|csv|ods)$/.test(e) ? '📊' : /^(docx?|odt|rtf)$/.test(e) ? '📄' : '📎'; };
 /* ===== «Справочники и инструменты»: справочники, рисовалка, личное хранилище ===== */
-const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh'];
-const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль']];
+/* ===== «Сопоставление SN»: IMEI + SN from the scanner, then the ICCID of the SIM card — one row of the table ===== */
+let SNMAP = null;
+const SN_F = [['imei', 'IMEI'], ['sn', 'SN'], ['iccid', 'ICCID']];
+async function loadSnmap(){ try { SNMAP = (await api('GET', '/api/snmap')).list || []; } catch(e) { SNMAP = { err: errText(e) }; } render(); }
+// «IMEI:868191051428009,SN:00501824112600015503» (also «MEI:…», a scanner in the Russian layout — «ШЬУШЖ…», or just two numbers)
+function snParse(s){
+  s = String(s || '').trim(); if (!s) return null;
+  const im = s.match(/(?:I?MEI|ШЬУШ|ЬУШ)\s*[:=Ж;]?\s*(\d{6,20})/i), sn = s.match(/(?:\bSN|ЫТ|S\/N)\s*[:=Ж;]?\s*([0-9A-Za-z]{4,40})/i);
+  if (im && sn) return { imei: im[1], sn: sn[1].toUpperCase() };
+  const g = s.match(/\d{6,}/g) || [];
+  return g.length >= 2 ? { imei: g[0], sn: g[1] } : null;
+}
+const snIccid = s => String(s || '').replace(/\s+/g, '').toUpperCase();
+const snDup = (k, v, self) => Array.isArray(SNMAP) && v ? SNMAP.find(e => e.id !== self && e[k] === v) : null;
+const snQrText = x => `IMEI:${x.imei},SN:${x.sn},ICCID:${x.iccid}`;
+function vSnmap(){
+  if (!SNMAP) { loadSnmap(); return '<div class="empty">Загружаем…</div>'; }
+  if (SNMAP.err) return `<div class="empty"><h3>Раздел недоступен</h3>${esc(SNMAP.err)}</div>`;
+  const P = ui.snPend;
+  return `<section class="card snbox"><h3 style="margin:0 0 10px">Сопоставление SN</h3>
+    <div class="snin"><label><span class="flab">1. Ввод со сканера</span><span data-keep style="display:contents"><input class="in mono" id="sn-scan" autocomplete="off" placeholder="IMEI:868191051428009,SN:00501824112600015503" value="${esc(ui.snScan || '')}" ${P ? 'disabled' : ''}></span></label>
+      <div class="snpend" id="sn-pend">${snPendHtml()}</div>
+      <label><span class="flab">2. Сим-карта (ICCID)</span><span data-keep style="display:contents"><input class="in mono" id="sn-sim" autocomplete="off" inputmode="numeric" placeholder="897019925050990299" value="${esc(ui.snSim || '')}" ${P ? '' : 'disabled'}></span></label></div>
+    <small class="dim">Отсканируйте код устройства и нажмите Enter — появятся IMEI и SN, курсор перейдёт к сим-карте. Отсканируйте сим-карту и нажмите Enter — строка запишется в таблицу, поля очистятся, курсор вернётся в поле 1. Esc — начать заново. Каждый IMEI, SN и ICCID можно записать только один раз.</small></section>
+    <div class="toolbar" style="margin-top:14px"><b>Записано: <span id="sn-cnt">${SNMAP.length}</span></b><span data-keep style="display:contents"><input class="in" id="snq" type="search" placeholder="Поиск по IMEI, SN, ICCID" aria-label="Поиск" value="${esc(ui.snq || '')}" style="flex:1 1 200px;max-width:320px"></span>
+      <button class="btn" data-act="snXlsx">⬇ Скачать Excel</button></div>
+    <div id="sn-qr">${snQrHtml()}</div><div id="sn-tbl">${snTable()}</div>`;
+}
+const snPendHtml = () => ui.snPend ? `<div class="mono">IMEI: <b>${esc(ui.snPend.imei)}</b></div><div class="mono">SN: <b>${esc(ui.snPend.sn)}</b></div>` : '';
+function snTable(){
+  const q = (ui.snq || '').replace(/\s+/g, '').toUpperCase(), all = SNMAP.map((x, i) => ({ ...x, no: i + 1 })).reverse();
+  const L = q ? all.filter(x => [x.imei, x.sn, x.iccid].some(v => String(v).includes(q))) : all, lim = ui.snAll ? L.length : 300;
+  if (!SNMAP.length) return '<div class="empty">Пока ничего не записано</div>';
+  if (!L.length) return '<div class="empty">Ничего не найдено</div>';
+  const cell = (x, k) => `<td><span class="mono" ${`data-ed="snmap|${esc(x.id)}|${k}" title="Дважды щёлкните, чтобы изменить"`}>${esc(x[k])}</span> <button class="linkish" data-act="snCopy" data-id="${x.id}|${k}" title="Скопировать">📋</button></td>`;
+  return `<div class="tblwrap card" style="padding:0"><table class="comp sntbl"><thead><tr><th>№</th>${SN_F.map(([, l]) => `<th>${l}</th>`).join('')}<th>Записал</th><th></th></tr></thead><tbody>
+    ${L.slice(0, lim).map(x => `<tr class="${ui.snQr === x.id ? 'sel' : ''}"><td class="dim">${x.no}</td>${SN_F.map(([k]) => cell(x, k)).join('')}<td class="dim" style="white-space:nowrap">${esc(who(x.by))}<br><small>${fmtDT(x.at)}</small></td>
+      <td style="white-space:nowrap"><button class="btn sm" data-act="snQr" data-id="${x.id}" title="Сгенерировать QR-код и скопировать его в буфер обмена">QR-код</button>${isHead() || x.by === me.id ? ' ' + armBtn('snd:' + x.id, '✕', 'snDel', x.id, 'btn sm ghost') : ''}</td></tr>`).join('')}</tbody></table></div>
+    ${L.length > lim ? `<p class="dim">Показаны последние ${lim} из ${L.length}. <button class="linkish" data-act="snAll">Показать все</button></p>` : ''}`;
+}
+function snQrHtml(){
+  const x = ui.snQr && Array.isArray(SNMAP) && SNMAP.find(e => e.id === ui.snQr); if (!x) return '';
+  return `<div class="card snqr"><div class="snqrimg">${qrSvg(snQrText(x), 'M')}</div><div><div class="mono" style="word-break:break-all">${esc(snQrText(x))}</div>
+    <div class="row-g" style="margin-top:8px"><button class="btn sm primary" data-act="snQrCopy" data-id="${x.id}">📋 Скопировать QR-код</button><button class="btn sm" data-act="snQrPng" data-id="${x.id}">⬇ Скачать PNG</button><button class="btn sm ghost" data-act="snQrClose">Закрыть</button></div></div></div>`;
+}
+const snRedraw = () => { const n = $('sn-cnt'); if (n) n.textContent = SNMAP.length; const t = $('sn-tbl'); if (t) t.innerHTML = snTable(); const q = $('sn-qr'); if (q) q.innerHTML = snQrHtml(); };
+function snCanvas(text, px = 8){
+  const q = window.qrcode(0, 'M'); q.addData(String(text), 'Byte'); q.make(); const N = q.getModuleCount(), B = 4, c = document.createElement('canvas'); c.width = c.height = (N + B * 2) * px;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+  for (let r = 0; r < N; r++) for (let k = 0; k < N; k++) if (q.isDark(r, k)) g.fillRect((k + B) * px, (r + B) * px, px, px);
+  return c;
+}
+// the clipboard API works only over HTTPS (or on localhost); otherwise the picture is copied the old way, through a selection
+async function snCopyImg(c){
+  if (window.ClipboardItem && navigator.clipboard?.write) { try { const b = await new Promise(r => c.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); return true; } catch(e) {} }
+  try { const d = document.createElement('div'); d.contentEditable = 'true'; d.style.cssText = 'position:fixed;left:-9999px;top:0'; const im = new Image(); im.src = c.toDataURL('image/png'); im.width = c.width / 2; d.appendChild(im); document.body.appendChild(d);
+    const rg = document.createRange(); rg.selectNodeContents(d); const s = getSelection(); s.removeAllRanges(); s.addRange(rg); const ok = document.execCommand('copy'); s.removeAllRanges(); d.remove(); return ok; } catch(e) { return false; }
+}
+async function snCopyTxt(t){
+  if (navigator.clipboard?.writeText) { try { await navigator.clipboard.writeText(t); return true; } catch(e) {} }
+  try { const a = document.createElement('textarea'); a.value = t; a.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(a); a.select(); const ok = document.execCommand('copy'); a.remove(); return ok; } catch(e) { return false; }
+}
+async function snQrCopy(id){ const x = SNMAP.find(e => e.id === id); if (!x) return; const ok = await snCopyImg(snCanvas(snQrText(x))); toast(ok ? 'QR-код скопирован — вставьте его (Ctrl+V)' : 'Не удалось скопировать — нажмите «Скачать PNG»'); }
+function snReset(focus = true){ ui.snPend = null; ui.snScan = ''; ui.snSim = ''; const a = $('sn-scan'), b = $('sn-sim'), p = $('sn-pend'); if (a) { a.value = ''; a.disabled = false; } if (b) { b.value = ''; b.disabled = true; } if (p) p.innerHTML = ''; if (focus && a) a.focus(); }
+let snBusy = false;
+async function snKey(e){
+  const t = e.target;
+  if (e.key === 'Escape' && (t.id === 'sn-sim' || t.id === 'sn-scan')) { e.preventDefault(); snReset(); return; }
+  if (e.key !== 'Enter') return;
+  if (t.id === 'sn-scan') { e.preventDefault(); const v = snParse(t.value); if (!v) { toast('Не найдены IMEI и SN — отсканируйте ещё раз'); t.select(); return; }
+    const d = snDup('imei', v.imei) ? ['IMEI', v.imei, snDup('imei', v.imei)] : snDup('sn', v.sn) ? ['SN', v.sn, snDup('sn', v.sn)] : null;
+    if (d) { toast(`${d[0]} ${d[1]} уже записан (строка № ${SNMAP.indexOf(d[2]) + 1})`); t.select(); return; }
+    ui.snPend = v; ui.snScan = t.value; $('sn-pend').innerHTML = snPendHtml(); t.disabled = true; const b = $('sn-sim'); b.disabled = false; b.value = ''; b.focus(); return; }
+  if (t.id === 'sn-sim') { e.preventDefault(); if (snBusy || !ui.snPend) return; const iccid = snIccid(t.value);
+    if (!/^[0-9A-F]{10,22}$/.test(iccid)) { toast('ICCID — от 10 до 22 цифр, отсканируйте сим-карту ещё раз'); t.select(); return; }
+    const d = snDup('iccid', iccid); if (d) { toast(`ICCID ${iccid} уже записан (строка № ${SNMAP.indexOf(d) + 1})`); t.select(); return; }
+    snBusy = true; try { const r = await api('POST', '/api/snmap', { ...ui.snPend, iccid }); SNMAP.push(r.item); toast('Записано: строка № ' + SNMAP.length); snReset(); snRedraw(); }
+    catch(err) { toast(errText(err)); t.select(); } finally { snBusy = false; } }
+}
+document.addEventListener('keydown', e => { if (e.target && (e.target.id === 'sn-scan' || e.target.id === 'sn-sim')) snKey(e); });
+async function snXlsx(){
+  if (!SNMAP.length) return toast('Таблица пустая');
+  const X = await loadSheetJS(), wb = X.utils.book_new(), a = [['IMEI', 'SN', 'ICCID'], ...SNMAP.map(x => [x.imei, x.sn, x.iccid])];
+  const ws = X.utils.aoa_to_sheet(a); ws['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 24 }];
+  // the numbers are text — otherwise Excel shows 8.97E+17 and drops the leading zeros
+  for (let r = 1; r < a.length; r++) for (let c = 0; c < 3; c++) { const ref = X.utils.encode_cell({ r, c }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
+  X.utils.book_append_sheet(wb, ws, 'Сопоставление SN'); X.writeFile(wb, `Сопоставление SN — ${today()}.xlsx`);
+}
+const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'snmap'];
+const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль'], ['snmap', 'sn', '🔗 Сопоставление SN']];
 const refTabsList = () => REF_TABS.filter(([, k]) => can('refs:' + k) && (k !== 'labels' || !isWorker()) && (k !== 'netshare' || isHead() || NETSHARES.length > 0) && (k !== 'ssh' || isHead()));
 const refTabs = () => `<nav class="seg stabs" aria-label="Справочники и инструменты">${refTabsList().map(([v, , l]) => `<a href="#${v}" class="${ui.view === v ? 'on' : ''}" ${ui.view === v ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
 /* «Личное хранилище»: passwords (what for, login, password, link, note) and notes; only the user himself sees them, the server keeps them encrypted */
@@ -5265,7 +5355,7 @@ function vTmine(){
 
 // the menu of a transport organization: a driver — his trips, waybills, receipts; the accountant — orders, «Учётка», reports; managers — all
 const transNav = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : me.role === 'accountant' ? ['tor', 'stock', 'trep', 'notes', 'refs'] : ['tor', 'disp', 'transport', 'stock', 'trep', 'notes', 'refs', ...(me.role === 'admin' ? ['users'] : [])];
-const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
+const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare', 'snmap'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', 'snmap', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
 /* ===== «Оборудование» системы заявок: справочник с QR-кодами и историей проблем ===== */
 let REQ_EQ = [];
 const eqOf = id => REQ_EQ.find(e => e.id === id);
@@ -7211,6 +7301,14 @@ async function act(el){
     case 'drAttach': return drAttach();
     case 'drSave': { const c = $('drawc'); if (!c) return; c.toBlob(b => { const u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = `Рисунок ${today()}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }, 'image/png'); return; }
     case 'vTab': ui.vtab = id; return render();
+    case 'snCopy': { const [i, k] = id.split('|'), x = SNMAP.find(e => e.id === i); if (x) toast(await snCopyTxt(x[k]) ? `${({ imei: 'IMEI', sn: 'SN', iccid: 'ICCID' })[k]} скопирован` : 'Не удалось скопировать — выделите и скопируйте вручную'); return; }
+    case 'snQr': ui.snQr = id; snRedraw(); return snQrCopy(id);
+    case 'snQrCopy': return snQrCopy(id);
+    case 'snQrClose': ui.snQr = null; snRedraw(); return;
+    case 'snQrPng': { const x = SNMAP.find(e => e.id === id); if (!x) return; const a = document.createElement('a'); a.href = snCanvas(snQrText(x)).toDataURL('image/png'); a.download = `QR ${x.imei}.png`; document.body.appendChild(a); a.click(); a.remove(); return; }
+    case 'snAll': ui.snAll = true; snRedraw(); return;
+    case 'snXlsx': try { await snXlsx(); } catch(e) { toast(errText(e)); } return;
+    case 'snDel': try { await api('DELETE', '/api/snmap/' + id); SNMAP = SNMAP.filter(e => e.id !== id); if (ui.snQr === id) ui.snQr = null; render(); toast('Строка удалена'); } catch(e) { toast(errText(e)); } return;
     case 'sshSrvNew': return openDrawer('sshSrv', null);
     case 'sshSrvEdit': return openDrawer('sshSrv', id);
     case 'sshCmdNew': return openDrawer('sshCmd', null);
@@ -7811,6 +7909,9 @@ document.addEventListener('input', e => {
   if (t.dataset && t.dataset.wof && ui.woFullDraft) { const [i, k] = t.dataset.wof.split('|'), x = ui.woFullDraft[Number(i)]; if (x) { x[k] = t.value; if (k === 'name') x.stockId = stockByName(t.value)?.id || null; if (k === 'per') wofCalc(Number(i)); woDraftSave(); woFullRecheck(); if (k === 'qty' && woSelHas('f', x.id)) woSelPaint('f'); } return; }
   if (t.id === 'wof-units') { ui.woFullUnits = t.value; wofCalc(); woDraftSave(); return; }
   if (t.id === 'nsq') { ui.nsq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vNetshare(); const n = $('nsq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'snq') { ui.snq = t.value; ui.snAll = false; snRedraw(); return; }
+  if (t.id === 'sn-scan') { ui.snScan = t.value; return; }
+  if (t.id === 'sn-sim') { ui.snSim = t.value; return; }
   if (t.id === 'vq') { ui.vq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vVault(); const n = $('vq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (['tp-job', 'tp-date', 'tp-veh', 'tp-note'].includes(t.id)) { ui[{ 'tp-job': 'tpJob', 'tp-date': 'tpDate', 'tp-veh': 'tpVeh', 'tp-note': 'tpNote' }[t.id]] = t.value; return; }
@@ -8097,11 +8198,11 @@ function route(){
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'snmap'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
-    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
+    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', sn: 'snmap' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
     ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
     try { history.replaceState(null, '', '#' + ui.view); } catch(e) {}
   }
