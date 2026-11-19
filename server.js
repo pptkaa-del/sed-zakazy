@@ -861,6 +861,7 @@ async function api(req, res, url) {
         // printing: the turn of the label on the printer's tape and a shift to hit the label exactly
         // not sent (an older page) — the saved value stays; it was reset to 0 on every save before
         rot: b.rot === undefined ? (Number(old.rot) || 0) : [0, 90, 180, 270].includes(Number(b.rot)) ? Number(b.rot) : 0,
+        flip: b.flip === undefined ? !!old.flip : !!b.flip,
         dx: b.dx === undefined ? (Number(old.dx) || 0) : num(b.dx, -30, 30, 0), dy: b.dy === undefined ? (Number(old.dy) || 0) : num(b.dy, -30, 30, 0),
         serial: { prefix: String(sr.prefix || '').slice(0, 30), suffix: String(sr.suffix || '').slice(0, 30), digits: num(sr.digits, 1, 12, 6) | 0,
           next: old.serial ? old.serial.next : Math.max(0, Math.floor(Number(sr.next) || 1)) },
