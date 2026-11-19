@@ -863,6 +863,8 @@ async function api(req, res, url) {
         rot: b.rot === undefined ? (Number(old.rot) || 0) : [0, 90, 180, 270].includes(Number(b.rot)) ? Number(b.rot) : 0,
         flip: b.flip === undefined ? !!old.flip : !!b.flip,
         scale: b.scale === undefined ? (Number(old.scale) || 100) : num(b.scale, 30, 200, 100),
+        sx: b.sx === undefined ? (Number(old.sx) || 100) : num(b.sx, 30, 200, 100),
+        sy: b.sy === undefined ? (Number(old.sy) || 100) : num(b.sy, 30, 200, 100),
         dx: b.dx === undefined ? (Number(old.dx) || 0) : num(b.dx, -30, 30, 0), dy: b.dy === undefined ? (Number(old.dy) || 0) : num(b.dy, -30, 30, 0),
         serial: { prefix: String(sr.prefix || '').slice(0, 30), suffix: String(sr.suffix || '').slice(0, 30), digits: num(sr.digits, 1, 12, 6) | 0,
           next: old.serial ? old.serial.next : Math.max(0, Math.floor(Number(sr.next) || 1)) },
