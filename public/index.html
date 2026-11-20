@@ -1507,7 +1507,7 @@ async function api(method, url, body, headers = {}){
   return j;
 }
 async function refresh(){
-  const d = await api('GET', '/api/data');
+  const d = await api('GET', '/api/data'); sideRefresh();
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   // the names of old points kept the reminder «(замена 2 модемов)» — it is not shown any more
@@ -8269,7 +8269,23 @@ function showBlocked(msg){
   $('app').hidden = true; $('loginView').hidden = true; $('blockscr').hidden = false;
 }
 $('blk-out').addEventListener('click', async () => { await fetch('/api/logout', { method:'POST', headers:{ 'X-Sed':'1' } }).catch(() => {}); $('blockscr').hidden = true; showLogin(); });
+// what was loaded for one user must not stay for the next one who logs in in the same tab
+function userDataReset(){
+  SSHT.forEach(t => { try { t.es?.close(); } catch(e) {} try { t.term.dispose(); } catch(e) {} try { t.el.remove(); } catch(e) {} }); SSHT.length = 0; ui.sshActive = null;
+  SSH = null; SNMAP = null; VAULT = null; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = '';
+}
+// the lists of the SSH console and «Сопоставление SN» follow the changes of the others (shared servers and commands, new rows)
+let sideBusy = false;
+async function sideRefresh(){
+  if (sideBusy || !me) return; sideBusy = true;
+  try {
+    if (SSH && !SSH.err) { const r = await api('GET', '/api/ssh'); if (SSH) { const was = JSON.stringify([SSH.servers, SSH.cmds]); SSH.servers = r.servers || []; SSH.cmds = r.cmds || [];
+      if (was !== JSON.stringify([SSH.servers, SSH.cmds]) && ui.view === 'ssh' && !(ui.drawer && /^ssh/.test(ui.drawer.kind || ''))) render(); } }
+    if (Array.isArray(SNMAP)) { const r = await api('GET', '/api/snmap'); if (Array.isArray(SNMAP)) { SNMAP = r.list || []; if (ui.view === 'snmap' && !edActive) snRedraw(); } }
+  } catch(e) {} finally { sideBusy = false; }
+}
 function showLogin(){
+  userDataReset();
   clearInterval(poll); poll = null; me = null; mode = 'loading'; closeDrawer(); $('upop').hidden = true;
   $('app').hidden = true; $('loginView').hidden = false; $('l-err').textContent = '';
   $('l-pass').type = 'password'; const eye = $('loginForm').querySelector('[data-pw-toggle]'); eye.setAttribute('aria-pressed','false'); eye.setAttribute('aria-label','Показать пароль'); eye.title = 'Показать пароль';
@@ -8303,7 +8319,7 @@ async function start(u){
   }
   if (!u.sys && !reqMode()) { const rt = $('refsTab'), rl = refTabsList(); if (rt && rl.length) rt.href = '#' + rl[0][0]; }
   document.body.classList.toggle('worker', isWorker());
-  ui.usersList = null; VAULT = null; ui.vShow = {};
+  ui.usersList = null; userDataReset(); ui.vShow = {};
   $('loginView').hidden = true; $('app').hidden = false;
   route();
   if (u.sys) { mode = 'live'; render(); }
