@@ -1378,7 +1378,7 @@ const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', c
 const KIND = { prod:'Изготовление', mount:'Монтаж', buy:'Закупка', work:'Работа' };
 const PLAN_KIND = { prod:'Изготовление', mount:'Монтаж' };
 const planKinds = j => { const k = j ? j.kind || 'mount' : 'both'; return k === 'prod' ? { prod:PLAN_KIND.prod } : k === 'mount' ? { mount:PLAN_KIND.mount } : PLAN_KIND; };
-const ROLE_NAMES = { admin:'Администратор', head:'Руководитель', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
+const ROLE_NAMES = { admin:'Администратор', head:'Руководитель', office:'Сотрудник офиса', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
 const ROLE_NAMES_REQ = { admin:'Администратор', head:'Руководитель', executor:'Исполнитель', worker:'Пользователь' };
 const ROLE_INFO_REQ = {
   admin:'Ведёт список оборудования (общее или закреплённое за пользователями), печатает QR-коды, управляет пользователями; видит все заявки.',
@@ -1391,6 +1391,7 @@ const roleInfo = k => (reqMode() ? ROLE_INFO_REQ : ROLE_INFO)[k] || '';
 const ROLE_INFO = {
   admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, карта объектов, назначение точек, пользователи.',
   head:'Всё, что может администратор, кроме отметки оплаты счетов и управления пользователями.',
+  office:'Те же права, что у руководителя.',
   accountant:'Видит всё, отмечает оплату и прикладывает чеки. Его скачивание счёта отмечается у остальных.',
   worker:'Видит только назначенные ему точки: «В работе» и «Выполненные», фото и отметки по каждой точке.',
   contractor:'То же, что сотрудник, но доступ к системе ограничен датой — после неё вход закрывается.'
@@ -1400,7 +1401,7 @@ const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], po
 let STAFF = [];
 let META = {};
 let me = null, rev = -1, mode = 'loading';
-const isHead = () => me && (me.role === 'admin' || me.role === 'head');
+const isHead = () => me && (me.role === 'admin' || me.role === 'head' || me.role === 'office');
 /* «Управление заявками»: the organization works only with requests */
 const reqMode = () => !!(me && !me.sys && me.org && me.org.type === 'requests');
 const canEdit = () => isHead();
@@ -2760,7 +2761,7 @@ const jobOf = id => S.jobs.find(j => j.id === id);
 const mayEditJob = j => canEdit();
 const onJob = j => me && (j.leaderId === me.id || (j.workers || []).includes(me.id));
 const jobNo = j => j.no || '—';
-const leaders = () => STAFF.filter(u => u.role === 'admin' || u.role === 'head');
+const leaders = () => STAFF.filter(u => u.role === 'admin' || u.role === 'head' || u.role === 'office');
 const workersList = () => STAFF.filter(u => u.role === 'worker' || u.role === 'contractor');
 const overdue = j => j.status !== 'done' && j.due && j.due < today();
 const routeUrl = pl => `https://yandex.ru/maps/?rtext=~${pl.lat},${pl.lng}&rtt=auto`;
@@ -2902,7 +2903,7 @@ function jobPlacesHtml(j){
 const placeDone = (j, pl) => { const need = j.photoSpec || []; const ph = pl.photos || {}; const got = need.filter(n => ph[n]).length; return { need: need.length, got, extra: (ph._extra || []).length, full: need.length ? got === need.length : !!((ph._extra || []).length || pl.comment) }; };
 const placeColor = (j, pl) => { if (pl.doneAt) return pl.notWorking ? '#C0392B' : '#1E9E4F'; const r = placeDone(j, pl); return (r.got || r.extra || pl.comment) ? '#E08A00' : null; };
 const isAdmin = () => me && me.role === 'admin';
-const HEADish = () => me && (me.role === 'admin' || me.role === 'head');
+const HEADish = () => me && (me.role === 'admin' || me.role === 'head' || me.role === 'office');
 // a closed point: the administrator always, the one who closed it — for 24 hours; «Руководитель» only looks
 const canReport = (j, pl) => me && (pl.doneAt ? isAdmin() || (pl.doneBy === me.id && Date.now() - Date.parse(pl.doneAt) < 864e5)
   : (mayEditJob(j) || j.leaderId === me.id || ((j.workers || []).includes(me.id) && (pl.assignee ? pl.assignee === me.id : (j.workers || []).length === 1))));
@@ -5740,7 +5741,7 @@ function vUsers(){
     const self = u.id === me.id;
     return `<div class="urow ${u.blocked?'blocked':''}">
       <div><b>${esc(u.name)}${self?' (вы)':''}</b><small class="mono">${esc(u.login)}${u.sys ? ' · администратор системы' : ''}</small>${(u.hide || []).length ? `<small class="dim">скрыто разделов: ${u.hide.length}</small>` : ''}</div>
-      <div><span class="chip ${u.role==='admin'||u.role==='head'?'c-work':u.role==='accountant'?'c-ok':u.role==='contractor'?'c-warn':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
+      <div><span class="chip ${u.role==='admin'||u.role==='head'||u.role==='office'?'c-work':u.role==='accountant'?'c-ok':u.role==='contractor'?'c-warn':'c-info'}">${esc(ROLE_NAMES[u.role]||u.role)}</span></div>
       <div>${u.blocked ? '<span class="chip c-bad">Заблокирован</span>' : u.expired ? '<span class="chip c-bad">Доступ истёк</span>' : '<span class="chip c-ok">Активен</span>'}${u.accessUntil ? `<small>доступ до ${fmtD(u.accessUntil)}</small>` : ''}</div>
       <div><small>Последний вход</small>${u.lastLoginAt ? esc(fmtDT(u.lastLoginAt)) : '<span class="dim">не входил</span>'}</div>
       <div class="acts"><button class="btn sm" data-act="userEdit" data-id="${u.id}">Изменить</button>
@@ -6318,7 +6319,7 @@ function renderDrawer(){
   }
   if (d.kind === 'dtAssign') {
     const sel = DT.points.filter(p => dtSel.has(p.no)), had = sel.filter(p => p.assignee);
-    const W = STAFF.filter(u => u.role === 'worker' || u.role === 'contractor'), O = STAFF.filter(u => u.role === 'admin' || u.role === 'head');
+    const W = STAFF.filter(u => u.role === 'worker' || u.role === 'contractor'), O = STAFF.filter(u => u.role === 'admin' || u.role === 'head' || u.role === 'office');
     const opt = u => `<label class="chk" style="flex-direction:row;display:flex;gap:8px"><input type="radio" name="dta-who" value="${u.id}"> <span>${esc(u.name)} <small class="dim">— ${esc(ROLE_NAMES[u.role])}, точек: ${DT.points.filter(p => p.assignee === u.id).length}</small></span></label>`;
     D.innerHTML = dh('Назначить исполнителя') + `<form class="d-body" data-form="dtAssign">
       <p style="margin:0">Выделено точек: <b>${sel.length}</b>${had.length ? ` · уже назначено: ${had.length} (${[...new Set(had.map(p => who(p.assignee)))].map(esc).join(', ')}) — назначение заменится` : ''}.</p>
