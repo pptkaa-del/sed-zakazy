@@ -61,6 +61,7 @@ const COLLECTIONS = ['projects', 'orders', 'invoices', 'tasks', 'counterparties'
 const ROLES = {
   admin:      'Администратор',
   head:       'Руководитель',
+  office:     'Сотрудник офиса', // the same rights as «Руководитель»
   accountant: 'Бухгалтер',
   worker:     'Сотрудник',
   contractor: 'Подрядчик',
@@ -72,7 +73,7 @@ const contractorExpired = u => u && u.role === 'contractor' && u.accessUntil && 
 function localDateNow() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 const PAY_FIELDS = ['status', 'paidAt', 'payNo', 'paidAmount', 'paidBy', 'receipt'];
 // «Руководитель» works like the administrator but neither marks invoices paid nor manages users
-const HEAD = u => u && (u.role === 'admin' || u.role === 'head');
+const HEAD = u => u && (u.role === 'admin' || u.role === 'head' || u.role === 'office');
 const canEdit = u => HEAD(u);
 const canPay = u => u.role === 'admin' || u.role === 'accountant';
 /* «Сотрудник» загружает счета и правит/удаляет только свои неоплаченные */
