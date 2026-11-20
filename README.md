@@ -232,7 +232,7 @@ curl -fsSL https://raw.githubusercontent.com/pptkaa-del/sed-zakazy/main/install.
 curl -fsSL https://raw.githubusercontent.com/pptkaa-del/sed-zakazy/main/install.sh | sudo bash -s -- ваш-домен.ru --email ваша@почта.ru
 ```
 
-То же самое, плюс сертификат Let's Encrypt и переадресация на HTTPS. A-запись домена должна заранее указывать на сервер.
+То же самое, плюс сертификат Let's Encrypt и переадресация на HTTPS. A-запись домена должна заранее указывать на сервер. Сначала домен, потом `--email` и почта; если перепутать (почта на месте домена) или указать IP-адрес, скрипт сразу остановится с подсказкой. Добавить HTTPS к уже установленному серверу — та же команда: `sudo bash /opt/sed-zakazy/install.sh ваш-домен.ru --email ваша@почта.ru`.
 
 **Виртуальный хостинг (reg.ru и похожие), по SSH, без sudo:**
 
