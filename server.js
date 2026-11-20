@@ -1217,6 +1217,15 @@ async function api(req, res, url) {
     const pub = x => ({ id: x.id, imei: x.imei, sn: x.sn, iccid: x.iccid, ip: x.ip || '', at: x.at, by: x.by, updatedAt: x.updatedAt || null });
     const dup = (k, v, self) => v && L.find(e => e !== self && e[k] === v);
     if (m === 'GET' && !p[2]) return send(res, 200, { list: L.map(pub) });
+    // «Доступ для другого сервера»: the manager turns it on, sees and copies the key, issues a new one or turns it off
+    if (p[2] === 'api-key') {
+      if (!HEAD(user)) return fail(res, 403, 'Доступ для другого сервера настраивает руководитель или администратор');
+      const A = db.snmapApi, info = () => db.snmapApi ? { enabled: true, key: vaultDec(db.snmapApi.key) || '', at: db.snmapApi.at, by: db.snmapApi.by, lastUsedAt: db.snmapApi.lastUsedAt || null, lastIp: db.snmapApi.lastIp || '', orgId: user.orgId } : { enabled: false, orgId: user.orgId };
+      if (m === 'GET') return send(res, 200, info());
+      if (m === 'POST') { const k = crypto.randomBytes(24).toString('base64url'); db.snmapApi = { key: vaultEnc(k), hash: snHash(k).toString('hex'), at: new Date().toISOString(), by: user.id }; saveDb(); return send(res, 200, info()); }
+      if (m === 'DELETE') { if (A) { db.snmapApi = null; saveDb(); } return send(res, 200, info()); }   // «delete» does not reach the database through the proxy
+      return fail(res, 405, 'Метод не поддерживается');
+    }
     if (m === 'POST' && !p[2]) {
       const b = await readJsonBody(req) || {}, x = { imei: num(b.imei), sn: num(b.sn), iccid: num(b.iccid), ip: num(b.ip) };
       if (x.ip && !ipOk(x.ip)) return fail(res, 400, 'IP-адрес — например 10.0.0.1');
@@ -3135,6 +3144,20 @@ function serveStatic(req, res, pathname) {
 /* the readings of the power monitor: building and server room power (true — «в режиме»), the battery (raw value of the device, 840 and more — full) and the signal;
    a reading with the same state only refreshes the time of the last one */
 const DEV_POWER = { 1: [false, false], 2: [true, true], 3: [false, true], 4: [true, false] };
+/* the rows of «Сопоставление SN» as JSON; the key goes in «Authorization: Bearer …» (or ?key=…); ?since=<time> — only rows added or changed after it */
+const snHash = t => crypto.createHash('sha256').update(String(t)).digest();
+const snRow = x => ({ imei: x.imei, sn: x.sn, iccid: x.iccid, ip: x.ip || '', at: x.at, updatedAt: x.updatedAt || x.at });
+async function snExport(req, res, url, o) {
+  const st = orgState(o); if (st.blocked) return fail(res, 423, st.message);
+  const A = db.snmapApi, m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i), key = m ? m[1] : url.searchParams.get('key') || '';
+  const throttleKey = 'snexp|' + clientIp(req);
+  if (throttled(throttleKey)) return fail(res, 429, 'Слишком много неверных ключей. Подождите 10 минут.');
+  if (!A || !A.hash || !key || !crypto.timingSafeEqual(snHash(key), Buffer.from(A.hash, 'hex'))) { attempts.get(throttleKey).push(Date.now()); return fail(res, 401, 'Неверный ключ доступа'); }
+  const since = url.searchParams.get('since'), L = (Array.isArray(db.snmap) ? db.snmap : []).map(snRow).filter(x => !since || String(x.updatedAt) > since);
+  // when and from where it was last used (without a new revision — the open pages need not reload)
+  A.lastUsedAt = new Date().toISOString(); A.lastIp = clientIp(req); { const e = ctx(); writeJSON(e.file, e.db); e.stamp = stamp(e.file); }
+  return send(res, 200, { organization: o.name, generatedAt: new Date().toISOString(), count: L.length, items: L });
+}
 async function devIn(req, res, url, key) {
   const c = reqCfgOf();
   if (!c.devToken || key !== c.devToken) return fail(res, 403, 'Неверный ключ устройства');
@@ -3168,6 +3191,12 @@ function startServer() {
         const o = orgById(orgId);
         if (!o || o.type !== 'requests' || !key) return fail(res, 404, 'Не найдено');
         return await als.run(orgEntry(orgId), async () => devIn(req, res, url, key));
+      }
+      // «Сопоставление SN» for another server: GET /api/sn-export/<organization> with the key of the organization (no session)
+      if (url.pathname.startsWith('/api/sn-export/')) {
+        const orgId = url.pathname.split('/')[3] || '', o = orgById(orgId);
+        if (!o || req.method !== 'GET') return fail(res, 404, 'Не найдено');
+        return await als.run(orgEntry(orgId), async () => snExport(req, res, url, o));
       }
       if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/files/')) {
         // every request works inside the data of the signed-in user's organization

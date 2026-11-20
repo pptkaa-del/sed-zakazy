@@ -357,7 +357,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .nsmsg{padding:6px 14px 6px calc(52px + var(--d,0) * 20px);font-size:13px;border-bottom:1px solid var(--rule-2)}
 .nscmdw{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0}.nscmdw .nscmd{margin:0;align-self:stretch}.nscmd{margin:6px 0;padding:8px 10px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-all;font-family:var(--f-mono,ui-monospace,monospace)}.nssteps{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 @media (max-width:640px){.nshead{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nshead span:last-child{display:none}.nsrow{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nsrow .nsmeta:last-child{display:none}}
-.snbox{max-width:760px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
+.snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
 .vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
@@ -4756,10 +4756,31 @@ function vSnmap(){
       <label><span class="flab">3. IP-адрес</span><span data-keep style="display:contents"><input class="in mono" id="sn-ip" autocomplete="off" inputmode="decimal" placeholder="10.0.0.1" value="${esc(ui.snIpV || '')}" ${P && P.iccid ? '' : 'disabled'}></span></label></div>
     <small class="dim">Отсканируйте код устройства и нажмите Enter — появятся IMEI и SN, курсор перейдёт к сим-карте. Отсканируйте сим-карту и нажмите Enter — курсор перейдёт к IP-адресу. Введите IP-адрес и нажмите Enter — строка запишется в таблицу, поля очистятся, курсор вернётся в поле 1. Esc — начать заново. Каждый IMEI, SN, ICCID и IP-адрес можно записать только один раз.</small></section>
     <div class="toolbar" style="margin-top:14px"><b>Записано: <span id="sn-cnt">${SNMAP.length}</span></b><span data-keep style="display:contents"><input class="in" id="snq" type="search" placeholder="Поиск по IMEI, SN, ICCID, IP" aria-label="Поиск" value="${esc(ui.snq || '')}" style="flex:1 1 200px;max-width:320px"></span>
-      <button class="btn" data-act="snXlsx">⬇ Скачать Excel</button></div>
+      <button class="btn" data-act="snXlsx">⬇ Скачать Excel</button><button class="btn" data-act="snJson" title="Все записи в формате JSON">⬇ Скачать JSON</button></div>
+    ${isHead() ? `<details class="card snapi" ${ui.snApiOpen ? 'open' : ''}><summary data-act="snApiToggle">🔌 Доступ для другого сервера (JSON по ссылке с ключом)</summary><div id="sn-api">${snApiHtml()}</div></details>` : ''}
     <div id="sn-qr">${snQrHtml()}</div><div id="sn-tbl">${snTable()}</div>`;
 }
 const snPendHtml = () => ui.snPend ? `<div class="mono">IMEI: <b>${esc(ui.snPend.imei)}</b></div><div class="mono">SN: <b>${esc(ui.snPend.sn)}</b></div>${ui.snPend.iccid ? `<div class="mono">ICCID: <b>${esc(ui.snPend.iccid)}</b></div>` : ''}` : '';
+// the address and the key another server uses to take the rows (GET with «Authorization: Bearer <ключ>»)
+const snApiUrl = () => `${location.origin}/api/sn-export/${encodeURIComponent(ui.snApi?.orgId || me?.org?.id || '')}`;
+function snApiHtml(){
+  const A = ui.snApi; if (!A) return '<p class="dim">Загружаем…</p>'; if (A.err) return `<p class="err">${esc(A.err)}</p>`;
+  if (!A.enabled) return `<p class="dim" style="margin:6px 0">Другой сервер (1С, учётная система, скрипт) сможет сам забирать все записи — IMEI, SN, ICCID, IP-адрес — в формате JSON по ссылке с секретным ключом. Сейчас доступ выключен.</p><button class="btn primary sm" data-act="snApiOn">Включить доступ</button>`;
+  const u = snApiUrl(), k = A.key, sh = ui.snApiShow;
+  return `<dl class="vkv snkv"><dt>Адрес</dt><dd><span class="mono">${esc(u)}</span> <button class="linkish" data-act="snApiCopy" data-id="url" title="Скопировать адрес">📋</button></dd>
+    <dt>Ключ</dt><dd><span class="mono">${sh ? esc(k) : '•'.repeat(16)}</span> <button class="linkish" data-act="snApiShow" title="${sh ? 'Скрыть' : 'Показать'}">${sh ? '🙈' : '👁'}</button> <button class="linkish" data-act="snApiCopy" data-id="key" title="Скопировать ключ">📋</button></dd>
+    <dt>Пример</dt><dd><span class="mono snex">curl -H "Authorization: Bearer ${sh ? esc(k) : 'КЛЮЧ'}" ${esc(u)}</span> <button class="linkish" data-act="snApiCopy" data-id="curl" title="Скопировать команду с ключом">📋</button></dd>
+    <dt>Использовался</dt><dd>${A.lastUsedAt ? `${fmtDT(A.lastUsedAt)}${A.lastIp ? ' · с адреса <span class="mono">' + esc(A.lastIp) + '</span>' : ''}` : '<span class="dim">ещё ни разу</span>'}</dd></dl>
+    <small class="dim">Ответ: <span class="mono">{ "count": …, "items": [ { "imei", "sn", "iccid", "ip", "at", "updatedAt" } ] }</span>. Добавьте <span class="mono">?since=2026-11-20T00:00:00Z</span> — придут только строки, добавленные или изменённые после этого времени. Ключ можно передать и в адресе: <span class="mono">?key=КЛЮЧ</span>. Храните ключ как пароль: с ним любой получит все записи.</small>
+    <div class="row-g" style="margin-top:8px">${armBtn('snApiNew', 'Выдать новый ключ', 'snApiOn', 'new', 'btn sm')}${armBtn('snApiOff', 'Выключить доступ', 'snApiOff', 'off', 'btn sm danger')}</div>
+    <small class="dim">После нового ключа или выключения старый ключ перестаёт работать сразу.</small>`;
+}
+async function snApiLoad(){ try { ui.snApi = await api('GET', '/api/snmap/api-key'); } catch(e) { ui.snApi = { err: errText(e) }; } const b = $('sn-api'); if (b) b.innerHTML = snApiHtml(); }
+function snJson(){
+  if (!SNMAP.length) return toast('Таблица пустая');
+  const d = { organization: me?.org?.name || '', generatedAt: new Date().toISOString(), count: SNMAP.length, items: SNMAP.map(x => ({ imei: x.imei, sn: x.sn, iccid: x.iccid, ip: x.ip || '', at: x.at, updatedAt: x.updatedAt || x.at })) };
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' })); a.download = `Сопоставление SN — ${today()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
 function snTable(){
   const q = (ui.snq || '').replace(/\s+/g, '').toUpperCase(), all = SNMAP.map((x, i) => ({ ...x, no: i + 1 })).reverse();
   const L = q ? all.filter(x => [x.imei, x.sn, x.iccid, x.ip].some(v => String(v).includes(q))) : all, lim = ui.snAll ? L.length : 300;
@@ -7342,6 +7363,12 @@ async function act(el){
     case 'snQrClose': ui.snQr = null; snRedraw(); return;
     case 'snQrPng': { const x = SNMAP.find(e => e.id === id); if (!x) return; const a = document.createElement('a'); a.href = snCanvas(snQrText(x)).toDataURL('image/png'); a.download = `QR ${x.imei}.png`; document.body.appendChild(a); a.click(); a.remove(); return; }
     case 'snAll': ui.snAll = true; snRedraw(); return;
+    case 'snJson': return snJson();
+    case 'snApiToggle': ui.snApiOpen = !el.closest('details')?.open; if (ui.snApiOpen) snApiLoad(); return;
+    case 'snApiShow': ui.snApiShow = !ui.snApiShow; { const b = $('sn-api'); if (b) b.innerHTML = snApiHtml(); } return;
+    case 'snApiCopy': { const A = ui.snApi || {}, t = id === 'url' ? snApiUrl() : id === 'key' ? A.key : `curl -H "Authorization: Bearer ${A.key}" ${snApiUrl()}`; toast(await snCopyTxt(t) ? ({ url: 'Адрес', key: 'Ключ', curl: 'Команда' })[id] + ' скопирован' + (id === 'curl' ? 'а' : '') : 'Не удалось скопировать'); return; }
+    case 'snApiOn': try { ui.snApi = await api('POST', '/api/snmap/api-key'); ui.snApiShow = true; const b = $('sn-api'); if (b) b.innerHTML = snApiHtml(); toast(id === 'new' ? 'Выдан новый ключ — старый больше не работает' : 'Доступ включён — передайте адрес и ключ'); } catch(e) { toast(errText(e)); } return;
+    case 'snApiOff': try { ui.snApi = await api('DELETE', '/api/snmap/api-key'); const b = $('sn-api'); if (b) b.innerHTML = snApiHtml(); toast('Доступ для другого сервера выключен'); } catch(e) { toast(errText(e)); } return;
     case 'snXlsx': try { await snXlsx(); } catch(e) { toast(errText(e)); } return;
     case 'snDel': try { await api('DELETE', '/api/snmap/' + id); SNMAP = SNMAP.filter(e => e.id !== id); if (ui.snQr === id) ui.snQr = null; render(); toast('Строка удалена'); } catch(e) { toast(errText(e)); } return;
     case 'sshSrvNew': return openDrawer('sshSrv', null);
@@ -8281,7 +8308,7 @@ $('blk-out').addEventListener('click', async () => { await fetch('/api/logout', 
 // what was loaded for one user must not stay for the next one who logs in in the same tab
 function userDataReset(){
   SSHT.forEach(t => { try { t.es?.close(); } catch(e) {} try { t.term.dispose(); } catch(e) {} try { t.el.remove(); } catch(e) {} }); SSHT.length = 0; ui.sshActive = null;
-  SSH = null; SNMAP = null; VAULT = null; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = '';
+  SSH = null; SNMAP = null; VAULT = null; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; ui.snApi = null; ui.snApiShow = false;
 }
 // the lists of the SSH console and «Сопоставление SN» follow the changes of the others (shared servers and commands, new rows)
 let sideBusy = false;
