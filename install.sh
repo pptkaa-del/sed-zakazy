@@ -55,6 +55,17 @@ while [ $# -gt 0 ]; do
   esac
 done
 DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
+# a mistake in the parameters (e-mail in place of the domain, an IP address) — say so at once instead of an nginx site for a name that does not exist;
+# an automatic update keeps working with the parameters it has
+bad_arg() { if [ -n "${SED_AUTO_UPDATE:-}" ]; then warn "$1"; else die "$1"; fi; }
+if [ -n "$DOMAIN" ]; then
+  case "$DOMAIN" in
+    *@*) bad_arg "«$DOMAIN» — это адрес почты, а не домен. Почта указывается после --email: sudo bash install.sh ваш-домен.ru --email $DOMAIN" ;;
+    *) if printf '%s' "$DOMAIN" | grep -qE '^[0-9.]+$'; then bad_arg "Сертификат Let's Encrypt на IP-адрес не выдаётся. Для работы по IP запустите без домена: sudo bash install.sh"
+       elif ! printf '%s' "$DOMAIN" | grep -qiE '^([a-z0-9а-яё]([a-z0-9а-яё-]*[a-z0-9а-яё])?\.)+[a-zа-яё0-9-]{2,}$'; then bad_arg "«$DOMAIN» не похоже на домен (пример: sed.company.ru)"; fi ;;
+  esac
+fi
+if [ -n "$EMAIL" ] && ! printf '%s' "$EMAIL" | grep -qE '^[^@ ]+@[^@ ]+\.[^@ ]+$'; then bad_arg "--email «$EMAIL» не похоже на адрес почты"; fi
 
 if [ -z "$MODE" ]; then
   if [ "$(id -u)" = 0 ]; then MODE=server; else MODE=shared; fi
