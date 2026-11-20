@@ -358,6 +358,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .nscmdw{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0}.nscmdw .nscmd{margin:0;align-self:stretch}.nscmd{margin:6px 0;padding:8px 10px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-all;font-family:var(--f-mono,ui-monospace,monospace)}.nssteps{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 @media (max-width:640px){.nshead{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nshead span:last-child{display:none}.nsrow{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nsrow .nsmeta:last-child{display:none}}
 .snbox{max-width:760px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
+.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
 .vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
 .sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
@@ -4980,6 +4981,15 @@ function sshAttach(){
   if (T.el.parentNode !== host) { host.querySelectorAll('.sshterm').forEach(x => x.remove()); host.appendChild(T.el); }
   try { T.fit.fit(); } catch(e) {}
 }
+/* «Кто ещё видит»: the other users of the SSH console (administrator, manager, office worker) */
+const sshPeople = () => leaders().filter(u => u.id !== me.id && !u.blocked);
+function sshShareHtml(x, what){
+  const P = sshPeople(), sh = new Set(x?.share || []);
+  return `<div class="wide"><span class="flab">Кто ещё видит ${what}</span>${P.length ? `<div class="sshshare">${P.map(u => `<label class="chk"><input type="checkbox" class="ssh-share" value="${esc(u.id)}" ${sh.has(u.id) ? 'checked' : ''}> ${esc(u.name)} <span class="dim">· ${esc(roleNames()[u.role] || u.role)}</span></label>`).join('')}</div>
+    <small class="dim">Отмеченные увидят ${what} у себя в SSH-консоли и смогут ${what === 'сервер' ? 'подключаться к нему' : 'выполнять её'}, но не смогут изменить или удалить${what === 'сервер' ? ', пароль и ключ им не показываются' : ''}. Никого не отметили — видите только вы.</small>` : '<small class="dim">Других пользователей SSH-консоли (администратор, руководитель, сотрудник офиса) нет — видите только вы.</small>'}</div>`;
+}
+const sshShareVal = () => [...document.querySelectorAll('.ssh-share:checked')].map(i => i.value);
+const sshFrom = x => x.shared ? `<small class="dim">👤 от ${esc(who(x.owner))}</small>` : (x.share || []).length ? `<small class="dim" title="${esc(x.share.map(who).join(', '))}">👥 видят ещё ${x.share.length}</small>` : '';
 function vSsh(){
   if (!SSH) { loadSsh(); return '<div class="empty">Открываем SSH-консоль…</div>'; }
   if (SSH.err) return `<div class="empty"><h3>SSH-консоль недоступна</h3>${esc(SSH.err)}</div>`;
@@ -4988,12 +4998,12 @@ function vSsh(){
   setTimeout(sshAttach, 0);
   return `<div class="sshwrap"><aside class="sshside">
     <section class="card sshbox"><div class="sshh"><b>🖥 Серверы</b><button class="btn sm primary" data-act="sshSrvNew">+ Сервер</button></div>
-      ${S.length ? `<ul class="sshlist">${S.map(x => `<li><div class="sshli"><b>${esc(x.name)}</b><small class="mono">${esc(x.user)}@${esc(x.host)}${x.port && x.port !== 22 ? ':' + x.port : ''} · ${x.auth === 'key' ? '🔑 ключ' : x.hasPassword ? '🔒 пароль' : 'без пароля'}</small></div>
-        <div class="row-g"><button class="btn sm ok" data-act="sshConnect" data-id="${x.id}">▶ Подключить</button><button class="btn sm ghost" data-act="sshSrvEdit" data-id="${x.id}" aria-label="Изменить сервер">✎</button></div></li>`).join('')}</ul>`
-        : '<p class="dim" style="margin:0">Добавьте сервер: адрес, порт, пользователь и пароль или ключ. Всё хранится зашифрованным и видно только вам.</p>'}</section>
+      ${S.length ? `<ul class="sshlist">${S.map(x => `<li><div class="sshli"><b>${esc(x.name)}</b><small class="mono">${esc(x.user)}@${esc(x.host)}${x.port && x.port !== 22 ? ':' + x.port : ''} · ${x.auth === 'key' ? '🔑 ключ' : x.hasPassword ? '🔒 пароль' : 'без пароля'}</small>${sshFrom(x)}</div>
+        <div class="row-g"><button class="btn sm ok" data-act="sshConnect" data-id="${x.id}">▶ Подключить</button>${x.shared ? '' : `<button class="btn sm ghost" data-act="sshSrvEdit" data-id="${x.id}" aria-label="Изменить сервер">✎</button>`}</div></li>`).join('')}</ul>`
+        : '<p class="dim" style="margin:0">Добавьте сервер: адрес, порт, пользователь и пароль или ключ. Всё хранится зашифрованным; другим пользователям сервер виден, только если вы их отметите.</p>'}</section>
     <section class="card sshbox"><div class="sshh"><b>⌨ Постоянные команды</b><button class="btn sm" data-act="sshCmdNew">+ Команда</button></div>
-      ${C.length ? `<ul class="sshlist">${C.map(x => `<li><div class="sshli"><b>${esc(x.title)}</b><small class="mono">${esc(x.cmd.length > 90 ? x.cmd.slice(0, 90) + '…' : x.cmd)}</small>${x.serverId && sname(x.serverId) ? `<small class="dim">для «${esc(sname(x.serverId))}»</small>` : ''}</div>
-        <div class="row-g"><button class="btn sm" data-act="sshRun" data-id="${x.id}" title="Выполнить в открытом подключении">▶</button><button class="btn sm" data-act="sshPaste" data-id="${x.id}" title="Вставить без Enter">⎘</button><button class="btn sm ghost" data-act="sshCmdEdit" data-id="${x.id}" aria-label="Изменить команду">✎</button></div></li>`).join('')}</ul>`
+      ${C.length ? `<ul class="sshlist">${C.map(x => `<li><div class="sshli"><b>${esc(x.title)}</b><small class="mono">${esc(x.cmd.length > 90 ? x.cmd.slice(0, 90) + '…' : x.cmd)}</small>${x.serverId && sname(x.serverId) ? `<small class="dim">для «${esc(sname(x.serverId))}»</small>` : ''}${sshFrom(x)}</div>
+        <div class="row-g"><button class="btn sm" data-act="sshRun" data-id="${x.id}" title="Выполнить в открытом подключении">▶</button><button class="btn sm" data-act="sshPaste" data-id="${x.id}" title="Вставить без Enter">⎘</button>${x.shared ? '' : `<button class="btn sm ghost" data-act="sshCmdEdit" data-id="${x.id}" aria-label="Изменить команду">✎</button>`}</div></li>`).join('')}</ul>`
         : '<p class="dim" style="margin:0">Сохраните команды, которыми пользуетесь постоянно (перезапуск службы, просмотр журнала, обновление) — они выполняются одним нажатием в открытом подключении.</p>'}</section></aside>
     <section class="card sshmain"><div class="sshtabs" id="sshTabsBar">${sshTabsHtml()}</div>
       <div class="sshhost" id="sshHost" data-keep>${act ? '' : '<div class="sshempty">Здесь откроется терминал сервера.</div>'}</div>
@@ -5010,7 +5020,8 @@ function sshSrvHtml(x){
     <div class="wide"><span class="flab">Вход</span><div class="seg" role="radiogroup"><label><input type="radio" name="ss-auth" value="password" ${d.auth !== 'key' ? 'checked' : ''}> По паролю</label><label><input type="radio" name="ss-auth" value="key" ${d.auth === 'key' ? 'checked' : ''}> По ключу</label></div></div>
     <label class="wide">${d.auth === 'key' ? 'Пароль ключа (если есть)' : 'Пароль'}<input class="in" id="ss-pass" type="password" maxlength="500" autocomplete="new-password" placeholder="${x && x.hasPassword ? 'сохранён — оставьте пустым, чтобы не менять' : ''}"></label>
     ${x && x.hasPassword ? '<label class="wide chk"><input type="checkbox" id="ss-clearpw"> Удалить сохранённый пароль</label>' : ''}
-    <label class="wide" id="ss-key-w" ${d.auth === 'key' ? '' : 'hidden'}>Закрытый ключ (OpenSSH, PEM)<textarea class="in mono" id="ss-key" rows="5" placeholder="${x && x.hasKey ? 'сохранён — оставьте пустым, чтобы не менять' : '-----BEGIN OPENSSH PRIVATE KEY-----'}" spellcheck="false"></textarea></label></div>
+    <label class="wide" id="ss-key-w" ${d.auth === 'key' ? '' : 'hidden'}>Закрытый ключ (OpenSSH, PEM)<textarea class="in mono" id="ss-key" rows="5" placeholder="${x && x.hasKey ? 'сохранён — оставьте пустым, чтобы не менять' : '-----BEGIN OPENSSH PRIVATE KEY-----'}" spellcheck="false"></textarea></label>
+    ${sshShareHtml(x, 'сервер')}</div>
     <p class="dim" style="margin:0;font-size:13px">Пароль и ключ хранятся на сервере зашифрованными и обратно в браузер не передаются. При первом подключении ключ сервера запоминается; если он потом изменится, подключение будет отклонено.</p>
     <div class="err" id="ferr"></div>
     <div class="row-g"><button class="btn primary" data-act="sshSrvSave" data-id="${x ? x.id : ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('sshd:' + x.id, 'Удалить сервер', 'sshSrvDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
@@ -5019,7 +5030,8 @@ function sshCmdHtml(x){
   return `<div class="d-body"><div class="form" data-keep>
     <label class="wide">Название<input class="in" id="sc-title" maxlength="200" value="${esc(x?.title || '')}" placeholder="Например: Перезапустить программу"></label>
     <label class="wide"><span>Команда <em class="req-star">*</em></span><textarea class="in mono" id="sc-cmd" rows="4" maxlength="10000" spellcheck="false" placeholder="sudo systemctl restart sed-zakazy">${esc(x?.cmd || '')}</textarea><small class="dim">Несколько строк — выполнятся по очереди.</small></label>
-    <label class="wide">Для сервера<select class="in" id="sc-srv"><option value="">— любого —</option>${SSH.servers.map(s => `<option value="${s.id}" ${x?.serverId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label></div>
+    <label class="wide">Для сервера<select class="in" id="sc-srv"><option value="">— любого —</option>${SSH.servers.map(s => `<option value="${s.id}" ${x?.serverId === s.id ? 'selected' : ''}>${esc(s.name)}${s.shared ? ' · от ' + esc(who(s.owner)) : ''}</option>`).join('')}</select></label>
+    ${sshShareHtml(x, 'команду')}</div>
     <div class="err" id="ferr"></div>
     <div class="row-g"><button class="btn primary" data-act="sshCmdSave" data-id="${x ? x.id : ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('sshcd:' + x.id, 'Удалить команду', 'sshCmdDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
 }
@@ -7320,12 +7332,12 @@ async function act(el){
     case 'sshCmdNew': return openDrawer('sshCmd', null);
     case 'sshCmdEdit': return openDrawer('sshCmd', id);
     case 'sshSrvSave': { const fe = $('ferr'); if (fe) fe.textContent = ''; const auth = document.querySelector('input[name=ss-auth]:checked')?.value || 'password';
-      const body = { name: $('ss-name').value, host: $('ss-host').value, port: Number($('ss-port').value) || 22, user: $('ss-user').value, os: $('ss-os').value, auth, password: $('ss-pass').value, clearPassword: !!$('ss-clearpw')?.checked, key: $('ss-key')?.value || '' };
+      const body = { name: $('ss-name').value, host: $('ss-host').value, port: Number($('ss-port').value) || 22, user: $('ss-user').value, os: $('ss-os').value, auth, password: $('ss-pass').value, clearPassword: !!$('ss-clearpw')?.checked, key: $('ss-key')?.value || '', share: sshShareVal() };
       try { const r = await api(id ? 'PUT' : 'POST', '/api/ssh/servers' + (id ? '/' + id : ''), body); const i = SSH.servers.findIndex(e => e.id === r.server.id); if (i >= 0) SSH.servers[i] = r.server; else SSH.servers.push(r.server); document.activeElement?.blur(); closeDrawer(); render(); toast(id ? 'Сохранено' : 'Сервер добавлен — нажмите «▶ Подключить»'); }
       catch(e) { if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
     case 'sshSrvDel': try { await api('DELETE', '/api/ssh/servers/' + id); SSH.servers = SSH.servers.filter(e => e.id !== id); closeDrawer(); render(); toast('Сервер удалён'); } catch(e) { toast(errText(e)); } return;
     case 'sshCmdSave': { const fe = $('ferr'); if (fe) fe.textContent = '';
-      try { const r = await api(id ? 'PUT' : 'POST', '/api/ssh/cmds' + (id ? '/' + id : ''), { title: $('sc-title').value, cmd: $('sc-cmd').value, serverId: $('sc-srv').value }); const i = SSH.cmds.findIndex(e => e.id === r.cmd.id); if (i >= 0) SSH.cmds[i] = r.cmd; else SSH.cmds.push(r.cmd); document.activeElement?.blur(); closeDrawer(); render(); toast(id ? 'Сохранено' : 'Команда сохранена'); }
+      try { const r = await api(id ? 'PUT' : 'POST', '/api/ssh/cmds' + (id ? '/' + id : ''), { title: $('sc-title').value, cmd: $('sc-cmd').value, serverId: $('sc-srv').value, share: sshShareVal() }); const i = SSH.cmds.findIndex(e => e.id === r.cmd.id); if (i >= 0) SSH.cmds[i] = r.cmd; else SSH.cmds.push(r.cmd); document.activeElement?.blur(); closeDrawer(); render(); toast(id ? 'Сохранено' : 'Команда сохранена'); }
       catch(e) { if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
     case 'sshCmdDel': try { await api('DELETE', '/api/ssh/cmds/' + id); SSH.cmds = SSH.cmds.filter(e => e.id !== id); closeDrawer(); render(); toast('Команда удалена'); } catch(e) { toast(errText(e)); } return;
     case 'sshConnect': return sshConnect(id);

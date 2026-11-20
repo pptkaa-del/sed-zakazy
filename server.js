@@ -1064,10 +1064,15 @@ async function api(req, res, url) {
     if (!db.sshVault || typeof db.sshVault !== 'object') db.sshVault = {};
     const V = db.sshVault[user.id] = db.sshVault[user.id] || { servers: [], cmds: [] }, now = new Date().toISOString(), t = (v, n) => String(v ?? '').slice(0, n);
     const srvOf = x => ({ id: x.id, at: x.at, ...(vaultDec(x.data) || {}) });
-    const srvPublic = x => { const v = srvOf(x); return { id: v.id, name: v.name, host: v.host, port: v.port, user: v.user, auth: v.auth, os: v.os, hasPassword: !!v.password, hasKey: !!v.key }; };
-    const cmdOf = x => ({ id: x.id, at: x.at, ...(vaultDec(x.data) || {}) });
+    // «Кто ещё видит»: the owner chooses the other users of the SSH console; they connect and run commands, but cannot change them or see the password or key
+    const canSsh = u => u && !u.sys && !u.blocked && HEAD(u) && sees(u, 'refs:ssh');
+    const cleanShare = a => [...new Set((Array.isArray(a) ? a : []).map(String))].filter(id => id !== user.id && canSsh(orgUsers().find(u => u.id === id)));
+    const meta = (x, owner) => owner === user.id ? { share: Array.isArray(x.share) ? x.share : [] } : { shared: true, owner };
+    const srvPublic = (x, owner = user.id) => { const v = srvOf(x); return { id: v.id, name: v.name, host: v.host, port: v.port, user: v.user, auth: v.auth, os: v.os, hasPassword: !!v.password, hasKey: !!v.key, ...meta(x, owner) }; };
+    const cmdOf = (x, owner = user.id) => ({ id: x.id, at: x.at, ...(vaultDec(x.data) || {}), ...meta(x, owner) });
+    const sharedTo = kind => Object.entries(db.sshVault).filter(([uid]) => uid !== user.id && orgUsers().some(u => u.id === uid)).flatMap(([uid, W]) => (W[kind] || []).filter(x => (x.share || []).includes(user.id)).map(x => [x, uid]));
     const mine = S => S && S.uid === user.id && S.orgId === user.orgId;
-    if (m === 'GET' && !p[2]) return send(res, 200, { servers: V.servers.map(srvPublic), cmds: V.cmds.map(cmdOf), sessions: [...SSH_SESS.values()].filter(mine).map(S => ({ sid: S.sid, name: S.name, closed: S.closed, at: S.at })) });
+    if (m === 'GET' && !p[2]) return send(res, 200, { servers: [...V.servers.map(x => srvPublic(x)), ...sharedTo('servers').map(([x, uid]) => srvPublic(x, uid))], cmds: [...V.cmds.map(x => cmdOf(x)), ...sharedTo('cmds').map(([x, uid]) => cmdOf(x, uid))], sessions: [...SSH_SESS.values()].filter(mine).map(S => ({ sid: S.sid, name: S.name, closed: S.closed, at: S.at })) });
     if (p[2] === 'servers') {
       const x = p[3] && V.servers.find(e => e.id === p[3]);
       if (m === 'DELETE' && x) { V.servers = V.servers.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
@@ -1080,8 +1085,10 @@ async function api(req, res, url) {
         if (!(v.port >= 1 && v.port <= 65535)) return fail(res, 400, 'Порт — от 1 до 65535');
         if (v.auth === 'key' && !v.key) return fail(res, 400, 'Вставьте закрытый ключ');
         if (!v.name) v.name = v.user + '@' + v.host;
+        if (p[3] && !x) return fail(res, 403, 'Этот сервер добавил другой пользователь — изменить его может только он');
         if (x) { x.data = vaultEnc(v); x.updatedAt = now; } else { if (V.servers.length >= 200) return fail(res, 400, 'Слишком много серверов'); V.servers.push({ id: newId(), at: now, data: vaultEnc(v) }); }
-        saveDb(); const it = x || V.servers[V.servers.length - 1]; return send(res, 200, { ok: true, server: srvPublic(it), rev: db.rev });
+        const it = x || V.servers[V.servers.length - 1]; if (b.share !== undefined) it.share = cleanShare(b.share);
+        saveDb(); return send(res, 200, { ok: true, server: srvPublic(it), rev: db.rev });
       }
       return fail(res, 404, 'Сервер не найден');
     }
@@ -1091,13 +1098,15 @@ async function api(req, res, url) {
       if (m === 'POST' || m === 'PUT') {
         const b = await readJsonBody(req), v = { title: t(b.title, 200).trim(), cmd: t(b.cmd, 10000), serverId: t(b.serverId, 40) || '' };
         if (!v.cmd.trim()) return fail(res, 400, 'Напишите команду'); if (!v.title) v.title = v.cmd.split('\n')[0].slice(0, 80);
+        if (p[3] && !x) return fail(res, 403, 'Эту команду добавил другой пользователь — изменить её может только он');
         if (x) { x.data = vaultEnc(v); x.updatedAt = now; } else { if (V.cmds.length >= 500) return fail(res, 400, 'Слишком много команд'); V.cmds.push({ id: newId(), at: now, data: vaultEnc(v) }); }
-        saveDb(); const it = x || V.cmds[V.cmds.length - 1]; return send(res, 200, { ok: true, cmd: cmdOf(it), rev: db.rev });
+        const it = x || V.cmds[V.cmds.length - 1]; if (b.share !== undefined) it.share = cleanShare(b.share);
+        saveDb(); return send(res, 200, { ok: true, cmd: cmdOf(it), rev: db.rev });
       }
       return fail(res, 404, 'Команда не найдена');
     }
     if (p[2] === 'connect' && m === 'POST') {
-      const b = await readJsonBody(req), x = V.servers.find(e => e.id === b.serverId); if (!x) return fail(res, 404, 'Сервер не найден');
+      const b = await readJsonBody(req), x = V.servers.find(e => e.id === b.serverId) || sharedTo('servers').map(([e]) => e).find(e => e.id === b.serverId); if (!x) return fail(res, 404, 'Сервер не найден');
       if ([...SSH_SESS.values()].filter(S => mine(S) && !S.closed).length >= 5) return fail(res, 400, 'Открыто уже 5 подключений — закройте лишние');
       try { const S = sshStart(user, srvOf(x), b.cols, b.rows); return send(res, 200, { ok: true, sid: S.sid, name: S.name }); } catch (e) { return fail(res, 400, e.message); }
     }
