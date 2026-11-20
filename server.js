@@ -1212,12 +1212,14 @@ async function api(req, res, url) {
   if (p[1] === 'snmap') {
     if (orgType(user) === 'requests' || !sees(user, 'refs:sn')) return fail(res, 403, 'Этот раздел для вас закрыт');
     if (!Array.isArray(db.snmap)) db.snmap = [];
-    const L = db.snmap, F = { imei: 'IMEI', sn: 'SN', iccid: 'ICCID' }, num = v => String(v ?? '').replace(/\s+/g, '').toUpperCase().slice(0, 40);
-    const pub = x => ({ id: x.id, imei: x.imei, sn: x.sn, iccid: x.iccid, at: x.at, by: x.by, updatedAt: x.updatedAt || null });
+    const L = db.snmap, F = { imei: 'IMEI', sn: 'SN', iccid: 'ICCID', ip: 'IP-адрес' }, num = v => String(v ?? '').replace(/\s+/g, '').toUpperCase().slice(0, 40);
+    const ipOk = v => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(v) || (/^[0-9A-F:]+$/.test(v) && v.includes(':') && v.length >= 3);
+    const pub = x => ({ id: x.id, imei: x.imei, sn: x.sn, iccid: x.iccid, ip: x.ip || '', at: x.at, by: x.by, updatedAt: x.updatedAt || null });
     const dup = (k, v, self) => v && L.find(e => e !== self && e[k] === v);
     if (m === 'GET' && !p[2]) return send(res, 200, { list: L.map(pub) });
     if (m === 'POST' && !p[2]) {
-      const b = await readJsonBody(req) || {}, x = { imei: num(b.imei), sn: num(b.sn), iccid: num(b.iccid) };
+      const b = await readJsonBody(req) || {}, x = { imei: num(b.imei), sn: num(b.sn), iccid: num(b.iccid), ip: num(b.ip) };
+      if (x.ip && !ipOk(x.ip)) return fail(res, 400, 'IP-адрес — например 10.0.0.1');
       for (const k of Object.keys(F)) { if (!x[k]) return fail(res, 400, 'Не указан ' + F[k]); const d = dup(k, x[k]); if (d) return fail(res, 409, `${F[k]} ${x[k]} уже записан (${new Date(d.at).toLocaleDateString('ru-RU')})`); }
       if (L.length >= 100000) return fail(res, 400, 'Слишком много записей');
       const it = { id: newId(), ...x, at: new Date().toISOString(), by: user.id }; L.push(it); saveDb(); return send(res, 200, { ok: true, item: pub(it), rev: db.rev });
@@ -1225,7 +1227,7 @@ async function api(req, res, url) {
     const x = p[2] && L.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Запись не найдена — обновите страницу');
     if (m === 'PUT') {
       const b = await readJsonBody(req) || {}, upd = {};
-      for (const k of Object.keys(F)) if (b[k] !== undefined) { const v = num(b[k]); if (!v) return fail(res, 400, F[k] + ' не может быть пустым'); const d = dup(k, v, x); if (d) return fail(res, 409, `${F[k]} ${v} уже записан в другой строке`); upd[k] = v; }
+      for (const k of Object.keys(F)) if (b[k] !== undefined) { const v = num(b[k]); if (!v) return fail(res, 400, F[k] + ' не может быть пустым'); if (k === 'ip' && !ipOk(v)) return fail(res, 400, 'IP-адрес — например 10.0.0.1'); const d = dup(k, v, x); if (d) return fail(res, 409, `${F[k]} ${v} уже записан в другой строке`); upd[k] = v; }
       Object.assign(x, upd, { updatedAt: new Date().toISOString() }); saveDb(); return send(res, 200, { ok: true, item: pub(x), rev: db.rev });
     }
     if (m === 'DELETE') { if (!HEAD(user) && x.by !== user.id) return fail(res, 403, 'Удалить строку может тот, кто её записал, или руководитель'); db.snmap = L.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }

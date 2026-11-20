@@ -1480,7 +1480,7 @@ document.addEventListener('dblclick', e => {
     if (!save || v === old.trim()) { inp.blur(); render(); if (ui.drawer) renderDrawer(); return; }
     if (!v && ['title', 'name', 'text'].includes(field)) { toast('Поле не может быть пустым'); render(); if (ui.drawer) renderDrawer(); return; }
     try {
-      if (col === 'snmap') { const r = await api('PUT', '/api/snmap/' + id, { [field]: v }); const i = SNMAP.findIndex(x => x.id === id); if (i >= 0) SNMAP[i] = r.item; }
+      if (col === 'snmap') { const r = await api('PUT', '/api/snmap/' + id, { [field]: field === 'ip' ? snIp(v) : v }); const i = SNMAP.findIndex(x => x.id === id); if (i >= 0) SNMAP[i] = r.item; }
       else if (col === 'notes') { const r = await api('PATCH', '/api/notes/' + id, { [field]: v }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); }
       else await upd(col, id, { [field]: v });
       toast('Сохранено');
@@ -4729,7 +4729,7 @@ const fileIco = f => { const e = ((f.name || '').split('.').pop() || '').toLower
 /* ===== «Справочники и инструменты»: справочники, рисовалка, личное хранилище ===== */
 /* ===== «Сопоставление SN»: IMEI + SN from the scanner, then the ICCID of the SIM card — one row of the table ===== */
 let SNMAP = null;
-const SN_F = [['imei', 'IMEI'], ['sn', 'SN'], ['iccid', 'ICCID']];
+const SN_F = [['imei', 'IMEI'], ['sn', 'SN'], ['iccid', 'ICCID'], ['ip', 'IP-адрес']];
 async function loadSnmap(){ try { SNMAP = (await api('GET', '/api/snmap')).list || []; } catch(e) { SNMAP = { err: errText(e) }; } render(); }
 // «IMEI:868191051428009,SN:00501824112600015503» (also «MEI:…», a scanner in the Russian layout — «ШЬУШЖ…», or just two numbers)
 function snParse(s){
@@ -4740,6 +4740,9 @@ function snParse(s){
   return g.length >= 2 ? { imei: g[0], sn: g[1] } : null;
 }
 const snIccid = s => String(s || '').replace(/\s+/g, '').toUpperCase();
+// «10.0.0.1»; a scanner or keyboard in the Russian layout types «ю» for the dot
+const snIp = s => String(s || '').replace(/\s+/g, '').replace(/[юЮ,бБ]/g, '.').toUpperCase();
+const snIpOk = v => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(v) || (/^[0-9A-F:]+$/.test(v) && v.includes(':') && v.length >= 3);
 const snDup = (k, v, self) => Array.isArray(SNMAP) && v ? SNMAP.find(e => e.id !== self && e[k] === v) : null;
 const snQrText = x => `IMEI:${x.imei},SN:${x.sn},ICCID:${x.iccid}`;
 function vSnmap(){
@@ -4749,19 +4752,20 @@ function vSnmap(){
   return `<section class="card snbox"><h3 style="margin:0 0 10px">Сопоставление SN</h3>
     <div class="snin"><label><span class="flab">1. Ввод со сканера</span><span data-keep style="display:contents"><input class="in mono" id="sn-scan" autocomplete="off" placeholder="IMEI:868191051428009,SN:00501824112600015503" value="${esc(ui.snScan || '')}" ${P ? 'disabled' : ''}></span></label>
       <div class="snpend" id="sn-pend">${snPendHtml()}</div>
-      <label><span class="flab">2. Сим-карта (ICCID)</span><span data-keep style="display:contents"><input class="in mono" id="sn-sim" autocomplete="off" inputmode="numeric" placeholder="897019925050990299" value="${esc(ui.snSim || '')}" ${P ? '' : 'disabled'}></span></label></div>
-    <small class="dim">Отсканируйте код устройства и нажмите Enter — появятся IMEI и SN, курсор перейдёт к сим-карте. Отсканируйте сим-карту и нажмите Enter — строка запишется в таблицу, поля очистятся, курсор вернётся в поле 1. Esc — начать заново. Каждый IMEI, SN и ICCID можно записать только один раз.</small></section>
-    <div class="toolbar" style="margin-top:14px"><b>Записано: <span id="sn-cnt">${SNMAP.length}</span></b><span data-keep style="display:contents"><input class="in" id="snq" type="search" placeholder="Поиск по IMEI, SN, ICCID" aria-label="Поиск" value="${esc(ui.snq || '')}" style="flex:1 1 200px;max-width:320px"></span>
+      <label><span class="flab">2. Сим-карта (ICCID)</span><span data-keep style="display:contents"><input class="in mono" id="sn-sim" autocomplete="off" inputmode="numeric" placeholder="897019925050990299" value="${esc(ui.snSim || '')}" ${P && !P.iccid ? '' : 'disabled'}></span></label>
+      <label><span class="flab">3. IP-адрес</span><span data-keep style="display:contents"><input class="in mono" id="sn-ip" autocomplete="off" inputmode="decimal" placeholder="10.0.0.1" value="${esc(ui.snIpV || '')}" ${P && P.iccid ? '' : 'disabled'}></span></label></div>
+    <small class="dim">Отсканируйте код устройства и нажмите Enter — появятся IMEI и SN, курсор перейдёт к сим-карте. Отсканируйте сим-карту и нажмите Enter — курсор перейдёт к IP-адресу. Введите IP-адрес и нажмите Enter — строка запишется в таблицу, поля очистятся, курсор вернётся в поле 1. Esc — начать заново. Каждый IMEI, SN, ICCID и IP-адрес можно записать только один раз.</small></section>
+    <div class="toolbar" style="margin-top:14px"><b>Записано: <span id="sn-cnt">${SNMAP.length}</span></b><span data-keep style="display:contents"><input class="in" id="snq" type="search" placeholder="Поиск по IMEI, SN, ICCID, IP" aria-label="Поиск" value="${esc(ui.snq || '')}" style="flex:1 1 200px;max-width:320px"></span>
       <button class="btn" data-act="snXlsx">⬇ Скачать Excel</button></div>
     <div id="sn-qr">${snQrHtml()}</div><div id="sn-tbl">${snTable()}</div>`;
 }
-const snPendHtml = () => ui.snPend ? `<div class="mono">IMEI: <b>${esc(ui.snPend.imei)}</b></div><div class="mono">SN: <b>${esc(ui.snPend.sn)}</b></div>` : '';
+const snPendHtml = () => ui.snPend ? `<div class="mono">IMEI: <b>${esc(ui.snPend.imei)}</b></div><div class="mono">SN: <b>${esc(ui.snPend.sn)}</b></div>${ui.snPend.iccid ? `<div class="mono">ICCID: <b>${esc(ui.snPend.iccid)}</b></div>` : ''}` : '';
 function snTable(){
   const q = (ui.snq || '').replace(/\s+/g, '').toUpperCase(), all = SNMAP.map((x, i) => ({ ...x, no: i + 1 })).reverse();
-  const L = q ? all.filter(x => [x.imei, x.sn, x.iccid].some(v => String(v).includes(q))) : all, lim = ui.snAll ? L.length : 300;
+  const L = q ? all.filter(x => [x.imei, x.sn, x.iccid, x.ip].some(v => String(v).includes(q))) : all, lim = ui.snAll ? L.length : 300;
   if (!SNMAP.length) return '<div class="empty">Пока ничего не записано</div>';
   if (!L.length) return '<div class="empty">Ничего не найдено</div>';
-  const cell = (x, k) => `<td><span class="mono" ${`data-ed="snmap|${esc(x.id)}|${k}" title="Дважды щёлкните, чтобы изменить"`}>${esc(x[k])}</span> <button class="linkish" data-act="snCopy" data-id="${x.id}|${k}" title="Скопировать">📋</button></td>`;
+  const cell = (x, k) => `<td><span class="mono${x[k] ? '' : ' dim'}" ${`data-ed="snmap|${esc(x.id)}|${k}" title="Дважды щёлкните, чтобы ${x[k] ? 'изменить' : 'вписать'}"`}>${x[k] ? esc(x[k]) : '—'}</span>${x[k] ? ` <button class="linkish" data-act="snCopy" data-id="${x.id}|${k}" title="Скопировать">📋</button>` : ''}</td>`;
   return `<div class="tblwrap card" style="padding:0"><table class="comp sntbl"><thead><tr><th>№</th>${SN_F.map(([, l]) => `<th>${l}</th>`).join('')}<th>Записал</th><th></th></tr></thead><tbody>
     ${L.slice(0, lim).map(x => `<tr class="${ui.snQr === x.id ? 'sel' : ''}"><td class="dim">${x.no}</td>${SN_F.map(([k]) => cell(x, k)).join('')}<td class="dim" style="white-space:nowrap">${esc(who(x.by))}<br><small>${fmtDT(x.at)}</small></td>
       <td style="white-space:nowrap"><button class="btn sm" data-act="snQr" data-id="${x.id}" title="Сгенерировать QR-код и скопировать его в буфер обмена">QR-код</button>${isHead() || x.by === me.id ? ' ' + armBtn('snd:' + x.id, '✕', 'snDel', x.id, 'btn sm ghost') : ''}</td></tr>`).join('')}</tbody></table></div>
@@ -4794,29 +4798,33 @@ async function snCopyTxt(t){
   try { const a = document.createElement('textarea'); a.value = t; a.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(a); a.select(); const ok = document.execCommand('copy'); a.remove(); return ok; } catch(e) { return false; }
 }
 async function snQrCopy(id){ const x = SNMAP.find(e => e.id === id); if (!x) return; const ok = await snCopyImg(snCanvas(snQrText(x))); toast(ok === 'img' ? 'QR-код скопирован — вставьте его (Ctrl+V)' : ok === 'html' ? 'Скопирован только для Word/Excel — для других программ: правая кнопка по QR-коду → «Копировать картинку»' : 'Не удалось скопировать: правая кнопка по QR-коду → «Копировать картинку» или «Скачать PNG»'); }
-function snReset(focus = true){ ui.snPend = null; ui.snScan = ''; ui.snSim = ''; const a = $('sn-scan'), b = $('sn-sim'), p = $('sn-pend'); if (a) { a.value = ''; a.disabled = false; } if (b) { b.value = ''; b.disabled = true; } if (p) p.innerHTML = ''; if (focus && a) a.focus(); }
+function snReset(focus = true){ ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; const a = $('sn-scan'), b = $('sn-sim'), c = $('sn-ip'), p = $('sn-pend'); if (a) { a.value = ''; a.disabled = false; } if (b) { b.value = ''; b.disabled = true; } if (c) { c.value = ''; c.disabled = true; } if (p) p.innerHTML = ''; if (focus && a) a.focus(); }
 let snBusy = false;
 async function snKey(e){
   const t = e.target;
-  if (e.key === 'Escape' && (t.id === 'sn-sim' || t.id === 'sn-scan')) { e.preventDefault(); snReset(); return; }
+  if (e.key === 'Escape' && (t.id === 'sn-sim' || t.id === 'sn-scan' || t.id === 'sn-ip')) { e.preventDefault(); snReset(); return; }
   if (e.key !== 'Enter') return;
   if (t.id === 'sn-scan') { e.preventDefault(); const v = snParse(t.value); if (!v) { toast('Не найдены IMEI и SN — отсканируйте ещё раз'); t.select(); return; }
     const d = snDup('imei', v.imei) ? ['IMEI', v.imei, snDup('imei', v.imei)] : snDup('sn', v.sn) ? ['SN', v.sn, snDup('sn', v.sn)] : null;
     if (d) { toast(`${d[0]} ${d[1]} уже записан (строка № ${SNMAP.indexOf(d[2]) + 1})`); t.select(); return; }
     ui.snPend = v; ui.snScan = t.value; $('sn-pend').innerHTML = snPendHtml(); t.disabled = true; const b = $('sn-sim'); b.disabled = false; b.value = ''; b.focus(); return; }
-  if (t.id === 'sn-sim') { e.preventDefault(); if (snBusy || !ui.snPend) return; const iccid = snIccid(t.value);
+  if (t.id === 'sn-sim') { e.preventDefault(); if (!ui.snPend) return; const iccid = snIccid(t.value);
     if (!/^[0-9A-F]{10,22}$/.test(iccid)) { toast('ICCID — от 10 до 22 цифр, отсканируйте сим-карту ещё раз'); t.select(); return; }
     const d = snDup('iccid', iccid); if (d) { toast(`ICCID ${iccid} уже записан (строка № ${SNMAP.indexOf(d) + 1})`); t.select(); return; }
-    snBusy = true; try { const r = await api('POST', '/api/snmap', { ...ui.snPend, iccid }); SNMAP.push(r.item); toast('Записано: строка № ' + SNMAP.length); snReset(); snRedraw(); }
+    ui.snPend.iccid = iccid; ui.snSim = t.value; $('sn-pend').innerHTML = snPendHtml(); t.disabled = true; const c = $('sn-ip'); c.disabled = false; c.value = ''; c.focus(); return; }
+  if (t.id === 'sn-ip') { e.preventDefault(); if (snBusy || !ui.snPend?.iccid) return; const ip = snIp(t.value);
+    if (!snIpOk(ip)) { toast('IP-адрес — например 10.0.0.1'); t.select(); return; }
+    const d = snDup('ip', ip); if (d) { toast(`IP-адрес ${ip} уже записан (строка № ${SNMAP.indexOf(d) + 1})`); t.select(); return; }
+    snBusy = true; try { const r = await api('POST', '/api/snmap', { ...ui.snPend, ip }); SNMAP.push(r.item); toast('Записано: строка № ' + SNMAP.length); snReset(); snRedraw(); }
     catch(err) { toast(errText(err)); t.select(); } finally { snBusy = false; } }
 }
-document.addEventListener('keydown', e => { if (e.target && (e.target.id === 'sn-scan' || e.target.id === 'sn-sim')) snKey(e); });
+document.addEventListener('keydown', e => { if (e.target && (e.target.id === 'sn-scan' || e.target.id === 'sn-sim' || e.target.id === 'sn-ip')) snKey(e); });
 async function snXlsx(){
   if (!SNMAP.length) return toast('Таблица пустая');
-  const X = await loadSheetJS(), wb = X.utils.book_new(), a = [['IMEI', 'SN', 'ICCID'], ...SNMAP.map(x => [x.imei, x.sn, x.iccid])];
-  const ws = X.utils.aoa_to_sheet(a); ws['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 24 }];
+  const X = await loadSheetJS(), wb = X.utils.book_new(), a = [['IMEI', 'SN', 'ICCID', 'IP-адрес'], ...SNMAP.map(x => [x.imei, x.sn, x.iccid, x.ip || ''])];
+  const ws = X.utils.aoa_to_sheet(a); ws['!cols'] = [{ wch: 20 }, { wch: 26 }, { wch: 24 }, { wch: 18 }];
   // the numbers are text — otherwise Excel shows 8.97E+17 and drops the leading zeros
-  for (let r = 1; r < a.length; r++) for (let c = 0; c < 3; c++) { const ref = X.utils.encode_cell({ r, c }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
+  for (let r = 1; r < a.length; r++) for (let c = 0; c < 4; c++) { const ref = X.utils.encode_cell({ r, c }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
   X.utils.book_append_sheet(wb, ws, 'Сопоставление SN'); X.writeFile(wb, `Сопоставление SN — ${today()}.xlsx`);
 }
 const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'snmap'];
@@ -7327,7 +7335,7 @@ async function act(el){
     case 'drAttach': return drAttach();
     case 'drSave': { const c = $('drawc'); if (!c) return; c.toBlob(b => { const u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = `Рисунок ${today()}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }, 'image/png'); return; }
     case 'vTab': ui.vtab = id; return render();
-    case 'snCopy': { const [i, k] = id.split('|'), x = SNMAP.find(e => e.id === i); if (x) toast(await snCopyTxt(x[k]) ? `${({ imei: 'IMEI', sn: 'SN', iccid: 'ICCID' })[k]} скопирован` : 'Не удалось скопировать — выделите и скопируйте вручную'); return; }
+    case 'snCopy': { const [i, k] = id.split('|'), x = SNMAP.find(e => e.id === i); if (x) toast(await snCopyTxt(x[k]) ? `${({ imei: 'IMEI', sn: 'SN', iccid: 'ICCID', ip: 'IP-адрес' })[k]} скопирован` : 'Не удалось скопировать — выделите и скопируйте вручную'); return; }
     case 'snQr': ui.snQr = id; snRedraw(); return snQrCopy(id);
     case 'snQrCopy': return snQrCopy(id);
     case 'snCopyHost': toast(await snCopyTxt(location.origin) ? 'Адрес скопирован' : location.origin); return;
@@ -7940,6 +7948,7 @@ document.addEventListener('input', e => {
   if (t.id === 'snq') { ui.snq = t.value; ui.snAll = false; snRedraw(); return; }
   if (t.id === 'sn-scan') { ui.snScan = t.value; return; }
   if (t.id === 'sn-sim') { ui.snSim = t.value; return; }
+  if (t.id === 'sn-ip') { ui.snIpV = t.value; return; }
   if (t.id === 'vq') { ui.vq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vVault(); const n = $('vq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (['tp-job', 'tp-date', 'tp-veh', 'tp-note'].includes(t.id)) { ui[{ 'tp-job': 'tpJob', 'tp-date': 'tpDate', 'tp-veh': 'tpVeh', 'tp-note': 'tpNote' }[t.id]] = t.value; return; }
@@ -8272,7 +8281,7 @@ $('blk-out').addEventListener('click', async () => { await fetch('/api/logout', 
 // what was loaded for one user must not stay for the next one who logs in in the same tab
 function userDataReset(){
   SSHT.forEach(t => { try { t.es?.close(); } catch(e) {} try { t.term.dispose(); } catch(e) {} try { t.el.remove(); } catch(e) {} }); SSHT.length = 0; ui.sshActive = null;
-  SSH = null; SNMAP = null; VAULT = null; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = '';
+  SSH = null; SNMAP = null; VAULT = null; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = '';
 }
 // the lists of the SSH console and «Сопоставление SN» follow the changes of the others (shared servers and commands, new rows)
 let sideBusy = false;
