@@ -493,11 +493,11 @@ function sshStart(user, srv, cols, rows) {
   if (srv.os !== 'other') args.push(`stty cols ${c} rows ${r} 2>/dev/null; exec "\${SHELL:-/bin/sh}" -l`);
   const proc = spawn(SSH_BIN, args, { env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
   const sid = crypto.randomBytes(12).toString('base64url');
-  const S = { sid, uid: user.id, orgId: user.orgId, name: srv.name || host, host, proc, chunks: [], size: 0, seq: 0, subs: new Set(), last: Date.now(), closed: false, code: null, tmp, at: new Date().toISOString() };
+  const S = { sid, uid: user.id, orgId: user.orgId, srvId: srv.id || '', name: srv.name || host, host, proc, chunks: [], size: 0, seq: 0, subs: new Set(), last: Date.now(), closed: false, code: null, tmp, at: new Date().toISOString() };
   SSH_SESS.set(sid, S);
-  proc.stdout.on('data', b => sshPush(S, b)); proc.stderr.on('data', b => sshPush(S, b));
+  proc.stdout.on('data', b => sshPush(S, b)); proc.stderr.on('data', b => { if (!S.hostKey && /REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed/.test(b.toString())) S.hostKey = true; sshPush(S, b); });
   proc.on('error', e => { sshPush(S, Buffer.from(e.code === 'ENOENT' ? '\r\n[На сервере программы не установлен клиент SSH (OpenSSH). Установите пакет openssh-client.]\r\n' : '\r\n[Ошибка запуска ssh: ' + e.message + ']\r\n')); });
-  proc.on('close', code => { S.closed = true; S.closedAt = Date.now(); S.code = code; sshCleanup(S); sshEmit(S, 'exit', JSON.stringify({ code, why: S.why || '' })); for (const r of S.subs) { try { r.end(); } catch {} } S.subs.clear(); });
+  proc.on('close', code => { S.closed = true; S.closedAt = Date.now(); S.code = code; sshCleanup(S); sshEmit(S, 'exit', JSON.stringify({ code, why: S.why || '', hostKey: !!S.hostKey, srvId: S.srvId })); for (const r of S.subs) { try { r.end(); } catch {} } S.subs.clear(); });
   // the key and the askpass script are needed only at the login
   setTimeout(() => { for (const f of S.tmp) { try { fs.unlinkSync(f); } catch {} } S.tmp = []; }, 60e3).unref();
   return S;
@@ -1078,6 +1078,22 @@ async function api(req, res, url) {
     if (p[2] === 'servers') {
       const x = p[3] && V.servers.find(e => e.id === p[3]);
       if (m === 'DELETE' && x) { V.servers = V.servers.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+      // «Забыть ключ сервера»: after a reinstall the server has a new host key and ssh refuses it; the owner removes the remembered one,
+      // the next connection remembers the new key
+      if (m === 'POST' && p[4] === 'forget-key') {
+        if (!x) return fail(res, 403, 'Забыть ключ может только тот, кто добавил сервер');
+        const v = srvOf(x), host = String(v.host || '').replace(/^\[|\]$/g, ''), port = Number(v.port) || 22, file = path.join(DATA_DIR, 'ssh_known_hosts');
+        if (!/^[A-Za-z0-9.:_-]+$/.test(host) || host.startsWith('-')) return fail(res, 400, 'Неверный адрес сервера');
+        if (!fs.existsSync(file)) return send(res, 200, { ok: true, removed: 0 });
+        const names = [host, `[${host}]:${port}`], before = fs.readFileSync(file, 'utf8');
+        const run = n => new Promise(ok => { const k = spawn(process.env.SSH_KEYGEN_BIN || 'ssh-keygen', ['-f', file, '-R', n], { stdio: 'ignore' }); k.on('error', () => ok(false)); k.on('close', c => ok(c === 0)); });
+        let tool = true; for (const n of names) tool = (await run(n)) && tool;
+        // without ssh-keygen: the plain (not hashed) lines of this host
+        if (!tool) { const L = fs.readFileSync(file, 'utf8').split('\n'); fs.writeFileSync(file, L.filter(l => !l.trim() || l.startsWith('#') || !l.split(/\s+/)[0].split(',').some(h => names.includes(h))).join('\n')); }
+        try { fs.unlinkSync(file + '.old'); } catch {}
+        const after = fs.readFileSync(file, 'utf8'), removed = before.split('\n').filter(Boolean).length - after.split('\n').filter(Boolean).length;
+        return send(res, 200, { ok: true, removed });
+      }
       if (m === 'POST' || m === 'PUT') {
         const b = await readJsonBody(req), old = x ? srvOf(x) : {};
         const v = { name: t(b.name, 200).trim(), host: t(b.host, 255).trim(), port: Number(b.port) || 22, user: t(b.user, 100).trim(), auth: b.auth === 'key' ? 'key' : 'password', os: b.os === 'other' ? 'other' : 'linux',
@@ -1118,7 +1134,7 @@ async function api(req, res, url) {
         res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no', Connection: 'keep-alive' });
         const since = Number(req.headers['last-event-id'] || url.searchParams.get('since') || 0);
         res.write('retry: 2000\n\n'); for (const [i, b64] of S.chunks) if (i > since) res.write(`id: ${i}\ndata: ${b64}\n\n`);
-        if (S.closed) { res.write(`event: exit\ndata: ${JSON.stringify({ code: S.code, why: S.why || '' })}\n\n`); return res.end(); }
+        if (S.closed) { res.write(`event: exit\ndata: ${JSON.stringify({ code: S.code, why: S.why || '', hostKey: !!S.hostKey, srvId: S.srvId })}\n\n`); return res.end(); }
         S.subs.add(res); S.last = Date.now();
         const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25e3);
         req.on('close', () => { clearInterval(ping); S.subs.delete(res); S.last = Date.now(); });
