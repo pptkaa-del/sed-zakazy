@@ -354,7 +354,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'sn'] };
+const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'sn'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -780,8 +780,10 @@ async function api(req, res, url) {
     if (orgType(user) !== 'requests' && sees(user, 'refs:list')) out.refs = (Array.isArray(db.refs) ? db.refs : []).filter(r => HEAD(user) || !r.restricted || (r.viewers || []).includes(user.id));
     // «Загрузить чек»: an employee sees his own receipts, a manager and the accountant see everyone's; the vehicles to choose for a refuelling
     if (orgType(user) !== 'requests') {
-      out.checks = (Array.isArray(db.checks) ? db.checks : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
-      out.trips = (Array.isArray(db.trips) ? db.trips : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
+      // «Учётка → Чеки / Путевые листы» can be hidden for an office user; field staff and a transport organization always have their own
+      const ckOff = k => !FIELD(user) && orgType(user) !== 'transport' && !sees(user, 'stock:' + k);
+      out.checks = ckOff('checks') ? [] : (Array.isArray(db.checks) ? db.checks : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
+      out.trips = ckOff('trips') ? [] : (Array.isArray(db.trips) ? db.trips : []).filter(x => HEAD(user) || user.role === 'accountant' || x.by === user.id);
       // a transport organization: the orders (rent of special vehicles, cargo); a driver gets his own
       if (orgType(user) === 'transport') {
         out.tOrders = Object.entries(db.tOrders || {}).map(([id, x]) => ({ id, ...x })).filter(x => HEAD(user) || user.role === 'accountant' || x.driverId === user.id);

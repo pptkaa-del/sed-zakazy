@@ -1557,13 +1557,17 @@ function animateView(el){
   clearTimeout(enterTimer); enterTimer = setTimeout(() => el.classList.remove('enter'), 700);
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
-const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета']]],
+const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета'], ['checks', 'Чеки'], ['trips', 'Путевые листы']]],
   ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['sn', 'Сопоставление SN']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
 const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:sn' };
-const viewOk = v => !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
+// «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
+const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
+const viewOk = v => ckView(v) ? can('stock:' + v) : !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
+// the first open sub-tab of «Учётка» (or none — then the tab is not shown)
+const stockFirst = () => [...['stock', 'inc', 'wo', 'pay'].filter(k => can('stock:' + k) && (k !== 'wo' || canWo())), ...(can('cps') ? ['cps'] : []), ...['checks', 'trips'].filter(k => can('stock:' + k))][0] || '';
 // the checkbox tree of the organization and user forms: checked — shown; what the organization hides is not offered to its users
 function secTree(hide, orgHide){
   hide = hide || []; orgHide = orgHide || [];
@@ -1621,7 +1625,7 @@ function stockTabs(){
   if (transMode()) return `<nav class="seg stabs" aria-label="Разделы учётки">${[['cps', 'Клиенты'], ['checks', 'Чеки'], ['trips', 'Путевые листы']].map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}">${l}</a>`).join('')}</nav>`;
   const n = S.invoices.filter(i => i.status === 'topay').length;
   const inc = S.invoices.filter(i => incState(i) === 'wait').length;
-  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [...(can('cps') ? [['cps', 'Контрагенты']] : []), ['checks', 'Чеки'], ['trips', 'Путевые листы']]);
+  const T = [['stock', 'Склад'], ['inc', 'Приходы'], ...(canWo() ? [['wo', 'Списание материалов']] : []), ['pay', 'Счета']].filter(([k]) => can('stock:' + k)).concat(isWorker() ? [] : [...(can('cps') ? [['cps', 'Контрагенты']] : []), ...[['checks', 'Чеки'], ['trips', 'Путевые листы']].filter(([k]) => can('stock:' + k))]);
   return `<nav class="seg stabs" aria-label="Разделы учётки">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}${k === 'pay' && n ? ` <span class="badge">${n}</span>` : k === 'inc' && inc ? ` <span class="badge" title="Ждут оприходования">${inc}</span>` : ''}</a>`).join('')}</nav>`;
 }
 function w98Update(){
@@ -8220,7 +8224,7 @@ function route(){
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
-    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', sn: 'snmap' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
+    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', sn: 'snmap', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
     ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
     try { history.replaceState(null, '', '#' + ui.view); } catch(e) {}
   }
@@ -8288,7 +8292,7 @@ async function start(u){
   if (!u.sys && !reqMode() && !transMode() && !isWorker()) {
     const pl = planTabsList(), pt = $('planTab'); pt.hidden = !pl.length; if (pl.length) pt.href = '#' + pl[0][0];
     // «Учётка» is shown while any of its sub-tabs is open (the warehouse sections, «Контрагенты», receipts, waybills)
-    const st = document.querySelector('#views a[data-v=stock]'); if (st) { st.hidden = false; st.href = tabOpen('stock') ? '#stock' : '#cps'; }
+    const st = document.querySelector('#views a[data-v=stock]'), sf = stockFirst(); if (st) { st.hidden = !sf; st.href = '#' + (sf || 'stock'); }
     const nt = $('notesTab'), notesOpen = tabOpen('notes'); if (!notesOpen && can('devs')) { nt.hidden = false; nt.href = '#devs'; } else nt.href = '#notes';
   }
   if (!u.sys && !reqMode()) { const rt = $('refsTab'), rl = refTabsList(); if (rt && rl.length) rt.href = '#' + rl[0][0]; }
