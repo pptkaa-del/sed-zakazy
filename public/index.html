@@ -358,7 +358,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .nscmdw{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0}.nscmdw .nscmd{margin:0;align-self:stretch}.nscmd{margin:6px 0;padding:8px 10px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-all;font-family:var(--f-mono,ui-monospace,monospace)}.nssteps{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 @media (max-width:640px){.nshead{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nshead span:last-child{display:none}.nsrow{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nsrow .nsmeta:last-child{display:none}}
 .snbox{max-width:760px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
-.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
+.sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
 .vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
 .sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
@@ -4956,7 +4956,11 @@ async function sshOpenTerm(sid, name, quiet, pre){
   T.es = new EventSource(`/api/ssh/s/${encodeURIComponent(sid)}/stream`);
   T.es.onmessage = e => { try { term.write(b64bytes(e.data)); } catch(err) {} };
   T.es.addEventListener('exit', e => { let w = {}; try { w = JSON.parse(e.data); } catch(err) {} T.closed = true; T.es.close();
-    term.write(`\r\n\x1b[90m[Соединение закрыто${w.why ? ': ' + w.why : w.code ? ', код ' + w.code : ''}]\x1b[0m\r\n`); sshTabs(); });
+    term.write(`\r\n\x1b[90m[Соединение закрыто${w.why ? ': ' + w.why : w.code ? ', код ' + w.code : ''}]\x1b[0m\r\n`);
+    if (w.hostKey) { const sv = SSH?.servers.find(x => x.id === w.srvId);
+      term.write(`\r\n\x1b[33m[Ключ сервера изменился с первого подключения. Так бывает после переустановки системы или пересоздания сервера у хостера. Если это так — ${sv && sv.shared ? `попросите ${who(sv.owner)} нажать` : 'откройте ✎ у сервера и нажмите'} «Забыть ключ сервера», затем подключитесь снова. Если сервер не переустанавливали — не подключайтесь и выясните причину.]\x1b[0m\r\n`);
+      toast('Ключ сервера изменился — см. сообщение в терминале'); }
+    sshTabs(); });
   T.es.onerror = () => { if (T.es.readyState === 2 && !T.closed) { T.closed = true; term.write('\r\n\x1b[90m[Связь с сервером программы потеряна — подключитесь заново]\x1b[0m\r\n'); sshTabs(); } };
   sshTabs(); render();
   return T;
@@ -5027,6 +5031,7 @@ function sshSrvHtml(x){
     <label class="wide" id="ss-key-w" ${d.auth === 'key' ? '' : 'hidden'}>Закрытый ключ (OpenSSH, PEM)<textarea class="in mono" id="ss-key" rows="5" placeholder="${x && x.hasKey ? 'сохранён — оставьте пустым, чтобы не менять' : '-----BEGIN OPENSSH PRIVATE KEY-----'}" spellcheck="false"></textarea></label>
     ${sshShareHtml(x, 'сервер')}</div>
     <p class="dim" style="margin:0;font-size:13px">Пароль и ключ хранятся на сервере зашифрованными и обратно в браузер не передаются. При первом подключении ключ сервера запоминается; если он потом изменится, подключение будет отклонено.</p>
+    ${x ? `<div class="sshfk"><div class="row-g">${armBtn('sshfk:' + x.id, '🔑 Забыть ключ сервера', 'sshForgetKey', x.id, 'btn sm')}</div><small class="dim">Нажмите, если сервер переустановили или пересоздали и подключение пишет «REMOTE HOST IDENTIFICATION HAS CHANGED». Следующее подключение запомнит новый ключ. Если сервер не меняли — не нажимайте: возможно, подключение перехватывают.</small></div>` : ''}
     <div class="err" id="ferr"></div>
     <div class="row-g"><button class="btn primary" data-act="sshSrvSave" data-id="${x ? x.id : ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('sshd:' + x.id, 'Удалить сервер', 'sshSrvDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
 }
@@ -7339,6 +7344,7 @@ async function act(el){
       const body = { name: $('ss-name').value, host: $('ss-host').value, port: Number($('ss-port').value) || 22, user: $('ss-user').value, os: $('ss-os').value, auth, password: $('ss-pass').value, clearPassword: !!$('ss-clearpw')?.checked, key: $('ss-key')?.value || '', share: sshShareVal() };
       try { const r = await api(id ? 'PUT' : 'POST', '/api/ssh/servers' + (id ? '/' + id : ''), body); const i = SSH.servers.findIndex(e => e.id === r.server.id); if (i >= 0) SSH.servers[i] = r.server; else SSH.servers.push(r.server); document.activeElement?.blur(); closeDrawer(); render(); toast(id ? 'Сохранено' : 'Сервер добавлен — нажмите «▶ Подключить»'); }
       catch(e) { if (fe) fe.textContent = errText(e); else toast(errText(e)); } return; }
+    case 'sshForgetKey': try { const r = await api('POST', `/api/ssh/servers/${id}/forget-key`); toast(r.removed ? 'Старый ключ сервера забыт — подключитесь снова' : 'Сохранённого ключа нет — подключитесь снова'); renderDrawer(); } catch(e) { toast(errText(e)); } return;
     case 'sshSrvDel': try { await api('DELETE', '/api/ssh/servers/' + id); SSH.servers = SSH.servers.filter(e => e.id !== id); closeDrawer(); render(); toast('Сервер удалён'); } catch(e) { toast(errText(e)); } return;
     case 'sshCmdSave': { const fe = $('ferr'); if (fe) fe.textContent = '';
       try { const r = await api(id ? 'PUT' : 'POST', '/api/ssh/cmds' + (id ? '/' + id : ''), { title: $('sc-title').value, cmd: $('sc-cmd').value, serverId: $('sc-srv').value, share: sshShareVal() }); const i = SSH.cmds.findIndex(e => e.id === r.cmd.id); if (i >= 0) SSH.cmds[i] = r.cmd; else SSH.cmds.push(r.cmd); document.activeElement?.blur(); closeDrawer(); render(); toast(id ? 'Сохранено' : 'Команда сохранена'); }
