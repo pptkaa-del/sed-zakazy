@@ -90,6 +90,8 @@ const canLead = u => canEdit(u);
 // «В планах», «Ожидание старта», «В работе», «Выполнена»
 const JOB_STATUS = ['new', 'wait', 'work', 'done'];
 const JOB_WORKER_FIELDS = ['status', 'report'];
+// «Задействован транспорт» of a task of the plan: only the vehicles of the organization
+const taskVehicles = a => [...new Set((Array.isArray(a) ? a : []).map(String))].filter(id => db.vehicles && db.vehicles[id]).slice(0, 30);
 const onJob = (u, j) => j.leaderId === u.id || (j.workers || []).includes(u.id);
 const mayEditJob = (u, j) => canEdit(u);
 function cleanJob(d){
@@ -2451,6 +2453,7 @@ async function api(req, res, url) {
     data.createdBy = user.id; data.createdAt = data.createdAt || new Date().toISOString();
     if (col === 'orders' || col === 'counterparties') data.comments = [];
     if (col === 'stock') { data.qty = 0; data.moves = []; data.acctQty = 0; }
+    if (col === 'tasks') data.vehicles = taskVehicles(data.vehicles);
     if (col === 'invoices') {
       if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
       data.projectId = db.orders[data.orderId].projectId || null;
@@ -2471,7 +2474,8 @@ async function api(req, res, url) {
     const patch = clean(await readJsonBody(req));
     delete patch.createdBy; delete patch.createdAt;
     if (col === 'orders' || col === 'counterparties') delete patch.comments;   // comments go through their own endpoint
-    if (col === 'stock') { delete patch.qty; delete patch.moves; delete patch.acctQty; }   // balances change only through moves and the 1C import
+    if (col === 'stock') { delete patch.qty; delete patch.moves; delete patch.acctQty; }
+    if (col === 'tasks' && patch.vehicles !== undefined) patch.vehicles = taskVehicles(patch.vehicles);   // balances change only through moves and the 1C import
     SEEN_FIELDS.forEach(f => delete patch[f]);   // set only by the server when the accountant downloads
     if (col === 'invoices') { delete patch.income; delete patch.supplierId; if ('items' in patch) { if (db.invoices[id].income) delete patch.items; else patch.items = cleanItems(patch.items); } }
     const keys = Object.keys(patch);
