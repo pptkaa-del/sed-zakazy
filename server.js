@@ -334,7 +334,9 @@ const saveOrgs = () => { writeJSON(ORGS_FILE, orgs); orgsStamp = stamp(ORGS_FILE
    administrator. One thread per user: { kind: 'admin' | 'sys', orgId, uid, msgs: [{ id, by, text, at }], userRead, staffRead } */
 const CHAT_FILE = path.join(DATA_DIR, 'chat.json');
 let chat = null, chatStamp;
-const chatDb = () => { const st = stamp(CHAT_FILE); if (!chat || st !== chatStamp) { chat = readJSON(CHAT_FILE, { threads: {} }); if (!chat.threads) chat.threads = {}; chatStamp = st; } return chat; };
+const chatDb = () => { const st = stamp(CHAT_FILE); if (!chat || st !== chatStamp) { chat = readJSON(CHAT_FILE, { threads: {} }); if (!chat.threads) chat.threads = {}; if (!chat.files) chat.files = {}; chatStamp = st; } return chat; };
+// the attachments of the conversations: DATA_DIR/chat-files/<id>; { name, type, size, at, by, thread } in chat.files
+const CHAT_FILES = path.join(DATA_DIR, 'chat-files');
 const saveChat = () => { writeJSON(CHAT_FILE, chat); chatStamp = stamp(CHAT_FILE); };
 const isOrgAdmin = u => u && u.role === 'admin' && !u.sys;
 // the thread a user writes in himself: to the administrators of his organization or (an administrator) to the system administrator
@@ -342,15 +344,41 @@ const chatMine = u => !u || u.sys ? null : isOrgAdmin(u) ? { kind: 'sys', key: `
 // who answers in a thread: the administrators of the organization / the system administrators
 const chatStaff = (u, th) => !!u && !u.blocked && (th.kind === 'admin' ? isOrgAdmin(u) && u.orgId === th.orgId : !!u.sys);
 const chatOwn = (u, th) => !!u && th.uid === u.id && th.orgId === u.orgId;
+const url_dl = req => /[?&]dl=1\b/.test(req.url || '');
 const chatUnread = u => { if (!u) return 0; let n = 0; for (const th of Object.values(chatDb().threads)) {
   if (chatOwn(u, th)) n += th.msgs.filter(x => x.by !== u.id && x.at > (th.userRead || '')).length;
   else if (chatStaff(u, th)) n += th.msgs.filter(x => x.by === th.uid && x.at > (th.staffRead || '')).length; } return n; };
-function chatApi(req, res, p, m, user, body) {
+async function chatApi(req, res, p, m, user) {
   const C = chatDb(), uName = id => users.find(u => u.id === id)?.name || 'Пользователь', mine = chatMine(user);
-  const pubMsg = th => x => ({ id: x.id, by: x.by, name: uName(x.by), staff: x.by !== th.uid, text: x.text, at: x.at });
+  const fileOf = id => { const f = C.files[id]; return f ? { id, name: f.name, type: f.type, size: f.size } : null; };
+  const pubMsg = th => x => ({ id: x.id, by: x.by, name: uName(x.by), staff: x.by !== th.uid, text: x.text, at: x.at, files: (x.files || []).map(fileOf).filter(Boolean) });
+  const canTh = key => { const th = C.threads[key]; return !!th && (chatOwn(user, th) || chatStaff(user, th)); };
+  // a file is uploaded first, then sent with the message; files not sent within a day are removed
+  if (p[2] === 'upload' && m === 'POST') {
+    let name = 'файл'; try { name = decodeURIComponent(String(req.headers['x-filename'] || 'файл')); } catch {}
+    name = name.replace(/[\\/\r\n"]/g, '_').slice(0, 200) || 'файл';
+    const buf = await readBody(req, MAX_FILE); if (!buf.length) return fail(res, 400, 'Пустой файл');
+    const type = String(req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+    fs.mkdirSync(CHAT_FILES, { recursive: true });
+    const day = new Date(Date.now() - 864e5).toISOString();
+    for (const [fid, f] of Object.entries(C.files)) if (!f.thread && f.at < day) { delete C.files[fid]; try { fs.unlinkSync(path.join(CHAT_FILES, fid)); } catch {} }
+    const id = newId(); fs.writeFileSync(path.join(CHAT_FILES, id), buf);
+    C.files[id] = { name, type, size: buf.length, at: new Date().toISOString(), by: user.id, thread: null }; saveChat();
+    return send(res, 200, fileOf(id));
+  }
+  if (p[2] === 'f' && p[3] && m === 'GET') {
+    const id = p[3], f = C.files[id];
+    if (!/^[\w-]+$/.test(id) || !f || !(f.thread ? canTh(f.thread) : f.by === user.id)) return fail(res, 404, 'Файл не найден');
+    const fp = path.join(CHAT_FILES, id); if (!fs.existsSync(fp)) return fail(res, 404, 'Файл не найден');
+    const inline = INLINE.has(f.type), enc = encodeURIComponent(f.name);
+    res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': inline ? f.type + (f.type.startsWith('text/') ? '; charset=utf-8' : '') : 'application/octet-stream', 'Content-Length': f.size,
+      'Content-Disposition': `${inline && !url_dl(req) ? 'inline' : 'attachment'}; filename="${enc}"; filename*=UTF-8''${enc}`, 'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox", 'Cache-Control': 'private, no-cache' });
+    return fs.createReadStream(fp).pipe(res);
+  }
+  const body = m === 'POST' ? await readJsonBody(req) : null;
   if (m === 'GET' && !p[2]) {
     const inbox = Object.entries(C.threads).filter(([, th]) => chatStaff(user, th) && th.msgs.length).map(([key, th]) => { const last = th.msgs[th.msgs.length - 1], o = users.find(u => u.id === th.uid);
-      return { key, kind: th.kind, uid: th.uid, name: uName(th.uid), role: o ? ROLES[o.role] : '', org: orgById(th.orgId)?.name || '', last: last.at, lastText: last.text.slice(0, 120), lastBy: last.by === th.uid ? 'user' : 'staff', unread: th.msgs.filter(x => x.by === th.uid && x.at > (th.staffRead || '')).length }; })
+      return { key, kind: th.kind, uid: th.uid, name: uName(th.uid), role: o ? ROLES[o.role] : '', org: orgById(th.orgId)?.name || '', last: last.at, lastText: (last.text || ((last.files || []).length ? '📎 файл' : '')).slice(0, 120), lastBy: last.by === th.uid ? 'user' : 'staff', unread: th.msgs.filter(x => x.by === th.uid && x.at > (th.staffRead || '')).length }; })
       .sort((a, b) => b.last.localeCompare(a.last));
     const th = mine && C.threads[mine.key];
     const staffCount = mine ? (mine.kind === 'admin' ? users.filter(u => isOrgAdmin(u) && u.orgId === user.orgId && !u.blocked).length : users.filter(u => u.sys && !u.blocked).length) : 0;
@@ -369,9 +397,12 @@ function chatApi(req, res, p, m, user, body) {
     return send(res, 200, { key, kind: th.kind, owner: { id: th.uid, name: uName(th.uid), role: o ? ROLES[o.role] : '', org: orgById(th.orgId)?.name || '' }, asOwner, msgs: th.msgs.map(pubMsg(th)) });
   }
   if (m === 'POST') {
-    const text = String(body?.text ?? '').trim().slice(0, 4000); if (!text) return fail(res, 400, 'Напишите сообщение');
+    const text = String(body?.text ?? '').trim().slice(0, 4000);
+    const files = [...new Set((Array.isArray(body?.files) ? body.files : []).map(String))].filter(id => C.files[id] && C.files[id].by === user.id && !C.files[id].thread).slice(0, 20);
+    if (!text && !files.length) return fail(res, 400, 'Напишите сообщение или прикрепите файл');
     if (th.msgs.length >= 2000) th.msgs = th.msgs.slice(-1500);
-    th.msgs.push({ id: newId(), by: user.id, text, at: now }); if (asOwner) th.userRead = now; else th.staffRead = now;
+    files.forEach(id => { C.files[id].thread = key; });
+    th.msgs.push({ id: newId(), by: user.id, text, at: now, ...(files.length ? { files } : {}) }); if (asOwner) th.userRead = now; else th.staffRead = now;
     C.threads[key] = th; saveChat(); return send(res, 200, { ok: true, msg: pubMsg(th)(th.msgs[th.msgs.length - 1]) });
   }
   return fail(res, 405, 'Метод не поддерживается');
@@ -705,7 +736,7 @@ async function api(req, res, url) {
   if (p[1] === 'orgs') return orgsApi(req, res, p, m, user);
   if (p[1] === 'backups') return backupsApi(req, res, p, m, user);
   if (p[1] === 'stats') return statsApi(req, res, m, user);
-  if (p[1] === 'chat') return chatApi(req, res, p, m, user, m === 'POST' ? await readJsonBody(req) : null);
+  if (p[1] === 'chat') return chatApi(req, res, p, m, user);
   if (p[1] === 'prefs' && m === 'PUT') { user.prefs = cleanPrefs(await readJsonBody(req) || {}); saveUsers(); return send(res, 200, { ok: true, prefs: user.prefs }); }
   // the system administrator manages organizations, backups and the server, not the work of an organization
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');

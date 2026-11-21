@@ -361,7 +361,8 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .chatbody{display:flex;flex-direction:column;gap:10px;min-height:0}.chatlog{display:flex;flex-direction:column;gap:10px;max-height:min(60vh,520px);overflow-y:auto;padding:4px 2px}
 .cmsg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:85%}.cmsg.me{align-self:flex-end;align-items:flex-end}
 .cbub{background:var(--mute-soft);color:var(--ink);padding:8px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word}.cmsg.me .cbub{background:var(--stamp);color:var(--stamp-ink)}
-.chatin{display:flex;gap:8px;align-items:flex-end}.chatin textarea{flex:1;resize:vertical}
+.chatin{display:flex;gap:8px;align-items:flex-end}.cattach{cursor:pointer;font-size:18px;padding:6px 10px}.cpends{display:flex;flex-wrap:wrap;gap:6px}.cpends:empty{display:none}.cpend{display:inline-flex;gap:4px;align-items:center}
+.cfiles{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}.cmsg.me .cfiles{justify-content:flex-end}.cfiles img{max-width:220px;max-height:160px;border-radius:8px;border:1px solid var(--rule-2);display:block}.cfile{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);text-decoration:none;color:var(--ink);word-break:break-all}.chatin textarea{flex:1;resize:vertical}
 .chatlist{display:flex;flex-direction:column;gap:6px}.chatrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);color:var(--ink);cursor:pointer;font:inherit}.chatrow.new{border-color:var(--stamp)}.chatlast{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
@@ -6110,7 +6111,10 @@ function chatBadges(){
   set('chatMineBadge', M?.unread || 0); set('chatInboxBadge', inb); set('chatBadge', (M?.unread || 0) + inb);
 }
 const chatTitle = T => T.asOwner ? (T.kind === 'sys' ? 'Администратору системы' : 'Администратору') : `${T.owner.name}${T.owner.role ? ' · ' + T.owner.role : ''}${me?.sys && T.owner.org ? ' · ' + T.owner.org : ''}`;
-const chatLogHtml = T => T.msgs.length ? T.msgs.map(x => `<div class="cmsg ${x.by === me.id ? 'me' : ''}"><div class="cbub">${esc(x.text)}</div><small class="dim">${x.by === me.id ? 'вы' : esc(x.name)} · ${fmtDT(x.at)}</small></div>`).join('')
+const chatFileUrl = (f, dl) => `/api/chat/f/${encodeURIComponent(f.id)}${dl ? '?dl=1' : ''}`;
+const chatFilesHtml = L => (L || []).length ? `<div class="cfiles">${L.map(f => /^image\//.test(f.type) ? `<a href="${chatFileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}"><img src="${chatFileUrl(f)}" alt="${esc(f.name)}" loading="lazy"></a>`
+  : `<a class="cfile" href="${chatFileUrl(f, true)}" download="${esc(f.name)}">${fileIco(f)} ${esc(f.name)} <small class="dim">${fmtSize(f.size)}</small></a>`).join('')}</div>` : '';
+const chatLogHtml = T => T.msgs.length ? T.msgs.map(x => `<div class="cmsg ${x.by === me.id ? 'me' : ''}">${x.text ? `<div class="cbub">${esc(x.text)}</div>` : ''}${chatFilesHtml(x.files)}<small class="dim">${x.by === me.id ? 'вы' : esc(x.name)} · ${fmtDT(x.at)}</small></div>`).join('')
   : `<div class="empty" style="padding:18px">${T.asOwner ? (T.kind === 'sys' ? 'Напишите администратору системы: вопрос, просьба продлить срок, проблема.' : 'Напишите администратору: вопрос, просьба, проблема в программе.') + (CHAT?.mine && !CHAT.mine.staffCount ? '<br><b>Сейчас ' + (T.kind === 'sys' ? 'администратора системы' : 'администратора в организации') + ' нет</b> — сообщение он увидит, когда появится.' : '') : 'Сообщений нет'}</div>`;
 async function chatThread(key, quiet){
   try { const T = await api('GET', '/api/chat/t/' + encodeURIComponent(key)); if (ui.drawer?.kind !== 'chat' || ui.drawer.id !== key) return;
@@ -6119,13 +6123,27 @@ async function chatThread(key, quiet){
     chatLoad();
   } catch(e) { toast(errText(e)); }
 }
+const chatPendDraw = () => { const b = $('chat-pend'); if (b) b.innerHTML = (ui.chatFiles || []).map(f => `<span class="chip cpend">${fileIco(f)} ${esc(f.name)} <button type="button" class="linkish" data-act="chatUnfile" data-id="${esc(f.id)}" aria-label="Убрать файл">✕</button></span>`).join('') + (ui.chatUp ? `<span class="dim">Загружаем «${esc(ui.chatUp)}»…</span>` : ''); };
+async function chatAttach(files){
+  ui.chatFiles = ui.chatFiles || [];
+  for (const fl0 of files) { if (fl0.size > MAX_MB * 1048576) { toast(`Файл «${fl0.name}» больше ${MAX_MB} МБ`); continue; }
+    ui.chatUp = fl0.name; chatPendDraw();
+    try { const fl = await shrinkImage(fl0), f = await api('POST', '/api/chat/upload', fl, { 'Content-Type': fl.type || 'application/octet-stream', 'X-Filename': encodeURIComponent(fl0.name) }); ui.chatFiles.push(f); }
+    catch(e) { toast(errText(e)); } }
+  ui.chatUp = ''; chatPendDraw(); $('chat-text')?.focus();
+}
 async function chatSend(){
-  const ta = $('chat-text'), T = ui.chatT; if (!ta || !T || ui.chatBusy) return; const text = ta.value.trim(); if (!text) return ta.focus();
-  ui.chatBusy = true; try { const r = await api('POST', '/api/chat/t/' + encodeURIComponent(T.key), { text }); T.msgs.push(r.msg); ta.value = ''; ui.chatDraft = ''; const log = $('chat-log'); if (log) { log.innerHTML = chatLogHtml(T); log.scrollTop = log.scrollHeight; } ta.focus(); }
+  const ta = $('chat-text'), T = ui.chatT; if (!ta || !T || ui.chatBusy) return; const text = ta.value.trim(), F = ui.chatFiles || [];
+  if (ui.chatUp) return toast('Подождите — файл ещё загружается'); if (!text && !F.length) return ta.focus();
+  ui.chatBusy = true; try { const r = await api('POST', '/api/chat/t/' + encodeURIComponent(T.key), { text, files: F.map(f => f.id) }); T.msgs.push(r.msg); ta.value = ''; ui.chatDraft = ''; ui.chatFiles = []; chatPendDraw(); const log = $('chat-log'); if (log) { log.innerHTML = chatLogHtml(T); log.scrollTop = log.scrollHeight; } ta.focus(); }
   catch(e) { toast(errText(e)); } finally { ui.chatBusy = false; }
 }
 document.addEventListener('keydown', e => { if (e.target.id === 'chat-text' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); } });
 document.addEventListener('input', e => { if (e.target.id === 'chat-text') ui.chatDraft = e.target.value; });
+// a screenshot pasted with Ctrl+V or files dropped onto the conversation are attached
+document.addEventListener('paste', e => { if (e.target.id !== 'chat-text') return; const F = [...(e.clipboardData?.files || [])]; if (F.length) { e.preventDefault(); chatAttach(F.map((f, i) => f.name && f.name !== 'image.png' ? f : new File([f], `Снимок ${fmtDT(new Date().toISOString()).replace(/[:,]/g, '-')}${i ? ' ' + (i + 1) : ''}.png`, { type: f.type }))); } });
+document.addEventListener('dragover', e => { if (e.target.closest?.('.chatbody')) e.preventDefault(); });
+document.addEventListener('drop', e => { if (!e.target.closest?.('.chatbody')) return; e.preventDefault(); const F = [...(e.dataTransfer?.files || [])]; if (F.length) chatAttach(F); });
 function renderDrawer(){
   const D = $('drawer'), d = ui.drawer; if (!d) return;
   if (d.kind === 'chat') {
@@ -6137,7 +6155,9 @@ function renderDrawer(){
     if (!T) { D.innerHTML = dh('Сообщения') + '<div class="d-body"><div class="empty">Загружаем…</div></div>'; chatThread(d.id); return; }
     D.innerHTML = dh(esc(chatTitle(T))) + `<div class="d-body chatbody">${!T.asOwner ? '<button type="button" class="linkish" data-act="chatInbox">← Все сообщения</button>' : ''}
       <div class="chatlog" id="chat-log">${chatLogHtml(T)}</div>
-      <div class="chatin" data-keep><textarea class="in" id="chat-text" rows="3" maxlength="4000" placeholder="Сообщение… (Enter — отправить, Shift+Enter — новая строка)">${esc(ui.chatDraft || '')}</textarea><button class="btn primary" data-act="chatSend">Отправить</button></div></div>`;
+      <div class="cpends" id="chat-pend"></div>
+      <div class="chatin" data-keep><label class="btn ghost cattach" title="Прикрепить файлы (фото, документы)">📎<input type="file" data-up="chatFile" multiple hidden></label><textarea class="in" id="chat-text" rows="3" maxlength="4000" placeholder="Сообщение… (Enter — отправить, Shift+Enter — новая строка). Файл можно перетащить сюда или вставить Ctrl+V">${esc(ui.chatDraft || '')}</textarea><button class="btn primary" data-act="chatSend">Отправить</button></div></div>`;
+    setTimeout(chatPendDraw, 0);
     setTimeout(() => { const l = $('chat-log'); if (l) l.scrollTop = l.scrollHeight; $('chat-text')?.focus(); }, 0);
     return;
   }
@@ -7376,10 +7396,11 @@ async function act(el){
     case 'wlKind': ui.wlKind = id; return render();
     case 'jobReport': ui.repDay = today(); return openDrawer('jobReport', id);
     case 'repDay': ui.repDay = id; return renderDrawer();
-    case 'chatMine': if (!CHAT) await chatLoad(); if (!CHAT?.mine) return; ui.chatDraft = ''; ui.chatT = null; return openDrawer('chat', CHAT.mine.key);
+    case 'chatMine': if (!CHAT) await chatLoad(); if (!CHAT?.mine) return; ui.chatDraft = ''; ui.chatT = null; ui.chatFiles = []; return openDrawer('chat', CHAT.mine.key);
     case 'chatInbox': ui.chatT = null; await chatLoad(); return openDrawer('chat', null);
-    case 'chatOpen': ui.chatDraft = ''; ui.chatT = null; return openDrawer('chat', id);
+    case 'chatOpen': ui.chatDraft = ''; ui.chatT = null; ui.chatFiles = []; return openDrawer('chat', id);
     case 'chatSend': return chatSend();
+    case 'chatUnfile': ui.chatFiles = (ui.chatFiles || []).filter(f => f.id !== id); chatPendDraw(); return;
     case 'prefs': $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded', 'false'); return openDrawer('prefs');
     case 'prefTheme': themeSet(THEMES.includes(id) ? id : 'system'); prefsSave({ theme: THEMES.includes(id) ? id : 'system' }); return segOn(el);
     case 'prefScale': prefsSave({ scale: Number(id) || 1 }); prefsChanged(); return segOn(el);
@@ -8206,6 +8227,7 @@ document.addEventListener('change', async e => {
     try { const x = DEVS.find(z => z.id === did), add = []; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(fl); add.push({ id: u.id, name: u.name, at: u.at, by: u.by }); }
       await devApi('PATCH', '/api/devs/' + did, { files: [...(x.files || []), ...add] }); renderDrawer(); toast(add.length > 1 ? `Загружено файлов: ${add.length}` : 'Файл загружен'); } catch(e) { toast(errText(e)); }
     return; }
+  if (t.dataset.up === 'chatFile') { const files = [...t.files]; t.value = ''; if (files.length) chatAttach(files); return; }
   if (t.dataset.up === 'reqFile') { const files = [...t.files]; t.value = ''; if (!files.length) return;
     const keep = reqKeep();
     try { await uploadMany(files, 'reqFiles'); } catch(e) { toast(errText(e)); }
@@ -8359,7 +8381,7 @@ $('blk-out').addEventListener('click', async () => { await fetch('/api/logout', 
 // what was loaded for one user must not stay for the next one who logs in in the same tab
 function userDataReset(){
   SSHT.forEach(t => { try { t.es?.close(); } catch(e) {} try { t.term.dispose(); } catch(e) {} try { t.el.remove(); } catch(e) {} }); SSHT.length = 0; ui.sshActive = null;
-  SSH = null; SNMAP = null; VAULT = null; CHAT = null; ui.chatT = null; ui.chatN = null; ui.chatDraft = ''; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; ui.snApi = null; ui.snApiShow = false;
+  SSH = null; SNMAP = null; VAULT = null; CHAT = null; ui.chatT = null; ui.chatFiles = []; ui.chatN = null; ui.chatDraft = ''; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; ui.snApi = null; ui.snApiShow = false;
 }
 // the lists of the SSH console and «Сопоставление SN» follow the changes of the others (shared servers and commands, new rows)
 let sideBusy = false;
