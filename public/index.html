@@ -357,6 +357,12 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .nsmsg{padding:6px 14px 6px calc(52px + var(--d,0) * 20px);font-size:13px;border-bottom:1px solid var(--rule-2)}
 .nscmdw{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:6px 0}.nscmdw .nscmd{margin:0;align-self:stretch}.nscmd{margin:6px 0;padding:8px 10px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-all;font-family:var(--f-mono,ui-monospace,monospace)}.nssteps{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 @media (max-width:640px){.nshead{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nshead span:last-child{display:none}.nsrow{grid-template-columns:16px 22px minmax(0,1fr) 70px}.nsrow .nsmeta:last-child{display:none}}
+#ubtn .badge{margin-left:2px}.upop button .badge{margin-left:4px}
+.chatbody{display:flex;flex-direction:column;gap:10px;min-height:0}.chatlog{display:flex;flex-direction:column;gap:10px;max-height:min(60vh,520px);overflow-y:auto;padding:4px 2px}
+.cmsg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:85%}.cmsg.me{align-self:flex-end;align-items:flex-end}
+.cbub{background:var(--mute-soft);color:var(--ink);padding:8px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word}.cmsg.me .cbub{background:var(--stamp);color:var(--stamp-ink)}
+.chatin{display:flex;gap:8px;align-items:flex-end}.chatin textarea{flex:1;resize:vertical}
+.chatlist{display:flex;flex-direction:column;gap:6px}.chatrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);color:var(--ink);cursor:pointer;font:inherit}.chatrow.new{border-color:var(--stamp)}.chatlast{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
@@ -1288,10 +1294,12 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
     </nav>
     <button class="btn sm rswitch" id="roleSw" type="button" data-act="roleSw" hidden></button>
     <div class="umenu" id="umenu">
-      <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><span class="badge" id="chatBadge" hidden title="Новые сообщения"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="upop" id="upop" role="menu" hidden>
         <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
         <button type="button" role="menuitem" data-act="prefs">⚙ Настройки</button>
+        <button type="button" role="menuitem" data-act="chatMine" id="chatMineBtn" hidden>✉ <span id="chatMineLbl">Написать администратору</span> <span class="badge" id="chatMineBadge" hidden></span></button>
+        <button type="button" role="menuitem" data-act="chatInbox" id="chatInboxBtn" hidden>📨 <span id="chatInboxLbl">Сообщения пользователей</span> <span class="badge" id="chatInboxBadge" hidden></span></button>
 
         <button type="button" role="menuitem" class="danger" data-act="logout">Выйти</button>
       </div>
@@ -6092,8 +6100,47 @@ function woFullHtml(o, ed, col = 'orders'){
     : `<ul class="stlist">${D.map(x => `<li>${esc(x.name)} — ${fmtQty(x.qty)} ${esc(x.unit || 'шт')}</li>`).join('')}</ul>`}
     <small class="dim">После сохранения ниже — проверка по бухгалтерским остаткам, «Сохранить список» (списать с бухгалтерского склада) и «Excel для 1С» — таблица для загрузки в 1С («Требование-накладная» → «Материалы» → «Загрузить»).</small></section>`;
 }
+/* ===== «Написать администратору»: a user ↔ the administrators of the organization, an administrator ↔ the system administrator ===== */
+let CHAT = null;
+async function chatLoad(){ try { CHAT = await api('GET', '/api/chat'); } catch(e) { return; } chatBadges(); if (ui.drawer?.kind === 'chat' && !ui.drawer.id) renderDrawer(); }
+function chatBadges(){
+  const C = CHAT || {}, M = C.mine, inb = (C.inbox || []).reduce((a, x) => a + x.unread, 0), set = (id, n) => { const b = $(id); if (b) { b.hidden = !n; b.textContent = n > 99 ? '99+' : n; } };
+  $('chatMineBtn').hidden = !M; $('chatMineLbl').textContent = M?.kind === 'sys' ? 'Написать администратору системы' : 'Написать администратору';
+  $('chatInboxBtn').hidden = !C.canInbox; $('chatInboxLbl').textContent = me?.sys ? 'Сообщения администраторов' : 'Сообщения пользователей';
+  set('chatMineBadge', M?.unread || 0); set('chatInboxBadge', inb); set('chatBadge', (M?.unread || 0) + inb);
+}
+const chatTitle = T => T.asOwner ? (T.kind === 'sys' ? 'Администратору системы' : 'Администратору') : `${T.owner.name}${T.owner.role ? ' · ' + T.owner.role : ''}${me?.sys && T.owner.org ? ' · ' + T.owner.org : ''}`;
+const chatLogHtml = T => T.msgs.length ? T.msgs.map(x => `<div class="cmsg ${x.by === me.id ? 'me' : ''}"><div class="cbub">${esc(x.text)}</div><small class="dim">${x.by === me.id ? 'вы' : esc(x.name)} · ${fmtDT(x.at)}</small></div>`).join('')
+  : `<div class="empty" style="padding:18px">${T.asOwner ? (T.kind === 'sys' ? 'Напишите администратору системы: вопрос, просьба продлить срок, проблема.' : 'Напишите администратору: вопрос, просьба, проблема в программе.') + (CHAT?.mine && !CHAT.mine.staffCount ? '<br><b>Сейчас ' + (T.kind === 'sys' ? 'администратора системы' : 'администратора в организации') + ' нет</b> — сообщение он увидит, когда появится.' : '') : 'Сообщений нет'}</div>`;
+async function chatThread(key, quiet){
+  try { const T = await api('GET', '/api/chat/t/' + encodeURIComponent(key)); if (ui.drawer?.kind !== 'chat' || ui.drawer.id !== key) return;
+    const had = ui.chatT && ui.chatT.key === key ? ui.chatT.msgs.length : -1; ui.chatT = T;
+    const log = $('chat-log'); if (quiet && log) { if (T.msgs.length !== had) { log.innerHTML = chatLogHtml(T); log.scrollTop = log.scrollHeight; } } else renderDrawer();
+    chatLoad();
+  } catch(e) { toast(errText(e)); }
+}
+async function chatSend(){
+  const ta = $('chat-text'), T = ui.chatT; if (!ta || !T || ui.chatBusy) return; const text = ta.value.trim(); if (!text) return ta.focus();
+  ui.chatBusy = true; try { const r = await api('POST', '/api/chat/t/' + encodeURIComponent(T.key), { text }); T.msgs.push(r.msg); ta.value = ''; ui.chatDraft = ''; const log = $('chat-log'); if (log) { log.innerHTML = chatLogHtml(T); log.scrollTop = log.scrollHeight; } ta.focus(); }
+  catch(e) { toast(errText(e)); } finally { ui.chatBusy = false; }
+}
+document.addEventListener('keydown', e => { if (e.target.id === 'chat-text' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); chatSend(); } });
+document.addEventListener('input', e => { if (e.target.id === 'chat-text') ui.chatDraft = e.target.value; });
 function renderDrawer(){
   const D = $('drawer'), d = ui.drawer; if (!d) return;
+  if (d.kind === 'chat') {
+    if (!d.id) { const L = CHAT?.inbox || [];
+      D.innerHTML = dh(me?.sys ? 'Сообщения администраторов' : 'Сообщения пользователей') + `<div class="d-body">${L.length ? `<div class="chatlist">${L.map(x => `<button type="button" class="chatrow ${x.unread ? 'new' : ''}" data-act="chatOpen" data-id="${esc(x.key)}"><span class="chatwho"><b>${esc(x.name)}</b> <small class="dim">${esc(x.role)}${me?.sys && x.org ? ' · ' + esc(x.org) : ''}</small>${x.unread ? ` <span class="badge">${x.unread}</span>` : ''}</span><span class="chatlast">${x.lastBy === 'staff' ? 'Вы: ' : ''}${esc(x.lastText)}</span><small class="dim">${fmtDT(x.last)}</small></button>`).join('')}</div>`
+        : `<div class="empty">Сообщений пока нет. Здесь появятся сообщения, которые ${me?.sys ? 'администраторы организаций пишут администратору системы' : 'пользователи организации пишут администратору'} через меню «✉ Написать администратору».</div>`}</div>`;
+      return; }
+    const T = ui.chatT && ui.chatT.key === d.id ? ui.chatT : null;
+    if (!T) { D.innerHTML = dh('Сообщения') + '<div class="d-body"><div class="empty">Загружаем…</div></div>'; chatThread(d.id); return; }
+    D.innerHTML = dh(esc(chatTitle(T))) + `<div class="d-body chatbody">${!T.asOwner ? '<button type="button" class="linkish" data-act="chatInbox">← Все сообщения</button>' : ''}
+      <div class="chatlog" id="chat-log">${chatLogHtml(T)}</div>
+      <div class="chatin" data-keep><textarea class="in" id="chat-text" rows="3" maxlength="4000" placeholder="Сообщение… (Enter — отправить, Shift+Enter — новая строка)">${esc(ui.chatDraft || '')}</textarea><button class="btn primary" data-act="chatSend">Отправить</button></div></div>`;
+    setTimeout(() => { const l = $('chat-log'); if (l) l.scrollTop = l.scrollHeight; $('chat-text')?.focus(); }, 0);
+    return;
+  }
   const v = (x, k) => esc(x?.[k] ?? '');
   if (d.kind === 'order') {
     const o = ord(d.id), hasInv = o && invOf(o.id).length;
@@ -7329,6 +7376,10 @@ async function act(el){
     case 'wlKind': ui.wlKind = id; return render();
     case 'jobReport': ui.repDay = today(); return openDrawer('jobReport', id);
     case 'repDay': ui.repDay = id; return renderDrawer();
+    case 'chatMine': if (!CHAT) await chatLoad(); if (!CHAT?.mine) return; ui.chatDraft = ''; ui.chatT = null; return openDrawer('chat', CHAT.mine.key);
+    case 'chatInbox': ui.chatT = null; await chatLoad(); return openDrawer('chat', null);
+    case 'chatOpen': ui.chatDraft = ''; ui.chatT = null; return openDrawer('chat', id);
+    case 'chatSend': return chatSend();
     case 'prefs': $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded', 'false'); return openDrawer('prefs');
     case 'prefTheme': themeSet(THEMES.includes(id) ? id : 'system'); prefsSave({ theme: THEMES.includes(id) ? id : 'system' }); return segOn(el);
     case 'prefScale': prefsSave({ scale: Number(id) || 1 }); prefsChanged(); return segOn(el);
@@ -8308,7 +8359,7 @@ $('blk-out').addEventListener('click', async () => { await fetch('/api/logout', 
 // what was loaded for one user must not stay for the next one who logs in in the same tab
 function userDataReset(){
   SSHT.forEach(t => { try { t.es?.close(); } catch(e) {} try { t.term.dispose(); } catch(e) {} try { t.el.remove(); } catch(e) {} }); SSHT.length = 0; ui.sshActive = null;
-  SSH = null; SNMAP = null; VAULT = null; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; ui.snApi = null; ui.snApiShow = false;
+  SSH = null; SNMAP = null; VAULT = null; CHAT = null; ui.chatT = null; ui.chatN = null; ui.chatDraft = ''; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; ui.snApi = null; ui.snApiShow = false;
 }
 // the lists of the SSH console and «Сопоставление SN» follow the changes of the others (shared servers and commands, new rows)
 let sideBusy = false;
@@ -8357,7 +8408,7 @@ async function start(u){
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null; userDataReset(); ui.vShow = {};
   $('loginView').hidden = true; $('app').hidden = false;
-  route();
+  route(); chatLoad().then(() => { ui.chatN = CHAT?.unread || 0; });
   if (u.sys) { mode = 'live'; render(); }
   else try { await refresh(); } catch(e) { $('banner').hidden = false; $('banner').textContent = errText(e); }
   clearInterval(poll);
@@ -8368,6 +8419,9 @@ async function start(u){
       $('banner').hidden = true;
       // a new version: reload quietly as soon as nothing is being edited (checked again on every poll)
       if (r.version) { if (!appVersion) appVersion = r.version; else if (r.version !== appVersion && safeToReload()) return location.reload(); }
+      // a new message: the counters, a notice, and the open conversation shows it at once
+      if ((r.chat || 0) !== (ui.chatN || 0)) { if ((r.chat || 0) > (ui.chatN || 0) && ui.chatN != null) toast('✉ Новое сообщение — откройте меню пользователя'); ui.chatN = r.chat || 0; chatLoad(); }
+      if (ui.drawer?.kind === 'chat' && ui.drawer.id) chatThread(ui.drawer.id, true);
       if (me.sys) { if (ui.view === 'server') loadStats(); }
       else if (r.rev !== rev) await refresh();
     } catch(e) { $('banner').hidden = false; $('banner').textContent = 'Нет связи с сервером. Изменения не сохраняются, пока связь не восстановится.'; }

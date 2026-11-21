@@ -330,6 +330,52 @@ function syncFromDisk() {
 }
 const saveUsers = () => { writeJSON(USERS_FILE, users); usersStamp = stamp(USERS_FILE); };
 const saveOrgs = () => { writeJSON(ORGS_FILE, orgs); orgsStamp = stamp(ORGS_FILE); };
+/* «Написать администратору»: a user of an organization writes to its administrators, an administrator of an organization — to the system
+   administrator. One thread per user: { kind: 'admin' | 'sys', orgId, uid, msgs: [{ id, by, text, at }], userRead, staffRead } */
+const CHAT_FILE = path.join(DATA_DIR, 'chat.json');
+let chat = null, chatStamp;
+const chatDb = () => { const st = stamp(CHAT_FILE); if (!chat || st !== chatStamp) { chat = readJSON(CHAT_FILE, { threads: {} }); if (!chat.threads) chat.threads = {}; chatStamp = st; } return chat; };
+const saveChat = () => { writeJSON(CHAT_FILE, chat); chatStamp = stamp(CHAT_FILE); };
+const isOrgAdmin = u => u && u.role === 'admin' && !u.sys;
+// the thread a user writes in himself: to the administrators of his organization or (an administrator) to the system administrator
+const chatMine = u => !u || u.sys ? null : isOrgAdmin(u) ? { kind: 'sys', key: `sys:${u.orgId}:${u.id}` } : { kind: 'admin', key: `admin:${u.orgId}:${u.id}` };
+// who answers in a thread: the administrators of the organization / the system administrators
+const chatStaff = (u, th) => !!u && !u.blocked && (th.kind === 'admin' ? isOrgAdmin(u) && u.orgId === th.orgId : !!u.sys);
+const chatOwn = (u, th) => !!u && th.uid === u.id && th.orgId === u.orgId;
+const chatUnread = u => { if (!u) return 0; let n = 0; for (const th of Object.values(chatDb().threads)) {
+  if (chatOwn(u, th)) n += th.msgs.filter(x => x.by !== u.id && x.at > (th.userRead || '')).length;
+  else if (chatStaff(u, th)) n += th.msgs.filter(x => x.by === th.uid && x.at > (th.staffRead || '')).length; } return n; };
+function chatApi(req, res, p, m, user, body) {
+  const C = chatDb(), uName = id => users.find(u => u.id === id)?.name || 'Пользователь', mine = chatMine(user);
+  const pubMsg = th => x => ({ id: x.id, by: x.by, name: uName(x.by), staff: x.by !== th.uid, text: x.text, at: x.at });
+  if (m === 'GET' && !p[2]) {
+    const inbox = Object.entries(C.threads).filter(([, th]) => chatStaff(user, th) && th.msgs.length).map(([key, th]) => { const last = th.msgs[th.msgs.length - 1], o = users.find(u => u.id === th.uid);
+      return { key, kind: th.kind, uid: th.uid, name: uName(th.uid), role: o ? ROLES[o.role] : '', org: orgById(th.orgId)?.name || '', last: last.at, lastText: last.text.slice(0, 120), lastBy: last.by === th.uid ? 'user' : 'staff', unread: th.msgs.filter(x => x.by === th.uid && x.at > (th.staffRead || '')).length }; })
+      .sort((a, b) => b.last.localeCompare(a.last));
+    const th = mine && C.threads[mine.key];
+    const staffCount = mine ? (mine.kind === 'admin' ? users.filter(u => isOrgAdmin(u) && u.orgId === user.orgId && !u.blocked).length : users.filter(u => u.sys && !u.blocked).length) : 0;
+    return send(res, 200, { mine: mine ? { ...mine, staffCount, unread: th ? th.msgs.filter(x => x.by !== user.id && x.at > (th.userRead || '')).length : 0 } : null, inbox, canInbox: isOrgAdmin(user) || !!user.sys, unread: chatUnread(user) });
+  }
+  if (p[2] !== 't' || !p[3]) return fail(res, 404, 'Не найдено');
+  const key = decodeURIComponent(p[3]); let th = C.threads[key];
+  const own = mine && mine.key === key;
+  if (!th && own) th = { kind: mine.kind, orgId: user.orgId, uid: user.id, msgs: [], userRead: '', staffRead: '' };
+  if (!th || !(own || chatOwn(user, th) || chatStaff(user, th))) return fail(res, 404, 'Переписка не найдена');
+  const asOwner = own || chatOwn(user, th), now = new Date().toISOString();
+  if (m === 'GET') {
+    const was = asOwner ? th.userRead : th.staffRead;
+    if (C.threads[key] && th.msgs.length && th.msgs[th.msgs.length - 1].at > (was || '')) { if (asOwner) th.userRead = now; else th.staffRead = now; saveChat(); }
+    const o = users.find(u => u.id === th.uid);
+    return send(res, 200, { key, kind: th.kind, owner: { id: th.uid, name: uName(th.uid), role: o ? ROLES[o.role] : '', org: orgById(th.orgId)?.name || '' }, asOwner, msgs: th.msgs.map(pubMsg(th)) });
+  }
+  if (m === 'POST') {
+    const text = String(body?.text ?? '').trim().slice(0, 4000); if (!text) return fail(res, 400, 'Напишите сообщение');
+    if (th.msgs.length >= 2000) th.msgs = th.msgs.slice(-1500);
+    th.msgs.push({ id: newId(), by: user.id, text, at: now }); if (asOwner) th.userRead = now; else th.staffRead = now;
+    C.threads[key] = th; saveChat(); return send(res, 200, { ok: true, msg: pubMsg(th)(th.msgs[th.msgs.length - 1]) });
+  }
+  return fail(res, 405, 'Метод не поддерживается');
+}
 const orgById = id => orgs.find(o => o.id === id);
 /* the kind of system an organization works in: «Все сервисы» (all) or «Управление заявками» (requests) */
 // «Все сервисы», «Управление заявками», «Транспортная организация» (спецтехника и грузоперевозки)
@@ -659,6 +705,7 @@ async function api(req, res, url) {
   if (p[1] === 'orgs') return orgsApi(req, res, p, m, user);
   if (p[1] === 'backups') return backupsApi(req, res, p, m, user);
   if (p[1] === 'stats') return statsApi(req, res, m, user);
+  if (p[1] === 'chat') return chatApi(req, res, p, m, user, m === 'POST' ? await readJsonBody(req) : null);
   if (p[1] === 'prefs' && m === 'PUT') { user.prefs = cleanPrefs(await readJsonBody(req) || {}); saveUsers(); return send(res, 200, { ok: true, prefs: user.prefs }); }
   // the system administrator manages organizations, backups and the server, not the work of an organization
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
@@ -726,7 +773,7 @@ async function api(req, res, url) {
     }
     return fail(res, 405, 'Метод не поддерживается');
   }
-  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION });
+  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION, chat: chatUnread(user) });
   if (p[1] === 'data' && m === 'GET') {
     // points written into works before they were marked on the map get the mark
     if (db.dt && Array.isArray(db.dt.points) && db.dt.points.some(x => x.need)) {
