@@ -368,6 +368,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .upop a.upop-link{display:block;text-decoration:none;padding:9px 10px;border-radius:8px;font-size:14px;color:var(--ink)}.upop a.upop-link:hover{background:var(--mute-soft)}
 .kit-i.got .jl-t{color:var(--ink-2)}.kit-dot{width:20px;text-align:center;color:var(--ink-2)}.kitbox .jl-t[data-act]{cursor:text}
 .wkit{margin-top:14px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:10px;background:var(--sheet)}.wkit h3{margin:0 0 6px}.wkit ul{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:6px}.wkit label{display:flex;gap:10px;align-items:flex-start;font-size:15px;cursor:pointer}.wkit label input{width:20px;height:20px;flex:none;margin-top:1px}.wkit label.got span{text-decoration:line-through;color:var(--ink-2)}
+.modsbar{margin-top:-4px}.modcard{cursor:pointer}.modgrid{max-width:1100px}
 .snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
@@ -1573,11 +1574,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета'], ['checks', 'Чеки'], ['trips', 'Путевые листы']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['sn', 'Сопоставление SN']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['mods', 'Дополнительные модули']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
-const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:sn' };
+const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:mods', mods: 'refs:mods' };
 // «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
 const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
 const viewOk = v => ckView(v) ? can('stock:' + v) : !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
@@ -1677,7 +1678,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? vSnmap() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -4863,10 +4864,17 @@ async function snXlsx(){
   for (let r = 1; r < a.length; r++) for (let c = 0; c < 4; c++) { const ref = X.utils.encode_cell({ r, c }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
   X.utils.book_append_sheet(wb, ws, 'Сопоставление SN'); X.writeFile(wb, `Сопоставление SN — ${today()}.xlsx`);
 }
-const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'snmap'];
-const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль'], ['snmap', 'sn', '🔗 Сопоставление SN']];
+const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'mods', 'snmap'];
+const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль'], ['mods', 'mods', '🧩 Дополнительные модули']];
 const refTabsList = () => REF_TABS.filter(([, k]) => can('refs:' + k) && (k !== 'labels' || !isWorker()) && (k !== 'netshare' || isHead() || NETSHARES.length > 0) && (k !== 'ssh' || isHead()));
-const refTabs = () => `<nav class="seg stabs" aria-label="Справочники и инструменты">${refTabsList().map(([v, , l]) => `<a href="#${v}" class="${ui.view === v ? 'on' : ''}" ${ui.view === v ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
+const refTabs = () => { const cur = MOD_VIEWS.includes(ui.view) ? 'mods' : ui.view; return `<nav class="seg stabs" aria-label="Справочники и инструменты">${refTabsList().map(([v, , l]) => `<a href="#${v}" class="${cur === v ? 'on' : ''}" ${cur === v ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`; };
+/* «Дополнительные модули»: separate tools of their own; each opens on its own page under this tab */
+const MODULES = [['snmap', '🔗', 'Сопоставление SN', 'IMEI и SN устройства со сканера, ICCID сим-карты и IP-адрес — в одной таблице; Excel, JSON, QR-коды и доступ для другого сервера.']];
+const MOD_VIEWS = MODULES.map(m => m[0]);
+const modsBar = cur => `<nav class="seg stabs modsbar" aria-label="Дополнительные модули"><a href="#mods">← Все модули</a>${MODULES.map(([v, i, l]) => `<a href="#${v}" class="${cur === v ? 'on' : ''}">${i} ${l}</a>`).join('')}</nav>`;
+function vMods(){
+  return `<div class="refgrid modgrid">${MODULES.map(([v, i, l, d]) => `<article class="card refcard modcard" data-act="go" data-id="${v}" role="button" tabindex="0"><b>${i} ${esc(l)}</b><div class="reftext">${esc(d)}</div><div class="row-g"><a class="btn sm primary" href="#${v}">Открыть</a></div></article>`).join('')}</div>`;
+}
 /* «Личное хранилище»: passwords (what for, login, password, link, note) and notes; only the user himself sees them, the server keeps them encrypted */
 let VAULT = null;
 async function loadVault(){ try { VAULT = await api('GET', '/api/vault'); } catch(e) { VAULT = { pw: [], notes: [], err: errText(e) }; } render(); }
@@ -5429,7 +5437,7 @@ function vTmine(){
 
 // the menu of a transport organization: a driver — his trips, waybills, receipts; the accountant — orders, «Учётка», reports; managers — all
 const transNav = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : me.role === 'accountant' ? ['tor', 'stock', 'trep', 'notes', 'refs'] : ['tor', 'disp', 'transport', 'stock', 'trep', 'notes', 'refs', ...(me.role === 'admin' ? ['users'] : [])];
-const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare', 'snmap'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', 'snmap', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
+const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare', 'mods', 'snmap'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', 'mods', 'snmap', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
 /* ===== «Оборудование» системы заявок: справочник с QR-кодами и историей проблем ===== */
 let REQ_EQ = [];
 const eqOf = id => REQ_EQ.find(e => e.id === id);
@@ -7450,6 +7458,7 @@ async function act(el){
     case 'chatOpen': ui.chatDraft = ''; ui.chatT = null; ui.chatFiles = []; return openDrawer('chat', id);
     case 'chatSend': return chatSend();
     case 'helpOpen': return openDrawer('helpDoc');
+    case 'go': location.hash = '#' + id; return;
     case 'chatUnfile': ui.chatFiles = (ui.chatFiles || []).filter(f => f.id !== id); chatPendDraw(); return;
     case 'prefs': $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded', 'false'); return openDrawer('prefs');
     case 'prefTheme': themeSet(THEMES.includes(id) ? id : 'system'); prefsSave({ theme: THEMES.includes(id) ? id : 'system' }); return segOn(el);
@@ -8392,11 +8401,11 @@ function route(){
   ui.view = me?.sys ? (['orgs', 'server'].includes(h) ? h : 'orgs')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'snmap'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'mods', 'snmap'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
-    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', sn: 'snmap', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
+    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', mods: 'mods', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
     ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
     try { history.replaceState(null, '', '#' + ui.view); } catch(e) {}
   }

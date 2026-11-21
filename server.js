@@ -326,8 +326,11 @@ if (!orgs) {
 orgsStamp = stamp(ORGS_FILE); usersStamp = stamp(USERS_FILE);
 // older roles: «Менеджер» and «Руководитель» become administrators, «Просмотр» — «Сотрудник»
 const OLD_ROLES = { manager: 'admin', user: 'admin', viewer: 'worker' };
-const normUsers = () => { let ch = false; users.forEach(u => { if (!u.orgId) { u.orgId = MAIN_ORG; ch = true; } if (OLD_ROLES[u.role]) { u.wasRole = u.role; u.role = OLD_ROLES[u.role]; ch = true; } }); return ch; };
+// «Сопоставление SN» moved into «Дополнительные модули»: a hidden «refs:sn» becomes a hidden «refs:mods»
+const hideMoved = h => { if (Array.isArray(h) && h.includes('refs:sn')) { const i = h.indexOf('refs:sn'); h.splice(i, 1); if (!h.includes('refs:mods')) h.push('refs:mods'); return true; } return false; };
+const normUsers = () => { let ch = false; users.forEach(u => { if (!u.orgId) { u.orgId = MAIN_ORG; ch = true; } if (OLD_ROLES[u.role]) { u.wasRole = u.role; u.role = OLD_ROLES[u.role]; ch = true; } if (hideMoved(u.hide)) ch = true; }); return ch; };
 if (normUsers() && users.length) writeJSON(USERS_FILE, users);
+if (Array.isArray(orgs) && orgs.reduce((a, o) => hideMoved(o.hide) || a, false)) writeJSON(ORGS_FILE, orgs);
 function syncFromDisk() {
   const b = stamp(USERS_FILE); if (b !== usersStamp) { users = readJSON(USERS_FILE, []); normUsers(); usersStamp = b; }
   const c = stamp(ORGS_FILE); if (c !== orgsStamp) { orgs = readJSON(ORGS_FILE, orgs); orgsStamp = c; }
@@ -435,7 +438,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'sn'] };
+const SECTIONS = { works: ['works'], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'mods'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -1299,7 +1302,7 @@ async function api(req, res, url) {
   }
   /* «Сопоставление SN»: IMEI and SN of a device (from the scanner) with the ICCID of its SIM card; each number may be recorded only once */
   if (p[1] === 'snmap') {
-    if (orgType(user) === 'requests' || !sees(user, 'refs:sn')) return fail(res, 403, 'Этот раздел для вас закрыт');
+    if (orgType(user) === 'requests' || !sees(user, 'refs:mods')) return fail(res, 403, 'Этот раздел для вас закрыт');
     if (!Array.isArray(db.snmap)) db.snmap = [];
     const L = db.snmap, F = { imei: 'IMEI', sn: 'SN', iccid: 'ICCID', ip: 'IP-адрес' }, num = v => String(v ?? '').replace(/\s+/g, '').toUpperCase().slice(0, 40);
     const ipOk = v => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(v) || (/^[0-9A-F:]+$/.test(v) && v.includes(':') && v.length >= 3);
