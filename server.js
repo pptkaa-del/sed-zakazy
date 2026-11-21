@@ -2280,6 +2280,33 @@ async function api(req, res, url) {
   /* a worker's report at a point of a job: the photos the job asks for, extra photos and a comment */
   /* lists of a work: «Что нужно сделать» (todo) and «Что нужно купить» (buy, with links and pictures);
      each item is changed on its own, so two people adding to a list do not overwrite each other */
+  /* «Что взять с собой»: the manager makes the checklist of a work; every employee of the work ticks what he has packed — each for himself */
+  if (p[1] === 'jobs' && p[3] === 'kit') {
+    const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
+    const L = j.kit = Array.isArray(j.kit) ? j.kit : [], now = new Date().toISOString(), ed = mayEditJob(user, j);
+    const out = () => { j.updatedAt = now; saveDb(); return send(res, 200, { ok: true, kit: L, rev: db.rev }); };
+    if (m === 'POST' && p.length === 4) {
+      if (!ed) return fail(res, 403, 'Чек-лист составляет руководитель или администратор');
+      const b = await readJsonBody(req) || {}, texts = (Array.isArray(b.texts) ? b.texts : [b.text]).map(t => String(t || '').trim().slice(0, 300)).filter(Boolean).slice(0, 100);
+      if (!texts.length) return fail(res, 400, 'Напишите, что взять');
+      if (L.length + texts.length > 200) return fail(res, 400, 'Слишком много пунктов');
+      texts.forEach(text => L.push({ id: newId(), text, at: now, by: user.id, got: {} }));
+      return out();
+    }
+    // «Снять мои отметки» — before the next trip
+    if (m === 'POST' && p[4] === 'reset') { if (!(onJob(user, j) || ed)) return fail(res, 403, 'Недостаточно прав'); L.forEach(x => { if (x.got) delete x.got[user.id]; }); return out(); }
+    const it = p[4] && L.find(x => x.id === p[4]); if (!it) return fail(res, 404, 'Пункт не найден — обновите страницу');
+    if (m === 'POST' && p[5] === 'got') {
+      if (!(onJob(user, j) || ed)) return fail(res, 403, 'Отмечать могут участники работы');
+      const b = await readJsonBody(req) || {}; it.got = it.got && typeof it.got === 'object' ? it.got : {};
+      if (b.got) it.got[user.id] = now; else delete it.got[user.id];
+      return out();
+    }
+    if (!ed) return fail(res, 403, 'Чек-лист меняет руководитель или администратор');
+    if (m === 'PATCH') { const b = await readJsonBody(req) || {}, t = String(b.text ?? '').trim().slice(0, 300); if (!t) return fail(res, 400, 'Пустой пункт — удалите его'); it.text = t; it.editedAt = now; return out(); }
+    if (m === 'DELETE') { L.splice(L.indexOf(it), 1); return out(); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'jobs' && p[3] === 'list' && ['todo', 'buy'].includes(p[4])) {
     const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
     if (!(mayEditJob(user, j) || onJob(user, j))) return fail(res, 403, 'Список работы меняют руководитель, администратор и участники работы');

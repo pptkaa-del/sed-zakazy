@@ -366,6 +366,8 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .chatlist{display:flex;flex-direction:column;gap:6px}.chatrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);color:var(--ink);cursor:pointer;font:inherit}.chatrow.new{border-color:var(--stamp)}.chatlast{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .helpbody{display:flex;flex-direction:column;gap:10px;height:100%}.helpframe{flex:1;width:100%;min-height:70vh;border:1px solid var(--rule-2);border-radius:8px;background:#fff}
 .upop a.upop-link{display:block;text-decoration:none;padding:9px 10px;border-radius:8px;font-size:14px;color:var(--ink)}.upop a.upop-link:hover{background:var(--mute-soft)}
+.kit-i.got .jl-t{color:var(--ink-2)}.kit-dot{width:20px;text-align:center;color:var(--ink-2)}.kitbox .jl-t[data-act]{cursor:text}
+.wkit{margin-top:14px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:10px;background:var(--sheet)}.wkit h3{margin:0 0 6px}.wkit ul{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:6px}.wkit label{display:flex;gap:10px;align-items:flex-start;font-size:15px;cursor:pointer}.wkit label input{width:20px;height:20px;flex:none;margin-top:1px}.wkit label.got span{text-decoration:line-through;color:var(--ink-2)}
 .snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
@@ -1519,7 +1521,7 @@ async function api(method, url, body, headers = {}){
   return j;
 }
 async function refresh(){
-  const d = await api('GET', '/api/data'); sideRefresh();
+  const d = await api('GET', '/api/data'); sideRefresh(); setTimeout(kitLive, 0);
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   // the names of old points kept the reminder «(замена 2 модемов)» — it is not shown any more
@@ -3402,6 +3404,7 @@ function renderW(){
       <b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${done ? `закрыто ${n} из ${tot}` : `осталось ${n} из ${tot}`}${j.due ? ` · срок ${fmtD(j.due)}${overdue(j) && !done ? ' — просрочено' : ''}` : ''}</small>
       ${tot ? `<span class="wbar"><i style="width:${Math.round(((j.places || []).filter(x => x.doneAt).length / tot) * 100)}%"></i></span>` : ''}</button>`; }).join('')}`
     : `<div class="empty" style="border:0;padding:16px">${done ? 'Закрытых точек пока нет.' : 'Вам пока не назначено задач.'}</div>`}
+    ${done ? '' : kitWHtml(jobs)}
     ${done && shown.length ? `<h3 style="margin-top:14px">Точки</h3>${shown.sort((a, b) => (b.pl.doneAt || '').localeCompare(a.pl.doneAt || '')).slice(0, 200).map(({ j, pl }) => `<button class="witem pt" data-act="wFly" data-id="${j.id}|${pl.id}"><b>${esc(pl.label || 'Точка')}</b><small>${esc(fmtDT(pl.doneAt))}${pl.notWorking ? ' · не работает' : ''} · ${wEditable(pl) ? 'можно изменить до ' + esc(wUntil(pl)) : 'только просмотр'}</small></button>`).join('')}` : ''}
     ${!done && shown.length ? `<h3 style="margin-top:14px">Точки · ${shown.length}</h3><p class="dim" style="font-size:12px;margin:0 4px 4px">Нажмите на точку на карте или здесь → «Выполнить».</p>${shown.slice(0, 200).map(({ j, pl }) => { const r = placeDone(j, pl); return `<button class="witem pt" data-act="wFly" data-id="${j.id}|${pl.id}"><b>${esc(pl.label || 'Точка')}</b>${DT_NEED[pl.need] ? `<span class="wneed" style="--c:${needColor(pl.need)}">${esc(DT_NEED[pl.need])}</span>` : ''}<small>${ui.wJob ? '' : esc(j.title) + ' · '}${r.need ? `фото ${r.got} из ${r.need}` : 'фото не требуются'}</small></button>`; }).join('')}` : ''}`;
   { const btn = $('wListBtn'), open = !!ui.wListOpen; $('wgrid').classList.toggle('open', open); btn.setAttribute('aria-expanded', open);
@@ -5817,6 +5820,61 @@ function vUsers(){
     <div class="roles">${Object.entries(roleNames()).map(([k,n]) => `<div><b>${n}</b><span class="dim">${roleInfo(k)}</span></div>`).join('')}</div>`;
 }
 
+/* ===== «Что взять с собой»: the manager makes the checklist, every employee of the work ticks what he has packed (each for himself) ===== */
+const kitMine = x => !!(x.got && me && x.got[me.id]);
+function kitBox(j){
+  const L = j.kit || [], ed = mayEditJob(j), mine = onJob(j), W = [...new Set([...(j.workers || []), ...(j.leaderId ? [j.leaderId] : [])])];
+  if (!L.length && !ed) return '';
+  const item = x => { const got = Object.keys(x.got || {}).filter(id => W.includes(id) || id === me.id), names = got.map(who).join(', ');
+    return `<li class="jl kit-i ${kitMine(x) ? 'got' : ''}">${mine ? `<label class="note-cb"><input type="checkbox" data-kit="${j.id}|${x.id}" ${kitMine(x) ? 'checked' : ''} aria-label="Взял"></label>` : '<span class="kit-dot">•</span>'}
+      <div class="jl-b">${ui.kitEdit === x.id ? `<span data-keep style="display:contents"><input class="in" id="kit-ed" data-kit-ed="${j.id}|${x.id}" maxlength="300" value="${esc(x.text)}"></span><small class="dim">Enter — сохранить, Esc — отменить</small>`
+        : `<div class="jl-t" ${ed ? `data-act="kitEdit" data-id="${x.id}" title="Щёлкните, чтобы изменить"` : ''}>${esc(x.text)}</div>`}
+        ${W.length ? `<small class="dim" title="${esc(names)}">взяли ${got.filter(id => W.includes(id)).length} из ${W.length}${names ? ': ' + esc(names) : ''}</small>` : ''}</div>
+      ${ed ? `<div class="jl-acts">${armBtn('kitd:' + x.id, '✕', 'kitDel', j.id + '|' + x.id, 'btn ghost sm')}</div>` : ''}</li>`; };
+  return `<div class="box jlist kitbox"><h4>🎒 Что взять с собой${L.length ? ` <span class="dim">· ${L.length}</span>` : ''}</h4>
+    ${ed ? `<div class="note-add" data-keep><textarea id="kit-new" rows="1" data-kitnew="${j.id}" maxlength="3000" placeholder="Что взять — Enter, чтобы добавить (список — каждая строка пункт)" aria-label="Что взять с собой"></textarea><button class="btn primary sm" type="button" data-act="kitAdd" data-id="${j.id}">Добавить</button></div>` : ''}
+    ${L.length ? `<ul class="jl-list">${L.map(item).join('')}</ul>` : '<p class="dim" style="margin:0">Пока пусто. Сотрудники работы увидят список у себя в «В работе» и отметят, что взяли.</p>'}
+    ${mine && L.some(kitMine) ? '<button class="linkish" data-act="kitReset" data-id="' + j.id + '">Снять мои отметки</button>' : ''}</div>`;
+}
+// the same checklist in the interface of an employee: what to take for each of his works
+function kitWHtml(jobs){
+  const J = jobs.filter(j => (j.kit || []).length && (!ui.wJob || ui.wJob === j.id)); if (!J.length) return '';
+  return J.map(j => { const L = j.kit, n = L.filter(kitMine).length;
+    return `<div class="wkit"><h3>🎒 Взять с собой${J.length > 1 || !ui.wJob ? ` · № ${jobNo(j)}` : ''} <span class="dim">${n} из ${L.length}</span></h3>
+      <ul>${L.map(x => `<li><label class="${kitMine(x) ? 'got' : ''}"><input type="checkbox" data-kit="${j.id}|${x.id}" ${kitMine(x) ? 'checked' : ''}> <span>${esc(x.text)}</span></label></li>`).join('')}</ul>
+      ${n ? `<button class="linkish" data-act="kitReset" data-id="${j.id}">Снять отметки</button>` : ''}${n === L.length ? ' <span class="ok-t">✓ всё собрано</span>' : ''}</div>`; }).join('');
+}
+async function kitApi(jid, method, path, body){
+  const r = await api(method, `/api/jobs/${jid}/kit${path || ''}`, body); const j = jobOf(jid); if (j) j.kit = r.kit;
+  refresh().catch(() => {}); return r;
+}
+// an open card of a work shows the employees' ticks as they come (the box is redrawn alone, not while someone types in it)
+function kitLive(){
+  if (ui.drawer?.kind === 'job') { const box = document.querySelector('#drawer .kitbox'), j = jobOf(ui.drawer.id);
+    const act = document.activeElement, typing = act && box && box.contains(act) && act.id !== 'kit-new';
+    if (box && j && !typing && !ui.kitEdit) { const ta = $('kit-new'), val = ta?.value || '', foc = act === ta, pos = ta?.selectionStart || 0;
+      const t = document.createElement('div'); t.innerHTML = kitBox(j); const nb = t.firstElementChild; if (!nb) return;
+      const ta2 = nb.querySelector('#kit-new'); if (ta2) ta2.value = val;
+      box.replaceWith(nb); if (foc && ta2) { ta2.focus(); try { ta2.setSelectionRange(pos, pos); } catch(e) {} } } }
+  if (ui.view === 'wwork' && !document.querySelector('.wkit')?.contains(document.activeElement)) { const w = document.querySelector('#wlist'); if (w && w.querySelector('.wkit') !== null) renderW(); }
+}
+const kitRedraw = () => { if (ui.drawer?.kind === 'job') renderDrawer(); if (ui.view === 'wwork') renderW(); };
+async function kitAdd(jid){
+  const ta = $('kit-new'), texts = (ta?.value || '').split(/\r?\n/).map(t => t.replace(/^\s*([-•*]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+  if (!texts.length) { ta?.focus(); return toast('Напишите, что взять'); }
+  try { await kitApi(jid, 'POST', '', { texts }); ta.value = ''; renderDrawer(); $('kit-new')?.focus(); } catch(e) { toast(errText(e)); }
+}
+async function kitSaveEdit(save){
+  const inp = $('kit-ed'); if (!inp) { ui.kitEdit = null; return; }
+  const [jid, iid] = inp.dataset.kitEd.split('|'), it = (jobOf(jid)?.kit || []).find(x => x.id === iid), v = inp.value.trim(); ui.kitEdit = null;
+  if (save && it && v && v !== it.text) { try { await kitApi(jid, 'PATCH', '/' + iid, { text: v }); } catch(e) { toast(errText(e)); } }
+  renderDrawer();
+}
+document.addEventListener('keydown', e => { const t = e.target;
+  if (t.dataset?.kitnew && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); kitAdd(t.dataset.kitnew); }
+  if (t.id === 'kit-ed') { if (e.key === 'Enter') { e.preventDefault(); kitSaveEdit(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); kitSaveEdit(false); } } });
+document.addEventListener('focusout', e => { if (e.target.id === 'kit-ed') setTimeout(() => { if (ui.kitEdit) kitSaveEdit(true); }, 0); });
+
 /* ===== Lists of a work: «Что нужно сделать» and «Что нужно купить» (links to sites and pictures) ===== */
 const JOB_LISTS = { todo: ['Что нужно сделать', 'Что нужно сделать — Enter, чтобы добавить', 'сделано'], buy: ['Что нужно купить', 'Что купить — можно вставить ссылку на сайт', 'куплено'] };
 const jlMay = j => mayEditJob(j) || onJob(j);
@@ -6687,6 +6745,7 @@ function renderDrawer(){
       ${j.features ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Ключевые особенности</b><div style="white-space:pre-wrap">${esc(j.features)}</div></div>` : ''}
       ${j.happening ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Что происходит</b><div style="white-space:pre-wrap">${esc(j.happening)}</div></div>` : ''}
       ${j.description || canEdit() ? `<p class="jdesc ${j.description ? '' : 'dim'}" ${edAttr('jobs', j.id, 'description', true)}>${j.description ? esc(j.description) : 'Описание — дважды щёлкните, чтобы добавить'}</p>` : ''}
+      ${kitBox(j)}
       ${jobListBox(j, 'todo')}
       ${jobListBox(j, 'buy')}
       <div class="box"><h4>Документы${(j.docs || []).length ? ' · ' + j.docs.length : ''}</h4>
@@ -7660,6 +7719,10 @@ async function act(el){
     case 'openIncome': return openDrawer('income', id);
     case 'newReceipt': return openDrawer('receipt');
     case 'reqNew': ui.reqFiles = []; ui.reqEq = ''; ui.reqKeepState = null; return openDrawer('reqForm');
+    case 'kitAdd': return kitAdd(id);
+    case 'kitEdit': ui.kitEdit = id; renderDrawer(); setTimeout(() => { const i = $('kit-ed'); if (i) { i.focus(); i.select(); } }, 0); return;
+    case 'kitDel': { const [jid, iid] = id.split('|'); try { await kitApi(jid, 'DELETE', '/' + iid); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
+    case 'kitReset': try { await kitApi(id, 'POST', '/reset'); kitRedraw(); toast('Отметки сняты'); } catch(e) { toast(errText(e)); } return;
     case 'jlAdd': { const [jid, k] = id.split('|'); return jlAdd(jid, k); }
     case 'jlDel': { const [jid, k, iid] = id.split('|'); try { await jlApi(jid, k, 'DELETE', iid); renderDrawer(); } catch(e) { toast(errText(e)); } return; }
     case 'jlLinkOpen': ui.jlLink = id || null; renderDrawer(); $('jl-url')?.focus(); return;
@@ -8192,6 +8255,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
   if (t.dataset.sec && !t.dataset.top) { t.closest('.secg')?.querySelectorAll('[data-top]').forEach(x => { x.disabled = !t.checked; }); return; }
   if (t.name === 'o-type') { const b = $('o-secs'); if (b) b.hidden = t.value !== 'all'; return; }
+  if (t.dataset.kit) { const [jid, iid] = t.dataset.kit.split('|'); try { await kitApi(jid, 'POST', `/${iid}/got`, { got: t.checked }); kitRedraw(); } catch(e) { toast(errText(e)); t.checked = !t.checked; } return; }
   if (t.dataset.jl) { const [jid, k, iid] = t.dataset.jl.split('|'); try { await jlApi(jid, k, 'PATCH', iid, { done: t.checked }); renderDrawer(); } catch(e) { toast(errText(e)); t.checked = !t.checked; } return; }
   if (t.dataset.dacc) { ui.devAcc = ui.devAcc || {}; if (t.value) ui.devAcc[t.dataset.dacc] = t.value; else delete ui.devAcc[t.dataset.dacc]; return; }
   if (t.id === 'planWho') { ui.planWho = t.value; return render(); }
