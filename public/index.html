@@ -304,7 +304,8 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 @media (max-width:760px){.lblwrap{grid-template-columns:1fr}.lbllist{flex-direction:row;flex-wrap:wrap}}
 /* «Управление заявками»: системы, фото, закрытие с заменой оборудования, таблицы */
 .uico{width:18px;height:18px;flex:0 0 auto;vertical-align:-3px}
-.flab{font-size:13px;color:var(--ink-2);display:block;margin-bottom:4px}.req-star{color:var(--bad);font-style:normal}
+.flab{font-size:13px;color:var(--ink-2);display:block;margin-bottom:4px}.req-star{display:none}.lreq>.lname::before{content:"✱";color:var(--bad);font-weight:700;margin-right:4px}
+.fhint{position:fixed;z-index:2000;max-width:min(360px,calc(100vw - 16px));background:var(--ink);color:var(--sheet);font-size:13px;line-height:1.4;padding:7px 10px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none;white-space:pre-wrap}
 .sysgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
 .sysopt input{position:absolute;opacity:0;pointer-events:none}
 .sysopt span{display:flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid var(--rule);border-radius:8px;background:var(--sheet);cursor:pointer;font-size:14px;line-height:1.2;min-height:46px}
@@ -2618,7 +2619,7 @@ function compTable(o){
     <td><input class="ci" data-f="name" value="${esc(c.name)}" aria-label="Наименование" style="min-width:220px"></td>
     <td><input class="ci num" data-f="qty" value="${esc(c.qty)}" inputmode="decimal" aria-label="Количество" style="width:70px"></td>
     <td><input class="ci" data-f="unit" value="${esc(c.unit)}" aria-label="Единица" style="width:56px"></td>
-    <td><input class="ci sup" data-f="supplier" value="${esc(c.supplier)}" placeholder="в наличии" aria-label="Поставщик (пусто — в наличии)" list="sup-${o.id}" style="min-width:150px"></td>
+    <td><input class="ci sup" data-f="supplier" value="${esc(c.supplier)}" placeholder="в наличии" data-ph-keep aria-label="Поставщик (пусто — в наличии)" list="sup-${o.id}" style="min-width:150px"></td>
     <td><input class="ci" data-f="invNo" value="${esc(c.invNo)}" aria-label="Номер счёта" list="inv-${o.id}" style="min-width:110px"></td>
     <td class="buyst">${String(c.supplier || '').trim() || st.get(c.id).st !== 'none' ? buyChip(st.get(c.id)) : '<span class="dim">в наличии</span>'}</td>
     <td><button class="icon" data-act="delComp" data-id="${o.id}|${esc(c.id)}" aria-label="Удалить строку" title="Удалить строку">✕</button></td>
@@ -4634,7 +4635,7 @@ function vChecks(){
       <div class="ckitems"><div class="ckir ckih"><span>Что куплено</span><span>Кол-во</span><span>Ед.</span><span>Цена, ₽</span><span>Сумма</span><span></span></div>
         ${ckItems().map((it, i) => `<div class="ckir"><input class="in" data-cki="${i}|name" value="${esc(it.name)}" placeholder="Наименование" aria-label="Что куплено"><input class="in mono" data-cki="${i}|qty" value="${esc(it.qty)}" inputmode="decimal" placeholder="Кол-во" aria-label="Количество"><input class="in" data-cki="${i}|unit" value="${esc(it.unit)}" placeholder="ед." aria-label="Единица"><input class="in mono" data-cki="${i}|price" value="${esc(it.price)}" inputmode="decimal" placeholder="Цена, ₽" aria-label="Цена"><b class="mono" id="cki-sum-${i}">${ckMoney(ckNum(it.qty) * ckNum(it.price))}</b><button type="button" class="btn sm ghost" data-act="ckRowDel" data-id="${i}" aria-label="Убрать строку">✕</button></div>`).join('')}
         <button type="button" class="btn sm" data-act="ckRowAdd">+ Строка</button></div>
-      <div class="form"><label>Сумма чека, ₽<input class="in mono" id="ck-sum" inputmode="decimal" value="${esc(ui.ckSum || '')}" placeholder="${ckMoney(ckCalc())}"></label><small class="wide dim" id="ck-calc">По строкам: <b>${ckMoney(ckCalc())} ₽</b>. Если сумма чека другая (скидка, доставка) — укажите её.</small></div>
+      <div class="form"><label>Сумма чека, ₽<input class="in mono" id="ck-sum" inputmode="decimal" value="${esc(ui.ckSum || '')}" placeholder="${ckMoney(ckCalc())}" data-ph-keep></label><small class="wide dim" id="ck-calc">По строкам: <b>${ckMoney(ckCalc())} ₽</b>. Если сумма чека другая (скидка, доставка) — укажите её.</small></div>
       <div class="row-g"><button class="btn primary" data-act="ckSave" data-id="buy">Загрузить чек</button></div></section>`;
   const L = mine.filter(x => x.kind === tab).sort((a, b) => b.date.localeCompare(a.date) || b.at.localeCompare(a.at));
   const total = L.reduce((a, x) => a + (x.sum || 0), 0);
@@ -8561,6 +8562,44 @@ async function start(u){
     } catch(e) { $('banner').hidden = false; $('banner').textContent = 'Нет связи с сервером. Изменения не сохраняются, пока связь не восстановится.'; }
   }, 5000);
 }
+/* ===== Hints of the fields: no grey text inside a field — the hint shows in a small window after the pointer rests on it 3 seconds;
+   a required field has ✱ before its name ===== */
+const HINT_MS = 3000;
+function fieldsDecorate(root){
+  if (!root || !root.querySelectorAll) return;
+  // a grey value that means something (an empty supplier is «в наличии», an empty sum is the sum of the lines) stays
+  const els = [...(root.matches?.('[placeholder]:not([data-ph-keep])') ? [root] : []), ...root.querySelectorAll('[placeholder]:not([data-ph-keep])')];
+  // a bare sample value («195.2.80.210», «root») reads as «Например: …»
+  els.forEach(el => { const p = (el.getAttribute('placeholder') || '').trim(); if (p) el.dataset.hint = /\s/.test(p) || /^например/i.test(p) || /[…:]$/.test(p) ? p : 'Например: ' + p; el.removeAttribute('placeholder'); });
+  const labs = new Set([...(root.matches?.('label') ? [root] : []), ...root.querySelectorAll('label')]);
+  labs.forEach(l => {
+    if (l.classList.contains('lreq') || l.classList.contains('chk')) return;
+    const req = l.querySelector('.req-star') || l.querySelector('input[required]:not([type=checkbox]):not([type=radio]):not([type=hidden]), select[required], textarea[required]');
+    if (!req) return;
+    // the name of the field: the first span, or the text before the field (wrapped so the mark goes in front of it)
+    let name = [...l.children].find(c => c.tagName === 'SPAN' && !c.classList.contains('pw') && c.textContent.trim());
+    if (!name) { const t = [...l.childNodes].find(n => n.nodeType === 3 && n.textContent.trim()); if (!t) return; name = document.createElement('span'); t.replaceWith(name); name.appendChild(t); }
+    name.classList.add('lname'); l.classList.add('lreq');
+  });
+}
+let hintT = null, hintEl = null;
+const hintHide = () => { clearTimeout(hintT); hintT = null; if (hintEl) { hintEl.remove(); hintEl = null; } };
+document.addEventListener('mouseover', e => {
+  const f = e.target.closest?.('[data-hint]'); if (!f) return;
+  if (hintEl && hintEl._for === f) return;
+  hintHide();
+  hintT = setTimeout(() => { if (!f.isConnected || !f.matches(':hover')) return;
+    const r = f.getBoundingClientRect(), d = document.createElement('div'); d.className = 'fhint'; d.setAttribute('role', 'tooltip'); d.textContent = f.dataset.hint; d._for = f;
+    document.body.appendChild(d); const w = d.offsetWidth, h = d.offsetHeight;
+    let x = Math.min(Math.max(8, r.left), innerWidth - w - 8), y = r.bottom + 6; if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 6);
+    d.style.left = x + 'px'; d.style.top = y + 'px'; hintEl = d; }, HINT_MS);
+});
+document.addEventListener('mouseout', e => { const f = e.target.closest?.('[data-hint]'); if (f && !f.contains(e.relatedTarget)) hintHide(); });
+['mousedown', 'keydown', 'scroll', 'wheel'].forEach(ev => document.addEventListener(ev, hintHide, true));
+new MutationObserver(ms => { for (const m of ms) { if (m.type === 'attributes') { if (m.target.hasAttribute('placeholder') && !m.target.hasAttribute('data-ph-keep')) fieldsDecorate(m.target); continue; } m.addedNodes.forEach(n => { if (n.nodeType === 1) fieldsDecorate(n); }); } })
+  .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['placeholder'] });
+document.addEventListener('DOMContentLoaded', () => fieldsDecorate(document.body));
+fieldsDecorate(document.body);
 document.addEventListener('click', e => { if (e.target.closest('[data-lp-login]')) { $('loginForm').scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => $('l-login').focus({ preventScroll: true }), 400); } });
 $('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
