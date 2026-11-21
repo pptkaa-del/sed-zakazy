@@ -364,6 +364,8 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .chatin{display:flex;gap:8px;align-items:flex-end}.cattach{cursor:pointer;font-size:18px;padding:6px 10px}.cpends{display:flex;flex-wrap:wrap;gap:6px}.cpends:empty{display:none}.cpend{display:inline-flex;gap:4px;align-items:center}
 .cfiles{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}.cmsg.me .cfiles{justify-content:flex-end}.cfiles img{max-width:220px;max-height:160px;border-radius:8px;border:1px solid var(--rule-2);display:block}.cfile{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);text-decoration:none;color:var(--ink);word-break:break-all}.chatin textarea{flex:1;resize:vertical}
 .chatlist{display:flex;flex-direction:column;gap:6px}.chatrow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--rule-2);border-radius:8px;background:var(--sheet);color:var(--ink);cursor:pointer;font:inherit}.chatrow.new{border-color:var(--stamp)}.chatlast{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.helpbody{display:flex;flex-direction:column;gap:10px;height:100%}.helpframe{flex:1;width:100%;min-height:70vh;border:1px solid var(--rule-2);border-radius:8px;background:#fff}
+.upop a.upop-link{display:block;text-decoration:none;padding:9px 10px;border-radius:8px;font-size:14px;color:var(--ink)}.upop a.upop-link:hover{background:var(--mute-soft)}
 .snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
@@ -1300,6 +1302,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
         <div class="uinfo"><b id="uname2"></b><small id="urole"></small></div>
         <button type="button" role="menuitem" data-act="prefs">⚙ Настройки</button>
         <button type="button" role="menuitem" data-act="chatMine" id="chatMineBtn" hidden>✉ <span id="chatMineLbl">Написать администратору</span> <span class="badge" id="chatMineBadge" hidden></span></button>
+        <a role="menuitem" class="upop-link" id="presLink" href="https://claude.ai/artifact/ET3u2YzTUtZTtfptERRZbg" target="_blank" rel="noopener" hidden>📊 Презентация системы</a>
         <button type="button" role="menuitem" data-act="chatInbox" id="chatInboxBtn" hidden>📨 <span id="chatInboxLbl">Сообщения пользователей</span> <span class="badge" id="chatInboxBadge" hidden></span></button>
 
         <button type="button" role="menuitem" class="danger" data-act="logout">Выйти</button>
@@ -5143,9 +5146,13 @@ function vRefs(){
   const G = [...groups.values()].sort((a, b) => (b.common - a.common) || (b.job - a.job) || a.name.localeCompare(b.name, 'ru'));
   const bar = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="rfq" type="search" placeholder="Название, текст, файл" aria-label="Поиск по справочникам" value="${esc(ui.rfq || '')}" style="flex:1 1 220px;max-width:360px"></span>
     ${head ? '<button class="btn primary" data-act="refNew">+ Справочник</button>' : ''}</div>`;
-  if (!REFS.length) return bar + `<div class="empty"><h3>Справочников пока нет</h3>${head ? 'Добавьте файлы (инструкции, схемы, таблицы) или текст и укажите, к какому проекту они относятся.' : 'Здесь появятся справочные материалы от руководителя.'}</div>`;
-  if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
-  return bar + G.map(g => `<section class="refgroup"><h3>${g.common ? '📚' : g.job ? '🏗' : '📁'} ${esc(g.name)} <span class="dim">${g.items.length}</span></h3><div class="refgrid">
+  // «Инструкция пользователя» is built into the program: every user sees it on top, whatever the organization added
+  const help = !q || 'инструкция пользователя руководство помощь'.includes(q) ? `<section class="refgroup"><h3>📘 Инструкция <span class="dim">1</span></h3><div class="refgrid"><article class="card refcard refhelp">
+    <b>Инструкция пользователя</b><div class="reftext">Как работать в программе: разделы меню, роли, работы, учёт, планирование, карта, инструменты, сопоставление SN, связь с администратором.</div>
+    <div class="row-g"><button class="btn sm primary" data-act="helpOpen">Открыть</button><a class="btn sm" href="/help/instruction.html" target="_blank" rel="noopener">В новой вкладке</a></div></article></div></section>` : '';
+  if (!REFS.length) return bar + help + `<div class="empty"><h3>Справочников пока нет</h3>${head ? 'Добавьте файлы (инструкции, схемы, таблицы) или текст и укажите, к какому проекту они относятся.' : 'Здесь появятся справочные материалы от руководителя.'}</div>`;
+  if (!L.length) return bar + (help || '<div class="empty">Ничего не найдено</div>');
+  return bar + help + G.map(g => `<section class="refgroup"><h3>${g.common ? '📚' : g.job ? '🏗' : '📁'} ${esc(g.name)} <span class="dim">${g.items.length}</span></h3><div class="refgrid">
     ${g.items.sort((a, b) => a.title.localeCompare(b.title, 'ru')).map(r => `<article class="card refcard">
       <div class="row-g" style="justify-content:space-between;align-items:flex-start"><b>${esc(r.title)}</b>${head ? `<button class="btn sm" data-act="refEdit" data-id="${r.id}">Изменить</button>` : ''}</div>
       ${r.text ? `<div class="reftext ${ui.refOpen === r.id ? 'open' : ''}">${esc(r.text)}</div>${r.text.length > 280 ? `<button class="linkish" data-act="refMore" data-id="${r.id}">${ui.refOpen === r.id ? 'Свернуть' : 'Показать полностью'}</button>` : ''}` : ''}
@@ -5972,7 +5979,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incEdo = false; ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
@@ -6146,6 +6153,7 @@ document.addEventListener('dragover', e => { if (e.target.closest?.('.chatbody')
 document.addEventListener('drop', e => { if (!e.target.closest?.('.chatbody')) return; e.preventDefault(); const F = [...(e.dataTransfer?.files || [])]; if (F.length) chatAttach(F); });
 function renderDrawer(){
   const D = $('drawer'), d = ui.drawer; if (!d) return;
+  if (d.kind === 'helpDoc') { D.innerHTML = dh('📘 Инструкция пользователя') + `<div class="d-body helpbody"><div class="row-g"><a class="btn sm" href="/help/instruction.html" target="_blank" rel="noopener">Открыть в новой вкладке</a><span class="dim">Для печати откройте в новой вкладке и нажмите Ctrl+P</span></div><iframe class="helpframe" src="/help/instruction.html" title="Инструкция пользователя"></iframe></div>`; return; }
   if (d.kind === 'chat') {
     if (!d.id) { const L = CHAT?.inbox || [];
       D.innerHTML = dh(me?.sys ? 'Сообщения администраторов' : 'Сообщения пользователей') + `<div class="d-body">${L.length ? `<div class="chatlist">${L.map(x => `<button type="button" class="chatrow ${x.unread ? 'new' : ''}" data-act="chatOpen" data-id="${esc(x.key)}"><span class="chatwho"><b>${esc(x.name)}</b> <small class="dim">${esc(x.role)}${me?.sys && x.org ? ' · ' + esc(x.org) : ''}</small>${x.unread ? ` <span class="badge">${x.unread}</span>` : ''}</span><span class="chatlast">${x.lastBy === 'staff' ? 'Вы: ' : ''}${esc(x.lastText)}</span><small class="dim">${fmtDT(x.last)}</small></button>`).join('')}</div>`
@@ -7400,6 +7408,7 @@ async function act(el){
     case 'chatInbox': ui.chatT = null; await chatLoad(); return openDrawer('chat', null);
     case 'chatOpen': ui.chatDraft = ''; ui.chatT = null; ui.chatFiles = []; return openDrawer('chat', id);
     case 'chatSend': return chatSend();
+    case 'helpOpen': return openDrawer('helpDoc');
     case 'chatUnfile': ui.chatFiles = (ui.chatFiles || []).filter(f => f.id !== id); chatPendDraw(); return;
     case 'prefs': $('upop').hidden = true; $('ubtn').setAttribute('aria-expanded', 'false'); return openDrawer('prefs');
     case 'prefTheme': themeSet(THEMES.includes(id) ? id : 'system'); prefsSave({ theme: THEMES.includes(id) ? id : 'system' }); return segOn(el);
@@ -8408,7 +8417,7 @@ async function start(u){
   document.body.classList.toggle('no-edit', !canEdit()); document.body.classList.toggle('field', isWorker());
   document.body.classList.toggle('can-invoice', canAddInvoice());
   $('usersTab').hidden = u.role !== 'admin'; $('notesTab').hidden = isWorker() || !!u.sys || reqMode();
-  $('orgsTab').hidden = !u.sys; ui.orgsList = null;
+  $('orgsTab').hidden = !u.sys; ui.orgsList = null; $('presLink').hidden = !u.sys;
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
   $('happ').textContent = reqMode() ? 'Управление заявками' : transMode() ? 'Спецтехника и грузоперевозки' : 'Управление предприятием';
   document.body.classList.toggle('reqmode', reqMode());
