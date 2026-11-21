@@ -372,7 +372,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
 .vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
-.plt .plname{width:260px;min-width:260px;max-width:260px;box-sizing:border-box;cursor:pointer}.plt tr.pgroup th,.plt tr.pgroup td{background:var(--mute-soft);border-top:2px solid var(--rule)}.plt tr.pgroup td.off{background:repeating-linear-gradient(135deg,var(--rule-2) 0 4px,var(--mute-soft) 4px 7px)}.plt tr.ptask td{height:34px}.plt td.pon{color:#1F2633;font-size:10px}.plt td.plt-late{box-shadow:inset 0 -3px 0 var(--bad)}.plt td.pcontr,.pcontr-i{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 3px,transparent 3px 6px)}.plt td.ptod{box-shadow:inset 2px 0 0 var(--stamp),inset -2px 0 0 var(--stamp)}.plt td.plt-late.ptod{box-shadow:inset 0 -3px 0 var(--bad),inset 2px 0 0 var(--stamp),inset -2px 0 0 var(--stamp)}.plt tr.pload th,.plt tr.pload td{font-weight:600;color:var(--ink);cursor:default;border-top:2px solid var(--rule)}.pdue{color:var(--bad);font-size:13px}.plt-late-i{box-shadow:inset 0 -3px 0 var(--bad);background:#F7C994!important}
+.plt .plname{width:260px;min-width:260px;max-width:260px;box-sizing:border-box;cursor:pointer}.plt tr.pgroup th,.plt tr.pgroup td{background:var(--mute-soft);border-top:2px solid var(--rule)}.plt tr.pgroup td.off{background:repeating-linear-gradient(135deg,var(--rule-2) 0 4px,var(--mute-soft) 4px 7px)}.plt tr.ptask td{height:34px}.plt td.pon{color:#1F2633;font-size:10px}.plt td.plt-late{box-shadow:inset 0 -3px 0 var(--bad)}.plt td.pcontr,.pcontr-i{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.55) 0 3px,transparent 3px 6px)}.plt td.ptod{box-shadow:inset 2px 0 0 var(--stamp),inset -2px 0 0 var(--stamp)}.plt td.plt-late.ptod{box-shadow:inset 0 -3px 0 var(--bad),inset 2px 0 0 var(--stamp),inset -2px 0 0 var(--stamp)}.plt tr.pload th,.plt tr.pload td{font-weight:600;color:var(--ink);cursor:default;border-top:2px solid var(--rule)}.pdue{color:var(--bad);font-size:13px}.plname .pveh{color:var(--ink-2)}.plt tr.pvehrow th,.plt tr.pvehrow td{border-top:0}.plt tr.pvehrow.pvfirst th,.plt tr.pvehrow.pvfirst td{border-top:2px solid var(--rule)}.plt td.pvclash{color:#8B1A1A}.plt-late-i{box-shadow:inset 0 -3px 0 var(--bad);background:#F7C994!important}
 .sgnote{display:block;padding:8px 14px}.pft td{font-size:13px}.pft td .pfmin{display:block;font-size:9px;font-weight:400;color:#4b5563}.pft td.pfdg{color:#fff}.pft td.pfdg .pfmin{color:#eafff0}.sgt .sgsum.sgplus b{color:var(--ok)}.sgt .sgsum.sgminus b{color:var(--bad)}.sgday{margin:6px 0 10px;font-size:16px}
 .vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vcard{text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;font:inherit;color:inherit}.vcard:hover{border-color:var(--stamp)}
 .vtop{display:flex;gap:10px;justify-content:space-between;align-items:center}.vtop b{font-size:16px}.plate{font:600 13px var(--f-mono,monospace);border:1.5px solid var(--ink);border-radius:4px;padding:1px 6px;background:var(--sheet);white-space:nowrap}
@@ -5948,12 +5948,15 @@ function taskTerm(t){
 function vPlan(){
   if (ui.planOrd && ui.planOrd !== '_' && !jobOf(ui.planOrd)) ui.planOrd = '';
   if (ui.planWho && !STAFF.some(u => u.id === ui.planWho)) ui.planWho = '';
+  if (ui.planVeh && !VEH_BRIEF.some(v => v.id === ui.planVeh)) ui.planVeh = '';
+  const inVeh = t => !ui.planVeh || (t.vehicles || []).includes(ui.planVeh);
   const inWho = t => !ui.planWho || ((t.staff || []).length ? t.staff.includes(ui.planWho) : !!jobOf(t.jobId) && jobPeople(jobOf(t.jobId)).includes(ui.planWho));
-  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planOrd || (ui.planOrd === '_' ? !jobOf(t.jobId) : t.jobId === ui.planOrd)) && (!ui.planKind || t.kind === ui.planKind) && inWho(t));
+  const tasks = S.tasks.filter(t => t.start && t.end && (!ui.planOrd || (ui.planOrd === '_' ? !jobOf(t.jobId) : t.jobId === ui.planOrd)) && (!ui.planKind || t.kind === ui.planKind) && inWho(t) && inVeh(t));
   const PJ = planJobs();
   const head0 = `<div class="toolbar">
     <select class="f" id="planOrd" aria-label="Работа"><option value="">Все работы</option>${PJ.map(j => `<option value="${j.id}" ${ui.planOrd===j.id?'selected':''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}<option value="_" ${ui.planOrd==='_'?'selected':''}>Без работы</option></select>
     <select class="f" id="planWho" aria-label="Сотрудник"><option value="">Все сотрудники</option>${STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<option value="${u.id}" ${ui.planWho===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>
+    ${VEH_BRIEF.length ? `<select class="f" id="planVeh" aria-label="Транспорт"><option value="">Весь транспорт</option>${VEH_BRIEF.map(v => `<option value="${v.id}" ${ui.planVeh === v.id ? 'selected' : ''}>${esc(v.name + (v.plate ? ' · ' + v.plate : ''))}</option>`).join('')}</select>` : ''}
     <div class="seg"><button data-act="planKind" data-id="" class="${!ui.planKind?'on':''}">Все</button><button data-act="planKind" data-id="prod" class="${ui.planKind==='prod'?'on':''}">Изготовление</button><button data-act="planKind" data-id="mount" class="${ui.planKind==='mount'?'on':''}">Монтаж</button></div>
     ${canEdit() ? `<button class="btn primary" data-act="newTask" data-id="${ui.planOrd && ui.planOrd !== '_' ? 'j:' + ui.planOrd : ''}">+ Задача</button>` : ''}
   </div>`;
@@ -5966,7 +5969,8 @@ function vPlan(){
   const inMonth = t => dnum(t.start) <= hi && Math.max(dnum(t.start), dnum(t.end)) >= lo;
   const MT = tasks.filter(inMonth);
   const PL_BG = { prod: '#CDBFF3', mount: '#F7C994', done: '#C3E6DC' };
-  const tip = t => `${t.title}: ${fmtD(t.start)} – ${fmtD(t.end)}${crew(t)?' · '+crew(t):''}${t.resp?' · '+t.resp:''}${(t.staff || []).length ? ' · сотрудники: ' + t.staff.map(id => who(id)).join(', ') : ''}${taskWe(t) ? '' : ' · без выходных'}`;
+  const vehTxt = t => (t.vehicles || []).map(vehLabel).join(', ');
+  const tip = t => `${t.title}: ${fmtD(t.start)} – ${fmtD(t.end)}${crew(t)?' · '+crew(t):''}${t.resp?' · '+t.resp:''}${(t.staff || []).length ? ' · сотрудники: ' + t.staff.map(id => who(id)).join(', ') : ''}${vehTxt(t) ? ' · транспорт: ' + vehTxt(t) : ''}${taskWe(t) ? '' : ' · без выходных'}`;
   const cellOf = (t, d) => {
     const k = dayKind(d), dn = dnum(d), s = dnum(t.start), e = Math.max(s, dnum(t.end)), on = dn >= s && dn <= e && (taskWe(t) || k === 'work');
     if (!on) return `<td class="${k !== 'work' ? 'off' : ''} ${dn === tn ? 'ptod' : ''}" data-act="editTask" data-id="${t.id}" title="${esc(tip(t))}"></td>`;
@@ -5974,7 +5978,7 @@ function vPlan(){
     return `<td class="pon ${late ? 'plt-late' : ''} ${brigadesOf(t) ? 'pcontr' : ''} ${dn === tn ? 'ptod' : ''}" style="background:${bg}" data-act="editTask" data-id="${t.id}" title="${esc(tip(t))}">${dn === s ? (t.done ? '✓' : '▸') : ''}</td>`;
   };
   const head = (k, d) => `<th class="${k !== 'work' ? 'off' : ''} ${d === today() ? 'tod' : ''}" title="${esc(DAY_KIND[k])}">${Number(d.slice(8))}<small>${wd[dayOf(d).getDay()]}</small></th>`;
-  const taskRow = t => `<tr class="ptask"><th class="sgname plname" data-act="editTask" data-id="${t.id}" role="button" tabindex="0" title="${esc(tip(t))}">${t.done ? '✓ ' : ''}${esc(t.title)}${exTag(t)}<small>${taskTerm(t)}</small></th>${days.map(d => cellOf(t, d)).join('')}</tr>`;
+  const taskRow = t => `<tr class="ptask"><th class="sgname plname" data-act="editTask" data-id="${t.id}" role="button" tabindex="0" title="${esc(tip(t))}">${t.done ? '✓ ' : ''}${esc(t.title)}${exTag(t)}<small>${taskTerm(t)}</small>${vehTxt(t) ? `<small class="pveh">🚚 ${esc(vehTxt(t))}</small>` : ''}</th>${days.map(d => cellOf(t, d)).join('')}</tr>`;
   const groupRow = (label, act, id, due, dueTitle) => `<tr class="pgroup"><th class="sgname plname" ${act ? `data-act="${act}" data-id="${id}" role="button" tabindex="0"` : ''}>${label}</th>${days.map(d => `<td class="${dayKind(d) !== 'work' ? 'off' : ''}" ${due === d ? `title="${esc(dueTitle)}"` : ''}>${due === d ? '<span class="pdue">⚑</span>' : ''}</td>`).join('')}</tr>`;
   const byStart = (a, b) => a.start.localeCompare(b.start);
   let rows = '';
@@ -5995,9 +5999,16 @@ function vPlan(){
   const loadRow = (label, arr) => `<tr class="pload"><th class="sgname plname">${label}</th>${arr.map((v, i) => `<td class="${dayKind(days[i]) !== 'work' ? 'off' : ''}">${v || ''}</td>`).join('')}</tr>`;
   if (per.some(Boolean)) rows += loadRow('Своих людей в день', per);
   if (con.some(Boolean)) rows += loadRow('Подрядчиков в день', con);
+  // a row per vehicle: the days it is busy; two tasks on one day — red with the number
+  const usedV = VEH_BRIEF.filter(v => MT.some(t => (t.vehicles || []).includes(v.id)));
+  usedV.forEach((v, vi) => {
+    const T = MT.filter(t => (t.vehicles || []).includes(v.id));
+    rows += `<tr class="pload pvehrow ${vi === 0 ? 'pvfirst' : ''}"><th class="sgname plname" title="${esc(vehLabel(v.id))}">🚚 ${esc(v.name)}${v.plate ? `<small>${esc(v.plate)}</small>` : ''}</th>${days.map(d => { const dn = dnum(d), on = T.filter(t => dn >= dnum(t.start) && dn <= Math.max(dnum(t.start), dnum(t.end)) && (taskWe(t) || dayKind(d) === 'work'));
+      return `<td class="${dayKind(d) !== 'work' ? 'off' : ''} ${on.length > 1 ? 'pvclash' : ''}" ${on.length ? `style="background:${on.length > 1 ? '#F4B4B4' : '#BFD4EE'}" title="${esc(fmtD(d) + ': ' + on.map(t => t.title).join(', ') + (on.length > 1 ? ' — занят в двух задачах' : ''))}" data-act="editTask" data-id="${on[0].id}"` : ''}>${on.length > 1 ? on.length : ''}</td>`; }).join('')}</tr>`;
+  });
   return head0 + `<section class="card sgwrap"><div class="sghead">
       <div class="row-g"><button class="btn sm" data-act="plMonth" data-id="${shift(-1)}" aria-label="Предыдущий месяц">‹</button><b>${otMonth(ym)}</b><button class="btn sm" data-act="plMonth" data-id="${shift(1)}" aria-label="Следующий месяц">›</button>${ym !== today().slice(0, 7) ? `<button class="btn sm ghost" data-act="plMonth" data-id="${today().slice(0, 7)}">Этот месяц</button>` : ''}</div>
-      <div class="sglegend"><span><i style="background:${PL_BG.prod}"></i>изготовление</span><span><i style="background:${PL_BG.mount}"></i>монтаж</span><span><i style="background:${PL_BG.done}"></i>выполнено</span><span><i class="plt-late-i"></i>просрочено</span><span><i class="pcontr-i" style="background-color:${PL_BG.mount}"></i>с подрядчиками</span><span><i class="sgoff"></i>выходной, праздник</span><span>▸ начало задачи · <span class="pdue">⚑</span> срок работы</span></div></div>
+      <div class="sglegend"><span><i style="background:${PL_BG.prod}"></i>изготовление</span><span><i style="background:${PL_BG.mount}"></i>монтаж</span><span><i style="background:${PL_BG.done}"></i>выполнено</span><span><i class="plt-late-i"></i>просрочено</span><span><i class="pcontr-i" style="background-color:${PL_BG.mount}"></i>с подрядчиками</span><span><i class="sgoff"></i>выходной, праздник</span>${VEH_BRIEF.length ? '<span><i style="background:#BFD4EE"></i>транспорт занят</span><span><i style="background:#F4B4B4"></i>транспорт в двух задачах</span>' : ''}<span>▸ начало задачи · <span class="pdue">⚑</span> срок работы</span></div></div>
     ${rows ? `<div class="sgscroll"><table class="sgt plt"><thead><tr><th class="sgname plname">Задача</th>${days.map(d => head(dayKind(d), d)).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`
       : `<div class="empty" style="border:0">В ${otMonth(ym).toLowerCase()} задач нет — пролистайте месяц стрелками.</div>`}
     <small class="dim sgnote">Строка — задача, закрашены её дни (задача «без выходных» не закрашивает выходные). Нажмите на задачу или клетку — откроется задача; на название работы — карточка работы.</small></section>`;
@@ -6842,6 +6853,7 @@ function renderDrawer(){
         ${J && (J.kind || 'mount') !== 'both' ? `<small class="dim" style="font-size:12px">Работа «${esc(WORK_KIND[J.kind || 'mount'])}» — доступен только этот тип.</small>` : ''}</div>
       <label>Ответственный<input class="in" id="t-resp" value="${v(t,'resp')}"></label>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействованы сотрудники</span><div class="tstaff">${STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<label class="chk"><input type="checkbox" name="t-staff" value="${u.id}" ${(t?.staff || []).includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('') || '<span class="dim">Пользователей нет</span>'}</div></div>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействован транспорт</span>${VEH_BRIEF.length ? `<div class="tstaff">${VEH_BRIEF.map(v => `<label class="chk"><input type="checkbox" name="t-veh" value="${v.id}" ${(t?.vehicles || []).includes(v.id) ? 'checked' : ''}> ${esc(v.name)}${v.plate ? ` <small class="dim">${esc(v.plate)}</small>` : ''}</label>`).join('')}</div>` : '<small class="dim" style="display:block;margin-top:4px">Транспорт ещё не добавлен — его заводят во вкладке «Транспорт».</small>'}</div>
       <label class="wide">Название<input class="in" id="t-title" value="${v(t,'title')}" required></label>
       <label>Начало<input class="in" type="date" id="t-start" value="${esc(st)}" required></label>
       <label>Окончание<input class="in" type="date" id="t-end" value="${esc(t?.end || dstr(dnum(st)+7))}" required></label>
@@ -7193,11 +7205,14 @@ async function onSubmit(e){
       if (en < s) return fail('Окончание не может быть раньше начала.');
       const brigades = val('t-brig') === '' ? 0 : Math.round(num(val('t-brig')));
       if (brigades < 0 || brigades > 99) return fail('Подрядчиков — от 0 до 99.');
-      const data = { jobId, kind:tk, staff:[...document.querySelectorAll('input[name=t-staff]:checked')].map(x => x.value), resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked, weekends:$('t-we').checked,
+      const vehicles = [...document.querySelectorAll('input[name=t-veh]:checked')].map(x => x.value);
+      const data = { jobId, kind:tk, staff:[...document.querySelectorAll('input[name=t-staff]:checked')].map(x => x.value), vehicles, resp:val('t-resp'), title:val('t-title'), start:s, end:en, done:$('t-done').checked, weekends:$('t-we').checked,
         people, brigades, contractors: brigades > 0, contractorsNote: '' };
       if (d.id) await upd('tasks', d.id, data); else await add('tasks', { ...data, createdAt:now });
       ui.tJob = undefined; ui.tKind = undefined;
-      closeDrawer(); render(); toast(d.id ? 'Задача сохранена' : 'Задача добавлена в план-график');
+      // the same vehicle in another task on the same days — said at once (the task is saved anyway)
+      const busy = vehicles.flatMap(vid => S.tasks.filter(o => o.id !== d.id && !o.done && (o.vehicles || []).includes(vid) && o.start <= en && o.end >= s).map(o => `«${vehLabel(vid)}» — «${o.title}» (${fmtD(o.start)} – ${fmtD(o.end)})`));
+      closeDrawer(); render(); toast((d.id ? 'Задача сохранена' : 'Задача добавлена в план-график') + (busy.length ? '. Внимание, транспорт уже занят в эти дни: ' + busy.slice(0, 3).join('; ') : ''));
     }
     if (kind === 'userForm') {
       const body = { name:val('uf-name'), login:val('uf-login'), role:$('uf-role').value };
@@ -8228,6 +8243,7 @@ document.addEventListener('change', async e => {
   if (t.dataset.jl) { const [jid, k, iid] = t.dataset.jl.split('|'); try { await jlApi(jid, k, 'PATCH', iid, { done: t.checked }); renderDrawer(); } catch(e) { toast(errText(e)); t.checked = !t.checked; } return; }
   if (t.dataset.dacc) { ui.devAcc = ui.devAcc || {}; if (t.value) ui.devAcc[t.dataset.dacc] = t.value; else delete ui.devAcc[t.dataset.dacc]; return; }
   if (t.id === 'planWho') { ui.planWho = t.value; return render(); }
+  if (t.id === 'planVeh') { ui.planVeh = t.value; return render(); }
   if (t.id === 't-job') { ui.tJob = t.value; ui.tKind = (document.querySelector('input[name=t-kind]:checked') || {}).value; ['t-title','t-resp','t-start','t-end','t-people','t-brig'].forEach(k => { ui.tKeep = ui.tKeep || {}; ui.tKeep[k] = $(k)?.value; }); ui.tKeep.done = $('t-done')?.checked; renderDrawer(); Object.entries(ui.tKeep).forEach(([k, v]) => { if (k === 'done') { if ($('t-done')) $('t-done').checked = v; } else if ($(k) && v !== undefined) $(k).value = v; }); ui.tKeep = null; return; }
   if (t.name === 't-kind') { ui.tKind = t.value; t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); return; }
   if (t.classList.contains('pci')) {
