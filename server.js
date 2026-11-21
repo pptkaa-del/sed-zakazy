@@ -48,6 +48,8 @@ const HOST = process.env.HOST || '0.0.0.0';
 /* Data lives outside the app folder by default, so a web server can never serve it as static files. */
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(os.homedir(), 'sed-zakazy-data'));
 const PUBLIC_DIR = path.join(__dirname, 'public');
+// the presentation of the system (PDF) — downloaded by the system administrator from his menu
+const PRESENTATION_FILE = path.join(__dirname, 'docs', 'presentation.pdf');
 const MAX_FILE = Number(process.env.MAX_FILE_MB || 50) * 1048576;
 const MAX_BACKUP = Number(process.env.BACKUP_MAX_MB || 2048) * 1048576;
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
@@ -739,6 +741,13 @@ async function api(req, res, url) {
   if (p[1] === 'chat') return chatApi(req, res, p, m, user);
   if (p[1] === 'prefs' && m === 'PUT') { user.prefs = cleanPrefs(await readJsonBody(req) || {}); saveUsers(); return send(res, 200, { ok: true, prefs: user.prefs }); }
   // the system administrator manages organizations, backups and the server, not the work of an organization
+  if (p[1] === 'presentation.pdf' && m === 'GET') {
+    if (!user.sys) return fail(res, 403, 'Презентацию скачивает администратор системы');
+    let st; try { st = fs.statSync(PRESENTATION_FILE); } catch { return fail(res, 404, 'Файл презентации не найден на сервере'); }
+    const name = encodeURIComponent('Управление предприятием — презентация.pdf');
+    res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': 'application/pdf', 'Content-Length': st.size, 'Content-Disposition': `attachment; filename="presentation.pdf"; filename*=UTF-8''${name}`, 'Cache-Control': 'private, no-cache' });
+    return fs.createReadStream(PRESENTATION_FILE).pipe(res);
+  }
   if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
