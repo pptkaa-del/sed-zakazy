@@ -1605,8 +1605,8 @@ function vAdmInit(){
   return `<section class="card" style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;max-width:860px">
     <h3 style="margin:0">Начальные остатки склада из 1С</h3>
     <p style="margin:0">Загрузите таблицу остатков из 1С (отчёт «Остатки товаров», ОСВ по счёту 10/41 и т. п., сохранённый в Excel или CSV). Количество из файла станет <b>и фактическим, и бухгалтерским</b> остатком позиции; позиции, которых нет на складе, будут созданы. В истории каждой позиции появится запись «Начальный остаток из 1С». Позиции, которых нет в файле, не меняются.</p>
-    <p class="dim" style="margin:0;font-size:13px">Обычно это делается один раз — при начале работы в программе. Чтобы потом обновлять только бухгалтерские остатки, используйте «Склад → Загрузить выгрузку 1С».</p>
-    <div class="row-g"><button class="btn primary" data-act="initImport">Загрузить начальные остатки из 1С</button></div>
+    <p class="dim" style="margin:0;font-size:13px">Обычно это делается один раз — при начале работы в программе. Потом обновляйте только бухгалтерские остатки кнопкой «Обновить бухгалтерские остатки из 1С»: фактические остатки она не меняет, позиции, которых нет в файле, получают бухгалтерский остаток 0.</p>
+    <div class="row-g"><button class="btn primary" data-act="initImport">Загрузить начальные остатки из 1С</button><button class="btn" data-act="acctImport">Обновить бухгалтерские остатки из 1С</button></div>
     ${I ? `<p class="box" style="margin:0">Последняя загрузка: <b>${esc(fmtDT(I.at))}</b>${I.by ? ', ' + esc(who(I.by)) : ''}${I.file ? `, файл «${esc(I.file)}»` : ''} — строк ${I.rows}, найдено на складе ${I.matched}, создано ${I.created}.</p>` : '<p class="dim" style="margin:0">Начальные остатки ещё не загружались.</p>'}
   </section>`;
 }
@@ -2220,10 +2220,9 @@ function vStock(){
   const head = `<div class="toolbar">
     <span data-keep style="display:contents"><input class="in" id="sq" type="search" value="${esc(ui.sq)}" style="flex:1 1 220px;min-width:0;max-width:360px" aria-label="Поиск по складу"></span>
     <button class="btn ${ui.sDiff ? 'primary' : ''}" data-act="sDiff" aria-pressed="${!!ui.sDiff}" title="Позиции, у которых фактический и бухгалтерский остатки различаются">${ui.sDiff ? '✓ ' : ''}Показать разницу <span class="${ui.sDiff ? '' : 'dim'}">${nDiff}</span></button>
-    ${canAcct() ? '<button class="btn" data-act="acctImport">Загрузить выгрузку 1С</button>' : ''}
     ${canEdit() ? '<button class="btn primary" data-act="newStock">+ Позиция</button>' : ''}
   </div>`;
-  if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canAcct() ? 'Загрузите выгрузку остатков из 1С — позиции создадутся сами — или ' : ''}${canEdit() ? 'добавьте позиции вручную: наименование, единицу, где хранится и минимальный запас. Затем отмечайте приход и расход.' : 'Позиции склада добавляют менеджер или администратор.'}</div>`;
+  if (!S.stock.length) return head + `<div class="empty"><h3>На складе пока пусто</h3>${canEdit() ? 'Добавьте позиции кнопкой «+ Позиция»: наименование, единица, где хранится и фактический остаток. ' : 'Позиции склада добавляет руководитель или администратор. '}${me?.role === 'admin' ? 'Остатки из 1С загружаются в «Администрирование → Начальные остатки».' : ''}</div>`;
   if (!list.length) return head + (ui.sDiff && !nDiff ? `<div class="empty"><h3>Расхождений нет</h3>Фактический и бухгалтерский остатки совпадают по всем позициям.</div>` : `<div class="empty"><h3>Ничего не найдено</h3>Измените поиск или фильтр.</div>`);
   return head + `<section class="card" style="padding:0;overflow:hidden">
     <div class="stk head"><span>Наименование</span><span style="text-align:right">Бухгалтерский</span><span style="text-align:right">Фактический</span><span>Где</span></div>
@@ -6349,7 +6348,7 @@ function renderDrawer(){
       <label class="wide">Наименование<input class="in" id="st-name" value="${v(it,'name')}" required></label>
       <label>Единица<input class="in" id="st-unit" value="${esc(it?.unit || 'шт')}"></label>
       <label>Где хранится<input class="in" id="st-loc" value="${v(it,'location')}" placeholder="Склад, стеллаж, полка…"></label>
-      ${it ? '' : '<label>Начальный остаток<input class="in mono" id="st-init" inputmode="decimal"></label>'}
+      ${it ? '' : '<label>Фактический остаток<input class="in mono" id="st-init" inputmode="decimal"><small class="dim">Бухгалтерский остаток будет 0 — он приходит из 1С и по накладным</small></label>'}
       <label class="wide">Примечание<input class="in" id="st-note" value="${v(it,'note')}"></label></div>
       <div class="err" id="ferr"></div>
       <div class="row-g"><button class="btn primary" type="submit">${it ? 'Сохранить' : 'Добавить'}</button><button class="btn" type="button" data-act="${it ? 'viewStock' : 'close'}" data-id="${it ? it.id : ''}">Отмена</button>${it ? armBtn('st:'+it.id, 'Удалить позицию', 'delStock', it.id) : ''}</div></form>`;
@@ -6962,7 +6961,7 @@ async function onSubmit(e){
       else {
         const id = await add('stock', data);
         const init = num(val('st-init'));
-        if (init > 0) { await api('POST', `/api/stock/${id}/moves`, { type:'in', qty:init, note:'Начальный остаток' }); await refresh(); }
+        if (init > 0) { await api('POST', `/api/stock/${id}/moves`, { type:'in', qty:init, acct:false, note:'Начальный остаток (только фактический)' }); await refresh(); }
         closeDrawer(); toast('Позиция добавлена');
       }
     }
