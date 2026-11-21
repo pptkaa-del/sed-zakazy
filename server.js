@@ -2179,10 +2179,11 @@ async function api(req, res, url) {
     if (b.type === 'out' && qty > bal + 1e-9) return fail(res, 409, `На складе только ${bal} ${it.unit || ''}`.trim());
     if (b.orderId && !db.orders[b.orderId]) return fail(res, 400, 'Заказ не найден');
     it.qty = Math.round((bal + (b.type === 'in' ? qty : -qty)) * 1000) / 1000;
-    // a receipt goes to the accounting balance too; an issue («Расход») changes only the actual one
-    if (b.type === 'in') it.acctQty = r3((Number(it.acctQty) || 0) + qty);
+    // a receipt goes to the accounting balance too; an issue («Расход») and the starting quantity of a new position («+ Позиция») change only the actual one
+    const toAcct = b.type === 'in' && b.acct !== false;
+    if (toAcct) it.acctQty = r3((Number(it.acctQty) || 0) + qty);
     it.moves = Array.isArray(it.moves) ? it.moves : [];
-    const mv = { id: newId(), type: b.type, ...(b.type === 'in' ? { acct: true, acctBalance: it.acctQty } : {}), qty, orderId: b.orderId || null, note: String(b.note || '').slice(0, 500), by: user.id, at: new Date().toISOString(), balance: it.qty };
+    const mv = { id: newId(), type: b.type, ...(toAcct ? { acct: true, acctBalance: it.acctQty } : {}), qty, orderId: b.orderId || null, note: String(b.note || '').slice(0, 500), by: user.id, at: new Date().toISOString(), balance: it.qty };
     it.moves.push(mv);
     it.updatedAt = mv.at; it.updatedBy = user.id;
     saveDb();
