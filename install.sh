@@ -2,10 +2,13 @@
 # Управление предприятием: установка и обновление одной командой.
 #
 #   bash install.sh [домен] [--email почта] [--port 80] [--no-auto-update] [--mode shared|server] [--branch main]
-#                   [--archive https://другой-сервер/sed-zakazy.tar.gz | /путь/к/архиву.zip]
+#                   [--archive https://другой-сервер/sed-zakazy.tar.gz | /путь/к/архиву.zip] [--archive-password пароль | -]
 #
 # --archive: код берётся не из GitHub, а из архива (.tar.gz или .zip) по ссылке или из файла;
 #   автообновление тогда следит за этим архивом и ставит его, когда он изменился.
+# --archive-password: пароль архива — zip с паролем или файл, зашифрованный openssl
+#   (openssl enc -aes-256-cbc -pbkdf2); «-» — спросить пароль, не показывая его. Пароль хранится
+#   в .archive-pass (доступ только root) и в сохранённые параметры не попадает.
 #
 # Режим выбирается сам:
 #   shared — виртуальный хостинг без прав root (reg.ru и т. п.): Node.js в ~/node,
@@ -39,6 +42,7 @@ HTTP_PORT=80
 AUTO=1
 MODE=""
 ARCHIVE=""
+ARCHIVE_PASS=""
 NODE_NEW="20.18.1"
 NODE_OLD="16.20.2"
 
@@ -53,6 +57,7 @@ while [ $# -gt 0 ]; do
     --mode)   MODE="${2:-}"; shift 2 ;;
     --branch) BRANCH="${2:-}"; shift 2 ;;
     --archive) ARCHIVE="${2:-}"; shift 2 ;;
+    --archive-password) ARCHIVE_PASS="${2:-}"; shift 2 ;;
     --port)   HTTP_PORT="${2:-}"; shift 2 ;;
     --no-auto-update) AUTO=0; shift ;;
     -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -60,6 +65,11 @@ while [ $# -gt 0 ]; do
     *)  DOMAIN="$1"; shift ;;
   esac
 done
+if [ "$ARCHIVE_PASS" = "-" ]; then
+  # asked from the keyboard (also under «curl … | sudo bash»); the restart of the script with its new copy gets the typed one
+  if { : </dev/tty; } 2>/dev/null; then read -r -s -p "Пароль архива: " ARCHIVE_PASS </dev/tty; echo >/dev/tty; else ARCHIVE_PASS=""; fi
+  for i in "${!ORIG_ARGS[@]}"; do [ "${ORIG_ARGS[$i]}" = "--archive-password" ] && ORIG_ARGS[$((i + 1))]="$ARCHIVE_PASS"; done
+fi
 DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
 # a mistake in the parameters (e-mail in place of the domain, an IP address) — say so at once instead of an nginx site for a name that does not exist;
 # an automatic update keeps working with the parameters it has
@@ -124,12 +134,28 @@ fetch_archive() {   # $1 = app dir
     cp "$ARCHIVE" "$tmp/a"
   fi
   sum="$(sha256sum "$tmp/a" | cut -c1-64)"
+  # the password: given now (kept for the automatic updates), or the one kept before
+  local pass="$ARCHIVE_PASS" passf="$dir/.archive-pass"
+  [ -z "$pass" ] && [ -f "$passf" ] && pass="$(cat "$passf")"
   mkdir "$tmp/x"
+  # encrypted with openssl (openssl enc -aes-256-cbc -pbkdf2): the file starts with «Salted__»
+  if [ "$(head -c8 "$tmp/a")" = "Salted__" ]; then
+    [ -n "$pass" ] || { rm -rf "$tmp"; die "Архив зашифрован — укажите пароль: --archive-password пароль (или «-», чтобы ввести его)"; }
+    command -v openssl >/dev/null || { rm -rf "$tmp"; die "Для зашифрованного архива нужна программа openssl"; }
+    SED_AP="$pass" openssl enc -d -aes-256-cbc -pbkdf2 -in "$tmp/a" -out "$tmp/d" -pass env:SED_AP 2>/dev/null || { rm -rf "$tmp"; die "Не удалось расшифровать архив — неверный пароль?"; }
+    mv "$tmp/d" "$tmp/a"
+  fi
   if [ "$(head -c2 "$tmp/a")" = "PK" ]; then
     if ! command -v unzip >/dev/null; then
       if [ -n "${PKG:-}" ] && [ "$(id -u)" = 0 ]; then pkg_install unzip; else rm -rf "$tmp"; die "Для .zip нужна программа unzip — установите её или используйте архив .tar.gz"; fi
     fi
-    unzip -q "$tmp/a" -d "$tmp/x" || { rm -rf "$tmp"; die "Архив .zip повреждён"; }
+    # a zip with a password: unzip (classic encryption) or 7z (AES), when there is one
+    if ! unzip -q -P "${pass:-}" "$tmp/a" -d "$tmp/x" 2>/dev/null; then
+      rm -rf "$tmp/x"; mkdir "$tmp/x"
+      if [ -n "$pass" ] && command -v 7z >/dev/null && 7z x -y -p"$pass" -o"$tmp/x" "$tmp/a" >/dev/null 2>&1; then :;
+      elif [ -z "$pass" ]; then rm -rf "$tmp"; die "Архив .zip повреждён или защищён паролем — укажите --archive-password";
+      else rm -rf "$tmp"; die "Не удалось распаковать .zip — неверный пароль? (для zip с шифрованием AES нужна программа 7z: apt install p7zip-full)"; fi
+    fi
   else
     tar -xzf "$tmp/a" -C "$tmp/x" 2>/dev/null || tar -xf "$tmp/a" -C "$tmp/x" 2>/dev/null || { rm -rf "$tmp"; die "Архив не читается: нужен .tar.gz или .zip"; }
   fi
@@ -139,6 +165,7 @@ fetch_archive() {   # $1 = app dir
   find "$dir" -mindepth 1 -maxdepth 1 ! -name sed.env ! -name .install-args ! -name tmp ! -name .htaccess ! -name node_modules ! -name '.archive-*' -exec rm -rf {} +
   cp -a "$src/." "$dir/"
   printf '%s\n' "$sum" > "$dir/.archive-sum"
+  if [ -n "$ARCHIVE_PASS" ]; then ( umask 077; printf '%s' "$ARCHIVE_PASS" > "$passf" ); chmod 600 "$passf"; ok "Пароль архива сохранён для автообновления ($passf, доступ только владельцу)"; fi
   rm -rf "$tmp"
   ok "Версия из архива: ${sum:0:12}"
 }
@@ -169,8 +196,14 @@ reexec_if_changed() {   # $1 = app dir: continue with the freshly downloaded ins
   rm -f "${SED_RUNNING_COPY:-}"
   SED_REEXEC=1 SED_SELF_DIR="$1" SED_RUNNING_COPY="" exec bash "$new" "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}"
 }
-save_args() {   # $1 = app dir: remember the parameters for automatic updates
-  printf '%s\n' "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}" > "$1/.install-args"
+save_args() {   # $1 = app dir: remember the parameters for automatic updates (the archive password is kept apart, in .archive-pass)
+  local a skip=0 out=()
+  for a in "${ORIG_ARGS[@]+"${ORIG_ARGS[@]}"}"; do
+    if [ "$skip" = 1 ]; then skip=0; continue; fi
+    if [ "$a" = "--archive-password" ]; then skip=1; continue; fi
+    out+=("$a")
+  done
+  printf '%s\n' "${out[@]+"${out[@]}"}" > "$1/.install-args"
 }
 set_env() {   # $1 file, $2 key, $3 value — add or replace KEY=value
   local f="$1" k="$2" v="$3"
