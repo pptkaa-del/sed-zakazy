@@ -2,6 +2,10 @@
 # Управление предприятием: установка и обновление одной командой.
 #
 #   bash install.sh [домен] [--email почта] [--port 80] [--no-auto-update] [--mode shared|server] [--branch main]
+#                   [--archive https://другой-сервер/sed-zakazy.tar.gz | /путь/к/архиву.zip]
+#
+# --archive: код берётся не из GitHub, а из архива (.tar.gz или .zip) по ссылке или из файла;
+#   автообновление тогда следит за этим архивом и ставит его, когда он изменился.
 #
 # Режим выбирается сам:
 #   shared — виртуальный хостинг без прав root (reg.ru и т. п.): Node.js в ~/node,
@@ -34,6 +38,7 @@ EMAIL=""
 HTTP_PORT=80
 AUTO=1
 MODE=""
+ARCHIVE=""
 NODE_NEW="20.18.1"
 NODE_OLD="16.20.2"
 
@@ -47,6 +52,7 @@ while [ $# -gt 0 ]; do
     --email)  EMAIL="${2:-}"; shift 2 ;;
     --mode)   MODE="${2:-}"; shift 2 ;;
     --branch) BRANCH="${2:-}"; shift 2 ;;
+    --archive) ARCHIVE="${2:-}"; shift 2 ;;
     --port)   HTTP_PORT="${2:-}"; shift 2 ;;
     --no-auto-update) AUTO=0; shift ;;
     -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -104,8 +110,41 @@ install_node() {   # $1 = target dir
 repo_url_with_token() {
   if [ -n "${GITHUB_TOKEN:-}" ]; then echo "$REPO" | sed "s#https://#https://x-access-token:${GITHUB_TOKEN}@#"; else echo "$REPO"; fi
 }
+# the code from an archive (.tar.gz or .zip) on another server or in a file: the program files are replaced,
+# the local ones (sed.env, the parameters, Passenger's tmp) stay; the checksum marks the version
+fetch_archive() {   # $1 = app dir
+  local dir="$1" tmp src sum
+  case "$dir" in ""|/|"$HOME"|/opt|/var|/usr|/root) die "Неподходящая папка для программы: $dir" ;; esac
+  tmp="$(mktemp -d)"
+  say "Беру код из архива $ARCHIVE"
+  if printf '%s' "$ARCHIVE" | grep -qiE '^https?://'; then
+    curl -fsSL --retry 3 --connect-timeout 20 -o "$tmp/a" "$ARCHIVE" || { rm -rf "$tmp"; die "Не удалось скачать архив: $ARCHIVE"; }
+  else
+    [ -f "$ARCHIVE" ] || { rm -rf "$tmp"; die "Файл архива не найден: $ARCHIVE"; }
+    cp "$ARCHIVE" "$tmp/a"
+  fi
+  sum="$(sha256sum "$tmp/a" | cut -c1-64)"
+  mkdir "$tmp/x"
+  if [ "$(head -c2 "$tmp/a")" = "PK" ]; then
+    if ! command -v unzip >/dev/null; then
+      if [ -n "${PKG:-}" ] && [ "$(id -u)" = 0 ]; then pkg_install unzip; else rm -rf "$tmp"; die "Для .zip нужна программа unzip — установите её или используйте архив .tar.gz"; fi
+    fi
+    unzip -q "$tmp/a" -d "$tmp/x" || { rm -rf "$tmp"; die "Архив .zip повреждён"; }
+  else
+    tar -xzf "$tmp/a" -C "$tmp/x" 2>/dev/null || tar -xf "$tmp/a" -C "$tmp/x" 2>/dev/null || { rm -rf "$tmp"; die "Архив не читается: нужен .tar.gz или .zip"; }
+  fi
+  src="$(find "$tmp/x" -maxdepth 3 -type f -name server.js | head -1)"; src="${src%/server.js}"
+  if [ -z "$src" ] || [ ! -f "$src/install.sh" ] || [ ! -d "$src/public" ]; then rm -rf "$tmp"; die "В архиве нет программы (server.js, install.sh, public)"; fi
+  mkdir -p "$dir"
+  find "$dir" -mindepth 1 -maxdepth 1 ! -name sed.env ! -name .install-args ! -name tmp ! -name .htaccess ! -name node_modules ! -name '.archive-*' -exec rm -rf {} +
+  cp -a "$src/." "$dir/"
+  printf '%s\n' "$sum" > "$dir/.archive-sum"
+  rm -rf "$tmp"
+  ok "Версия из архива: ${sum:0:12}"
+}
 fetch_code() {   # $1 = app dir, $2 = owner (optional, server mode)
   local dir="$1"
+  if [ -n "$ARCHIVE" ]; then fetch_archive "$dir"; return; fi
   if [ -f "$dir/server.js" ] && [ -d "$dir/.git" ]; then
     say "Обновляю код в $dir"
     local src=origin; [ -n "${GITHUB_TOKEN:-}" ] && src="$(repo_url_with_token)"
