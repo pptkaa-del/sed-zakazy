@@ -345,6 +345,13 @@ const chatDb = () => { const st = stamp(CHAT_FILE); if (!chat || st !== chatStam
 // the attachments of the conversations: DATA_DIR/chat-files/<id>; { name, type, size, at, by, thread } in chat.files
 const CHAT_FILES = path.join(DATA_DIR, 'chat-files');
 const saveChat = () => { writeJSON(CHAT_FILE, chat); chatStamp = stamp(CHAT_FILE); };
+/* «Запросить пробный доступ» on the login page: the requests go to the system administrator (tab «Запросы доступа») */
+const TRIALS_FILE = path.join(DATA_DIR, 'trials.json');
+let trials = null, trialsStamp;
+const trialsDb = () => { const st = stamp(TRIALS_FILE); if (!trials || st !== trialsStamp) { trials = readJSON(TRIALS_FILE, []); if (!Array.isArray(trials)) trials = []; trialsStamp = st; } return trials; };
+const saveTrials = () => { writeJSON(TRIALS_FILE, trials); trialsStamp = stamp(TRIALS_FILE); };
+const TRIAL_TYPES = { all: 'Все сервисы', requests: 'Управление заявками', transport: 'Транспортная организация' };
+const trialsNew = () => trialsDb().filter(x => x.status === 'new').length;
 const isOrgAdmin = u => u && u.role === 'admin' && !u.sys;
 // the thread a user writes in himself: to the administrators of his organization or (an administrator) to the system administrator
 const chatMine = u => !u || u.sys ? null : isOrgAdmin(u) ? { kind: 'sys', key: `sys:${u.orgId}:${u.id}` } : { kind: 'admin', key: `admin:${u.orgId}:${u.id}` };
@@ -717,6 +724,22 @@ async function api(req, res, url) {
     console.log(`Через браузер создан администратор системы «${u.login}».`);
     return send(res, 200, meInfo(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
+  // a request for a trial access — without a session; a hidden field catches robots, an address may send 5 an hour
+  if (p[1] === 'trial' && m === 'POST') {
+    const b = await readJsonBody(req) || {}, t = (v, n) => String(v ?? '').trim().slice(0, n), key = 'trial|' + clientIp(req), now = Date.now();
+    const a = (attempts.get(key) || []).filter(x => now - x < 3600e3); attempts.set(key, a);
+    if (a.length >= 5) return fail(res, 429, 'Слишком много запросов с этого адреса. Попробуйте через час.');
+    if (t(b.website, 200)) return send(res, 200, { ok: true });
+    const x = { org: t(b.org, 200), type: TRIAL_TYPES[b.type] ? b.type : '', name: t(b.name, 200), phone: t(b.phone, 40), email: t(b.email, 200).toLowerCase(), comment: t(b.comment, 2000) };
+    if (!x.org) return fail(res, 400, 'Укажите название организации');
+    if (!x.type) return fail(res, 400, 'Выберите тип системы');
+    if (!x.name) return fail(res, 400, 'Укажите имя контактного лица');
+    if (x.phone.replace(/\D/g, '').length < 6) return fail(res, 400, 'Укажите номер телефона');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email)) return fail(res, 400, 'Укажите почту, например name@company.ru');
+    const L = trialsDb(); if (L.length >= 5000) L.splice(0, L.length - 4000);
+    L.push({ id: newId(), at: new Date().toISOString(), ...x, ip: clientIp(req), status: 'new' }); saveTrials(); a.push(now);
+    return send(res, 200, { ok: true });
+  }
   if (p[1] === 'login' && m === 'POST') {
     const { login = '', password = '' } = await readJsonBody(req);
     const key = clientIp(req) + '|' + String(login).trim().toLowerCase();
@@ -753,7 +776,7 @@ async function api(req, res, url) {
     res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': 'application/pdf', 'Content-Length': st.size, 'Content-Disposition': `attachment; filename="presentation.pdf"; filename*=UTF-8''${name}`, 'Cache-Control': 'private, no-cache' });
     return fs.createReadStream(PRESENTATION_FILE).pipe(res);
   }
-  if (user.sys && !['rev', 'password'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
+  if (user.sys && !['rev', 'password', 'trials'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
   if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
@@ -818,7 +841,21 @@ async function api(req, res, url) {
     }
     return fail(res, 405, 'Метод не поддерживается');
   }
-  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION, chat: chatUnread(user) });
+  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION, chat: chatUnread(user), ...(user.sys ? { trials: trialsNew() } : {}) });
+  // «Запросы доступа»: the system administrator sees the requests, marks them (new / done / rejected), writes a note, deletes
+  if (p[1] === 'trials') {
+    if (!user.sys) return fail(res, 403, 'Запросы доступа видит администратор системы');
+    const L = trialsDb();
+    if (m === 'GET' && !p[2]) return send(res, 200, { list: L.slice().reverse(), types: TRIAL_TYPES });
+    const x = p[2] && L.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Запрос не найден — обновите страницу');
+    if (m === 'PATCH') { const b = await readJsonBody(req) || {};
+      if (b.status !== undefined) { if (!['new', 'done', 'rejected'].includes(b.status)) return fail(res, 400, 'Неизвестный статус'); x.status = b.status; x.handledAt = new Date().toISOString(); x.handledBy = user.id; }
+      if (b.note !== undefined) x.note = String(b.note).slice(0, 2000);
+      if (b.orgId !== undefined) x.orgId = String(b.orgId).slice(0, 40);
+      saveTrials(); return send(res, 200, { ok: true, item: x }); }
+    if (m === 'DELETE') { trials = L.filter(e => e !== x); saveTrials(); return send(res, 200, { ok: true }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'data' && m === 'GET') {
     // points written into works before they were marked on the map get the mark
     if (db.dt && Array.isArray(db.dt.points) && db.dt.points.some(x => x.need)) {
