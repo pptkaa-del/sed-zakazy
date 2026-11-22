@@ -1328,14 +1328,17 @@ async function api(req, res, url) {
       ? (t(b.name, 200).trim() || t(b.phone, 60).trim() ? { name: t(b.name, 200).trim(), phone: t(b.phone, 60).trim(), note: t(b.note, 2000) } : 'Укажите ФИО или номер телефона')
       : kind === 'pw'
       ? (t(b.title, 200).trim() ? { title: t(b.title, 200).trim(), login: t(b.login, 300), pass: t(b.pass, 500), url: t(b.url, 500).trim(), note: t(b.note, 2000) } : 'Напишите, от чего этот логин и пароль')
-      : (t(b.title, 200).trim() || t(b.text, 20000).trim() ? { title: t(b.title, 200).trim(), text: t(b.text, 20000) } : 'Заметка пустая');
+      : (() => { const pics = (Array.isArray(b.pics) ? b.pics : []).filter(x => typeof x === 'string' && x.length <= 1.6e6 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(x)).slice(0, 6);
+          // pictures (from «Рисовалка») are kept inside the note, encrypted with it — so nobody else sees them, not even in «Файлы»
+          return t(b.title, 200).trim() || t(b.text, 20000).trim() || pics.length ? { title: t(b.title, 200).trim(), text: t(b.text, 20000), ...(pics.length ? { pics } : {}) } : 'Заметка пустая'; })();
     if (m === 'POST' && !p[3]) {
       if (L.length >= 2000) return fail(res, 400, 'Слишком много записей');
       const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v);
       const x = { id: newId(), at: now, data: vaultEnc(v) }; L.push(x); saveDb(); return send(res, 200, { ok: true, item: open(x), rev: db.rev });
     }
     const x = p[3] && L.find(e => e.id === p[3]); if (!x) return fail(res, 404, 'Запись не найдена — обновите страницу');
-    if (m === 'PUT') { const v = clean(await readJsonBody(req)); if (typeof v === 'string') return fail(res, 400, v); x.data = vaultEnc(v); x.updatedAt = now; saveDb(); return send(res, 200, { ok: true, item: open(x), rev: db.rev }); }
+    if (m === 'PUT') { const b = await readJsonBody(req); if (kind === 'notes' && b.pics === undefined) b.pics = (vaultDec(x.data) || {}).pics;   // a save without «pics» keeps the pictures
+      const v = clean(b); if (typeof v === 'string') return fail(res, 400, v); x.data = vaultEnc(v); x.updatedAt = now; saveDb(); return send(res, 200, { ok: true, item: open(x), rev: db.rev }); }
     if (m === 'DELETE') { V[kind] = L.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }

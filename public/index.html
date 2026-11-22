@@ -376,6 +376,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 #trialForm label.tr-type{flex-direction:row;align-items:flex-start;gap:10px;color:var(--ink);cursor:pointer}.tr-type span{display:flex;flex-direction:column}.tr-type small{color:var(--ink-2);font-size:12px}.tr-sub{font-weight:600;font-size:14px;margin-top:4px}.tr-hp{position:absolute!important;left:-9999px;width:1px;height:1px;overflow:hidden}
 .tr-done{display:flex;flex-direction:column;gap:10px;align-items:flex-start}.tr-done h3{margin:0}.lp-trialbtn{width:100%}
 .trlist{display:flex;flex-direction:column;gap:12px;max-width:900px}.tritem{padding:14px 16px;display:flex;flex-direction:column;gap:8px}.tritem.new{border-color:var(--warn)}.trtop{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}.trtop small{display:block;margin-top:2px}
+.vnpics{display:flex;flex-wrap:wrap;gap:8px}.vnpic{position:relative;display:inline-block}.vnpic img{max-width:220px;max-height:150px;border:1px solid var(--rule-2);border-radius:8px;display:block;background:#fff}.vnpic .btn{position:absolute;top:4px;right:4px;background:var(--sheet)}.vnthumbs{display:flex;gap:6px;align-items:center}.vnthumbs img{width:96px;height:60px;object-fit:contain;border-radius:6px;border:1px solid var(--rule-2);background:#fff}
 .snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
@@ -4984,6 +4985,7 @@ function vVault(){
   if (!VAULT.notes.length) return bar + '<div class="empty"><h3>Заметок пока нет</h3>Нажмите «+ Заметка» — для любых личных записей.</div>';
   if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
   return bar + `<div class="vlistc">${L.map(x => `<article class="card vitem click" data-act="vNoteEdit" data-id="${x.id}" role="button" tabindex="0"><b>${esc(x.title || 'Без заголовка')}</b>
+    ${(x.pics || []).length ? `<div class="vnthumbs">${x.pics.slice(0, 3).map(p => `<img src="${p}" alt="">`).join('')}${x.pics.length > 3 ? `<span class="dim">+${x.pics.length - 3}</span>` : ''}</div>` : ''}
     <div class="vnote">${esc((x.text || '').slice(0, 600))}${(x.text || '').length > 600 ? '…' : ''}</div><small class="dim">${esc(fmtDT(x.updatedAt || x.at))}</small></article>`).join('')}</div>`;
 }
 function vaultPwHtml(x){
@@ -5006,9 +5008,12 @@ function vaultCtHtml(x){
     <div class="row-g"><button class="btn primary" data-act="vCtSave" data-id="${x?.id || ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('vcd:' + x.id, 'Удалить', 'vCtDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
 }
 function vaultNoteHtml(x){
+  const P = ui.vnPics || [];
   return `<div class="d-body"><div class="form" data-keep>
     <label class="wide">Заголовок<input class="in" id="vn-title" maxlength="200" value="${esc(x?.title || '')}"></label>
-    <label class="wide">Текст<textarea class="in" id="vn-text" rows="14" maxlength="20000">${esc(x?.text || '')}</textarea></label></div>
+    <label class="wide">Текст<textarea class="in" id="vn-text" rows="${P.length ? 6 : 14}" maxlength="20000">${esc(x?.text || '')}</textarea></label>
+    ${P.length ? `<div class="wide vnpics">${P.map((p, i) => `<span class="vnpic"><a href="${p}" target="_blank" rel="noopener"><img src="${p}" alt="Рисунок ${i + 1}"></a><button type="button" class="btn sm ghost" data-act="vnPicDel" data-id="${i}" aria-label="Убрать рисунок">✕</button></span>`).join('')}</div>` : ''}
+    <small class="wide dim">Рисунок в заметку — из «Рисовалки»: «Куда прикрепить» → «Заметки личного хранилища».</small></div>
     <div class="err" id="ferr"></div>
     <div class="row-g"><button class="btn primary" data-act="vNoteSave" data-id="${x?.id || ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('vnd:' + x.id, 'Удалить', 'vNoteDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
 }
@@ -5801,15 +5806,26 @@ function vShared(){
 }
 /* «Рисовалка»: draw, insert a picture, attach the drawing to a note or a task */
 const DRAW = { img: null, undo: [], color: '#111111', width: 4, eraser: false };
+/* where a drawing goes: own tasks, shared tasks, developments, the notes of the personal vault */
+function drTargets(){
+  const sel = ui.drawTarget || '', o = (v, l) => `<option value="${esc(v)}" ${sel === v ? 'selected' : ''}>${esc(l)}</option>`, cut = t => (t || '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'без текста';
+  const own = NOTES.filter(isOwnNote), shared = NOTES.filter(n => ntype(n) === 'shared' && n.by === me.id);   // a shared task is changed by its author
+  const devs = can('devs') ? DEVS.filter(devEdit) : [], vault = can('refs:vault') && VAULT && !VAULT.err ? VAULT.notes : null;
+  return o('', '＋ Новая собственная задача')
+    + (own.length ? `<optgroup label="Собственные задачи">${own.map(n => o('n:' + n.id, cut(n.text))).join('')}</optgroup>` : '')
+    + (shared.length ? `<optgroup label="Общие задачи">${shared.map(n => o('n:' + n.id, cut(n.title || n.text))).join('')}</optgroup>` : '')
+    + (devs.length ? `<optgroup label="Разработки">${devs.map(d => o('d:' + d.id, '№ ' + (d.no || '') + ' · ' + cut(d.name))).join('')}</optgroup>` : '')
+    + (vault ? `<optgroup label="Заметки личного хранилища">${o('vn:new', '＋ Новая заметка в хранилище')}${vault.map(x => o('vn:' + x.id, cut(x.title || x.text))).join('')}</optgroup>` : '');
+}
 function vDraw(){
-  const targets = NOTES.filter(n => isOwnNote(n) || (ntype(n) === 'shared' && n.by === me.id));
+  if (!isWorker() && can('refs:vault') && !VAULT && !ui.vLoading) { ui.vLoading = true; loadVault().finally(() => { ui.vLoading = false; }); }
   return `<div class="drawbar">
       <div class="dcolors">${['#111111', '#E02424', '#1F6FEB', '#2E9E4F', '#F57C00', '#7B2CBF', '#FFFFFF'].map(c => `<button class="dcol ${DRAW.color === c && !DRAW.eraser ? 'on' : ''}" style="--c:${c}" data-act="drColor" data-id="${c}" aria-label="Цвет ${c}"></button>`).join('')}</div>
       <select class="f" id="dr-w" aria-label="Толщина">${[2, 4, 8, 16, 28].map(w => `<option value="${w}" ${DRAW.width === w ? 'selected' : ''}>Толщина ${w}</option>`).join('')}</select>
       <button class="btn sm ${DRAW.eraser ? 'primary' : ''}" data-act="drEraser">Ластик</button><button class="btn sm" data-act="drUndo">↶ Отменить</button><button class="btn sm" data-act="drClear">Очистить</button>
       <label class="btn sm">Вставить картинку<input type="file" accept="image/*" id="dr-img" hidden></label>
       <span class="dtsep"></span>
-      ${isWorker() ? '' : `<select class="f" id="dr-target" aria-label="Куда прикрепить"><option value="">Прикрепить к новой заметке</option>${targets.map(n => `<option value="${esc(n.id)}" ${ui.drawTarget === n.id ? 'selected' : ''}>${esc((ntype(n) === 'shared' ? 'Общая задача: ' : 'Заметка: ') + (n.text || 'без текста').slice(0, 50))}</option>`).join('')}</select>
+      ${isWorker() ? '' : `<select class="f" id="dr-target" aria-label="Куда прикрепить">${drTargets()}</select>
       <button class="btn primary" data-act="drAttach">Прикрепить рисунок</button>`}<button class="btn" data-act="drSave">💾 Скачать PNG</button></div>
     <div class="drawwrap"><canvas id="drawc" width="1600" height="1000"></canvas></div>`;
 }
@@ -5837,10 +5853,20 @@ async function drAttach(){
   const file = new File([blob], `Рисунок ${fmtDT(new Date().toISOString()).replace(/[:,]/g, '-')}.png`, { type: 'image/png' });
   try {
     toast('Сохраняем рисунок…');
-    const f = await upload(file), tgt = $('dr-target').value, ff = { id: f.id, name: f.name };
-    if (tgt) { const n = NOTES.find(x => x.id === tgt); const r = await api('PATCH', '/api/notes/' + tgt, { files: [...(n.files || []), ff] }); Object.assign(n, r.note); toast('Рисунок прикреплён'); }
-    else { const r = await api('POST', '/api/notes', { type: 'task', text: '', files: [ff] }); NOTES.unshift(r.note); toast('Рисунок сохранён в новой заметке'); }
-    const sh = tgt && ntype(NOTES.find(x => x.id === tgt) || {}) === 'shared';
+    const tgt = $('dr-target').value, [kind, tid] = tgt.includes(':') ? tgt.split(/:(.*)/) : ['', tgt];
+    // the personal vault: the picture goes inside the note, encrypted (JPEG — several times smaller than PNG)
+    if (kind === 'vn') {
+      const pic = c.toDataURL('image/jpeg', 0.85), old = tid !== 'new' && VAULT.notes.find(x => x.id === tid);
+      if (old && (old.pics || []).length >= 6) return toast('В заметке уже 6 картинок — выберите другую');
+      const r = await api(old ? 'PUT' : 'POST', `/api/vault/notes${old ? '/' + old.id : ''}`, old ? { title: old.title, text: old.text, pics: [...(old.pics || []), pic] } : { title: 'Рисунок ' + fmtDT(new Date().toISOString()), text: '', pics: [pic] });
+      vaultPut('notes', r.item); toast(old ? 'Рисунок добавлен в заметку хранилища' : 'Рисунок сохранён в новой заметке хранилища');
+      ui.drawTarget = null; DRAW.img = null; DRAW.undo = []; ui.vtab = 'notes'; render(); return;
+    }
+    const f = await upload(file), ff = { id: f.id, name: f.name };
+    if (kind === 'd') { const d = DEVS.find(x => x.id === tid); if (!d) return toast('Разработка не найдена'); await devApi('PATCH', '/api/devs/' + tid, { files: [...(d.files || []), { id: f.id, name: f.name, at: f.at, by: f.by }] }); toast('Рисунок добавлен в разработку «' + (d.name || '') + '»'); }
+    else if (kind === 'n') { const n = NOTES.find(x => x.id === tid); const r = await api('PATCH', '/api/notes/' + tid, { files: [...(n.files || []), ff] }); Object.assign(n, r.note); toast(ntype(n) === 'shared' ? 'Рисунок прикреплён к общей задаче' : 'Рисунок прикреплён к задаче'); }
+    else { const r = await api('POST', '/api/notes', { type: 'task', text: '', files: [ff] }); NOTES.unshift(r.note); toast('Рисунок сохранён в новой собственной задаче'); }
+    const sh = kind === 'n' && ntype(NOTES.find(x => x.id === tid) || {}) === 'shared';
     ui.drawTarget = null; DRAW.img = null; DRAW.undo = []; ui.ntab = sh ? 'shared' : 'task'; render(); refresh().catch(() => {});
   } catch(e) { toast(errText(e)); }
 }
@@ -7550,7 +7576,7 @@ async function act(el){
     case 'ntab': if (id === 'devs') { location.hash = '#devs'; return; } ui.ntab = id; if (ui.view !== 'notes') { location.hash = '#notes'; return; } return render();
     case 'memoAdd': { const t = $('memo-new'), text = t.value.trim(); if (!text) return toast('Напишите текст заметки');
       try { const r = await api('POST', '/api/notes', { type: 'memo', text }); NOTES.unshift(r.note); t.value = ''; document.activeElement?.blur(); render(); toast('Заметка добавлена'); } catch(e) { toast(errText(e)); } return; }
-    case 'memoDraw': ui.drawTarget = id; DRAW.img = null; DRAW.undo = []; location.hash = '#draw'; return;
+    case 'memoDraw': ui.drawTarget = 'n:' + id; DRAW.img = null; DRAW.undo = []; location.hash = '#draw'; return;
     case 'memoFileDel': { const [nid, fid] = id.split('|'), n = NOTES.find(x => x.id === nid); if (!n) return;
       try { const r = await api('PATCH', '/api/notes/' + nid, { files: (n.files || []).filter(f => f.id !== fid) }); Object.assign(n, r.note); render(); } catch(e) { toast(errText(e)); } return; }
     case 'sharedAdd': { const text = ($('sh-new')?.value || '').trim(), share = [...document.querySelectorAll('input[name=sh-users]:checked')].map(x => x.value), assignee = $('sh-as')?.value || '', due = $('sh-due')?.value || '';
@@ -7624,17 +7650,18 @@ async function act(el){
     case 'vCopyLogin': { const x = VAULT.pw.find(e => e.id === id); return x && copyText(x.login, 'Логин'); }
     case 'vPwNew': ui.vpVis = false; return openDrawer('vaultPw', null);
     case 'vPwEdit': ui.vpVis = false; return openDrawer('vaultPw', id);
-    case 'vNoteNew': return openDrawer('vaultNote', null);
+    case 'vNoteNew': ui.vnPics = []; return openDrawer('vaultNote', null);
     case 'vCtNew': return openDrawer('vaultCt', null);
     case 'vCtEdit': return openDrawer('vaultCt', id);
     case 'vCtSave': return vaultSave('contacts', id, { name: $('vc-name').value, phone: $('vc-phone').value, note: $('vc-note').value });
     case 'vCtDel': return vaultDel('contacts', id);
     case 'vCopyPhone': { const x = VAULT.contacts.find(e => e.id === id); return x && copyText(x.phone, 'Номер'); }
-    case 'vNoteEdit': return openDrawer('vaultNote', id);
+    case 'vNoteEdit': ui.vnPics = [...(VAULT.notes.find(x => x.id === id)?.pics || [])]; return openDrawer('vaultNote', id);
     case 'vpVis': { ui.vpVis = !ui.vpVis; const p = $('vp-pass'); if (p) p.type = ui.vpVis ? 'text' : 'password'; el.textContent = ui.vpVis ? '🙈 Скрыть' : '👁 Показать'; return; }
     case 'vpGen': { const p = $('vp-pass'); if (p) { p.value = genPass(); p.type = 'text'; ui.vpVis = true; } return; }
     case 'vPwSave': return vaultSave('pw', id, { title: $('vp-title').value, login: $('vp-login').value, pass: $('vp-pass').value, url: $('vp-url').value, note: $('vp-note').value });
-    case 'vNoteSave': return vaultSave('notes', id, { title: $('vn-title').value, text: $('vn-text').value });
+    case 'vNoteSave': return vaultSave('notes', id, { title: $('vn-title').value, text: $('vn-text').value, pics: ui.vnPics || [] });
+    case 'vnPicDel': ui.vnPics = (ui.vnPics || []).filter((_, i) => i !== Number(id)); { const t = $('vn-title').value, x = $('vn-text').value; renderDrawer(); $('vn-title').value = t; $('vn-text').value = x; } return;
     case 'vPwDel': return vaultDel('pw', id);
     case 'vNoteDel': return vaultDel('notes', id);
     case 'noteEdit': ui.noteEdit = id; render(); { const t = $('note-ed'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } } return;
