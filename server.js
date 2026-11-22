@@ -1207,6 +1207,8 @@ async function api(req, res, url) {
     if (p[2] === 'servers') {
       const x = p[3] && V.servers.find(e => e.id === p[3]);
       if (m === 'DELETE' && x) { V.servers = V.servers.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+      // «👁 Показать пароль» in the card of the server: only to the one who added it (those it is shared with never get it)
+      if (m === 'GET' && p[4] === 'secret') { if (!x) return fail(res, 403, 'Пароль сервера видит только тот, кто его добавил'); return send(res, 200, { password: srvOf(x).password || '' }); }
       // «Забыть ключ сервера»: after a reinstall the server has a new host key and ssh refuses it; the owner removes the remembered one,
       // the next connection remembers the new key
       if (m === 'POST' && p[4] === 'forget-key') {
