@@ -5148,11 +5148,11 @@ function sshSrvHtml(x){
     <label><span>Пользователь <em class="req-star">*</em></span><input class="in mono" id="ss-user" maxlength="100" value="${esc(d.user || '')}" placeholder="root" autocomplete="off"></label>
     <label>Система<select class="in" id="ss-os"><option value="linux" ${d.os !== 'other' ? 'selected' : ''}>Linux / Unix</option><option value="other" ${d.os === 'other' ? 'selected' : ''}>Windows / другая</option></select></label>
     <div class="wide"><span class="flab">Вход</span><div class="seg" role="radiogroup"><label><input type="radio" name="ss-auth" value="password" ${d.auth !== 'key' ? 'checked' : ''}> По паролю</label><label><input type="radio" name="ss-auth" value="key" ${d.auth === 'key' ? 'checked' : ''}> По ключу</label></div></div>
-    <label class="wide">${d.auth === 'key' ? 'Пароль ключа (если есть)' : 'Пароль'}<input class="in" id="ss-pass" type="password" maxlength="500" autocomplete="new-password" placeholder="${x && x.hasPassword ? 'сохранён — оставьте пустым, чтобы не менять' : ''}"></label>
+    <label class="wide">${d.auth === 'key' ? 'Пароль ключа (если есть)' : 'Пароль'}<span class="pw"><input class="in" id="ss-pass" type="password" maxlength="500" autocomplete="new-password" placeholder="${x && x.hasPassword ? 'сохранён — оставьте пустым, чтобы не менять; 👁 — показать' : ''}"><button type="button" class="pw-eye" data-pw-toggle ${x && x.hasPassword && !x.shared ? `data-ssh-secret="${x.id}"` : ''} aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></span></label>
     ${x && x.hasPassword ? '<label class="wide chk"><input type="checkbox" id="ss-clearpw"> Удалить сохранённый пароль</label>' : ''}
     <label class="wide" id="ss-key-w" ${d.auth === 'key' ? '' : 'hidden'}>Закрытый ключ (OpenSSH, PEM)<textarea class="in mono" id="ss-key" rows="5" placeholder="${x && x.hasKey ? 'сохранён — оставьте пустым, чтобы не менять' : '-----BEGIN OPENSSH PRIVATE KEY-----'}" spellcheck="false"></textarea></label>
     ${sshShareHtml(x, 'сервер')}</div>
-    <p class="dim" style="margin:0;font-size:13px">Пароль и ключ хранятся на сервере зашифрованными и обратно в браузер не передаются. При первом подключении ключ сервера запоминается; если он потом изменится, подключение будет отклонено.</p>
+    <p class="dim" style="margin:0;font-size:13px">Пароль и ключ хранятся на сервере зашифрованными. Пароль приходит в браузер только по кнопке 👁 и только тому, кто добавил сервер; ключ — никогда. При первом подключении ключ сервера запоминается; если он потом изменится, подключение будет отклонено.</p>
     ${x ? `<div class="sshfk"><div class="row-g">${armBtn('sshfk:' + x.id, '🔑 Забыть ключ сервера', 'sshForgetKey', x.id, 'btn sm')}</div><small class="dim">Нажмите, если сервер переустановили или пересоздали и подключение пишет «REMOTE HOST IDENTIFICATION HAS CHANGED». Следующее подключение запомнит новый ключ. Если сервер не меняли — не нажимайте: возможно, подключение перехватывают.</small></div>` : ''}
     <div class="err" id="ferr"></div>
     <div class="row-g"><button class="btn primary" data-act="sshSrvSave" data-id="${x ? x.id : ''}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? armBtn('sshd:' + x.id, 'Удалить сервер', 'sshSrvDel', x.id, 'btn danger') : ''}<button class="btn" data-act="close">Отмена</button></div></div>`;
@@ -8088,6 +8088,12 @@ async function act(el){
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   const eye = e.target.closest('[data-pw-toggle]');
+  // the saved password of an SSH server: brought from the server the first time it is shown (only for the one who added the server)
+  if (eye && eye.dataset.sshSecret && !eye.dataset.loaded) {
+    e.preventDefault(); const inp = eye.parentElement.querySelector('input');
+    api('GET', `/api/ssh/servers/${eye.dataset.sshSecret}/secret`).then(r => { eye.dataset.loaded = '1'; if (!inp.value) inp.value = r.password || ''; if (!r.password) toast('Пароль не сохранён'); eye.click(); }).catch(err => toast(errText(err)));
+    return;
+  }
   if (eye) {
     e.preventDefault();
     const inp = eye.parentElement.querySelector('input');
