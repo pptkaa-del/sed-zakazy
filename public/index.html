@@ -1214,7 +1214,7 @@ nav.views{order:3;width:100%}
 .login h1{font-size:18px}
 .login label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2)}
 .pw{position:relative;display:block}
-.pw .in{padding-right:44px}
+.pw .in{padding-right:44px}.pw .in.pw2{padding-right:84px}.pw .pw-copy{right:40px;font-size:15px}
 .pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:32px;border:0;background:transparent;color:var(--ink-2);border-radius:6px;cursor:pointer;display:grid;place-items:center}
 .pw-eye:hover{color:var(--ink);background:var(--mute-soft)}
 .pw-eye[aria-pressed="false"] .pw-slash{display:none}
@@ -5148,7 +5148,7 @@ function sshSrvHtml(x){
     <label><span>Пользователь <em class="req-star">*</em></span><input class="in mono" id="ss-user" maxlength="100" value="${esc(d.user || '')}" placeholder="root" autocomplete="off"></label>
     <label>Система<select class="in" id="ss-os"><option value="linux" ${d.os !== 'other' ? 'selected' : ''}>Linux / Unix</option><option value="other" ${d.os === 'other' ? 'selected' : ''}>Windows / другая</option></select></label>
     <div class="wide"><span class="flab">Вход</span><div class="seg" role="radiogroup"><label><input type="radio" name="ss-auth" value="password" ${d.auth !== 'key' ? 'checked' : ''}> По паролю</label><label><input type="radio" name="ss-auth" value="key" ${d.auth === 'key' ? 'checked' : ''}> По ключу</label></div></div>
-    <label class="wide">${d.auth === 'key' ? 'Пароль ключа (если есть)' : 'Пароль'}<span class="pw"><input class="in" id="ss-pass" type="password" maxlength="500" autocomplete="new-password" placeholder="${x && x.hasPassword ? 'сохранён — оставьте пустым, чтобы не менять; 👁 — показать' : ''}"><button type="button" class="pw-eye" data-pw-toggle ${x && x.hasPassword && !x.shared ? `data-ssh-secret="${x.id}"` : ''} aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></span></label>
+    <label class="wide">${d.auth === 'key' ? 'Пароль ключа (если есть)' : 'Пароль'}<span class="pw"><input class="in" id="ss-pass" type="password" maxlength="500" autocomplete="new-password" placeholder="${x && x.hasPassword ? 'сохранён — оставьте пустым, чтобы не менять; 👁 — показать' : ''}"><button type="button" class="pw-eye" data-pw-toggle ${x && x.hasPassword && !x.shared ? `data-ssh-secret="${x.id}"` : ''} aria-label="Показать пароль" aria-pressed="false" title="Показать пароль"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path class="pw-slash" d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button><button type="button" class="pw-eye pw-copy" data-act="pwCopy" hidden aria-label="Скопировать пароль" title="Скопировать пароль">📋</button></span></label>
     ${x && x.hasPassword ? '<label class="wide chk"><input type="checkbox" id="ss-clearpw"> Удалить сохранённый пароль</label>' : ''}
     <label class="wide" id="ss-key-w" ${d.auth === 'key' ? '' : 'hidden'}>Закрытый ключ (OpenSSH, PEM)<textarea class="in mono" id="ss-key" rows="5" placeholder="${x && x.hasKey ? 'сохранён — оставьте пустым, чтобы не менять' : '-----BEGIN OPENSSH PRIVATE KEY-----'}" spellcheck="false"></textarea></label>
     ${sshShareHtml(x, 'сервер')}</div>
@@ -7535,6 +7535,7 @@ async function act(el){
     case 'chatInbox': ui.chatT = null; await chatLoad(); return openDrawer('chat', null);
     case 'chatOpen': ui.chatDraft = ''; ui.chatT = null; ui.chatFiles = []; return openDrawer('chat', id);
     case 'chatSend': return chatSend();
+    case 'pwCopy': { const inp = el.parentElement.querySelector('input'); if (!inp || !inp.value) return toast('Пароль пустой'); toast(await snCopyTxt(inp.value) ? 'Пароль скопирован' : 'Не удалось скопировать — выделите и скопируйте вручную'); return; }
     case 'helpOpen': return openDrawer('helpDoc');
     case 'go': location.hash = '#' + id; return;
     case 'chatUnfile': ui.chatFiles = (ui.chatFiles || []).filter(f => f.id !== id); chatPendDraw(); return;
@@ -8099,6 +8100,8 @@ document.addEventListener('click', e => {
     const inp = eye.parentElement.querySelector('input');
     const show = inp.type === 'password';
     inp.type = show ? 'text' : 'password';
+    // «📋 Скопировать» next to it while the password is shown
+    const cp = eye.parentElement.querySelector('.pw-copy'); if (cp) { cp.hidden = !show; inp.classList.toggle('pw2', show); }
     eye.setAttribute('aria-pressed', String(show));
     eye.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль'); eye.title = eye.getAttribute('aria-label');
     inp.focus();
