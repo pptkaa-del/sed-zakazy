@@ -350,7 +350,7 @@ const TRIALS_FILE = path.join(DATA_DIR, 'trials.json');
 let trials = null, trialsStamp;
 const trialsDb = () => { const st = stamp(TRIALS_FILE); if (!trials || st !== trialsStamp) { trials = readJSON(TRIALS_FILE, []); if (!Array.isArray(trials)) trials = []; trialsStamp = st; } return trials; };
 const saveTrials = () => { writeJSON(TRIALS_FILE, trials); trialsStamp = stamp(TRIALS_FILE); };
-const TRIAL_TYPES = { all: 'Все сервисы', requests: 'Управление заявками', transport: 'Транспортная организация' };
+const TRIAL_TYPES = { all: 'Все сервисы', requests: 'Управление заявками', transport: 'Транспортная организация', ip: 'ИП / самозанятый' };
 const trialsNew = () => trialsDb().filter(x => x.status === 'new').length;
 const isOrgAdmin = u => u && u.role === 'admin' && !u.sys;
 // the thread a user writes in himself: to the administrators of his organization or (an administrator) to the system administrator
@@ -424,7 +424,9 @@ async function chatApi(req, res, p, m, user) {
 const orgById = id => orgs.find(o => o.id === id);
 /* the kind of system an organization works in: «Все сервисы» (all) or «Управление заявками» (requests) */
 // «Все сервисы», «Управление заявками», «Транспортная организация» (спецтехника и грузоперевозки)
-const ORG_TYPES = ['all', 'requests', 'transport'];
+// «ИП / самозанятый» (ip): договоры, счета, налог 6 %, сканы документов
+const ORG_TYPES = ['all', 'requests', 'transport', 'ip'];
+const IP_ROLES = ['admin', 'head', 'accountant'];
 const orgType = u => { const o = u && orgById(u.orgId); return o && ORG_TYPES.includes(o.type) ? o.type : 'all'; };
 const REQ_ROLES = ['admin', 'head', 'executor', 'worker'];
 // «time» — late and/or left early in one mark (the old «late» and «early» are still read)
@@ -789,6 +791,7 @@ async function api(req, res, url) {
       const b = await readJsonBody(req);
       const err = validateUser(b, true); if (err) return fail(res, 400, err);
       if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
+      if (orgType(user) === 'ip' && !IP_ROLES.includes(b.role)) return fail(res, 400, 'В организации «ИП / самозанятый» роли: администратор, руководитель, бухгалтер');
       if (orgType(user) === 'requests' ? !REQ_ROLES.includes(b.role) : b.role === 'executor') return fail(res, 400, orgType(user) === 'requests' ? 'В системе заявок роли: администратор, руководитель, исполнитель, пользователь' : 'Роль «Исполнитель» есть только в системе заявок');
       if (b.role === 'contractor' && !/^\d{4}-\d{2}-\d{2}$/.test(String(b.accessUntil || ''))) return fail(res, 400, 'Для подрядчика укажите, до какой даты у него доступ');
       const nu = addUser(String(b.login), b.role, String(b.name).trim(), String(b.password), user.orgId);
@@ -802,6 +805,7 @@ async function api(req, res, url) {
       const b = await readJsonBody(req);
       if (b.role !== undefined) {
         if (!ROLES[b.role]) return fail(res, 400, 'Неизвестная роль');
+        if (orgType(user) === 'ip' && !IP_ROLES.includes(b.role)) return fail(res, 400, 'В организации «ИП / самозанятый» роли: администратор, руководитель, бухгалтер');
         if (orgType(user) === 'requests' ? !REQ_ROLES.includes(b.role) : b.role === 'executor') return fail(res, 400, orgType(user) === 'requests' ? 'В системе заявок роли: администратор, руководитель, исполнитель, пользователь' : 'Роль «Исполнитель» есть только в системе заявок');
         if (target.id === user.id && b.role !== 'admin') return fail(res, 400, 'Нельзя снять роль администратора с самого себя');
         target.role = b.role;
@@ -1343,6 +1347,61 @@ async function api(req, res, url) {
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Сопоставление SN»: IMEI and SN of a device (from the scanner) with the ICCID of its SIM card; each number may be recorded only once */
+  /* «ИП / самозанятый»: договоры, счета, доходы для налога, сканы документов и реквизиты — all in the database of the organization */
+  if (p[1] === 'ip') {
+    if (orgType(user) !== 'ip') return fail(res, 403, 'Этот раздел есть только у организации «ИП / самозанятый»');
+    if (!db.ip || typeof db.ip !== 'object') db.ip = {};
+    const I = db.ip; ['contracts', 'invoices', 'incomes', 'docs'].forEach(k => { if (!Array.isArray(I[k])) I[k] = []; });
+    if (!I.profile) I.profile = { status: 'ip', taxRate: 6 }; if (!I.contrib || typeof I.contrib !== 'object') I.contrib = {};
+    const ed = HEAD(user) || user.role === 'accountant', t = (v, n) => String(v ?? '').trim().slice(0, n), now = new Date().toISOString();
+    const day = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : '';
+    const amt = v => { const x = Math.round(Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')) * 100) / 100; return isFinite(x) && x >= 0 ? x : 0; };
+    const out = () => { saveDb(); return send(res, 200, { ok: true, ip: I, rev: db.rev }); };
+    if (m === 'GET' && !p[2]) return send(res, 200, { ip: I });
+    if (!ed) return fail(res, 403, 'Изменять может администратор, руководитель или бухгалтер');
+    if (p[2] === 'profile' && m === 'PUT') {
+      const b = await readJsonBody(req) || {};
+      I.profile = { status: b.status === 'sz' ? 'sz' : 'ip', name: t(b.name, 300), inn: t(b.inn, 12), ogrnip: t(b.ogrnip, 15), address: t(b.address, 500), city: t(b.city, 100), phone: t(b.phone, 60), email: t(b.email, 200),
+        bank: t(b.bank, 300), bik: t(b.bik, 9), account: t(b.account, 20), corr: t(b.corr, 20), taxRate: Math.min(20, Math.max(0, Number(b.taxRate) || 6)) };
+      return out();
+    }
+    // «Страховые взносы» of a quarter: the tax of an ИП is reduced by them
+    if (p[2] === 'contrib' && m === 'PUT') { const b = await readJsonBody(req) || {}, key = String(b.key || ''); if (!/^\d{4}-Q[1-4]$/.test(key)) return fail(res, 400, 'Неверный период'); I.contrib[key] = amt(b.sum); return out(); }
+    const kinds = { contracts: 'Договор', invoices: 'Счёт', incomes: 'Доход', docs: 'Документ' }, k = p[2];
+    if (!kinds[k]) return fail(res, 404, 'Не найдено');
+    const L = I[k];
+    // the next number within the year of the document
+    const nextNo = date => { const y = String(date || localDateNow()).slice(0, 4), ns = L.filter(x => String(x.date || '').startsWith(y)).map(x => parseInt(String(x.no || '').split(/[-/]/).pop(), 10) || 0); return String((ns.length ? Math.max(...ns) : 0) + 1); };
+    const clean = (b, old) => {
+      if (k === 'contracts') {
+        const date = day(b.date) || localDateNow();
+        const v = { no: t(b.no, 40) || old?.no || nextNo(date), date, kind: t(b.kind, 100) || 'оказания услуг', client: t(b.client, 300), clientInn: t(b.clientInn, 12), clientType: b.clientType === 'person' ? 'person' : 'company',
+          clientAddress: t(b.clientAddress, 500), clientRep: t(b.clientRep, 300), subject: t(b.subject, 5000), sum: amt(b.sum), until: day(b.until), payment: t(b.payment, 3000), status: ['draft', 'active', 'closed'].includes(b.status) ? b.status : 'active' };
+        return v.client ? v : 'Укажите заказчика';
+      }
+      if (k === 'invoices') {
+        const date = day(b.date) || localDateNow();
+        const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 100).map(l => ({ name: t(l.name, 500), qty: amt(l.qty) || 1, unit: t(l.unit, 20) || 'шт', price: amt(l.price) })).filter(l => l.name);
+        const v = { no: t(b.no, 40) || old?.no || nextNo(date), date, contractId: t(b.contractId, 40), client: t(b.client, 300), clientInn: t(b.clientInn, 12), clientType: b.clientType === 'person' ? 'person' : 'company', lines,
+          total: Math.round(lines.reduce((a, l) => a + l.qty * l.price, 0) * 100) / 100, due: day(b.due), paid: !!b.paid, paidAt: b.paid ? day(b.paidAt) || localDateNow() : '', note: t(b.note, 2000) };
+        if (!v.client) return 'Укажите плательщика';
+        return lines.length ? v : 'Добавьте хотя бы одну строку';
+      }
+      if (k === 'incomes') { const v = { date: day(b.date) || localDateNow(), sum: amt(b.sum), from: b.from === 'person' ? 'person' : 'company', comment: t(b.comment, 500) }; return v.sum > 0 ? v : 'Укажите сумму'; }
+      const v = { kind: ['contract', 'invoice', 'act', 'check', 'supp', 'other'].includes(b.kind) ? b.kind : 'other', title: t(b.title, 300), date: day(b.date) || localDateNow(), contractId: t(b.contractId, 40), invoiceId: t(b.invoiceId, 40),
+        files: (Array.isArray(b.files) ? b.files : []).filter(f => f && db.files[f.id]).slice(0, 20).map(f => ({ id: f.id, name: db.files[f.id].name, type: db.files[f.id].type, size: db.files[f.id].size })) };
+      return v.files.length ? v : 'Прикрепите файл';
+    };
+    if (m === 'POST' && !p[3]) {
+      if (L.length >= 20000) return fail(res, 400, 'Слишком много записей');
+      const v = clean(await readJsonBody(req) || {}); if (typeof v === 'string') return fail(res, 400, v);
+      L.push({ id: newId(), ...v, at: now, by: user.id }); return out();
+    }
+    const x = p[3] && L.find(e => e.id === p[3]); if (!x) return fail(res, 404, kinds[k] + ' не найден — обновите страницу');
+    if (m === 'PUT') { const v = clean(await readJsonBody(req) || {}, x); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { updatedAt: now, updatedBy: user.id }); return out(); }
+    if (m === 'DELETE') { I[k] = L.filter(e => e !== x); return out(); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'snmap') {
     if (orgType(user) === 'requests' || !sees(user, 'refs:mods')) return fail(res, 403, 'Этот раздел для вас закрыт');
     if (!Array.isArray(db.snmap)) db.snmap = [];
