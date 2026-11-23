@@ -326,7 +326,7 @@ if (!orgs) {
 orgsStamp = stamp(ORGS_FILE); usersStamp = stamp(USERS_FILE);
 // older roles: «Менеджер» and «Руководитель» become administrators, «Просмотр» — «Сотрудник»
 const OLD_ROLES = { manager: 'admin', user: 'admin', viewer: 'worker' };
-// «Сопоставление SN» moved into «Дополнительные модули»: a hidden «refs:sn» becomes a hidden «refs:mods»
+// «Этикетки для модемов» moved into «Дополнительные модули»: a hidden «refs:sn» becomes a hidden «refs:mods»
 const hideMoved = h => { if (Array.isArray(h) && h.includes('refs:sn')) { const i = h.indexOf('refs:sn'); h.splice(i, 1); if (!h.includes('refs:mods')) h.push('refs:mods'); return true; } return false; };
 const normUsers = () => { let ch = false; users.forEach(u => { if (!u.orgId) { u.orgId = MAIN_ORG; ch = true; } if (OLD_ROLES[u.role]) { u.wasRole = u.role; u.role = OLD_ROLES[u.role]; ch = true; } if (hideMoved(u.hide)) ch = true; }); return ch; };
 if (normUsers() && users.length) writeJSON(USERS_FILE, users);
@@ -1362,7 +1362,7 @@ async function api(req, res, url) {
     if (m === 'DELETE') { V[kind] = L.filter(e => e !== x); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
     return fail(res, 405, 'Метод не поддерживается');
   }
-  /* «Сопоставление SN»: IMEI and SN of a device (from the scanner) with the ICCID of its SIM card; each number may be recorded only once */
+  /* «Этикетки для модемов»: IMEI and SN of a device (from the scanner) with the ICCID of its SIM card; each number may be recorded only once */
   /* «ИП / самозанятый»: договоры, счета, доходы для налога, сканы документов и реквизиты — all in the database of the organization */
   if (p[1] === 'ip') {
     if (orgType(user) !== 'ip') return fail(res, 403, 'Этот раздел есть только у организации «ИП / самозанятый»');
@@ -3383,7 +3383,7 @@ function serveStatic(req, res, pathname) {
 /* the readings of the power monitor: building and server room power (true — «в режиме»), the battery (raw value of the device, 840 and more — full) and the signal;
    a reading with the same state only refreshes the time of the last one */
 const DEV_POWER = { 1: [false, false], 2: [true, true], 3: [false, true], 4: [true, false] };
-/* the rows of «Сопоставление SN» as JSON; the key goes in «Authorization: Bearer …» (or ?key=…); ?since=<time> — only rows added or changed after it */
+/* the rows of «Этикетки для модемов» as JSON; the key goes in «Authorization: Bearer …» (or ?key=…); ?since=<time> — only rows added or changed after it */
 const snHash = t => crypto.createHash('sha256').update(String(t)).digest();
 const snRow = x => ({ imei: x.imei, sn: x.sn, iccid: x.iccid, ip: x.ip || '', at: x.at, updatedAt: x.updatedAt || x.at });
 async function snExport(req, res, url, o) {
@@ -3431,7 +3431,7 @@ function startServer() {
         if (!o || o.type !== 'requests' || !key) return fail(res, 404, 'Не найдено');
         return await als.run(orgEntry(orgId), async () => devIn(req, res, url, key));
       }
-      // «Сопоставление SN» for another server: GET /api/sn-export/<organization> with the key of the organization (no session)
+      // «Этикетки для модемов» for another server: GET /api/sn-export/<organization> with the key of the organization (no session)
       if (url.pathname.startsWith('/api/sn-export/')) {
         const orgId = url.pathname.split('/')[3] || '', o = orgById(orgId);
         if (!o || req.method !== 'GET') return fail(res, 404, 'Не найдено');
