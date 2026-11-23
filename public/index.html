@@ -2502,12 +2502,12 @@ function orderDetail(o, win){
   const ts = tasksOf(o.id);
   const specs = o.specs || [];
   const jj = S.jobs.find(x => x.orderId === o.id || x.id === o.jobId);
-  return `${win ? (jj && jj.kind === 'both' ? jobTabs(jj, 'prod') : jj ? `<div class="row-g"><button class="btn sm" data-act="jobTabWork" data-id="${jj.id}">🛠 Карточка работы</button></div>` : '')
+  return `${win ? (jj && jj.kind === 'both' ? jobTabs(jj, 'prod') : '')
     : jj && jj.kind === 'both' ? `<div class="row-g jtabrow"><button class="btn ghost back" data-act="backList">← Все работы</button>${jobTabs(jj, 'prod')}</div>` : `<button class="btn ghost back" data-act="back">${jj && jj.kind === 'prod' ? '← Карточка работы' : '← К работе'}</button>`}
   <div class="ohead">
     <div style="min-width:0">
       <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
-      <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`].filter(Boolean).join(' · ')}</div>
+      <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && (win ? `Работа: № ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}` : `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`)].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
     <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
   </div>
@@ -3035,6 +3035,14 @@ function jobMatBox(j){
       : full ? `<p class="dim" style="margin:0">Списание — по списку «на весь объём работы» (строк: ${j.woFull.lines.length})${j.writeoff ? ` · ✓ сохранено ${esc(fmtDT(j.writeoff.at))}` : ''}.</p>` : '<p class="dim" style="margin:0">Материалов пока нет. Добавьте их со склада или откройте «Список для списания» → «Список на весь объём работы».</p>'}</div>`;
 }
 /* the work's tasks in the plan-schedule */
+// «Счета» in the card of a work: the invoices of the work and of its production; «+ Счёт» — the form with this work chosen
+function jobInvBox(j){
+  const L = S.invoices.filter(i => i.jobId === j.id || (j.orderId && i.orderId === j.orderId)).sort((a, b) => (a.status === b.status ? 0 : a.status === 'topay' ? -1 : 1) || String(b.date || '').localeCompare(String(a.date || '')));
+  const due = sum(L.filter(i => i.status === 'topay'), i => i.amount);
+  if (!L.length && !canEdit()) return '';
+  return `<div class="box"><div class="ch"><h4>Счета${L.length ? ' · ' + L.length : ''}</h4>${canEdit() ? `<button class="btn sm primary" data-act="newInvoice" data-id="job:${j.id}">+ Счёт</button>` : ''}</div>
+    ${L.length ? `<div class="ilist">${L.map(i => invRow(i, true)).join('')}</div>${due ? `<p class="dim" style="margin:6px 0 0">К оплате: <b class="mono" style="color:var(--ink)">${money(due)}</b></p>` : ''}` : '<p class="dim" style="margin:0">Счетов нет. Нажмите «+ Счёт» и загрузите файл — из PDF номер, сумма, дата и поставщик подставятся сами.</p>'}</div>`;
+}
 function jobPlanBox(j){
   const T = S.tasks.filter(t => t.jobId === j.id).sort((a, b) => String(a.start).localeCompare(String(b.start)));
   return `<div class="box"><div class="ch"><h4>План-график${T.length ? ' · ' + T.length : ''}</h4><div class="row-g">${T.length ? `<a class="btn sm" href="#plan" data-act="planOfJob" data-id="${j.id}">Открыть график</a>` : ''}${canEdit() ? `<button class="btn sm" data-act="newTask" data-id="j:${j.id}">+ В план-график</button>` : ''}</div></div>
@@ -3787,12 +3795,13 @@ function vPay(){
   if (!list.length) return head + `<div class="empty"><h3>${ui.payF==='topay'?'Все счета оплачены':'Нет счетов по этому фильтру'}</h3>Выберите другой фильтр или заказ.</div>`;
   const sorter = ui.payF === 'paid' ? (a,b) => (b.paidAt||'').localeCompare(a.paidAt||'') : (a,b) => (a.status===b.status?0:a.status==='topay'?-1:1) || (a.due||'9').localeCompare(b.due||'9');
   const groups = new Map();
-  list.forEach(i => { const k = i.orderId || '_'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  list.forEach(i => { const k = i.orderId || (i.jobId ? 'job:' + i.jobId : '_'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
   const keys = [...groups.keys()].sort((a,b) => (ord(b)?.number||'').localeCompare(ord(a)?.number||'','ru',{numeric:true}));
   return head + keys.map(k => {
     const o = ord(k), is = groups.get(k).sort(sorter);
     const due = sum(is.filter(i => i.status==='topay'), i => i.amount);
-    return `<section class="pproj"><div class="pp-h"><h3><button class="linkish" data-act="gotoOrder" data-id="${k}">${esc(ordName(o))}</button></h3>
+    const gj = k.startsWith('job:') ? jobOf(k.slice(4)) : null;
+    return `<section class="pproj"><div class="pp-h"><h3>${gj ? `<button class="linkish" data-act="openJob" data-id="${gj.id}">${esc('Работа № ' + jobNo(gj) + ' · ' + gj.title)}</button>` : `<button class="linkish" data-act="gotoOrder" data-id="${k}">${esc(ordName(o))}</button>`}</h3>
       <span class="dim">${o?.billNo?`выставлен счёт № ${esc(o.billNo)}${o.billDate?' от '+fmtD(o.billDate):''} · `:''}к оплате <span class="mono" style="color:var(--ink)">${money(due)}</span></span></div>
       <div class="ilist">${is.map(i => invRow(i,true)).join('')}</div></section>`;
   }).join('');
@@ -6559,6 +6568,14 @@ const renderDrawerBase = renderDrawer;
 renderDrawer = function(){ renderDrawerBase(); supMarkAll(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
 const opt = (obj, sel) => Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?'selected':''}>${v}</option>`).join('');
+// where an invoice goes: an order (production), or a work without production («job:<id>»); opened from a work — that work is chosen
+function invTargetOpts(i, ctx){
+  const cj = String(ctx || '').startsWith('job:') ? jobOf(String(ctx).slice(4)) : null;
+  const sel = i ? (i.orderId || (i.jobId ? 'job:' + i.jobId : '')) : cj ? (cj.orderId && ord(cj.orderId) ? cj.orderId : 'job:' + cj.id) : ctx;
+  const J = S.jobs.filter(j => !(j.orderId && ord(j.orderId)) && (j.status !== 'done' || 'job:' + j.id === sel)).sort((a, b) => (b.no || 0) - (a.no || 0));
+  return `<option value="">— выберите —</option><optgroup label="Производство (заказы)">${orderOpts(sel)}</optgroup>${J.length ? `<optgroup label="Работы">${J.map(j => `<option value="job:${j.id}" ${sel === 'job:' + j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}</optgroup>` : ''}`;
+}
+const invJob = i => i && (jobOf(i.jobId) || S.jobs.find(j => j.orderId && j.orderId === i.orderId)) || null;
 const orderOpts = sel => ordersSorted().map(o => `<option value="${o.id}" ${o.id===sel?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('');
 const targetOpts = sel => `<option value="" ${!sel?'selected':''}>Общие работы (без заказа)</option>` + orderOpts(sel);
 
@@ -7226,7 +7243,7 @@ function renderDrawer(){
       <label class="wide">Файл счёта${i?.file?` (сейчас: ${esc(i.file.name)})`:''}<input class="in" type="file" id="f-file" accept="${ACCEPT}">
         <small class="dim" style="font-size:12px">Из PDF-счёта номер, сумма, дата и поставщик подставятся сами — проверьте их.</small></label>
       <div class="wide" id="f-parse" hidden></div>
-      <label class="wide">Заказ<select class="in" id="f-ord" required>${orderOpts(i?.orderId || d.ctx)}</select></label>
+      <label class="wide">Заказ или работа<select class="in" id="f-ord" required>${invTargetOpts(i, d.ctx)}</select></label>
       <label>Номер счёта<input class="in" id="f-num" value="${v(i,'number')}" required></label>
       <label>Дата счёта<input class="in" type="date" id="f-date" value="${esc(i?.date || today())}"></label>
       <label class="wide">Поставщик<input class="in" id="f-sup" list="sup-list" autocomplete="off" value="${v(i,'supplier')}" required>
@@ -7509,6 +7526,7 @@ function renderDrawer(){
       ${kitBox(j)}
       ${jobListBox(j, 'todo')}
       ${jobListBox(j, 'buy')}
+      ${jobInvBox(j)}
       <div class="box"><h4>Документы${(j.docs || []).length ? ' · ' + j.docs.length : ''}</h4>
         ${(j.docs || []).length ? `<ul class="files">${j.docs.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)} · ${fmtD((f.at || '').slice(0, 10))}</small>${ed ? armBtn('jdoc:' + f.id, '✕', 'jobDocDel', j.id + '|' + f.id, 'icon') : ''}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Документов нет.</p>'}
         ${ed ? `<div class="row-g"><label class="btn sm">Загрузить документы<input type="file" data-up="jobDoc" data-id="${j.id}" accept="${ACCEPT}" multiple hidden></label></div>` : ''}</div>
@@ -7591,7 +7609,7 @@ function renderDrawer(){
     D.innerHTML = dh(`Счёт № ${esc(i.number)} от ${fmtD(i.date)}`) + `<div class="d-body">
       <div><span class="chip ${cc}">${cl}</span>${exTag(i)}</div>
       <dl class="kv">
-        <dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${i.orderId}">${esc(o ? o.number+' · '+o.title : '—')}</a></dd>
+        ${o || !invJob(i) ? `<dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${i.orderId}">${esc(o ? o.number+' · '+o.title : '—')}</a></dd>` : ''}${invJob(i) ? `<dt>Работа</dt><dd><a href="#works" data-act="openJob" data-id="${invJob(i).id}">${esc('№ ' + jobNo(invJob(i)) + ' · ' + invJob(i).title)}</a></dd>` : ''}
         <dt>Поставщик</dt><dd>${esc(i.supplier)}</dd>
         <dt>Назначение</dt><dd>${esc(i.purpose||'—')}</dd>
         <dt>Сумма</dt><dd class="mono"><b>${money(i.amount)}</b></dd>
@@ -7958,11 +7976,14 @@ async function onSubmit(e){
       toast(`Оприходовано строк: ${r.lines}${r.created ? `, новых позиций склада: ${r.created}` : ''}`);
     }
     if (kind === 'invoice') {
-      const o = ord(val('f-ord'));
-      if (!o) return fail('Выберите заказ. Если заказов нет, сначала создайте его.');
+      const tv = val('f-ord'), tj = tv.startsWith('job:') ? jobOf(tv.slice(4)) : null, o = tj ? null : ord(tv);
+      if (!o && !tj) return fail('Выберите заказ или работу.');
+      // opened from a work with production: the order is chosen, the work is kept
+      const cj = String(d.ctx || '').startsWith('job:') ? jobOf(String(d.ctx).slice(4)) : null, oldI = d.id && inv(d.id);
+      const jobId = tj ? tj.id : (cj && cj.orderId === o.id ? cj.id : (oldI?.jobId && jobOf(oldI.jobId)?.orderId === o.id ? oldI.jobId : null));
       if (!val('f-num') || !val('f-sup')) return fail('Укажите номер счёта и поставщика.');
       if (!(num(val('f-amt')) > 0)) return fail('Укажите сумму счёта.');
-      const data = { orderId:o.id, number:val('f-num'), date:val('f-date'), supplier:val('f-sup'), amount:num(val('f-amt')), due:val('f-due'), purpose:val('f-purp') };
+      const data = { orderId:o ? o.id : null, jobId, number:val('f-num'), date:val('f-date'), supplier:val('f-sup'), amount:num(val('f-amt')), due:val('f-due'), purpose:val('f-purp') };
       if (ui.invInn) data.supplierInn = ui.invInn;
       const old = d.id && inv(d.id);
       if (!old?.income) {

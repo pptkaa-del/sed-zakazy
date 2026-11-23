@@ -2608,8 +2608,13 @@ async function api(req, res, url) {
     if (col === 'stock') { data.qty = 0; data.moves = []; data.acctQty = 0; }
     if (col === 'tasks') data.vehicles = taskVehicles(data.vehicles);
     if (col === 'invoices') {
-      if (!db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
-      data.projectId = db.orders[data.orderId].projectId || null;
+      // an invoice belongs to an order, or to a work (a mounting work has no order); a work with production gives its order
+      const job = data.jobId && db.jobs[data.jobId]; if (!job) data.jobId = null;
+      if (!data.orderId && job && job.orderId && db.orders[job.orderId]) data.orderId = job.orderId;
+      if (data.orderId && !db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
+      if (!data.orderId && !job) return fail(res, 400, 'Выберите заказ или работу');
+      if (!data.orderId) data.orderId = null;
+      data.projectId = data.orderId ? db.orders[data.orderId].projectId || null : null;
       data.status = 'topay'; [...PAY_FIELDS.slice(1), ...SEEN_FIELDS].forEach(f => delete data[f]);
       delete data.income; data.items = cleanItems(data.items);
     }
@@ -2685,9 +2690,12 @@ async function api(req, res, url) {
     if (payKeys.length && !canPay(user)) return fail(res, 403, 'Отмечать оплату может только бухгалтер или администратор');
     const mayEdit = canEdit(user) || (col === 'invoices' && ownsInvoice(user, db[col][id]));
     if (keys.length > payKeys.length && !mayEdit) return fail(res, 403, 'Недостаточно прав');
-    if (col === 'invoices' && patch.orderId !== undefined) {
-      if (!db.orders[patch.orderId]) return fail(res, 400, 'Заказ не найден');
-      patch.projectId = db.orders[patch.orderId].projectId || null;
+    if (col === 'invoices' && (patch.orderId !== undefined || patch.jobId !== undefined)) {
+      if (patch.jobId !== undefined && patch.jobId && !db.jobs[patch.jobId]) return fail(res, 400, 'Работа не найдена');
+      const jobId = patch.jobId !== undefined ? patch.jobId || null : db[col][id].jobId || null;
+      if (patch.jobId !== undefined) patch.jobId = jobId;
+      if (patch.orderId) { if (!db.orders[patch.orderId]) return fail(res, 400, 'Заказ не найден'); patch.projectId = db.orders[patch.orderId].projectId || null; }
+      else if (patch.orderId !== undefined) { if (!jobId) return fail(res, 400, 'Выберите заказ или работу'); patch.orderId = null; patch.projectId = null; }
     }
     if (col === 'invoices' && patch.file !== undefined && (patch.file && patch.file.id) !== (db[col][id].file && db[col][id].file.id)) {
       SEEN_FIELDS.forEach(f => { patch[f] = null; });   // new invoice file: the accountant has not seen it yet
@@ -2716,6 +2724,7 @@ async function api(req, res, url) {
     } else if (!canEdit(user) && !(col === 'invoices' && ownsInvoice(user, d))) return fail(res, 403, 'Недостаточно прав');
     if (col === 'projects' && listOf('orders').some(o => o.projectId === id)) return fail(res, 409, 'В проекте есть заказы');
     if (col === 'orders' && listOf('invoices').some(i => i.orderId === id)) return fail(res, 409, 'По заказу есть счета');
+    if (col === 'jobs' && listOf('invoices').some(i => i.jobId === id && !i.orderId)) return fail(res, 409, 'По работе есть счета — сначала удалите их');
     if (col === 'counterparties' && listOf('orders').some(o => o.customerId === id)) return fail(res, 409, 'Контрагент указан заказчиком в заказах');
     if (col === 'invoices' && d.status === 'paid') return fail(res, 409, 'Оплаченный счёт удалить нельзя');
     if (col === 'invoices' && d.income) return fail(res, 409, 'По счёту оприходован товар на склад. Сначала отмените приход');
