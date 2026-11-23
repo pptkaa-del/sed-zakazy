@@ -1694,7 +1694,7 @@ async function refresh(){
   $('banner').hidden = true;
   render();
   if (ui.drawer?.kind === 'invoice' && !drawerBusy() && !$('drawer').querySelector('form')) renderDrawer();
-  if ((ui.drawer?.kind === 'job' || ui.drawer?.kind === 'place' || ui.drawer?.kind === 'wdo' || ui.drawer?.kind === 'jobDone') && !drawerBusy()) renderDrawer();
+  if ((ui.drawer?.kind === 'job' || ui.drawer?.kind === 'prodWin' || ui.drawer?.kind === 'place' || ui.drawer?.kind === 'wdo' || ui.drawer?.kind === 'jobDone') && !drawerBusy()) renderDrawer();
   const nNew = S.jobs.filter(j => j.status === 'new' && (j.workers || []).includes(me?.id)).length;
   $('jobBadge').hidden = !nNew; $('jobBadge').textContent = nNew;
   if (isWorker()) { const left = wPoints(false).length; $('wBadge').hidden = !left; $('wBadge').textContent = left; }
@@ -1829,6 +1829,7 @@ function render(){
   V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
+  if (ui.drawer?.kind === 'prodWin' && !drawerBusy()) { renderDrawer(); $('drawer').querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; } }); }
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (pending && !document.activeElement?.closest('[data-keep]')) render(); }, 0));
@@ -2492,14 +2493,17 @@ function featuresCard(o){
 }
 const saveFeatures = (oid, F) => guard(upd('orders', oid, { features: F }));
 // «Производство и монтаж»: two tabs — the card of the work (a window) and the production (a page)
+// the production of an order in the same window as the card of a work
+function prodWinOpen(oid){ ui.order = oid; ui.orderTab = 'main'; remember(); openDrawer('prodWin', oid); }
 const jobTabs = (j, cur) => `<div class="seg jtabs" role="tablist" aria-label="Работа и производство"><button role="tab" data-act="jobTabWork" data-id="${j.id}" class="${cur === 'work' ? 'on' : ''}" aria-selected="${cur === 'work'}">🛠 Работа</button><button role="tab" data-act="jobTabProd" data-id="${j.id}" class="${cur === 'prod' ? 'on' : ''}" aria-selected="${cur === 'prod'}">🏭 Производство${ord(j.orderId) ? ` <span class="dim">${esc(ord(j.orderId).number)}</span>` : ''}</button></div>`;
-function orderDetail(o){
+function orderDetail(o, win){
   const comps = o.components || [];
   const is = invOf(o.id).sort((a,b) => (a.date||'').localeCompare(b.date||''));
   const ts = tasksOf(o.id);
   const specs = o.specs || [];
   const jj = S.jobs.find(x => x.orderId === o.id || x.id === o.jobId);
-  return `${jj && jj.kind === 'both' ? `<div class="row-g jtabrow"><button class="btn ghost back" data-act="backList">← Все работы</button>${jobTabs(jj, 'prod')}</div>` : `<button class="btn ghost back" data-act="back">${jj && jj.kind === 'prod' ? '← Карточка работы' : '← К работе'}</button>`}
+  return `${win ? (jj && jj.kind === 'both' ? jobTabs(jj, 'prod') : jj ? `<div class="row-g"><button class="btn sm" data-act="jobTabWork" data-id="${jj.id}">🛠 Карточка работы</button></div>` : '')
+    : jj && jj.kind === 'both' ? `<div class="row-g jtabrow"><button class="btn ghost back" data-act="backList">← Все работы</button>${jobTabs(jj, 'prod')}</div>` : `<button class="btn ghost back" data-act="back">${jj && jj.kind === 'prod' ? '← Карточка работы' : '← К работе'}</button>`}
   <div class="ohead">
     <div style="min-width:0">
       <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
@@ -6536,7 +6540,8 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('jobwin', kind === 'job' && ctx !== 'full'); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const WIN = k => k === 'job' || k === 'prodWin'; if (WIN(kind)) ui.drawerBack = null; else if (ui.drawer && WIN(ui.drawer.kind) && ui.drawer.ctx !== 'full') ui.drawerBack = { ...ui.drawer };   // a form opened from the window returns to it
+  $('drawer').classList.toggle('jobwin', (kind === 'job' && ctx !== 'full') || kind === 'prodWin'); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
   if (kind === 'ipContract' || kind === 'ipInvoice') $('drawer').classList.add('wide'); $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
@@ -6546,7 +6551,10 @@ function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() &
   if (kind === 'wdo') { $('drawer').scrollTop = 0; $('drawer').querySelector('.d-body')?.scrollTo?.(0, 0); const first = $('drawer').querySelector('.slots li:not(.ok) label, .slots label, .upl2 label'); if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); } return; }
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){
-  eqScanStop(); if (mini) { try { mini.remove(); } catch(e){} mini = null; } $('drawer').classList.remove('jobwin'); ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
+  eqScanStop(); if (mini) { try { mini.remove(); } catch(e){} mini = null; }
+  const back = ui.drawerBack; ui.drawerBack = null;
+  if (back && ui.drawer && !['job', 'prodWin'].includes(ui.drawer.kind) && (back.kind === 'job' ? jobOf(back.id) : ord(back.id))) return openDrawer(back.kind, back.id, back.ctx);
+  $('drawer').classList.remove('jobwin'); ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const renderDrawerBase = renderDrawer;
 renderDrawer = function(){ renderDrawerBase(); supMarkAll(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
@@ -6953,6 +6961,8 @@ document.addEventListener('dragover', e => { if (e.target.closest?.('.chatbody')
 document.addEventListener('drop', e => { if (!e.target.closest?.('.chatbody')) return; e.preventDefault(); const F = [...(e.dataTransfer?.files || [])]; if (F.length) chatAttach(F); });
 function renderDrawer(){
   const D = $('drawer'), d = ui.drawer; if (!d) return;
+  if (d.kind === 'prodWin') { const o = ord(d.id); if (!o) return closeDrawer(); const j = S.jobs.find(x => x.orderId === o.id || x.id === o.jobId);
+    D.innerHTML = dh(`Производство · ${esc(o.number)}`) + `<div class="d-body prodwin">${orderDetail(o, j)}</div>`; return; }
   if (d.kind === 'ipContract') { const c = d.id && ipC(d.id); D.innerHTML = dh(c ? `Договор № ${esc(c.no)}` : 'Новый договор') + ipContractHtml(c); return; }
   if (d.kind === 'ipInvoice') { const x = d.id && ipI(d.id); D.innerHTML = dh(x ? `Счёт № ${esc(x.no)}` : 'Новый счёт') + ipInvoiceHtml(x); return; }
   if (d.kind === 'helpDoc') { D.innerHTML = dh('📘 Инструкция пользователя') + `<div class="d-body helpbody"><div class="row-g"><a class="btn sm" href="/help/instruction.html" target="_blank" rel="noopener">Открыть в новой вкладке</a><span class="dim">Для печати откройте в новой вкладке и нажмите Ctrl+P</span></div><iframe class="helpframe" src="/help/instruction.html" title="Инструкция пользователя"></iframe></div>`; return; }
@@ -8376,8 +8386,8 @@ async function act(el){
     case 'newJobAt': { const [wid, day] = id.split('|'); return openDrawer('jobForm', null, { worker: wid, date: day }); }
     case 'editJob': ui.jPhotoEdit = null; ui.jfKind = null; return openDrawer('jobForm', id);
     // a click on a work: «Производство» opens as production, «Монтаж» — the card of the work, «Производство и монтаж» — the card with the tabs «Работа» / «Производство»
-    case 'openJob': { ui.jPhotoEdit = null; const j = jobOf(id); if (j && j.kind === 'prod' && ord(j.orderId)) { closeDrawer(); ui.order = j.orderId; ui.orderTab = 'main'; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); window.scrollTo({ top: 0 }); return; } return openDrawer('job', id); }
-    case 'jobTabProd': { const j = jobOf(id); if (!j || !ord(j.orderId)) return toast('Заказ на производство не найден'); closeDrawer(); ui.order = j.orderId; ui.orderTab = 'main'; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); window.scrollTo({ top: 0 }); return; }
+    case 'openJob': { ui.jPhotoEdit = null; const j = jobOf(id); if (j && j.kind === 'prod' && ord(j.orderId)) return prodWinOpen(j.orderId); return openDrawer('job', id); }
+    case 'jobTabProd': { const j = jobOf(id); if (!j || !ord(j.orderId)) return toast('Заказ на производство не найден'); return prodWinOpen(j.orderId); }
     case 'jobTabWork': ui.jPhotoEdit = null; return openDrawer('job', id);
     case 'wlToggle': ui.wlOpen = ui.wlOpen === id ? null : id; return render();
     case 'wlFull': ui.jPhotoEdit = null; return openDrawer('job', id);
@@ -8485,7 +8495,7 @@ async function act(el){
     case 'selOrder': if (ui.order !== id) ui.orderTab = 'main'; ui.order = id; ui.animNext = true; remember(); render(); window.scrollTo({top:0}); return;
     case 'backList': closeDrawer(); ui.order = null; remember(); location.hash = 'works'; return;
     case 'back': { const o = ord(ui.order), jid = o && (o.jobId || S.jobs.find(j => j.orderId === o.id)?.id); ui.order = null; remember(); location.hash = 'works'; if (jid) setTimeout(() => openDrawer('job', jid), 50); return; }
-    case 'gotoOrder': closeDrawer(); ui.order = id; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); return;
+    case 'gotoOrder': if (ord(id)) return prodWinOpen(id); closeDrawer(); ui.order = id; remember(); if (location.hash !== '#orders') location.hash = 'orders'; else render(); return;
     case 'newOrder': return openDrawer('order');
     case 'selCp': ui.cp = id; ui.animNext = true; render(); window.scrollTo({top:0}); return;
     case 'backCp': ui.cp = null; return render();
