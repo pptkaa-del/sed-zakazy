@@ -797,7 +797,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password', 'trials'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap', 'cal'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -1887,6 +1887,21 @@ async function api(req, res, url) {
   /* «Мои задачи»: a personal to-do list — each administrator sees and changes only his own notes */
   /* «Мои задачи»: personal tasks («task»), notes with drawings and pictures («memo») and shared tasks («shared»):
      a shared task is seen by the users chosen by its author; they can write comments */
+  /* «Мой календарь»: the own entries of a user — a date, a time (from–to, may be empty), what, a comment; nobody else sees them */
+  if (p[1] === 'cal') {
+    if (!db.cal || typeof db.cal !== 'object') db.cal = {};
+    const L = Array.isArray(db.cal[user.id]) ? db.cal[user.id] : (db.cal[user.id] = []);
+    const t = (v, n) => String(v ?? '').trim().slice(0, n), tm = v => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v || '')) ? String(v) : '';
+    const clean = b => { const v = { date: /^\d{4}-\d{2}-\d{2}$/.test(String(b.date || '')) ? String(b.date) : '', time: tm(b.time), timeTo: tm(b.timeTo), title: t(b.title, 300), comment: t(b.comment, 5000), done: !!b.done };
+      if (!v.date) return 'Укажите дату'; if (!v.title && !v.comment) return 'Напишите, что запланировано, или комментарий'; if (v.timeTo && v.time && v.timeTo < v.time) return 'Время окончания раньше начала'; return v; };
+    const out = () => { saveDb(); return send(res, 200, { list: L }); };
+    if (m === 'GET' && !p[2]) return send(res, 200, { list: L });
+    if (m === 'POST' && !p[2]) { if (L.length >= 5000) return fail(res, 400, 'Слишком много записей'); const v = clean(await readJsonBody(req) || {}); if (typeof v === 'string') return fail(res, 400, v); L.push({ id: newId(), ...v, at: new Date().toISOString() }); return out(); }
+    const x = p[2] && L.find(e => e.id === p[2]); if (!x) return fail(res, 404, 'Запись не найдена — обновите страницу');
+    if (m === 'PUT') { const v = clean({ ...x, ...(await readJsonBody(req) || {}) }); if (typeof v === 'string') return fail(res, 400, v); Object.assign(x, v, { editedAt: new Date().toISOString() }); return out(); }
+    if (m === 'DELETE') { db.cal[user.id] = L.filter(e => e !== x); saveDb(); return send(res, 200, { list: db.cal[user.id] }); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'notes') {
     if (!Array.isArray(db.notes)) db.notes = [];
     const N = db.notes;
