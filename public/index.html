@@ -4943,9 +4943,10 @@ function snLabel(x){
   return c;
 }
 /* ===== the modem USR-G771 on a COM port (Web Serial: Chrome/Edge, HTTPS or localhost): 8 data bits, no parity, 1 stop bit =====
-   every command ends with a carriage return: «+++» — the AT command mode, «AT+CIP» — the IP address (repeated until it comes), «AT+ENTM» — leave the AT mode, «AT+Z» — the restart */
-const SNM_DEF = { v: 2, auto: false, baud: 115200, port: 0, enter: '+++', cmds: 'AT+CIP', after: 'AT+ENTM\nAT+Z', wait: 30 };
-let SNM = (() => { try { const o = JSON.parse(localStorage.getItem('snModem') || '{}'); if (o.v !== 2) { delete o.cmds; delete o.after; } return { ...SNM_DEF, ...o, v: 2 }; } catch(e) { return { ...SNM_DEF }; } })();
+   as the utility of the manufacturer does: «+++» (no line end) → the answer «a» → «a» → the answer «+ok» — the AT command mode;
+   then the commands with «\r\n»: «AT+CIP» — the IP address (repeated until it comes), «AT+ENTM» — leave the AT mode, «AT+Z» — the restart */
+const SNM_DEF = { v: 3, auto: false, baud: 115200, port: 0, enter: '+++', cmds: 'AT+CIP', after: 'AT+ENTM\nAT+Z', wait: 30 };
+let SNM = (() => { try { const o = JSON.parse(localStorage.getItem('snModem') || '{}'); if (o.v !== 3) { delete o.cmds; delete o.after; delete o.enter; } return { ...SNM_DEF, ...o, v: 3 }; } catch(e) { return { ...SNM_DEF }; } })();
 const snmSave = () => { try { localStorage.setItem('snModem', JSON.stringify(SNM)); } catch(e) {} };
 let SN_PORTS = [], snmBusy = false, snmLog = [], snmSt = { t: '', c: '' };
 const snSerialOk = () => !!(window.isSecureContext && navigator.serial);
@@ -4966,7 +4967,7 @@ function snModemHtml(){
     </div>
     <p class="snmst ${snmSt.c}" id="sn-mst">${esc(snmSt.t || (SNM.auto ? 'После сканирования сим-карты программа сама подключится к модему, получит IP-адрес, запишет строку и скопирует этикетку.' : ''))}</p>
     <details style="margin-top:6px"><summary style="cursor:pointer" class="dim">Команды модема и журнал обмена</summary>
-      <div class="snin" style="margin-top:8px"><label><span class="flab">Вход в режим AT-команд</span><input class="in mono" id="sn-enter" data-ph-keep value="${esc(SNM.enter)}"></label>
+      <div class="snin" style="margin-top:8px"><label><span class="flab">Вход в режим AT-команд (отправляется без переноса строки, затем «a» → «+ok»)</span><input class="in mono" id="sn-enter" data-ph-keep value="${esc(SNM.enter)}"></label>
         <label><span class="flab">Команды получения IP (по одной в строке, пробуются по очереди)</span><textarea class="in mono" id="sn-cmds" rows="3" data-ph-keep>${esc(SNM.cmds)}</textarea></label>
         <label><span class="flab">Команды после получения IP (выход из режима AT и перезагрузка, по очереди)</span><textarea class="in mono" id="sn-after" rows="2" data-ph-keep>${esc(SNM.after)}</textarea></label>
         <label style="max-width:260px"><span class="flab">Ждать IP от модема, секунд</span><input class="in" id="sn-wait" type="number" min="3" max="180" value="${+SNM.wait || 30}"></label>
@@ -4987,10 +4988,12 @@ async function snModemIp(port, baud){
   const send = async (t, show = t) => { snmLogAdd('→ ' + show.replace(/\r/g, '')); await writer.write(enc.encode(t)); };
   const wait = async (re, ms) => { const end = Date.now() + ms; while (Date.now() < end) { if (re.test(buf)) return true; await sleep(40); } return re.test(buf); };
   const take = () => { const t = buf; buf = ''; snmLines(t).forEach(l => snmLogAdd('← ' + l)); return t; };
-  const at = async (cmd, ms = 2500) => { buf = ''; await send(cmd + '\r'); await wait(/(\+ok|\bOK\b|ERR|ERROR)/i, ms); await sleep(120); return take(); };
+  const at = async (cmd, ms = 2500) => { buf = ''; await send(cmd + '\r\n'); await wait(/(\+ok|\bOK\b|ERR|ERROR)/i, ms); await sleep(120); return take(); };
   try {
-    // the AT command mode: a pause, then «+++» with a carriage return; whatever the modem answers goes to the log
-    await sleep(300); buf = ''; let heard = false; await send((SNM.enter || '+++') + '\r'); await wait(/\S/, 1500); await sleep(300); heard = /\S/.test(buf); take();
+    // the AT command mode: a pause, «+++» without a line end, the answer «a», then «a» (also without a line end) and the answer «+ok»
+    await sleep(500); buf = ''; let heard = false; await send(SNM.enter || '+++');
+    if (await wait(/a/i, 2000)) { heard = true; take(); buf = ''; await send('a'); if (!(await wait(/\+ok/i, 2000))) { take(); throw new Error('Модем не подтвердил вход в режим AT-команд («+ok») — ответы в журнале обмена'); } take(); }
+    else { take(); /* perhaps the modem is in the AT mode already */ const r = await at('AT', 1500); if (!/(\+ok|\bOK\b)/i.test(r)) throw new Error('Модем не ответил на «+++» — проверьте COM-порт, скорость и питание'); heard = true; }
     snmStatus('Модем в режиме AT-команд, ждём IP-адрес…');
     const cmds = snmLines(SNM.cmds), end = Date.now() + Math.min(180, Math.max(3, +SNM.wait || 30)) * 1000; let ip = '';
     if (!cmds.length) throw new Error('Не указаны команды получения IP');
