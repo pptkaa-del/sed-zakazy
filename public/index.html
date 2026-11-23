@@ -378,7 +378,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .trlist{display:flex;flex-direction:column;gap:12px;max-width:900px}.tritem{padding:14px 16px;display:flex;flex-direction:column;gap:8px}.tritem.new{border-color:var(--warn)}.trtop{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}.trtop small{display:block;margin-top:2px}
 .vnpics{display:flex;flex-wrap:wrap;gap:8px}.vnpic{position:relative;display:inline-block}.vnpic img{max-width:220px;max-height:150px;border:1px solid var(--rule-2);border-radius:8px;display:block;background:#fff}.vnpic .btn{position:absolute;top:4px;right:4px;background:var(--sheet)}.vnthumbs{display:flex;gap:6px;align-items:center}.vnthumbs img{width:96px;height:60px;object-fit:contain;border-radius:6px;border:1px solid var(--rule-2);background:#fff}
 .ipt td{vertical-align:top}.ipt .ipcon{border:1px solid var(--rule);border-radius:6px;padding:4px 6px;background:var(--sheet);color:var(--ink)}.ipt tr.click{cursor:pointer}.ipl td{padding:3px}.ipl .in{width:100%}.ipinc,.ipup{padding:14px 16px;margin:14px 0}.ipdocs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}.ipdoc{padding:12px 14px;display:flex;flex-direction:column;gap:8px}.ipfile{cursor:pointer;text-align:center;justify-content:center}
-.snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
+.snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snip{display:flex;align-items:flex-end;gap:6px;margin-top:4px}.snip label{display:flex;flex-direction:column;gap:2px;width:84px}.snip .in{text-align:center}.snip b{padding-bottom:8px;font-size:20px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
 .vtop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.vtop b{overflow-wrap:anywhere}.vkv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13px}.vkv dt{color:var(--ink-2)}.vkv dd{margin:0;overflow-wrap:anywhere}.vnote{white-space:pre-wrap;font-size:13px;color:var(--ink-2);max-height:9em;overflow:hidden}
@@ -4837,6 +4837,7 @@ function snParse(s){
 }
 const snIccid = s => String(s || '').replace(/\s+/g, '').toUpperCase();
 // «10.0.0.1»; a scanner or keyboard in the Russian layout types «ю» for the dot
+const SN_IP1 = 10, SN_IP2 = 178, snOct = v => /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(String(v));
 const snIp = s => String(s || '').replace(/\s+/g, '').replace(/[юЮ,бБ]/g, '.').toUpperCase();
 const snIpOk = v => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(v) || (/^[0-9A-F:]+$/.test(v) && v.includes(':') && v.length >= 3);
 const snDup = (k, v, self) => Array.isArray(SNMAP) && v ? SNMAP.find(e => e.id !== self && e[k] === v) : null;
@@ -4849,8 +4850,10 @@ function vSnmap(){
     <div class="snin"><label><span class="flab">1. Ввод со сканера</span><span data-keep style="display:contents"><input class="in mono" id="sn-scan" autocomplete="off" placeholder="IMEI:868191051428009,SN:00501824112600015503" value="${esc(ui.snScan || '')}" ${P ? 'disabled' : ''}></span></label>
       <div class="snpend" id="sn-pend">${snPendHtml()}</div>
       <label><span class="flab">2. Сим-карта (ICCID)</span><span data-keep style="display:contents"><input class="in mono" id="sn-sim" autocomplete="off" inputmode="numeric" placeholder="897019925050990299" value="${esc(ui.snSim || '')}" ${P && !P.iccid ? '' : 'disabled'}></span></label>
-      <label><span class="flab">3. IP-адрес</span><span data-keep style="display:contents"><input class="in mono" id="sn-ip" autocomplete="off" inputmode="decimal" placeholder="10.0.0.1" value="${esc(ui.snIpV || '')}" ${P && P.iccid ? '' : 'disabled'}></span></label></div>
-    <small class="dim">Отсканируйте код устройства и нажмите Enter — появятся IMEI и SN, курсор перейдёт к сим-карте. Отсканируйте сим-карту и нажмите Enter — курсор перейдёт к IP-адресу. Введите IP-адрес и нажмите Enter — строка запишется в таблицу, поля очистятся, курсор вернётся в поле 1. Esc — начать заново. Каждый IMEI, SN, ICCID и IP-адрес можно записать только один раз.</small></section>
+      <div><span class="flab">3. IP-адрес</span><div class="snip" data-keep><label><small>Октет 1</small><input class="in mono" value="${SN_IP1}" disabled title="Постоянный"></label><b>.</b><label><small>Октет 2</small><input class="in mono" value="${SN_IP2}" disabled title="Постоянный"></label><b>.</b>
+        <label><small>Октет 3</small><input class="in mono" id="sn-ip3" autocomplete="off" inputmode="numeric" maxlength="3" data-ph-keep placeholder="0–255" value="${esc(ui.snIp3 || '')}" ${P && P.iccid ? '' : 'disabled'}></label><b>.</b>
+        <label><small>Октет 4</small><input class="in mono" id="sn-ip4" autocomplete="off" inputmode="numeric" maxlength="3" data-ph-keep placeholder="0–255" value="${esc(ui.snIp4 || '')}" ${P && P.iccid && ui.snIp4On ? '' : 'disabled'}></label></div></div></div>
+    <small class="dim">Отсканируйте код устройства и нажмите Enter — появятся IMEI и SN, курсор перейдёт к сим-карте. Отсканируйте сим-карту и нажмите Enter — курсор перейдёт к октету 3 IP-адреса (октеты 1 и 2 постоянные — ${SN_IP1}.${SN_IP2}). Введите октет 3 и нажмите Enter (или точку) — курсор перейдёт к октету 4. Введите октет 4 и нажмите Enter — строка с полным IP-адресом запишется в таблицу, этикетка скопируется в буфер обмена, поля очистятся, курсор вернётся в поле 1. Esc — начать заново. Каждый IMEI, SN, ICCID и IP-адрес можно записать только один раз.</small></section>
     <div class="toolbar" style="margin-top:14px"><b>Записано: <span id="sn-cnt">${SNMAP.length}</span></b><span data-keep style="display:contents"><input class="in" id="snq" type="search" placeholder="Поиск по IMEI, SN, ICCID, IP" aria-label="Поиск" value="${esc(ui.snq || '')}" style="flex:1 1 200px;max-width:320px"></span>
       <button class="btn" data-act="snXlsx">⬇ Скачать Excel</button><button class="btn" data-act="snJson" title="Все записи в формате JSON">⬇ Скачать JSON</button></div>
     ${isHead() ? `<details class="card snapi" ${ui.snApiOpen ? 'open' : ''}><summary data-act="snApiToggle">🔌 Доступ для другого сервера (JSON по ссылке с ключом)</summary><div id="sn-api">${snApiHtml()}</div></details>` : ''}
@@ -4942,11 +4945,14 @@ async function snCopyTxt(t){
   try { const a = document.createElement('textarea'); a.value = t; a.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(a); a.select(); const ok = document.execCommand('copy'); a.remove(); return ok; } catch(e) { return false; }
 }
 async function snQrCopy(id){ const x = SNMAP.find(e => e.id === id); if (!x) return; const ok = await snCopyImg(snCanvas(snQrText(x))); toast(ok === 'img' ? 'QR-код скопирован — вставьте его (Ctrl+V)' : ok === 'html' ? 'Скопирован только для Word/Excel — для других программ: правая кнопка по QR-коду → «Копировать картинку»' : 'Не удалось скопировать: правая кнопка по QR-коду → «Копировать картинку» или «Скачать PNG»'); }
-function snReset(focus = true){ ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; const a = $('sn-scan'), b = $('sn-sim'), c = $('sn-ip'), p = $('sn-pend'); if (a) { a.value = ''; a.disabled = false; } if (b) { b.value = ''; b.disabled = true; } if (c) { c.value = ''; c.disabled = true; } if (p) p.innerHTML = ''; if (focus && a) a.focus(); }
+function snReset(focus = true){ ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIp3 = ''; ui.snIp4 = ''; ui.snIp4On = false; const a = $('sn-scan'), b = $('sn-sim'), p = $('sn-pend'); if (a) { a.value = ''; a.disabled = false; } if (b) { b.value = ''; b.disabled = true; } ['sn-ip3', 'sn-ip4'].forEach(i => { const c = $(i); if (c) { c.value = ''; c.disabled = true; } }); if (p) p.innerHTML = ''; if (focus && a) a.focus(); }
 let snBusy = false;
 async function snKey(e){
   const t = e.target;
-  if (e.key === 'Escape' && (t.id === 'sn-sim' || t.id === 'sn-scan' || t.id === 'sn-ip')) { e.preventDefault(); snReset(); return; }
+  if (e.key === 'Escape' && (t.id === 'sn-sim' || t.id === 'sn-scan' || t.id === 'sn-ip3' || t.id === 'sn-ip4')) { e.preventDefault(); snReset(); return; }
+  // a point in the octet 3 works as Enter; Backspace in the empty octet 4 goes back to the octet 3
+  if (t.id === 'sn-ip3' && (e.key === '.' || e.key === ',' || e.key === 'ю' || e.key === 'б')) { e.preventDefault(); if (t.value) return snKey({ target: t, key: 'Enter', preventDefault(){} }); return; }
+  if (t.id === 'sn-ip4' && e.key === 'Backspace' && !t.value) { e.preventDefault(); const c = $('sn-ip3'); t.disabled = true; ui.snIp4On = false; c.disabled = false; c.focus(); c.select(); return; }
   if (e.key !== 'Enter') return;
   if (t.id === 'sn-scan') { e.preventDefault(); const v = snParse(t.value); if (!v) { toast('Не найдены IMEI и SN — отсканируйте ещё раз'); t.select(); return; }
     const d = snDup('imei', v.imei) ? ['IMEI', v.imei, snDup('imei', v.imei)] : snDup('sn', v.sn) ? ['SN', v.sn, snDup('sn', v.sn)] : null;
@@ -4955,14 +4961,21 @@ async function snKey(e){
   if (t.id === 'sn-sim') { e.preventDefault(); if (!ui.snPend) return; const iccid = snIccid(t.value);
     if (!/^[0-9A-F]{10,22}$/.test(iccid)) { toast('ICCID — от 10 до 22 цифр, отсканируйте сим-карту ещё раз'); t.select(); return; }
     const d = snDup('iccid', iccid); if (d) { toast(`ICCID ${iccid} уже записан (строка № ${SNMAP.indexOf(d) + 1})`); t.select(); return; }
-    ui.snPend.iccid = iccid; ui.snSim = t.value; $('sn-pend').innerHTML = snPendHtml(); t.disabled = true; const c = $('sn-ip'); c.disabled = false; c.value = ''; c.focus(); return; }
-  if (t.id === 'sn-ip') { e.preventDefault(); if (snBusy || !ui.snPend?.iccid) return; const ip = snIp(t.value);
-    if (!snIpOk(ip)) { toast('IP-адрес — например 10.0.0.1'); t.select(); return; }
+    ui.snPend.iccid = iccid; ui.snSim = t.value; $('sn-pend').innerHTML = snPendHtml(); t.disabled = true; const c = $('sn-ip3'); c.disabled = false; c.value = ''; c.focus(); return; }
+  if (t.id === 'sn-ip3') { e.preventDefault(); if (!ui.snPend?.iccid) return; const v = t.value.trim();
+    if (!snOct(v)) { toast('Октет 3 — число от 0 до 255'); t.select(); return; }
+    ui.snIp3 = String(+v); t.value = ui.snIp3; ui.snIp4On = true; const c = $('sn-ip4'); c.disabled = false; c.focus(); c.select(); return; }
+  if (t.id === 'sn-ip4') { e.preventDefault(); if (snBusy || !ui.snPend?.iccid) return; const o3 = ($('sn-ip3')?.value || '').trim(), v = t.value.trim();
+    if (!snOct(o3)) { toast('Октет 3 — число от 0 до 255'); const c = $('sn-ip3'); c.disabled = false; c.focus(); c.select(); return; }
+    if (!snOct(v)) { toast('Октет 4 — число от 0 до 255'); t.select(); return; }
+    const ip = `${SN_IP1}.${SN_IP2}.${+o3}.${+v}`;
     const d = snDup('ip', ip); if (d) { toast(`IP-адрес ${ip} уже записан (строка № ${SNMAP.indexOf(d) + 1})`); t.select(); return; }
-    snBusy = true; try { const r = await api('POST', '/api/snmap', { ...ui.snPend, ip }); SNMAP.push(r.item); toast('Записано: строка № ' + SNMAP.length); snReset(); snRedraw(); }
+    snBusy = true; try { const r = await api('POST', '/api/snmap', { ...ui.snPend, ip }); SNMAP.push(r.item); const n = SNMAP.length; snReset(); snRedraw();
+      // the label of the new row goes straight to the clipboard
+      const ok = await snCopyImg(snLabel(r.item)); toast(`Записано: строка № ${n}, IP ${ip}. ` + (ok === 'img' ? 'Этикетка скопирована — вставьте её (Ctrl+V)' : ok === 'html' ? 'Этикетка скопирована только для Word/Excel' : 'Этикетку скопировать не удалось — кнопка «⬇ Этикетка» в строке')); }
     catch(err) { toast(errText(err)); t.select(); } finally { snBusy = false; } }
 }
-document.addEventListener('keydown', e => { if (e.target && (e.target.id === 'sn-scan' || e.target.id === 'sn-sim' || e.target.id === 'sn-ip')) snKey(e); });
+document.addEventListener('keydown', e => { if (e.target && (e.target.id === 'sn-scan' || e.target.id === 'sn-sim' || e.target.id === 'sn-ip3' || e.target.id === 'sn-ip4')) snKey(e); });
 async function snXlsx(){
   if (!SNMAP.length) return toast('Таблица пустая');
   const X = await loadSheetJS(), wb = X.utils.book_new(), a = [['IMEI', 'SN', 'ICCID', 'IP-адрес'], ...SNMAP.map(x => [x.imei, x.sn, x.iccid, x.ip || ''])];
@@ -8511,7 +8524,7 @@ document.addEventListener('input', e => {
   if (t.id === 'snq') { ui.snq = t.value; ui.snAll = false; snRedraw(); return; }
   if (t.id === 'sn-scan') { ui.snScan = t.value; return; }
   if (t.id === 'sn-sim') { ui.snSim = t.value; return; }
-  if (t.id === 'sn-ip') { ui.snIpV = t.value; return; }
+  if (t.id === 'sn-ip3' || t.id === 'sn-ip4') { const v = t.value.replace(/\D/g, '').slice(0, 3); if (v !== t.value) t.value = v; ui[t.id === 'sn-ip3' ? 'snIp3' : 'snIp4'] = v; return; }
   if (t.id === 'vq') { ui.vq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vVault(); const n = $('vq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'rfq') { ui.rfq = t.value; const pos = t.selectionStart; $('view').innerHTML = refTabs() + vRefs(); const n = $('rfq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (['tp-job', 'tp-date', 'tp-veh', 'tp-note'].includes(t.id)) { ui[{ 'tp-job': 'tpJob', 'tp-date': 'tpDate', 'tp-veh': 'tpVeh', 'tp-note': 'tpNote' }[t.id]] = t.value; return; }
@@ -8883,7 +8896,7 @@ $('blk-out').addEventListener('click', async () => { await fetch('/api/logout', 
 // what was loaded for one user must not stay for the next one who logs in in the same tab
 function userDataReset(){
   SSHT.forEach(t => { try { t.es?.close(); } catch(e) {} try { t.term.dispose(); } catch(e) {} try { t.el.remove(); } catch(e) {} }); SSHT.length = 0; ui.sshActive = null;
-  SSH = null; SNMAP = null; VAULT = null; CHAT = null; ui.chatT = null; ui.chatFiles = []; ui.chatN = null; ui.chatDraft = ''; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIpV = ''; ui.snApi = null; ui.snApiShow = false;
+  SSH = null; SNMAP = null; VAULT = null; CHAT = null; ui.chatT = null; ui.chatFiles = []; ui.chatN = null; ui.chatDraft = ''; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIp3 = ''; ui.snIp4 = ''; ui.snIp4On = false; ui.snApi = null; ui.snApiShow = false;
 }
 // the lists of the SSH console and «Этикетки для модемов» follow the changes of the others (shared servers and commands, new rows)
 let sideBusy = false;
