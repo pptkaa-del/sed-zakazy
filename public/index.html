@@ -560,7 +560,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .dtneeds{display:flex;flex-wrap:wrap;gap:6px}.needbtn{display:inline-flex;gap:7px;align-items:center;padding:7px 12px;border:2px solid var(--c,#9AA3AD);border-radius:999px;background:var(--sheet);font:inherit;font-size:14px;cursor:pointer;color:inherit}.needbtn i{width:12px;height:12px;border-radius:50%;background:var(--c)}.needbtn:hover:not(:disabled){background:color-mix(in srgb,var(--c) 15%,var(--sheet))}.needbtn:disabled{opacity:.45;cursor:default}.needbtn.none{border-style:dashed}
 .legbtn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--sheet);font:inherit;font-size:13px;cursor:pointer;color:inherit}.legbtn i{width:10px;height:10px;display:inline-block}.legbtn.off{opacity:.4;text-decoration:line-through}
 .worow{display:grid;grid-template-columns:minmax(0,1fr) 90px 220px auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}.worow:first-child{border-top:0}.worow small{display:block}@media (max-width:820px){.worow{grid-template-columns:1fr auto}}
-.jfplan{border:1px solid var(--rule);border-radius:10px;padding:8px 12px 12px;margin:0}.jfplan legend{padding:0 6px;font-weight:600}.jfplan legend .chk{display:flex;gap:6px;align-items:center}.tstaff{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;max-height:160px;overflow:auto}.tstaff .chk{flex-direction:row;display:flex;gap:6px;align-items:center;font-size:14px}
+.calwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:12px;align-items:start}@media (max-width:900px){.calwrap{grid-template-columns:minmax(0,1fr)}}.calhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}.calhead b{font-size:18px;min-width:150px;text-align:center}.calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.calw{font-size:12px;color:var(--ink-2);text-align:center;padding:2px 0}.calc{position:relative;display:flex;flex-direction:column;align-items:stretch;text-align:left;min-height:86px;padding:4px 5px;border:1px solid var(--rule);border-radius:6px;background:var(--sheet);color:var(--ink);font:inherit;cursor:pointer;overflow:hidden;min-width:0}.calc.off{background:var(--mute-soft)}.calc.out{opacity:.45}.calc.tod .caln{background:var(--stamp);color:var(--stamp-ink);border-radius:10px;padding:0 6px}.calc.sel{outline:2px solid var(--stamp);outline-offset:-2px}.caln{font-weight:700;font-size:13px;align-self:flex-start}.calcnt{display:none;position:absolute;right:4px;top:4px;font-size:11px;background:var(--stamp);color:var(--stamp-ink);border-radius:8px;padding:0 5px}.call{display:flex;flex-direction:column;gap:1px;margin-top:2px;font-size:11.5px;line-height:1.25}.call span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.call .done{text-decoration:line-through;opacity:.6}.call .due{color:var(--warn)}@media (max-width:600px){.calc{min-height:48px}.call{display:none}.calcnt{display:block;top:auto;bottom:3px;right:3px}}.call2{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.call2 li{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--rule);border-radius:8px}.call2 li.done .calx{text-decoration:line-through;opacity:.6}.call2 li.ed{border-color:var(--stamp);background:var(--stamp-soft)}.call2 li.due{background:var(--warn-soft)}.calx{flex:1;min-width:0;word-break:break-word}.calcm{white-space:pre-wrap;color:var(--ink-2);font-size:13px;margin-top:2px}.calf{display:flex;flex-direction:column;gap:8px}.calf label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}.jfplan{border:1px solid var(--rule);border-radius:10px;padding:8px 12px 12px;margin:0}.jfplan legend{padding:0 6px;font-weight:600}.jfplan legend .chk{display:flex;gap:6px;align-items:center}.tstaff{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;max-height:160px;overflow:auto}.tstaff .chk{flex-direction:row;display:flex;gap:6px;align-items:center;font-size:14px}
 .staffc .ch{align-items:flex-start}.spbar{height:4px;border-radius:2px;background:var(--rule-2);margin-top:6px;min-width:60px;overflow:hidden}.spbar i{display:block;height:100%;background:var(--ok)}.stnums{display:flex;gap:18px}.stnums div{text-align:right}.stnums b{display:block;font-size:22px;font-family:var(--f-mono)}.stnums small{font-size:12px;color:var(--ink-2)}.stlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.stlist small{display:block}
 [data-ed]{cursor:text;border-radius:4px}[data-ed]:hover{box-shadow:0 0 0 1px var(--rule)}[data-ed].editing{box-shadow:none}.ed-in{font:inherit;width:100%;min-width:160px}
 .ntabs{margin-bottom:14px}.memo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.memo{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--rule);border-radius:12px;background:var(--sheet)}.memo-t{white-space:pre-wrap;overflow-wrap:anywhere}.memo small{display:block}.memo.done .memo-t{text-decoration:line-through;color:var(--ink-2)}
@@ -1656,8 +1656,7 @@ async function refresh(){
     b.title = actingWorker() ? 'Вернуться к работе руководителя' : 'Открыть работы, назначенные вам, как у сотрудника'; }
   // an employee gets «Мои задачи» once a task is assigned to him
   { const mine = NOTES.filter(x => x.type === 'shared' && x.assignee === me?.id), open = mine.filter(x => !x.done).length;
-    $('mytTab').hidden = !isWorker() || !mine.length; $('mytBadge').hidden = !open; $('mytBadge').textContent = open;
-    if (isWorker() && ui.view === 'mytasks' && !mine.length) { location.hash = '#wwork'; } }
+    $('mytTab').hidden = !isWorker(); $('mytBadge').hidden = !open; $('mytBadge').textContent = open; }
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
   render();
@@ -1794,7 +1793,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -6062,17 +6061,17 @@ function myWorkBox(){
 function notesTabsBar(tab){
   const open = NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k);
   const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'devs' ? DEVS.length : k === 'mine' ? myAssignedCount() : 0;
-  const T = [...NOTE_TABS.filter(([k]) => open.includes(k)), ...(tabOpen('notes') ? [['mine', 'Назначенные мне']] : []), ...(can('devs') && !reqMode() ? [['devs', 'Разработки']] : [])];
+  const T = [...NOTE_TABS.filter(([k]) => open.includes(k)), ...(tabOpen('notes') ? [['mine', 'Назначенные мне']] : []), ['cal', '📅 Мой календарь'], ...(can('devs') && !reqMode() ? [['devs', 'Разработки']] : [])];
   return `<div class="seg ntabs" role="tablist">${T.map(([k, l]) => `<button role="tab" data-act="ntab" data-id="${k}" class="${tab === k ? 'on' : ''}" aria-selected="${tab === k}">${l}${cnt(k) ? ` <span class="dim">${cnt(k)}</span>` : ''}</button>`).join('')}</div>`;
 }
 const NOTE_TABS = [['task', 'Собственные'], ['shared', 'Общие задачи']];
 const ntype = n => n.type || 'task';
 const isOwnNote = n => ntype(n) === 'task' || ntype(n) === 'memo';
 function vNotes(){
-  const open = [...NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k), 'mine'], tab = open.includes(ui.ntab) ? ui.ntab : open[0];
+  const open = [...NOTE_TABS.filter(([k]) => can('notes:' + k)).map(([k]) => k), 'mine', 'cal'], tab = open.includes(ui.ntab) ? ui.ntab : open[0];
   const cnt = k => k === 'task' ? NOTES.filter(n => ntype(n) === 'task' && !n.done).length : k === 'shared' ? NOTES.filter(n => ntype(n) === 'shared' && !n.done).length : k === 'memo' ? NOTES.filter(n => ntype(n) === 'memo').length : 0;
   const tabs = notesTabsBar(tab);
-  return tabs + (tab === 'shared' ? vShared() : tab === 'mine' ? vAssignedToMe() : vTasksList());
+  return tabs + (tab === 'shared' ? vShared() : tab === 'mine' ? vAssignedToMe() : tab === 'cal' ? vCal() : vTasksList());
 }
 // «Назначенные мне»: works and plan tasks where I am an executor, and shared tasks assigned to me
 const myAssignedCount = () => { const a = myAssigned(); return a.jobs.length + a.tasks.length + NOTES.filter(n => n.type === 'shared' && n.assignee === me?.id && !n.done).length; };
@@ -6109,7 +6108,54 @@ function shComments(n, own){
   return `<div class="sh-c">${(n.comments || []).map(c => `<div class="cmt1"><b>${esc(who(c.by))}</b> <small class="dim">${esc(fmtDT(c.at))}</small>${c.by === me.id || own ? ` <button class="linkish" data-act="shCmtDel" data-id="${esc(n.id)}|${esc(c.id)}">удалить</button>` : ''}<div>${esc(c.text)}</div></div>`).join('')}
         <div class="row-g" data-keep><input class="in" id="shc-${esc(n.id)}" placeholder="Комментарий" style="flex:1 1 220px"><button class="btn sm" data-act="shCmt" data-id="${esc(n.id)}">Отправить</button></div></div>`;
 }
-/* «Мои задачи» of an employee: the shared tasks assigned to him */
+/* «Мои задачи» of an employee: the shared tasks assigned to him and «Мой календарь» */
+function vWorkerMy(){
+  const tab = ui.mytab === 'cal' ? 'cal' : 'tasks', n = NOTES.filter(x => x.type === 'shared' && x.assignee === me.id && !x.done).length;
+  return `<div class="seg ntabs" role="tablist"><button role="tab" data-act="mytab" data-id="tasks" class="${tab === 'tasks' ? 'on' : ''}">Назначенные мне${n ? ` <span class="dim">${n}</span>` : ''}</button><button role="tab" data-act="mytab" data-id="cal" class="${tab === 'cal' ? 'on' : ''}">📅 Мой календарь</button></div>` + (tab === 'cal' ? vCal() : vMyTasks(''));
+}
+/* ===== «Мой календарь»: the own entries — a date, a time from–to, what, a comment; a month and the chosen day ===== */
+let CAL = null;
+async function calLoad(){ try { CAL = (await api('GET', '/api/cal')).list || []; } catch(e) { CAL = { err: errText(e) }; } render(); }
+const calOf = d => (Array.isArray(CAL) ? CAL : []).filter(x => x.date === d).sort((a, b) => (a.time || '99').localeCompare(b.time || '99') || String(a.at).localeCompare(String(b.at)));
+const calTime = x => x.time ? x.time + (x.timeTo ? '–' + x.timeTo : '') : '';
+// the due dates of the shared tasks assigned to me — shown in the calendar too
+const calDue = d => NOTES.filter(n => n.type === 'shared' && n.assignee === me.id && n.due === d);
+function vCal(){
+  if (!CAL) { calLoad(); return '<div class="empty">Загружаем календарь…</div>'; }
+  if (CAL.err) return `<div class="empty"><h3>Календарь недоступен</h3>${esc(CAL.err)}</div>`;
+  const td = today(), M = /^\d{4}-\d{2}$/.test(ui.calM || '') ? ui.calM : td.slice(0, 7), sel = ui.calD || td;
+  const [y, m] = M.split('-').map(Number), first = M + '-01', start = dnum(first) - ((dayOf(first).getDay() + 6) % 7);
+  const last = dnum(dstr(dnum(`${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`) - 1)), weeks = Math.ceil((last - start + 1) / 7);
+  const cells = Array.from({ length: weeks * 7 }, (_, i) => dstr(start + i));
+  const cell = d => { const L = calOf(d), du = calDue(d), k = dayKind(d), n = L.length + du.length;
+    return `<button class="calc ${d.slice(0, 7) !== M ? 'out' : ''} ${k !== 'work' ? 'off' : ''} ${d === td ? 'tod' : ''} ${d === sel ? 'sel' : ''}" data-act="calDay" data-id="${d}" title="${esc(fmtD(d))}">
+      <span class="caln">${Number(d.slice(8))}</span>${n ? `<span class="calcnt">${n}</span>` : ''}
+      <span class="call">${L.slice(0, 3).map(x => `<span class="${x.done ? 'done' : ''}">${x.time ? `<b>${esc(x.time)}</b> ` : ''}${esc(x.title || x.comment)}</span>`).join('')}${du.slice(0, 1).map(x => `<span class="due">📌 ${esc(x.text)}</span>`).join('')}${n > 3 ? `<span class="dim">ещё ${n - 3}</span>` : ''}</span></button>`; };
+  const L = calOf(sel), du = calDue(sel), ed = ui.calEd && CAL.find(x => x.id === ui.calEd), wd = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'][dayOf(sel).getDay()];
+  return `<div class="calwrap"><section class="card calm">
+      <div class="calhead"><button class="btn sm" data-act="calMon" data-id="-1" aria-label="Предыдущий месяц">←</button><b>${MONTHS_NOM_RU[m - 1]} ${y}</b><button class="btn sm" data-act="calMon" data-id="1" aria-label="Следующий месяц">→</button><button class="btn sm ghost" data-act="calDay" data-id="${td}">Сегодня</button></div>
+      <div class="calg">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(x => `<span class="calw">${x}</span>`).join('')}${cells.map(cell).join('')}</div></section>
+    <section class="card cald"><h3 style="margin:0 0 8px">${wd}, ${esc(fmtD(sel))}</h3>
+      ${L.length || du.length ? `<ul class="call2">${L.map(x => `<li class="${x.done ? 'done' : ''} ${ed && ed.id === x.id ? 'ed' : ''}"><label class="note-cb"><input type="checkbox" data-caldone="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="Выполнено"></label>
+          <div class="calx"><div>${x.time ? `<b class="mono">${esc(calTime(x))}</b> ` : ''}${esc(x.title || '')}</div>${x.comment ? `<div class="calcm">${esc(x.comment)}</div>` : ''}</div>
+          <span class="row-g" style="gap:4px;flex:none"><button class="btn sm ghost" data-act="calEdit" data-id="${esc(x.id)}" title="Изменить">✎</button>${armBtn('cal:' + x.id, '✕', 'calDel', x.id, 'btn sm ghost')}</span></li>`).join('')}
+        ${du.map(x => `<li class="due"><span>📌</span><div class="calx"><div>Срок общей задачи: ${esc(x.text)}</div><div class="calcm">Поставил: ${esc(who(x.by))}${x.done ? ' · выполнено' : ''}</div></div></li>`).join('')}</ul>` : '<p class="dim">На этот день ничего не запланировано.</p>'}
+      <div class="calf" data-keep><h4 style="margin:12px 0 6px">${ed ? 'Изменить запись' : 'Добавить на этот день'}</h4>
+        ${ed ? `<label>Дата<input class="in" type="date" id="cal-date" value="${esc(ed.date)}"></label>` : ''}
+        <div class="row-g" style="gap:8px"><label>Время с<input class="in mono" type="time" id="cal-time" value="${esc(ed?.time || '')}"></label><label>до<input class="in mono" type="time" id="cal-to" value="${esc(ed?.timeTo || '')}"></label></div>
+        <label>Что<input class="in" id="cal-title" maxlength="300" value="${esc(ed?.title || '')}" placeholder="Встреча, звонок, выезд…" data-ph-keep></label>
+        <label>Комментарий<textarea class="in" id="cal-cm" rows="3" maxlength="5000">${esc(ed?.comment || '')}</textarea></label>
+        <div class="row-g"><button class="btn primary" data-act="calSave">${ed ? 'Сохранить' : '+ Добавить'}</button>${ed ? '<button class="btn" data-act="calCancel">Отмена</button>' : ''}</div></div></section></div>`;
+}
+async function calSave(){
+  const ed = ui.calEd && CAL.find(x => x.id === ui.calEd), g = id => ($(id)?.value || '').trim();
+  const b = { date: ed ? g('cal-date') : (ui.calD || today()), time: g('cal-time'), timeTo: g('cal-to'), title: g('cal-title'), comment: g('cal-cm') };
+  if (b.timeTo && !b.time) return toast('Укажите время начала');
+  document.activeElement?.blur?.();
+  try { CAL = (await api(ed ? 'PUT' : 'POST', '/api/cal' + (ed ? '/' + ed.id : ''), b)).list; ui.calEd = null; if (ed) { ui.calD = b.date; ui.calM = b.date.slice(0, 7); } render(); toast(ed ? 'Запись сохранена' : 'Добавлено в календарь'); } catch(e) { toast(errText(e)); }
+}
+document.addEventListener('change', async e => { const id = e.target?.dataset?.caldone; if (!id) return; try { CAL = (await api('PUT', '/api/cal/' + id, { done: e.target.checked })).list; render(); } catch(err) { toast(errText(err)); } });
+document.addEventListener('keydown', e => { if (e.target?.id === 'cal-title' && e.key === 'Enter') { e.preventDefault(); calSave(); } });
 function vMyTasks(title){
   const L = NOTES.filter(n => n.type === 'shared' && n.assignee === me.id).sort((a, b) => (a.done - b.done) || String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(b.at).localeCompare(String(a.at)));
   return `<div class="notes">${title === '' ? '' : `<h2 style="margin:0 0 12px">${title || 'Мои задачи'}</h2>`}${L.length ? `<ul class="memo-list">${L.map(n => `<li class="memo shared ${n.done ? 'done' : ''} ${shLate(n) ? 'late' : ''}">
@@ -8161,6 +8207,13 @@ async function act(el){
     case 'dtShowAll': Object.keys(DT_SHOW).forEach(k => DT_SHOW[k] = true); ui.dtOnlyCheck = false; try { localStorage.setItem('sed-dt-show', JSON.stringify(DT_SHOW)); } catch(err){} prefsSave({ dtShow: { ...DT_SHOW } }); return renderDt();
     case 'jdDayClear': ui.jdDay = ''; return renderDrawer();
     case 'noteAdd': return noteAdd();
+    case 'mytab': ui.mytab = id; return render();
+    case 'calDay': document.activeElement?.blur?.(); ui.calD = id; ui.calM = id.slice(0, 7); ui.calEd = null; return render();
+    case 'calMon': { const [y, m] = (ui.calM || today().slice(0, 7)).split('-').map(Number), t = new Date(y, m - 1 + Number(id), 1); ui.calM = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`; return render(); }
+    case 'calSave': return calSave();
+    case 'calEdit': document.activeElement?.blur?.(); ui.calEd = id; render(); $('cal-title')?.focus(); return;
+    case 'calCancel': document.activeElement?.blur?.(); ui.calEd = null; return render();
+    case 'calDel': try { CAL = (await api('DELETE', '/api/cal/' + id)).list; if (ui.calEd === id) ui.calEd = null; render(); toast('Запись удалена'); } catch(e) { toast(errText(e)); } return;
     case 'ntab': if (id === 'devs') { location.hash = '#devs'; return; } ui.ntab = id; if (ui.view !== 'notes') { location.hash = '#notes'; return; } return render();
     case 'memoAdd': { const t = $('memo-new'), text = t.value.trim(); if (!text) return toast('Напишите текст заметки');
       try { const r = await api('POST', '/api/notes', { type: 'memo', text }); NOTES.unshift(r.note); t.value = ''; document.activeElement?.blur(); render(); toast('Заметка добавлена'); } catch(e) { toast(errText(e)); } return; }
@@ -9201,7 +9254,7 @@ $('blk-out').addEventListener('click', async () => { await fetch('/api/logout', 
 // what was loaded for one user must not stay for the next one who logs in in the same tab
 function userDataReset(){
   SSHT.forEach(t => { try { t.es?.close(); } catch(e) {} try { t.term.dispose(); } catch(e) {} try { t.el.remove(); } catch(e) {} }); SSHT.length = 0; ui.sshActive = null;
-  SSH = null; SNMAP = null; VAULT = null; CHAT = null; ui.chatT = null; ui.chatFiles = []; ui.chatN = null; ui.chatDraft = ''; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIp3 = ''; ui.snIp4 = ''; ui.snIp4On = false; ui.snApi = null; ui.snApiShow = false;
+  SSH = null; SNMAP = null; VAULT = null; CHAT = null; CAL = null; ui.chatT = null; ui.chatFiles = []; ui.chatN = null; ui.chatDraft = ''; ui.snQr = null; ui.snPend = null; ui.snScan = ''; ui.snSim = ''; ui.snIp3 = ''; ui.snIp4 = ''; ui.snIp4On = false; ui.snApi = null; ui.snApiShow = false;
 }
 // the lists of the SSH console and «Этикетки для модемов» follow the changes of the others (shared servers and commands, new rows)
 let sideBusy = false;
