@@ -2507,7 +2507,8 @@ function orderDataBox(o){
     ${f('Срок сдачи', 'deadline', 'date', o.deadline ? fmtD(o.deadline) : '')}
     ${f('№ выставленного счёта', 'billNo', '', esc(o.billNo || ''))}
     ${f('Дата выставленного счёта', 'billDate', 'date', o.billDate ? fmtD(o.billDate) : '')}
-  </dl><p class="dim" style="margin:6px 0 0;font-size:12px">Поля меняются двойным щелчком по значению: Enter — сохранить, Esc — отменить.</p></div>`;
+  </dl><p class="dim" style="margin:6px 0 0;font-size:12px">Поля меняются двойным щелчком по значению: Enter — сохранить, Esc — отменить.</p>
+  ${invOf(o.id).length ? '' : `<div class="row-g" style="margin-top:6px">${armBtn('ord', 'Удалить заказ', 'delOrder', o.id)}</div>`}</div>`;
 }
 // the production of an order in the same window as the card of a work
 function prodWinOpen(oid){ ui.order = oid; ui.orderTab = 'main'; remember(); openDrawer('prodWin', oid); }
@@ -2535,7 +2536,7 @@ function orderDetail(o, win){
       <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && (win ? `Работа: № ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}` : `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`)].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
-    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span><button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button><button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
+    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span>${win ? '' : `<button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button>`}<button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
   </div>
   ${win ? orderDataBox(o) : ''}
   <div class="seg otabs" role="tablist" aria-label="Разделы заказа">
@@ -6619,7 +6620,7 @@ function vPlan(){
 
 /* ---------- drawer ---------- */
 function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const WIN = k => k === 'job' || k === 'prodWin'; if (WIN(kind)) ui.drawerBack = null; else if (ui.drawer && WIN(ui.drawer.kind) && ui.drawer.ctx !== 'full') ui.drawerBack = { ...ui.drawer };   // a form opened from the window returns to it
-  $('drawer').classList.toggle('jobwin', (kind === 'job' && ctx !== 'full') || kind === 'prodWin'); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
+  $('drawer').classList.toggle('jobwin', (kind === 'job' && ctx !== 'full') || kind === 'prodWin' || kind === 'jobForm');   /* a new work — the same window as an opened one */ const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
   if (kind === 'ipContract' || kind === 'ipInvoice') $('drawer').classList.add('wide'); $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
@@ -7612,7 +7613,7 @@ function renderDrawer(){
       </div>
       <div class="err" id="ferr"></div>
       <div class="row-g">${ed ? (j.status === 'done' ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Вернуть в работу</button>` : `<button class="btn sm ok" data-act="jobStatus" data-id="${j.id}|done">✓ Работа выполнена</button>`) : ''}
-        ${ed ? `<button class="btn sm" data-act="editJob" data-id="${j.id}">Изменить</button>${armBtn('job', 'Удалить работу', 'delJob', j.id)}` : ''}
+        ${ed ? armBtn('job', 'Удалить работу', 'delJob', j.id) : ''}
         <button class="btn sm" data-act="close">Закрыть</button></div>
     </div>`;
   }
