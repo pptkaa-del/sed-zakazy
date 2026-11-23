@@ -634,6 +634,15 @@ function makeSession(u) {
   const body = `${u.id}.${exp}.${u.ver || 0}`;
   return `${body}.${sign(body)}`;
 }
+/* the system administrator «as the administrator of the main organization» (the switch in his header): while it is on, he is seen
+   as an ordinary administrator of his organization — the data, the users, every section; the changes he makes go to his own record */
+const actingViews = new WeakMap();
+const asActing = u => {
+  if (!u || !u.sys || !u.actAsOrg) return u;
+  let v = actingViews.get(u);
+  if (!v) { v = new Proxy(u, { get: (t, k) => k === 'sys' ? false : k === 'role' ? 'admin' : k === 'actingSys' ? true : t[k] }); actingViews.set(u, v); }
+  return v;
+};
 function sessionUser(req) {
   const m = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie || '');
   if (!m) return null;
@@ -645,7 +654,7 @@ function sessionUser(req) {
   if (Number(parts[1]) < Date.now()) return null;
   const u = users.find(x => x.id === parts[0]);
   if (!u || u.blocked || String(u.ver || 0) !== parts[2] || contractorExpired(u)) return null;
-  return u;
+  return asActing(u);
 }
 function cookie(req, value, maxAge) {
   const secure = COOKIE_SECURE || (TRUST_PROXY && req.headers['x-forwarded-proto'] === 'https');
@@ -724,7 +733,7 @@ async function api(req, res, url) {
     const err = validateUser(b, true); if (err) return fail(res, 400, err);
     const u = addUser(String(b.login), 'admin', String(b.name).trim(), String(b.password), MAIN_ORG, true);
     console.log(`Через браузер создан администратор системы «${u.login}».`);
-    return send(res, 200, meInfo(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
+    return send(res, 200, meInfo(asActing(u)), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
   // a request for a trial access — without a session; a hidden field catches robots, an address may send 5 an hour
   if (p[1] === 'trial' && m === 'POST') {
@@ -755,7 +764,7 @@ async function api(req, res, url) {
     if (contractorExpired(u)) return fail(res, 403, `Срок доступа подрядчика истёк ${u.accessUntil.split('-').reverse().join('.')}. Обратитесь к администратору`);
     const ost = orgState(orgById(u.orgId)); if (ost.blocked) return blockedFail(ost);
     u.lastLoginAt = new Date().toISOString(); saveUsers();
-    return send(res, 200, meInfo(u), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
+    return send(res, 200, meInfo(asActing(u)), { 'Set-Cookie': cookie(req, makeSession(u), SESSION_DAYS * 86400) });
   }
   if (p[1] === 'logout' && m === 'POST') return send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, '', 0) });
 
@@ -769,6 +778,13 @@ async function api(req, res, url) {
   if (p[1] === 'backups') return backupsApi(req, res, p, m, user);
   if (p[1] === 'stats') return statsApi(req, res, m, user);
   if (p[1] === 'chat') return chatApi(req, res, p, m, user);
+  // the switch of the system administrator: «Интерфейс основной организации» ↔ «Администратор системы»
+  if (p[1] === 'sys-mode' && m === 'POST') {
+    const real = users.find(x => x.id === user.id);
+    if (!real || !real.sys) return fail(res, 403, 'Переключение есть только у администратора системы');
+    const b = await readJsonBody(req) || {}; real.actAsOrg = !!b.org; saveUsers();
+    return send(res, 200, meInfo(asActing(real)));
+  }
   if (p[1] === 'prefs' && m === 'PUT') { user.prefs = cleanPrefs(await readJsonBody(req) || {}); saveUsers(); return send(res, 200, { ok: true, prefs: user.prefs }); }
   // the system administrator manages organizations, backups and the server, not the work of an organization
   if (p[1] === 'presentation.pdf' && m === 'GET') {
@@ -2969,7 +2985,7 @@ const MAP = {
   subdomains: process.env.MAP_SUBDOMAINS || 'abc',
   maxZoom: Number(process.env.MAP_MAX_ZOOM || 19),
 };
-const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), prefs: u.prefs || {}, map: MAP, sys: !!u.sys, hide: u.sys ? [] : hiddenFor(u), org: o ? { id: o.id, name: o.name, until: o.until || '', type: orgType(u), hide: o.hide || [] } : null, orgWarn: st.warn || '' }; };
+const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), actingSys: !!u.actingSys, prefs: u.prefs || {}, map: MAP, sys: !!u.sys, hide: u.sys ? [] : hiddenFor(u), org: o ? { id: o.id, name: o.name, until: o.until || '', type: orgType(u), hide: o.hide || [] } : null, orgWarn: st.warn || '' }; };
 const adminUser = u => ({ ...publicUser(u), sys: !!u.sys, hide: u.hide || [], accessUntil: u.accessUntil || '', expired: !!contractorExpired(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
 /* Remember that the accountant has opened the invoice file(s) */

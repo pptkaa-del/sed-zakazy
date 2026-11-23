@@ -1377,6 +1377,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#trials" data-v="trials" id="trialsTab" hidden>Запросы доступа <span class="badge" id="trialsBadge" hidden></span></a>
     </nav>
     <button class="btn sm rswitch" id="roleSw" type="button" data-act="roleSw" hidden></button>
+    <button class="btn sm rswitch" id="sysSw" type="button" data-act="sysSw" hidden></button>
     <div class="umenu" id="umenu">
       <button class="ubtn" id="ubtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="upop"><span class="avatar" id="uav"></span><span class="uname" id="uname"></span><span class="badge" id="chatBadge" hidden title="Новые сообщения"></span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="upop" id="upop" role="menu" hidden>
@@ -7813,6 +7814,7 @@ async function act(el){
     case 'chatInbox': ui.chatT = null; await chatLoad(); return openDrawer('chat', null);
     case 'chatOpen': ui.chatDraft = ''; ui.chatT = null; ui.chatFiles = []; return openDrawer('chat', id);
     case 'chatSend': return chatSend();
+    case 'sysSw': try { const to = !me.actingSys; await api('POST', '/api/sys-mode', { org: to }); location.hash = to ? '#works' : '#orgs'; location.reload(); } catch(e) { toast(errText(e)); } return;
     case 'pwCopy': { const inp = el.parentElement.querySelector('input'); if (!inp || !inp.value) return toast('Пароль пустой'); toast(await snCopyTxt(inp.value) ? 'Пароль скопирован' : 'Не удалось скопировать — выделите и скопируйте вручную'); return; }
     case 'helpOpen': return openDrawer('helpDoc');
     case 'go': location.hash = '#' + id; return;
@@ -8881,7 +8883,10 @@ async function start(u){
   $('hsub').textContent = u.org ? u.org.name : 'Заказы, контрагенты, документы, счета и план-график';
   $('happ').textContent = reqMode() ? 'Управление заявками' : transMode() ? 'Спецтехника и грузоперевозки' : 'Управление предприятием';
   document.body.classList.toggle('reqmode', reqMode());
-  $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
+  // the system administrator switches between his own interface and the one of the administrator of the main organization
+  { const b = $('sysSw'); b.hidden = !(u.sys || u.actingSys); b.textContent = u.actingSys ? '↩ Администратор системы' : '🏢 Интерфейс основной организации';
+    b.title = u.actingSys ? 'Вернуться к организациям, серверу и запросам доступа' : 'Работать как администратор основной организации: работы, склад, пользователи и все разделы'; b.classList.toggle('primary', !!u.actingSys); }
+  $('urole').textContent = u.roleName + (u.sys ? ' · администратор системы' : u.actingSys ? ' · администратор системы в основной организации' : '') + ' · ' + u.login + (u.org ? ' · ' + u.org.name : '');
   $('orgwarn').hidden = !u.orgWarn; $('orgwarn').textContent = u.orgWarn ? '⚠ ' + u.orgWarn + ' Для продления обратитесь к администратору системы.' : '';
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
