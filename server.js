@@ -1435,6 +1435,24 @@ async function api(req, res, url) {
       if (m === 'DELETE') { if (A) { db.snmapApi = null; saveDb(); } return send(res, 200, info()); }   // «delete» does not reach the database through the proxy
       return fail(res, 405, 'Метод не поддерживается');
     }
+    // «Прошить модем»: the configurations of the modem (.ini of the utility of the manufacturer) — kept encrypted: they hold the command password of the modem;
+    // everybody of the module reads them (to flash a modem), the manager or the administrator adds and deletes
+    if (p[2] === 'cfg') {
+      if (!Array.isArray(db.snmapCfg)) db.snmapCfg = [];
+      const C = db.snmapCfg, cpub = x => ({ id: x.id, name: x.name, text: vaultDec(x.text) || '', at: x.at, by: x.by });
+      if (m === 'GET') return send(res, 200, { list: C.map(cpub) });
+      if (!HEAD(user)) return fail(res, 403, 'Конфигурации добавляет руководитель или администратор');
+      if (m === 'POST' && !p[3]) {
+        const b = await readJsonBody(req) || {}, name = String(b.name || '').trim().slice(0, 60), text = String(b.text || '').slice(0, 200000);
+        if (!name) return fail(res, 400, 'Укажите название конфигурации'); if (!/^\s*\[[^\]]+\]/m.test(text)) return fail(res, 400, 'Это не файл конфигурации (.ini)');
+        if (C.length >= 50) return fail(res, 400, 'Слишком много конфигураций');
+        const old = C.find(x => x.name.toLowerCase() === name.toLowerCase()), v = { name, text: vaultEnc(text), at: new Date().toISOString(), by: user.id };
+        if (old) Object.assign(old, v); else C.push({ id: newId(), ...v });
+        saveDb(); return send(res, 200, { list: C.map(cpub) });
+      }
+      if (m === 'DELETE' && p[3]) { db.snmapCfg = C.filter(x => x.id !== p[3]); saveDb(); return send(res, 200, { list: db.snmapCfg.map(cpub) }); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
     if (m === 'POST' && !p[2]) {
       const b = await readJsonBody(req) || {}, x = { imei: num(b.imei), sn: num(b.sn), iccid: num(b.iccid), ip: num(b.ip) };
       if (x.ip && !ipOk(x.ip)) return fail(res, 400, 'IP-адрес — например 10.0.0.1');
