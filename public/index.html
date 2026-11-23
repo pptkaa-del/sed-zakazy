@@ -4962,7 +4962,7 @@ function snModemHtml(){
       <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="sn-auto" ${SNM.auto ? 'checked' : ''} ${sup ? '' : 'disabled'}> Получить IP автоматически</label>
       <label style="display:flex;gap:6px;align-items:center">COM-порт <select class="in" id="sn-port" ${sup && SN_PORTS.length ? '' : 'disabled'}>${SN_PORTS.length ? SN_PORTS.map((p, i) => `<option value="${i}" ${i === SNM.port ? 'selected' : ''}>${esc(snPortName(p, i))}</option>`).join('') : '<option>— не выбран —</option>'}</select></label>
       <button class="btn sm" data-act="snmPick" ${sup ? '' : 'disabled'} title="Браузер покажет список COM-портов компьютера">🔌 Выбрать COM-порт…</button>
-      <label style="display:flex;gap:6px;align-items:center">Скорость <select class="in" id="sn-baud" ${sup ? '' : 'disabled'}>${[115200, 9600].map(b => `<option value="${b}" ${+SNM.baud === b ? 'selected' : ''}>${b}</option>`).join('')}</select></label>
+      <span title="Программа сама пробует 115200 и 9600; первой — скорость, на которой модем ответил в прошлый раз">Скорость: <b>авто</b> (115200 / 9600, последняя — <span id="sn-baudv">${+SNM.baud || 115200}</span>)</span>
       <span class="dim">Чётность/данные/стоп: None/8/1</span>
       <button class="btn sm" data-act="snfOpen" ${sup ? '' : 'disabled'} title="Записать в модем конфигурацию (WT, RTMS…) через COM-порт">⚙ Прошить модем</button>
       <button class="btn sm primary" data-act="snmGet" ${sup && SN_PORTS.length && ui.snPend?.iccid && !snmBusy ? '' : 'disabled'} title="После сканирования сим-карты">📡 Получить IP с модема</button>
@@ -4983,8 +4983,20 @@ const snmLogAdd = l => { snmLog.push(new Date().toTimeString().slice(0, 8) + ' '
 const snmLines = t => String(t || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
 // an IPv4 address in the answer of the modem (not 0.0.0.0 and not a mask)
 const snmIpOf = t => (String(t).match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g) || []).find(v => v.split('.').every(o => +o <= 255) && v !== '0.0.0.0' && !v.startsWith('255.'));
-// one session with the modem: the port is opened at 8N1, the modem is put into the AT command mode, «job» gets «at(command)», the port is closed in any case
-async function snModemSession(port, baud, job){
+// one session with the modem: the speed of the port is found by itself — first the speed that worked last time, then the other one (115200 / 9600), 8N1;
+// the modem is put into the AT command mode, «job» gets «at(command)», the port is closed in any case
+const SN_BAUDS = [115200, 9600];
+class SnHandshake extends Error {}
+async function snModemSession(port, _baud, job){
+  const order = [+SNM.baud || 115200, ...SN_BAUDS.filter(b => b !== +SNM.baud)]; let last;
+  for (const baud of order) {
+    snmLogAdd(`— Скорость ${baud}, 8N1`);
+    try { return await snModemTry(port, baud, job); }
+    catch(e) { if (!(e instanceof SnHandshake)) throw e; last = e; snmLogAdd(`— На скорости ${baud} модем не ответил`); await new Promise(r => setTimeout(r, 1200)); }
+  }
+  throw new Error('Модем не ответил ни на 115200, ни на 9600 — проверьте COM-порт и питание (ответы в журнале обмена)');
+}
+async function snModemTry(port, baud, job){
   const sleep = ms => new Promise(r => setTimeout(r, ms)), enc = new TextEncoder(), dec = new TextDecoder();
   await port.open({ baudRate: +baud, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
   let buf = '', reader = port.readable.getReader(), writer = port.writable.getWriter(), done = false;
@@ -4994,11 +5006,13 @@ async function snModemSession(port, baud, job){
   const take = () => { const t = buf; buf = ''; snmLines(t).forEach(l => snmLogAdd('← ' + l)); return t; };
   const at = async (cmd, ms = 2500) => { buf = ''; await send(cmd + '\r\n'); await wait(/(\+ok|\bOK\b|ERR|ERROR)/i, ms); await sleep(120); return take(); };
   try {
-    // the AT command mode: a pause, «+++» without a line end, the answer «a», then «a» (also without a line end) and the answer «+ok»
+    // the AT command mode: a pause, «+++» without a line end, the answer «a», then «a» (also without a line end) and the answer «+ok»; at a wrong speed — no answer or rubbish
     await sleep(500); buf = ''; await send(SNM.enter || '+++');
-    if (await wait(/a/i, 2000)) { take(); buf = ''; await send('a'); if (!(await wait(/\+ok/i, 2000))) { take(); throw new Error('Модем не подтвердил вход в режим AT-команд («+ok») — ответы в журнале обмена'); } take(); }
-    else { take(); /* perhaps the modem is in the AT mode already */ const r = await at('AT', 1500); if (!/(\+ok|\bOK\b)/i.test(r)) throw new Error('Модем не ответил на «+++» — проверьте COM-порт, скорость и питание'); }
-    return await job({ at, sleep });
+    if (await wait(/a/, 1500)) { take(); buf = ''; await send('a'); if (!(await wait(/\+ok/i, 1500))) { take(); throw new SnHandshake('no +ok'); } take(); }
+    else { take(); /* perhaps the modem is in the AT mode already */ const r = await at('AT', 1200); if (!/(\+ok|\bOK\b)/i.test(r)) throw new SnHandshake('no answer'); }
+    if (+SNM.baud !== +baud) { SNM.baud = +baud; snmSave(); }
+    snmLogAdd(`— Модем отвечает на скорости ${baud}`); const sp = $('sn-baudv'); if (sp) sp.textContent = baud;
+    return await job({ at, sleep, baud });
   } finally { done = true; try { await reader.cancel(); } catch(e) {} try { reader.releaseLock(); } catch(e) {} try { writer.releaseLock(); } catch(e) {} await pump; try { await port.close(); } catch(e) {} }
 }
 const snmAnsOk = r => /(\+ok|\bOK\b)/i.test(r) && !/ERR/i.test(r);
@@ -5037,7 +5051,7 @@ function snfHtml(){
     <div class="snfl">${C.map(c => `<label class="snfc${c.id === snf.sel ? ' on' : ''}"><input type="radio" name="snf" value="${esc(c.id)}" ${c.id === snf.sel ? 'checked' : ''} ${snf.busy ? 'disabled' : ''}> <b>${esc(c.name)}</b>${isHead() && !snf.busy ? ` <button class="linkish" data-f="del" data-id="${esc(c.id)}" title="Удалить конфигурацию">✕</button>` : ''}</label>`).join('')}</div>
     ${P ? `<dl class="vkv snfi">${P.info.map(([k, v]) => `<dt>${esc(k)}</dt><dd class="mono">${esc(v || '—')}</dd>`).join('')}<dt>Команд</dt><dd>${P.cmds.length}, затем сохранение и перезагрузка (<span class="mono">${esc(SNM.save || 'AT+S')}</span>)</dd></dl>
       <details><summary class="dim" style="cursor:pointer">Команды, которые будут отправлены</summary><pre class="snlog">${esc(P.cmds.join('\n'))}</pre></details>` : ''}`}
-    <p class="dim" style="margin:8px 0 0">COM-порт: ${port ? esc(snPortName(port, SNM.port)) + ', ' + SNM.baud + ', 8N1' : '<b>не выбран</b> — выберите в блоке «Модем USR-G771»'}</p>
+    <p class="dim" style="margin:8px 0 0">COM-порт: ${port ? esc(snPortName(port, SNM.port)) + ', скорость авто (115200 / 9600), 8N1' : '<b>не выбран</b> — выберите в блоке «Модем USR-G771»'}</p>
     <div class="snfbar" ${snf.of ? '' : 'hidden'}><div style="width:${snf.of ? Math.round(snf.n / snf.of * 100) : 0}%"></div></div>
     <p class="snmst ${snf.c}" id="snf-st">${esc(snf.st)}</p>
     ${snf.errs.length ? `<details open><summary style="cursor:pointer">Модем не принял команд: ${snf.errs.length}</summary><pre class="snlog">${esc(snf.errs.join('\n'))}</pre></details>` : ''}
@@ -5074,7 +5088,7 @@ async function snfFlash(){
   const x = SNCFG && SNCFG.find(e => e.id === snf.sel), port = SN_PORTS[SNM.port]; if (!x || !port || snf.busy || snmBusy) return;
   const P = snfParse(x.text); if (!P.cmds.length) return toast('В конфигурации нет параметров');
   const save = snmLines(SNM.save || 'AT+S');
-  snf.busy = true; snmBusy = true; snf.errs = []; snf.n = 0; snf.of = P.cmds.length + save.length; snf.st = `Подключаемся к модему (${snPortName(port, SNM.port)}, ${SNM.baud}, 8N1)…`; snf.c = ''; snfDraw(); snmLogAdd(`— Прошивка «${x.name}»: ${P.cmds.length} команд`);
+  snf.busy = true; snmBusy = true; snf.errs = []; snf.n = 0; snf.of = P.cmds.length + save.length; snf.st = `Подключаемся к модему (${snPortName(port, SNM.port)}), подбираем скорость…`; snf.c = ''; snfDraw(); snmLogAdd(`— Прошивка «${x.name}»: ${P.cmds.length} команд`);
   const st = (t, c = '') => { snf.st = t; snf.c = c; snfDraw(); };
   try {
     await snModemSession(port, SNM.baud, async ({ at, sleep }) => {
@@ -5085,7 +5099,9 @@ async function snfFlash(){
       for (const c of save) { snf.n++; st(`Сохранение и перезагрузка: ${c}`); await at(c, 3000); }
     });
     // the toast would be hidden under the window — the note about the new speed goes into the status line
-    const u = (P.info.find(([k]) => k.startsWith('Порт модема'))?.[1] || '').split(',')[0], sp = +u && +u !== +SNM.baud ? ` После перезагрузки модем работает на скорости ${u} — выберите её в блоке «Модем USR-G771».` : '';
+    // after the restart the modem works at the speed of the configuration — it is tried first next time
+    const u = +(P.info.find(([k]) => k.startsWith('Порт модема'))?.[1] || '').split(',')[0], sp = SN_BAUDS.includes(u) && u !== +SNM.baud ? ` После перезагрузки модем работает на скорости ${u}.` : '';
+    if (SN_BAUDS.includes(u)) { SNM.baud = u; snmSave(); }
     st((snf.errs.length ? `Прошивка «${x.name}» записана, модем перезагружается. Не приняты команды: ${snf.errs.length} — список ниже.` : `Готово: конфигурация «${x.name}» записана, модем перезагружается.`) + sp, snf.errs.length ? 'err' : 'ok');
   } catch(e) { st((e && e.message || String(e)).replace(/^Failed to open serial port.*/, 'COM-порт занят другой программой или отключён'), 'err'); snmLogAdd('✕ ' + (e && e.message || e)); }
   finally { snf.busy = false; snmBusy = false; snfDraw(); snmRedraw(); }
@@ -5094,7 +5110,7 @@ async function snAutoIp(){
   if (snmBusy) return; if (!snSerialOk()) return snmStatus('COM-порт доступен только в Chrome/Edge по HTTPS — введите IP вручную', 'err');
   const port = SN_PORTS[SNM.port]; if (!port) return snmStatus('Выберите COM-порт (кнопка «🔌 Выбрать COM-порт…») — пока введите IP вручную', 'err');
   const pend = ui.snPend; if (!pend?.iccid) return;
-  snmBusy = true; snmRedraw(); snmStatus(`Подключаемся к модему (${snPortName(port, SNM.port)}, ${SNM.baud}, 8N1)…`);
+  snmBusy = true; snmRedraw(); snmStatus(`Подключаемся к модему (${snPortName(port, SNM.port)}), подбираем скорость…`);
   try {
     const ip = await snModemIp(port, SNM.baud);
     if (ui.snPend !== pend) return snmStatus('IP ' + ip + ' получен, но ввод уже начат заново', 'err');
@@ -5109,7 +5125,6 @@ async function snAutoIp(){
 document.addEventListener('change', e => { const t = e.target; if (!t || !t.id) return;
   if (t.id === 'sn-auto') { SNM.auto = t.checked; snmSave(); snmStatus(''); snmRedraw(); if (SNM.auto && !SN_PORTS.length) snmStatus('Выберите COM-порт модема', 'err'); else if (SNM.auto && ui.snPend?.iccid && !ui.snIp4On) snAutoIp(); }
   else if (t.id === 'sn-port') { SNM.port = +t.value || 0; snmSave(); }
-  else if (t.id === 'sn-baud') { SNM.baud = +t.value === 9600 ? 9600 : 115200; snmSave(); }
   else if (t.id === 'sn-save') { SNM.save = t.value.trim() || 'AT+S'; snmSave(); }
   else if (t.id === 'sn-enter') { SNM.enter = t.value.trim() || '+++'; snmSave(); }
   else if (t.id === 'sn-cmds' || t.id === 'sn-after') { SNM[t.id === 'sn-cmds' ? 'cmds' : 'after'] = t.value; snmSave(); }
