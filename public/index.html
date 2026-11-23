@@ -377,6 +377,7 @@ table.devacc{width:100%;border-collapse:collapse;font-size:14px}table.devacc th{
 .tr-done{display:flex;flex-direction:column;gap:10px;align-items:flex-start}.tr-done h3{margin:0}.lp-trialbtn{width:100%}
 .trlist{display:flex;flex-direction:column;gap:12px;max-width:900px}.tritem{padding:14px 16px;display:flex;flex-direction:column;gap:8px}.tritem.new{border-color:var(--warn)}.trtop{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}.trtop small{display:block;margin-top:2px}
 .vnpics{display:flex;flex-wrap:wrap;gap:8px}.vnpic{position:relative;display:inline-block}.vnpic img{max-width:220px;max-height:150px;border:1px solid var(--rule-2);border-radius:8px;display:block;background:#fff}.vnpic .btn{position:absolute;top:4px;right:4px;background:var(--sheet)}.vnthumbs{display:flex;gap:6px;align-items:center}.vnthumbs img{width:96px;height:60px;object-fit:contain;border-radius:6px;border:1px solid var(--rule-2);background:#fff}
+.ipt td{vertical-align:top}.ipt .ipcon{border:1px solid var(--rule);border-radius:6px;padding:4px 6px;background:var(--sheet);color:var(--ink)}.ipt tr.click{cursor:pointer}.ipl td{padding:3px}.ipl .in{width:100%}.ipinc,.ipup{padding:14px 16px;margin:14px 0}.ipdocs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}.ipdoc{padding:12px 14px;display:flex;flex-direction:column;gap:8px}.ipfile{cursor:pointer;text-align:center;justify-content:center}
 .snbox{max-width:760px}.snapi{margin-top:12px;padding:10px 14px}.snapi summary{cursor:pointer;font-weight:600}.snkv .mono{word-break:break-all}.snex{font-size:12px}.snin{display:grid;gap:10px;margin-bottom:8px}.snin label{display:flex;flex-direction:column;gap:4px}.snin .in{font-size:16px}.snpend{min-height:0;padding:0 2px;font-size:15px}.snpend:not(:empty){padding:6px 10px;background:var(--ok-soft);border-radius:6px}.sntbl td{vertical-align:top}.sntbl tr.sel td{background:var(--ok-soft)}.sntbl [data-ed]{cursor:text}.snqr{display:flex;gap:14px;align-items:flex-start;padding:12px;margin-bottom:12px;flex-wrap:wrap}.snqrimg{width:150px;height:150px;background:#fff;flex:none;image-rendering:pixelated}.snqrwarn{background:var(--warn-soft);color:var(--ink);padding:8px 10px;border-radius:6px;margin-top:10px;font-size:13px;line-height:1.45}
 .sshfk{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border:1px solid var(--rule-2);border-radius:6px}.sshshare{display:flex;flex-direction:column;gap:4px;margin:4px 0}.sshshare .chk{display:flex;gap:8px;align-items:center;flex-direction:row}
 .vphone{font-size:15px}.vphone a{text-decoration:none}.vhint{margin:0 0 12px;font-size:13px}.vlistc{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.vitem{padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.vitem.click{cursor:pointer}
@@ -1318,7 +1319,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
   <form id="trialForm" novalidate>
     <p class="dim" style="margin:0">Оставьте заявку — администратор системы свяжется с вами и откроет доступ.</p>
     <label>Название организации<input class="in" id="tr-org" maxlength="200" required></label>
-    <fieldset class="tr-types"><legend>Тип системы</legend><label class="tr-type"><input type="radio" name="tr-type" value="all" checked> <span><b>Все сервисы</b><small>Работы, склад, контрагенты, счета, план-график, карта объектов, задачи.</small></span></label><label class="tr-type"><input type="radio" name="tr-type" value="requests" > <span><b>Управление заявками</b><small>Пользователь создаёт заявку на ремонт или обслуживание, исполнитель отмечает выполнение.</small></span></label><label class="tr-type"><input type="radio" name="tr-type" value="transport" > <span><b>Транспортная организация</b><small>Спецтехника и грузоперевозки: заказы, диспетчерская, транспорт и ТО, водители, путевые листы.</small></span></label></fieldset>
+    <fieldset class="tr-types"><legend>Тип системы</legend><label class="tr-type"><input type="radio" name="tr-type" value="all" checked> <span><b>Все сервисы</b><small>Работы, склад, контрагенты, счета, план-график, карта объектов, задачи.</small></span></label><label class="tr-type"><input type="radio" name="tr-type" value="requests" > <span><b>Управление заявками</b><small>Пользователь создаёт заявку на ремонт или обслуживание, исполнитель отмечает выполнение.</small></span></label><label class="tr-type"><input type="radio" name="tr-type" value="ip" > <span><b>ИП / самозанятый</b><small>Договоры, счета, расчёт налога 6 %, сканы документов.</small></span></label><label class="tr-type"><input type="radio" name="tr-type" value="transport" > <span><b>Транспортная организация</b><small>Спецтехника и грузоперевозки: заказы, диспетчерская, транспорт и ТО, водители, путевые листы.</small></span></label></fieldset>
     <div class="tr-sub">Контактное лицо</div>
     <label>Имя<input class="in" id="tr-name" maxlength="200" autocomplete="name" required></label>
     <label>Номер телефона<input class="in" id="tr-phone" maxlength="40" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+7 900 000-00-00"></label>
@@ -1339,6 +1340,11 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <div><h1 id="happ">Управление предприятием</h1><p class="sub" id="hsub">Заказы, контрагенты, документы, счета и план-график</p></div>
     </div>
     <nav class="views" id="views">
+      <a href="#ipc" data-v="ipc" hidden>Договоры</a>
+      <a href="#ipi" data-v="ipi" hidden>Счета</a>
+      <a href="#ipt" data-v="ipt" hidden>Налог</a>
+      <a href="#ipd" data-v="ipd" hidden>Документы</a>
+      <a href="#ipp" data-v="ipp" hidden>Реквизиты</a>
       <a href="#tor" data-v="tor" hidden>Заказы</a>
       <a href="#disp" data-v="disp" hidden>Диспетчерская</a>
       <a href="#tmine" data-v="tmine" hidden>Мои рейсы</a>
@@ -1474,7 +1480,7 @@ const ROLE_INFO_REQ = {
   executor:'Видит новые заявки, приступает к выполнению и закрывает их с описанием сделанного и фото; видит список оборудования и историю его проблем.',
   worker:'Создаёт заявки: выбирает оборудование из списка или по QR-коду, описывает проблему, прикладывает фото; видит ход своих заявок.',
 };
-const roleNames = () => reqMode() ? ROLE_NAMES_REQ : transMode() ? { ...ROLE_NAMES, head: 'Руководитель / диспетчер', worker: 'Водитель', contractor: 'Водитель-подрядчик' } : ROLE_NAMES;
+const roleNames = () => ipMode() ? { admin: ROLE_NAMES.admin, head: ROLE_NAMES.head, accountant: ROLE_NAMES.accountant } : reqMode() ? ROLE_NAMES_REQ : transMode() ? { ...ROLE_NAMES, head: 'Руководитель / диспетчер', worker: 'Водитель', contractor: 'Водитель-подрядчик' } : ROLE_NAMES;
 const roleInfo = k => (reqMode() ? ROLE_INFO_REQ : ROLE_INFO)[k] || '';
 const ROLE_INFO = {
   admin:'Всё в организации: работы, заказы, склад, контрагенты, счета, карта объектов, назначение точек, пользователи.',
@@ -1594,7 +1600,7 @@ async function api(method, url, body, headers = {}){
   return j;
 }
 async function refresh(){
-  const d = await api('GET', '/api/data'); sideRefresh(); setTimeout(kitLive, 0);
+  const d = await api('GET', '/api/data'); sideRefresh(); setTimeout(kitLive, 0); if (ipMode() && IP) loadIp(true);
   rev = d.rev; names = d.users || {}; META = d.meta || {}; syncNeeds();
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   // the names of old points kept the reminder «(замена 2 модемов)» — it is not shown any more
@@ -1672,7 +1678,7 @@ const planTabs = () => `<nav class="seg stabs" aria-label="Планирован�
 /* «Администрирование» (the administrator): users, the initial balances from 1C, the files of the organization */
 const ADMIN_VIEWS = ['users', 'admInit', 'admFiles'];
 function adminTabs(){
-  const T = [['users', 'Пользователи'], ...(reqMode() ? [] : [['admInit', 'Начальные остатки']]), ['admFiles', 'Файлы']];
+  const T = [['users', 'Пользователи'], ...(reqMode() || ipMode() ? [] : [['admInit', 'Начальные остатки']]), ['admFiles', 'Файлы']];
   return `<nav class="seg stabs" aria-label="Разделы администрирования">${T.map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
 }
 function vAdmInit(){
@@ -1749,7 +1755,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vMyTasks() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   V.querySelectorAll('.feat .fi, #feat-new').forEach(t => { if (t.value) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; } });
@@ -3764,7 +3770,7 @@ function vOrgs(){
   const rows = L.slice().sort((a, b) => (a.id === me.org?.id ? -1 : b.id === me.org?.id ? 1 : 0) || a.name.localeCompare(b.name, 'ru')).map(o => {
     const [cc, cl] = ORG_STATE(o), mine = o.id === me.org?.id;
     return `<div class="orow ${o.state !== 'active' ? 'off' : ''}">
-      <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b> <span class="chip ${o.type === 'requests' ? 'c-info' : o.type === 'transport' ? 'c-warn' : 'c-mute'}">${o.type === 'requests' ? 'Управление заявками' : o.type === 'transport' ? 'Транспортная организация' : 'Все сервисы'}</span><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
+      <div><b>${esc(o.name)}${mine ? ' <span class="dim">(ваша)</span>' : ''}</b> <span class="chip ${o.type === 'requests' ? 'c-info' : o.type === 'transport' ? 'c-warn' : 'c-mute'}">${o.type === 'requests' ? 'Управление заявками' : o.type === 'transport' ? 'Транспортная организация' : o.type === 'ip' ? 'ИП / самозанятый' : 'Все сервисы'}</span><small class="mono">${esc(o.id)}</small>${o.note ? `<small>${esc(o.note)}</small>` : ''}</div>
       <div><small class="lbl">Пользователей</small>${o.users}</div>
       <div><small class="lbl">Администраторы</small>${!o.admins.some(a => !a.sys) ? '<span class="chip c-warn">нет администратора организации</span><br>' : ''}${o.admins.length ? o.admins.map(a => `${esc(a.name)} <span class="mono dim">${esc(a.login)}</span>${a.blocked ? ' <span class="chip c-bad">заблокирован</span>' : ''}`).join('<br>') : '<span class="dim">нет</span>'}</div>
       <div><span class="chip ${cc}">${cl}</span><small>${o.until ? 'до ' + fmtD(o.until) + ' включительно' : 'без срока'}</small></div>
@@ -6120,7 +6126,8 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc'; $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
+  if (kind === 'ipContract' || kind === 'ipInvoice') $('drawer').classList.add('wide'); $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
   if (kind === 'income') { const i = inv(id); ui.incEdo = false; ui.incWb = i && !i.income ? { supplier: i.supplier } : null; ui.incLines = i ? (i.items || []).map(x => ({ ...x })) : []; if (i && !i.income && !ui.incLines.length) ui.incLines = [{ id:uid(), name:'', qty:'', unit:'шт', price:'' }]; }
@@ -6249,6 +6256,248 @@ function woFullHtml(o, ed, col = 'orders'){
     : `<ul class="stlist">${D.map(x => `<li>${esc(x.name)} — ${fmtQty(x.qty)} ${esc(x.unit || 'шт')}</li>`).join('')}</ul>`}
     <small class="dim">После сохранения ниже — проверка по бухгалтерским остаткам, «Сохранить список» (списать с бухгалтерского склада) и «Excel для 1С» — таблица для загрузки в 1С («Требование-накладная» → «Материалы» → «Загрузить»).</small></section>`;
 }
+/* ===== «ИП / самозанятый»: договоры, счета, налог 6 %, документы (сканы), реквизиты ===== */
+const ipv = id => ($(id)?.value || '').trim();
+const ipMode = () => !!(me && !me.sys && me.org && me.org.type === 'ip');
+const IP_VIEWS = ['ipc', 'ipi', 'ipt', 'ipd', 'ipp'];
+const ipNav = () => [...IP_VIEWS, ...(me?.role === 'admin' ? ['users', 'admFiles'] : [])];
+const ipEd = () => !!me && (isHead() || me.role === 'accountant');
+let IP = null, ipBusy = false;
+async function loadIp(quiet){
+  if (ipBusy) return; ipBusy = true;
+  try { IP = (await api('GET', '/api/ip')).ip; } catch(e) { if (!quiet) IP = { err: errText(e) }; } finally { ipBusy = false; }
+  if (!quiet || (IP_VIEWS.includes(ui.view) && !ui.drawer && !document.activeElement?.closest('#view [data-keep], #view input, #view textarea'))) render();
+}
+async function ipApi(method, path, body){ const r = await api(method, '/api/ip' + path, body); IP = r.ip; return r; }
+const IP_DOC = { contract: 'Договор', invoice: 'Счёт', act: 'Акт', check: 'Чек', supp: 'Доп. соглашение', other: 'Другое' };
+const IP_CST = { draft: ['Черновик', 'c-mute'], active: ['Действует', 'c-ok'], closed: ['Закрыт', 'c-info'] };
+const ipC = id => (IP?.contracts || []).find(x => x.id === id), ipI = id => (IP?.invoices || []).find(x => x.id === id);
+const ipCName = c => c ? `№ ${c.no} от ${fmtD(c.date)} · ${c.client}` : '';
+const ipIName = x => x ? `Счёт № ${x.no} от ${fmtD(x.date)} · ${x.client}` : '';
+const ipProfOk = () => !!(IP?.profile?.name && IP.profile.inn);
+const ipStatusName = () => IP?.profile?.status === 'sz' ? 'Самозанятый (НПД)' : 'ИП (УСН «доходы»)';
+const ipNoProf = () => ipProfOk() ? '' : `<p class="box" style="margin:0 0 12px">Заполните <a href="#ipp">«Реквизиты»</a> — ФИО, ИНН и банк подставятся в договоры и счета.</p>`;
+function vIp(v){
+  if (!IP) { loadIp(); return '<div class="empty">Загружаем…</div>'; }
+  if (IP.err) return `<div class="empty"><h3>Раздел недоступен</h3>${esc(IP.err)}</div>`;
+  return v === 'ipc' ? vIpContracts() : v === 'ipi' ? vIpInvoices() : v === 'ipt' ? vIpTax() : v === 'ipd' ? vIpDocs() : vIpProfile();
+}
+const ipQ = (id, k) => `<span data-keep style="display:contents"><input class="in" id="${id}" type="search" aria-label="Поиск" value="${esc(ui[k] || '')}" placeholder="Поиск" style="flex:1 1 220px;max-width:340px"></span>`;
+const ipHas = (x, q) => !q || JSON.stringify([x.no, x.client, x.clientInn, x.subject, x.title, x.note, (x.lines || []).map(l => l.name)]).toLowerCase().includes(q);
+/* --- Договоры --- */
+function vIpContracts(){
+  const q = (ui.ipcq || '').trim().toLowerCase(), L = IP.contracts.filter(x => ipHas(x, q)).sort((a, b) => b.date.localeCompare(a.date) || String(b.no).localeCompare(String(a.no), 'ru', { numeric: true }));
+  const bar = `<div class="toolbar">${ipQ('ipcq', 'ipcq')}${ipEd() ? '<button class="btn primary" data-act="ipcNew">+ Договор</button>' : ''}</div>${ipNoProf()}`;
+  if (!IP.contracts.length) return bar + '<div class="empty"><h3>Договоров пока нет</h3>Нажмите «+ Договор»: заказчик, предмет, сумма, срок и порядок оплаты — затем «🖨 Печать / PDF».</div>';
+  if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
+  return bar + `<div class="tblwrap card" style="padding:0"><table class="comp ipt"><thead><tr><th>№ · дата</th><th>Заказчик</th><th>Предмет</th><th class="r">Сумма</th><th>Срок</th><th>Статус</th><th>Счета · документы</th></tr></thead><tbody>
+    ${L.map(c => { const inv = IP.invoices.filter(x => x.contractId === c.id), docs = IP.docs.filter(d => d.contractId === c.id), [sl, sc] = IP_CST[c.status] || IP_CST.active;
+      return `<tr class="click" data-act="ipcOpen" data-id="${c.id}"><td><b>№ ${esc(c.no)}</b><br><small class="dim">${fmtD(c.date)}</small></td><td>${esc(c.client)}${c.clientInn ? `<br><small class="dim">ИНН ${esc(c.clientInn)}</small>` : ''}</td><td>${esc((c.subject || '').slice(0, 120))}${(c.subject || '').length > 120 ? '…' : ''}</td>
+        <td class="r">${c.sum ? money(c.sum) : '—'}</td><td>${c.until ? 'до ' + fmtD(c.until) : '—'}</td><td><span class="chip ${sc}">${sl}</span></td><td>${inv.length ? `🧾 ${inv.length} (оплачено ${inv.filter(x => x.paid).length})` : ''} ${docs.length ? '📎 ' + docs.length : ''}</td></tr>`; }).join('')}</tbody></table></div>`;
+}
+function ipContractHtml(c){
+  const d = c || { date: today(), kind: 'оказания услуг', clientType: 'company', status: 'active' }, ed = ipEd(), dis = ed ? '' : 'disabled';
+  const inv = c ? IP.invoices.filter(x => x.contractId === c.id) : [], docs = c ? IP.docs.filter(x => x.contractId === c.id) : [];
+  return `<div class="d-body"><div class="form" data-keep>
+    <label>Номер<input class="in mono" id="ipc-no" value="${esc(d.no || '')}" placeholder="пусто — следующий по порядку" ${dis}></label>
+    <label>Дата<input class="in" type="date" id="ipc-date" value="${esc(d.date || today())}" ${dis}></label>
+    <label class="wide">Вид договора<input class="in" id="ipc-kind" value="${esc(d.kind || '')}" placeholder="оказания услуг, подряда, поставки…" ${dis}></label>
+    <label class="wide"><span>Заказчик <em class="req-star">*</em></span><input class="in" id="ipc-client" value="${esc(d.client || '')}" placeholder="ООО «Ромашка» или ФИО" ${dis}></label>
+    <label>ИНН заказчика<input class="in mono" id="ipc-inn" value="${esc(d.clientInn || '')}" inputmode="numeric" ${dis}></label>
+    <label>Заказчик —<select class="in" id="ipc-ctype" ${dis}><option value="company" ${d.clientType !== 'person' ? 'selected' : ''}>организация или ИП</option><option value="person" ${d.clientType === 'person' ? 'selected' : ''}>физическое лицо</option></select></label>
+    <label class="wide">Адрес заказчика<input class="in" id="ipc-addr" value="${esc(d.clientAddress || '')}" ${dis}></label>
+    <label class="wide">В лице (представитель заказчика)<input class="in" id="ipc-rep" value="${esc(d.clientRep || '')}" placeholder="генерального директора Иванова И. И., действующего на основании Устава" ${dis}></label>
+    <label class="wide">Предмет договора<textarea class="in" id="ipc-subj" rows="4" ${dis} placeholder="Исполнитель обязуется оказать услуги по …">${esc(d.subject || '')}</textarea></label>
+    <label>Сумма, ₽<input class="in mono" id="ipc-sum" inputmode="decimal" value="${d.sum ? esc(d.sum) : ''}" ${dis}></label>
+    <label>Срок — до<input class="in" type="date" id="ipc-until" value="${esc(d.until || '')}" ${dis}></label>
+    <label class="wide">Порядок оплаты<textarea class="in" id="ipc-pay" rows="2" ${dis} placeholder="100 % в течение 5 рабочих дней после подписания акта">${esc(d.payment || '')}</textarea></label>
+    <label>Статус<select class="in" id="ipc-st" ${dis}>${Object.entries(IP_CST).map(([k, [l]]) => `<option value="${k}" ${d.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+    ${c ? `<div class="box"><h4>Счета по договору</h4>${inv.length ? `<ul class="stlist">${inv.map(x => `<li><button class="linkish" data-act="ipiOpen" data-id="${x.id}">№ ${esc(x.no)} от ${fmtD(x.date)}</button> · ${money(x.total)} · ${x.paid ? `<span class="ok-t">оплачен ${fmtD(x.paidAt)}</span>` : 'не оплачен'}</li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Счетов нет.</p>'}
+      ${docs.length ? `<h4 style="margin-top:8px">Документы</h4><ul class="stlist">${docs.map(x => `<li>${esc(IP_DOC[x.kind])}${x.title ? ' · ' + esc(x.title) : ''} — ${x.files.map(f => `<a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a>`).join(', ')}</li>`).join('')}</ul>` : ''}</div>` : ''}
+    <div class="err" id="ferr"></div>
+    <div class="row-g">${ed ? `<button class="btn primary" data-act="ipcSave" data-id="${c?.id || ''}">${c ? 'Сохранить' : 'Добавить'}</button>` : ''}${c ? `<button class="btn" data-act="ipcPrint" data-id="${c.id}">🖨 Печать / PDF</button>${ed ? `<button class="btn" data-act="ipiFromC" data-id="${c.id}">+ Счёт по договору</button><button class="btn" data-act="ipdFor" data-id="c|${c.id}">📎 Загрузить скан</button>${armBtn('ipcd:' + c.id, 'Удалить', 'ipcDel', c.id, 'btn danger')}` : ''}` : ''}<button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+const ipcBody = () => ({ no: ipv('ipc-no'), date: ipv('ipc-date'), kind: ipv('ipc-kind'), client: ipv('ipc-client'), clientInn: ipv('ipc-inn'), clientType: $('ipc-ctype').value, clientAddress: ipv('ipc-addr'), clientRep: ipv('ipc-rep'), subject: $('ipc-subj').value, sum: ipv('ipc-sum'), until: ipv('ipc-until'), payment: $('ipc-pay').value, status: $('ipc-st').value });
+/* --- Счета --- */
+function vIpInvoices(){
+  const q = (ui.ipiq || '').trim().toLowerCase(), f = ui.ipiF || 'all';
+  const L = IP.invoices.filter(x => ipHas(x, q) && (f === 'all' || (f === 'paid' ? x.paid : !x.paid))).sort((a, b) => b.date.localeCompare(a.date) || String(b.no).localeCompare(String(a.no), 'ru', { numeric: true }));
+  const unpaid = IP.invoices.filter(x => !x.paid), over = unpaid.filter(x => x.due && x.due < today());
+  const bar = `<div class="toolbar"><div class="seg">${[['all', 'Все'], ['open', 'Не оплачены'], ['paid', 'Оплачены']].map(([k, l]) => `<button data-act="ipiF" data-id="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>${ipQ('ipiq', 'ipiq')}${ipEd() ? '<button class="btn primary" data-act="ipiNew">+ Счёт</button>' : ''}
+    <span class="dim">Ждут оплаты: <b>${money(unpaid.reduce((a, x) => a + x.total, 0))}</b>${over.length ? ` · <span class="bad-t">просрочено ${over.length}</span>` : ''}</span></div>${ipNoProf()}`;
+  if (!IP.invoices.length) return bar + '<div class="empty"><h3>Счетов пока нет</h3>Нажмите «+ Счёт» или откройте договор → «+ Счёт по договору». Оплаченные счета попадают в расчёт налога.</div>';
+  if (!L.length) return bar + '<div class="empty">Ничего не найдено</div>';
+  return bar + `<div class="tblwrap card" style="padding:0"><table class="comp ipt"><thead><tr><th>№ · дата</th><th>Плательщик</th><th>Договор</th><th class="r">Сумма</th><th>Оплатить до</th><th>Оплата</th></tr></thead><tbody>
+    ${L.map(x => { const c = ipC(x.contractId), late = !x.paid && x.due && x.due < today();
+      return `<tr class="click" data-act="ipiOpen" data-id="${x.id}"><td><b>№ ${esc(x.no)}</b><br><small class="dim">${fmtD(x.date)}</small></td><td>${esc(x.client)}</td><td>${c ? `№ ${esc(c.no)} от ${fmtD(c.date)}` : '<span class="dim">—</span>'}</td><td class="r">${money(x.total)}</td>
+        <td>${x.due ? `<span class="${late ? 'bad-t' : ''}">${fmtD(x.due)}</span>` : '—'}</td><td>${x.paid ? `<span class="chip c-ok">оплачен ${fmtD(x.paidAt)}</span>` : `<span class="chip ${late ? 'c-bad' : 'c-warn'}">${late ? 'просрочен' : 'не оплачен'}</span>`}</td></tr>`; }).join('')}</tbody></table></div>`;
+}
+function ipInvoiceHtml(x){
+  const d = x || ui.ipiDraft || { date: today(), clientType: 'company' }, ed = ipEd(), dis = ed ? '' : 'disabled', L = ui.ipLines || [];
+  const total = L.reduce((a, l) => a + num(l.qty || 1) * num(l.price), 0);
+  return `<div class="d-body"><div class="form" data-keep>
+    <label>Номер<input class="in mono" id="ipi-no" value="${esc(d.no || '')}" placeholder="пусто — следующий по порядку" ${dis}></label>
+    <label>Дата<input class="in" type="date" id="ipi-date" value="${esc(d.date || today())}" ${dis}></label>
+    <label class="wide">Договор<select class="in" id="ipi-contract" ${dis}><option value="">— без договора —</option>${IP.contracts.slice().sort((a, b) => b.date.localeCompare(a.date)).map(c => `<option value="${c.id}" ${d.contractId === c.id ? 'selected' : ''}>${esc(ipCName(c))}</option>`).join('')}</select></label>
+    <label class="wide"><span>Плательщик <em class="req-star">*</em></span><input class="in" id="ipi-client" value="${esc(d.client || '')}" ${dis}></label>
+    <label>ИНН плательщика<input class="in mono" id="ipi-inn" value="${esc(d.clientInn || '')}" inputmode="numeric" ${dis}></label>
+    <label>Плательщик —<select class="in" id="ipi-ctype" ${dis}><option value="company" ${d.clientType !== 'person' ? 'selected' : ''}>организация или ИП</option><option value="person" ${d.clientType === 'person' ? 'selected' : ''}>физическое лицо</option></select></label>
+    <div class="wide"><span class="flab">Позиции</span><table class="lines ipl"><thead><tr><th>Наименование</th><th style="width:80px">Кол-во</th><th style="width:70px">Ед.</th><th style="width:120px">Цена, ₽</th><th style="width:120px" class="r">Сумма</th><th style="width:36px"></th></tr></thead><tbody>
+      ${L.map((l, i) => `<tr><td><input class="in" data-ipl="${i}|name" value="${esc(l.name || '')}" ${dis}></td><td><input class="in mono" data-ipl="${i}|qty" value="${esc(l.qty ?? 1)}" inputmode="decimal" ${dis}></td><td><input class="in" data-ipl="${i}|unit" value="${esc(l.unit || 'шт')}" ${dis}></td><td><input class="in mono" data-ipl="${i}|price" value="${esc(l.price ?? '')}" inputmode="decimal" ${dis}></td><td class="r mono" id="ipl-sum-${i}">${money(num(l.qty || 1) * num(l.price))}</td><td>${ed ? `<button type="button" class="btn sm ghost" data-act="iplDel" data-id="${i}" aria-label="Убрать строку">✕</button>` : ''}</td></tr>`).join('')}
+      </tbody></table>${ed ? '<button type="button" class="btn sm" data-act="iplAdd">+ Строка</button>' : ''} <b style="margin-left:12px">Итого: <span id="ipl-total">${money(total)}</span></b> <small class="dim">без НДС</small></div>
+    <label>Оплатить до<input class="in" type="date" id="ipi-due" value="${esc(d.due || '')}" ${dis}></label>
+    <label class="chk" style="flex-direction:row;display:flex;gap:8px;align-items:center;align-self:end"><input type="checkbox" id="ipi-paid" ${d.paid ? 'checked' : ''} ${dis}> Оплачен</label>
+    <label>Дата оплаты<input class="in" type="date" id="ipi-paidat" value="${esc(d.paidAt || '')}" ${dis}><small class="dim">По ней счёт попадает в доход для налога</small></label>
+    <label class="wide">Комментарий<input class="in" id="ipi-note" value="${esc(d.note || '')}" ${dis}></label></div>
+    <div class="err" id="ferr"></div>
+    <div class="row-g">${ed ? `<button class="btn primary" data-act="ipiSave" data-id="${x?.id || ''}">${x ? 'Сохранить' : 'Добавить'}</button>` : ''}${x ? `<button class="btn" data-act="ipiPrint" data-id="${x.id}">🖨 Печать / PDF</button>${ed ? `<button class="btn" data-act="ipdFor" data-id="i|${x.id}">📎 Загрузить скан</button>${armBtn('ipid:' + x.id, 'Удалить', 'ipiDel', x.id, 'btn danger')}` : ''}` : ''}<button class="btn" data-act="close">Закрыть</button></div></div>`;
+}
+const ipiBody = () => ({ no: ipv('ipi-no'), date: ipv('ipi-date'), contractId: $('ipi-contract').value, client: ipv('ipi-client'), clientInn: ipv('ipi-inn'), clientType: $('ipi-ctype').value, lines: (ui.ipLines || []).map(l => ({ name: l.name, qty: l.qty, unit: l.unit, price: l.price })), due: ipv('ipi-due'), paid: $('ipi-paid').checked, paidAt: ipv('ipi-paidat'), note: ipv('ipi-note') });
+function iplTotal(){ const L = ui.ipLines || []; L.forEach((l, i) => { const c = $('ipl-sum-' + i); if (c) c.textContent = money(num(l.qty || 1) * num(l.price)); }); const t = $('ipl-total'); if (t) t.textContent = money(L.reduce((a, l) => a + num(l.qty || 1) * num(l.price), 0)); }
+// a redraw of the invoice form keeps what is typed in its fields
+function ipiRedraw(){ const keep = ipiBody(); ui.ipiDraft = { ...(ui.ipiDraft || {}), ...keep }; const x = ui.drawer?.id && ipI(ui.drawer.id); if (x) Object.assign(ui.ipiKeep = ui.ipiKeep || {}, keep); renderDrawer(); Object.entries({ 'ipi-no': keep.no, 'ipi-date': keep.date, 'ipi-client': keep.client, 'ipi-inn': keep.clientInn, 'ipi-due': keep.due, 'ipi-paidat': keep.paidAt, 'ipi-note': keep.note }).forEach(([id, v]) => { const e = $(id); if (e) e.value = v || ''; }); const s = $('ipi-contract'); if (s) s.value = keep.contractId; const ty = $('ipi-ctype'); if (ty) ty.value = keep.clientType; const pd = $('ipi-paid'); if (pd) pd.checked = keep.paid; }
+/* --- Налог --- */
+// the income of a period: paid invoices (by the date of payment) and the incomes written by hand
+function ipIncome(from, to){
+  const inv = IP.invoices.filter(x => x.paid && x.paidAt >= from && x.paidAt <= to), inc = IP.incomes.filter(x => x.date >= from && x.date <= to);
+  const part = k => inv.filter(x => (x.clientType || 'company') === k).reduce((a, x) => a + x.total, 0) + inc.filter(x => x.from === k).reduce((a, x) => a + x.sum, 0);
+  return { company: part('company'), person: part('person'), all: part('company') + part('person'), n: inv.length + inc.length };
+}
+function vIpTax(){
+  const y = Number(ui.ipYear) || new Date().getFullYear(), P = IP.profile || {}, rate = Number(P.taxRate) || 6, sz = P.status === 'sz', r2 = v => Math.round(v * 100) / 100;
+  const years = [...new Set([y, new Date().getFullYear(), ...IP.invoices.filter(x => x.paidAt).map(x => Number(x.paidAt.slice(0, 4))), ...IP.incomes.map(x => Number(x.date.slice(0, 4)))])].sort((a, b) => b - a);
+  const head = `<div class="toolbar"><select class="f" id="ipYear" aria-label="Год">${years.map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${v} год</option>`).join('')}</select>
+    <span class="dim">${esc(ipStatusName())} · ставка ${sz ? '4 % с физлиц, 6 % с организаций и ИП' : rate + ' %'} — <a href="#ipp">изменить в «Реквизитах»</a></span></div>`;
+  let table;
+  if (!sz) {
+    // УСН «доходы»: the advance payments by the cumulative total of the year, reduced by the insurance contributions
+    let incC = 0, conC = 0, dueC = 0;
+    const deadlines = ['28.04.' + y, '28.07.' + y, '28.10.' + y, '28.04.' + (y + 1)];
+    const rows = [1, 2, 3, 4].map(q => { const from = `${y}-${pad(q * 3 - 2)}-01`, to = `${y}-${pad(q * 3)}-${q === 1 || q === 4 ? 31 : 30}`, I = ipIncome(from, to), key = `${y}-Q${q}`, con = Number(IP.contrib[key]) || 0;
+      incC += I.all; conC += con; const taxC = r2(incC * rate / 100), dueNow = Math.max(0, r2(taxC - conC)), pay = r2(dueNow - dueC); dueC = dueNow;
+      return `<tr><td><b>${q} квартал</b>${q === 4 ? ' (год)' : ''}</td><td class="r">${money(I.all)}</td><td class="r">${money(incC)}</td><td class="r">${money(taxC)}</td>
+        <td class="r">${ipEd() ? `<span data-keep style="display:contents"><input class="in mono ipcon" data-contrib="${key}" value="${con || ''}" inputmode="decimal" aria-label="Взносы за ${q} квартал" style="width:110px;text-align:right"></span>` : money(con)}</td>
+        <td class="r"><b>${money(Math.max(0, pay))}</b></td><td>${q === 4 ? 'налог за год — до ' : 'аванс — до '}${deadlines[q - 1]}</td></tr>`; });
+    table = `<div class="tblwrap card" style="padding:0"><table class="comp ipt"><thead><tr><th>Период</th><th class="r">Доход за квартал</th><th class="r">Доход с начала года</th><th class="r">Налог ${rate} % с начала года</th><th class="r">Страховые взносы за квартал</th><th class="r">К уплате</th><th>Срок</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>
+      <p class="dim" style="font-size:13px">Налог считается нарастающим итогом с начала года: ${rate} % от дохода минус уплаченные страховые взносы (ИП без работников может уменьшить налог на всю сумму взносов), минус уже начисленные авансы. Доход — оплаченные счета по дате оплаты и поступления, внесённые вручную. Это расчёт для проверки — сверяйте его с личным кабинетом налоговой.</p>`;
+  } else {
+    // НПД: by month, 4 % from individuals and 6 % from companies and ИП, paid by the 28th of the next month
+    const rows = Array.from({ length: 12 }, (_, i) => { const mm = pad(i + 1), from = `${y}-${mm}-01`, to = `${y}-${mm}-31`, I = ipIncome(from, to), tax = r2(I.person * 0.04 + I.company * 0.06);
+      const nx = i === 11 ? `28.01.${y + 1}` : `28.${pad(i + 2)}.${y}`;
+      return `<tr class="${I.all ? '' : 'dim'}"><td>${MONTHS_NOM_RU[i]}</td><td class="r">${money(I.person)}</td><td class="r">${money(I.company)}</td><td class="r"><b>${money(tax)}</b></td><td>до ${nx}</td></tr>`; });
+    const Y = ipIncome(`${y}-01-01`, `${y}-12-31`);
+    table = `<div class="tblwrap card" style="padding:0"><table class="comp ipt"><thead><tr><th>Месяц</th><th class="r">Доход от физлиц (4 %)</th><th class="r">Доход от организаций и ИП (6 %)</th><th class="r">Налог</th><th>Срок</th></tr></thead><tbody>${rows.join('')}
+      <tr><td><b>Итого за год</b></td><td class="r"><b>${money(Y.person)}</b></td><td class="r"><b>${money(Y.company)}</b></td><td class="r"><b>${money(r2(Y.person * 0.04 + Y.company * 0.06))}</b></td><td></td></tr></tbody></table></div>
+      <p class="dim" style="font-size:13px">Для самозанятого (НПД): 6 % — с доходов от организаций и ИП, 4 % — от физических лиц; налог за месяц платится до 28-го числа следующего месяца. Лимит дохода — 2,4 млн ₽ в год${Y.all > 2400000 ? ' — <span class="bad-t">превышен</span>' : `, осталось ${money(2400000 - Y.all)}`}. Налоговый вычет «Мой налог» здесь не учитывается.</p>`;
+  }
+  const inc = IP.incomes.filter(x => x.date.startsWith(String(y))).sort((a, b) => b.date.localeCompare(a.date));
+  return head + table + `<section class="card ipinc"><h3 style="margin:0 0 8px">Поступления, внесённые вручную · ${y}</h3><p class="dim" style="margin:0 0 8px;font-size:13px">Оплаты без счёта в программе (наличными, по QR, на карту). Оплаченные счета учитываются сами.</p>
+    ${ipEd() ? `<div class="row-g" data-keep><input class="in" type="date" id="ipn-date" value="${today()}" style="width:auto"><input class="in mono" id="ipn-sum" inputmode="decimal" placeholder="Сумма, ₽" style="width:140px"><select class="in" id="ipn-from" style="width:auto"><option value="company">от организации или ИП</option><option value="person">от физлица</option></select><input class="in" id="ipn-comment" placeholder="За что" style="flex:1 1 200px"><button class="btn primary" data-act="ipnAdd">+ Доход</button></div>` : ''}
+    ${inc.length ? `<ul class="stlist" style="margin-top:8px">${inc.map(x => `<li>${fmtD(x.date)} · <b>${money(x.sum)}</b> · ${x.from === 'person' ? 'от физлица' : 'от организации/ИП'}${x.comment ? ' · ' + esc(x.comment) : ''} ${ipEd() ? armBtn('ipnd:' + x.id, '✕', 'ipnDel', x.id, 'btn sm ghost') : ''}</li>`).join('')}</ul>` : '<p class="dim" style="margin:8px 0 0">Нет.</p>'}</section>`;
+}
+/* --- Документы (сканы) --- */
+function vIpDocs(){
+  const f = ui.ipdF || 'all', q = (ui.ipdq || '').trim().toLowerCase();
+  const L = IP.docs.filter(x => (f === 'all' || x.kind === f) && (!q || [x.title, ...(x.files || []).map(z => z.name), ipCName(ipC(x.contractId)), ipIName(ipI(x.invoiceId))].join(' ').toLowerCase().includes(q))).sort((a, b) => b.date.localeCompare(a.date));
+  const pre = ui.ipdPre || {};
+  const up = ipEd() ? `<section class="card ipup"><h3 style="margin:0 0 8px">Загрузить сканы</h3><div class="form" data-keep>
+      <label>Что это<select class="in" id="ipd-kind">${Object.entries(IP_DOC).map(([k, l]) => `<option value="${k}" ${pre.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Дата<input class="in" type="date" id="ipd-date" value="${today()}"></label>
+      <label class="wide">Название<input class="in" id="ipd-title" placeholder="Например: Акт № 5 за октябрь" value="${esc(pre.title || '')}"></label>
+      <label>К договору<select class="in" id="ipd-contract"><option value="">—</option>${IP.contracts.map(c => `<option value="${c.id}" ${pre.contractId === c.id ? 'selected' : ''}>${esc(ipCName(c))}</option>`).join('')}</select></label>
+      <label>К счёту<select class="in" id="ipd-invoice"><option value="">—</option>${IP.invoices.map(x => `<option value="${x.id}" ${pre.invoiceId === x.id ? 'selected' : ''}>${esc(ipIName(x))}</option>`).join('')}</select></label>
+      <label class="wide btn primary ipfile">📎 Выбрать файлы и загрузить<input type="file" data-up="ipDoc" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" hidden></label></div>
+      <small class="dim">Фото или сканы (PDF, JPG, PNG), можно несколько файлов сразу — они станут одним документом.</small></section>` : '';
+  const bar = `<div class="toolbar"><div class="seg">${[['all', 'Все'], ...Object.entries(IP_DOC)].map(([k, l]) => `<button data-act="ipdF" data-id="${k}" class="${f === k ? 'on' : ''}">${l} <span class="dim">${k === 'all' ? IP.docs.length : IP.docs.filter(x => x.kind === k).length}</span></button>`).join('')}</div>${ipQ('ipdq', 'ipdq')}</div>`;
+  return up + bar + (L.length ? `<div class="ipdocs">${L.map(x => { const c = ipC(x.contractId), i = ipI(x.invoiceId);
+    return `<article class="card ipdoc"><div class="row-g" style="justify-content:space-between"><div><span class="chip c-info">${esc(IP_DOC[x.kind] || 'Документ')}</span> <b>${esc(x.title || x.files[0]?.name || '')}</b><small class="dim" style="display:block">${fmtD(x.date)}${c ? ' · договор ' + esc(ipCName(c)) : ''}${i ? ' · ' + esc(ipIName(i)) : ''}</small></div>${ipEd() ? armBtn('ipdd:' + x.id, '✕', 'ipdDel', x.id, 'btn sm ghost') : ''}</div>
+      <div class="thumbs">${x.files.map(f2 => /^image\//.test(f2.type || '') ? `<a class="tw" href="${esc(fileUrl(f2))}" target="_blank" rel="noopener">${thumbF(f2)}</a>` : `<a class="cfile" href="${esc(fileUrl(f2))}" target="_blank" rel="noopener">${fileIco(f2)} ${esc(f2.name)}</a>`).join('')}</div></article>`; }).join('')}</div>`
+    : `<div class="empty">${IP.docs.length ? 'Ничего не найдено' : 'Документов пока нет — загрузите сканы договоров, счетов, актов, чеков и дополнительных соглашений.'}</div>`);
+}
+/* --- Реквизиты --- */
+function vIpProfile(){
+  const P = IP.profile || {}, ed = ipEd(), dis = ed ? '' : 'disabled', f = (id, l, k, ph = '', cls = '') => `<label class="${cls}">${l}<input class="in" id="ipp-${id}" value="${esc(P[k] || '')}" placeholder="${esc(ph)}" ${dis}></label>`;
+  return `<section class="card" style="padding:16px 18px;max-width:860px"><h3 style="margin:0 0 4px">Реквизиты</h3><p class="dim" style="margin:0 0 12px">Подставляются в договоры и счета.</p><div class="form" data-keep>
+    <label class="wide">Статус<select class="in" id="ipp-status" ${dis}><option value="ip" ${P.status !== 'sz' ? 'selected' : ''}>Индивидуальный предприниматель (УСН «доходы»)</option><option value="sz" ${P.status === 'sz' ? 'selected' : ''}>Самозанятый (налог на профессиональный доход)</option></select></label>
+    ${f('name', 'ФИО полностью', 'name', 'Иванов Иван Иванович', 'wide')}${f('inn', 'ИНН', 'inn', '12 цифр')}${f('ogrnip', 'ОГРНИП (для ИП)', 'ogrnip', '15 цифр')}${f('address', 'Адрес', 'address', '', 'wide')}${f('city', 'Город (в договоре)', 'city', 'Москва')}${f('phone', 'Телефон', 'phone')}${f('email', 'Почта', 'email')}
+    ${f('bank', 'Банк', 'bank', 'АО «Банк»', 'wide')}${f('bik', 'БИК', 'bik', '9 цифр')}${f('account', 'Расчётный счёт', 'account', '20 цифр')}${f('corr', 'Корр. счёт', 'corr', '20 цифр')}
+    <label>Ставка налога, %<input class="in mono" id="ipp-rate" value="${esc(P.taxRate || 6)}" inputmode="decimal" ${dis}><small class="dim">УСН «доходы» — 6 % (в некоторых регионах меньше); у самозанятого ставки фиксированы: 4 и 6 %</small></label></div>
+    <div class="err" id="ferr"></div>${ed ? '<div class="row-g"><button class="btn primary" data-act="ippSave">Сохранить реквизиты</button></div>' : ''}</section>`;
+}
+/* --- Печать: договор и счёт на оплату (окно браузера «Печать» → «Сохранить как PDF») --- */
+function ipPrintDoc(title, body){
+  const w = window.open('', '_blank'); if (!w) return toast('Браузер не дал открыть окно печати — разрешите всплывающие окна');
+  w.document.write(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:18mm 16mm}body{font:12pt/1.45 "Times New Roman",Times,serif;color:#000;margin:0}h1{font-size:15pt;text-align:center;margin:0 0 4mm}.c{text-align:center}.row{display:flex;justify-content:space-between;margin-bottom:5mm}p{margin:0 0 2.5mm;text-align:justify}h2{font-size:12pt;margin:5mm 0 2mm}table{width:100%;border-collapse:collapse;margin:3mm 0}td,th{border:1px solid #000;padding:1.5mm 2mm;vertical-align:top;font-size:11pt}th{background:#f2f2f2}.r{text-align:right}.nb td{border:0;padding:1mm 2mm}.sig{display:flex;gap:10mm;margin-top:8mm}.sig>div{flex:1}.line{border-bottom:1px solid #000;height:9mm;margin-top:6mm}.bank td{font-size:10.5pt}.big{font-size:13pt;font-weight:bold}</style></head><body>${body}<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.close();
+}
+const ipSeller = P => `${P.status === 'sz' ? '' : 'Индивидуальный предприниматель '}${esc(P.name || '________________')}${P.status === 'sz' ? ', применяющий специальный налоговый режим «Налог на профессиональный доход»' : ''}, ИНН ${esc(P.inn || '________')}${P.status !== 'sz' && P.ogrnip ? ', ОГРНИП ' + esc(P.ogrnip) : ''}`;
+const ipReqs = (P, who) => `<b>${who}</b><br>${esc(P.name || '')}<br>ИНН ${esc(P.inn || '')}${P.ogrnip ? '<br>ОГРНИП ' + esc(P.ogrnip) : ''}${P.address ? '<br>' + esc(P.address) : ''}${P.bank ? `<br>р/с ${esc(P.account || '')}<br>${esc(P.bank)}<br>БИК ${esc(P.bik || '')}${P.corr ? ', к/с ' + esc(P.corr) : ''}` : ''}${P.phone ? '<br>Тел.: ' + esc(P.phone) : ''}${P.email ? '<br>' + esc(P.email) : ''}`;
+function ipPrintContract(c){
+  const P = IP.profile || {}, nds = P.status === 'sz' ? 'НДС не облагается (Исполнитель применяет налог на профессиональный доход)' : 'НДС не облагается в связи с применением Исполнителем упрощённой системы налогообложения (ст. 346.11 НК РФ)';
+  const client = `${esc(c.client)}${c.clientInn ? ', ИНН ' + esc(c.clientInn) : ''}${c.clientRep ? ', в лице ' + esc(c.clientRep) : ''}`;
+  ipPrintDoc(`Договор № ${c.no}`, `<h1>ДОГОВОР № ${esc(c.no)}<br><span style="font-weight:normal;font-size:12pt">${esc(c.kind || 'оказания услуг')}</span></h1>
+    <div class="row"><span>г. ${esc(P.city || '________')}</span><span>${fmtD(c.date)}</span></div>
+    <p>${ipSeller(P)}, именуемый в дальнейшем «Исполнитель», с одной стороны, и ${client}, именуемый в дальнейшем «Заказчик», с другой стороны, заключили настоящий договор о нижеследующем.</p>
+    <h2>1. Предмет договора</h2><p>${esc(c.subject || 'Исполнитель обязуется оказать услуги, а Заказчик — принять и оплатить их.').replace(/\n/g, '<br>')}</p>
+    <h2>2. Стоимость и порядок оплаты</h2><p>2.1. Стоимость по договору составляет ${c.sum ? `<b>${esc(money(c.sum).replace(' ₽', ''))} руб.</b>` : '________ руб.'} ${nds}.</p><p>2.2. ${esc(c.payment || 'Оплата производится в безналичном порядке на расчётный счёт Исполнителя на основании выставленного счёта.').replace(/\n/g, '<br>')}</p>
+    <h2>3. Срок</h2><p>3.1. ${c.until ? `Работы (услуги) выполняются в срок до ${fmtD(c.until)}.` : 'Срок выполнения согласуется сторонами.'} Факт выполнения подтверждается актом, подписанным сторонами.</p>
+    <h2>4. Ответственность и прочие условия</h2><p>4.1. За неисполнение или ненадлежащее исполнение обязательств стороны несут ответственность в соответствии с законодательством РФ.</p><p>4.2. Договор вступает в силу с момента подписания и действует до полного исполнения обязательств. Споры решаются путём переговоров, а при недостижении согласия — в суде по месту нахождения Исполнителя.</p><p>4.3. Договор составлен в двух экземплярах, по одному для каждой из сторон; скан-копии имеют силу оригинала до обмена оригиналами.</p>
+    <h2>5. Реквизиты и подписи сторон</h2><table class="nb"><tr><td style="width:50%">${ipReqs(P, 'Исполнитель')}<div class="line"></div>${esc(P.name || '')}</td><td>${ipReqs({ name: c.client, inn: c.clientInn, address: c.clientAddress }, 'Заказчик')}<div class="line"></div>${esc(c.clientRep || '')}</td></tr></table>`);
+}
+function ipPrintInvoice(x){
+  const P = IP.profile || {}, c = ipC(x.contractId);
+  ipPrintDoc(`Счёт № ${x.no}`, `<table class="bank"><tr><td colspan="2" style="width:60%">${esc(P.bank || 'Банк получателя')}<br><small>Банк получателя</small></td><td>БИК</td><td>${esc(P.bik || '')}</td></tr><tr><td colspan="2"></td><td>Сч. №</td><td>${esc(P.corr || '')}</td></tr>
+      <tr><td>ИНН ${esc(P.inn || '')}</td><td>${P.ogrnip ? 'ОГРНИП ' + esc(P.ogrnip) : ''}</td><td rowspan="2">Сч. №</td><td rowspan="2">${esc(P.account || '')}</td></tr><tr><td colspan="2">${P.status === 'sz' ? '' : 'ИП '}${esc(P.name || '')}<br><small>Получатель</small></td></tr></table>
+    <h1 style="text-align:left;margin-top:6mm">Счёт на оплату № ${esc(x.no)} от ${fmtD(x.date)}</h1><hr>
+    <table class="nb"><tr><td style="width:22%">Исполнитель:</td><td><b>${ipSeller(P)}${P.address ? ', ' + esc(P.address) : ''}</b></td></tr><tr><td>Заказчик:</td><td><b>${esc(x.client)}${x.clientInn ? ', ИНН ' + esc(x.clientInn) : ''}</b></td></tr>${c ? `<tr><td>Основание:</td><td>Договор № ${esc(c.no)} от ${fmtD(c.date)}</td></tr>` : ''}</table>
+    <table><tr><th>№</th><th>Наименование</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Сумма</th></tr>${x.lines.map((l, i) => `<tr><td class="r">${i + 1}</td><td>${esc(l.name)}</td><td class="r">${esc(String(l.qty).replace('.', ','))}</td><td>${esc(l.unit)}</td><td class="r">${esc(ckMoney(l.price))}</td><td class="r">${esc(ckMoney(l.qty * l.price))}</td></tr>`).join('')}</table>
+    <p class="r big">Итого: ${esc(ckMoney(x.total))} руб.</p><p class="r">Без налога (НДС)</p><p>Всего наименований ${x.lines.length}, на сумму ${esc(ckMoney(x.total))} руб.${x.due ? ` Оплатить до ${fmtD(x.due)}.` : ''}</p>${x.note ? `<p>${esc(x.note)}</p>` : ''}
+    <div class="sig"><div>Исполнитель<div class="line"></div>${esc(P.name || '')}</div><div></div></div>`);
+}
+/* --- events of the module --- */
+document.addEventListener('input', e => { const t = e.target; if (!t.dataset) return;
+  if (t.dataset.ipl) { const [i, k] = t.dataset.ipl.split('|'); const l = (ui.ipLines || [])[Number(i)]; if (l) { l[k] = t.value; iplTotal(); } return; }
+  if (['ipcq', 'ipiq', 'ipdq'].includes(t.id)) { ui[t.id] = t.value; const pos = t.selectionStart; $('view').innerHTML = vIp(ui.view); const n = $(t.id); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch(x) {} } } });
+document.addEventListener('change', async e => { const t = e.target;
+  if (t.id === 'ipYear') { ui.ipYear = t.value; return render(); }
+  if (t.id === 'ipi-contract' && t.value) { const c = ipC(t.value); if (c) { const cl = $('ipi-client'), inn = $('ipi-inn'), ty = $('ipi-ctype'); if (cl && !cl.value) cl.value = c.client; if (inn && !inn.value) inn.value = c.clientInn || ''; if (ty) ty.value = c.clientType || 'company'; } return; }
+  if (t.id === 'ipi-paid' && t.checked) { const pa = $('ipi-paidat'); if (pa && !pa.value) pa.value = today(); return; }
+  if (t.dataset?.contrib) { try { await ipApi('PUT', '/contrib', { key: t.dataset.contrib, sum: t.value });
+      // the table is redrawn at once; the cursor stays in the field it went to
+      const f = document.activeElement?.dataset?.contrib; $('view').innerHTML = vIp(ui.view); if (f) document.querySelector(`[data-contrib="${f}"]`)?.focus(); toast('Взносы сохранены'); } catch(x) { toast(errText(x)); } return; }
+  if (t.dataset?.up === 'ipDoc') { const files = [...t.files]; t.value = ''; if (!files.length) return;
+    try { const up = []; for (const fl of files) { toast(`Загружаем «${fl.name}»…`); const u = await upload(await shrinkImage(fl)); up.push({ id: u.id, name: u.name }); }
+      await ipApi('POST', '/docs', { kind: $('ipd-kind').value, title: ipv('ipd-title'), date: ipv('ipd-date'), contractId: $('ipd-contract').value, invoiceId: $('ipd-invoice').value, files: up });
+      ui.ipdPre = null; document.activeElement?.blur?.(); render(); toast(up.length > 1 ? `Документ загружен (${up.length} файла)` : 'Документ загружен'); } catch(x) { toast(errText(x)); } } });
+async function ipAct(a, id, el){
+  const fail = m => { const fe = $('ferr'); if (fe) fe.textContent = m; else toast(m); };
+  // the button pressed may sit in a block that keeps the page from redrawing while it has the focus
+  if (el?.closest?.('#view')) document.activeElement?.blur?.();
+  switch (a) {
+    case 'ipcNew': return openDrawer('ipContract', null);
+    case 'ipcOpen': return openDrawer('ipContract', id);
+    case 'ipcSave': try { const b = ipcBody(); if (!b.client.trim()) return fail('Укажите заказчика.'); await ipApi(id ? 'PUT' : 'POST', '/contracts' + (id ? '/' + id : ''), b); closeDrawer(); render(); toast(id ? 'Договор сохранён' : 'Договор добавлен'); } catch(x) { fail(errText(x)); } return;
+    case 'ipcDel': try { await ipApi('DELETE', '/contracts/' + id); closeDrawer(); render(); toast('Договор удалён'); } catch(x) { toast(errText(x)); } return;
+    case 'ipcPrint': { const c = ipC(id); if (c) ipPrintContract(c); return; }
+    case 'ipiNew': ui.ipLines = [{ name: '', qty: 1, unit: 'шт', price: '' }]; ui.ipiDraft = null; return openDrawer('ipInvoice', null);
+    case 'ipiFromC': { const c = ipC(id); if (!c) return; ui.ipLines = [{ name: (c.subject || '').split('\n')[0].slice(0, 200) || 'Услуги по договору № ' + c.no, qty: 1, unit: 'усл.', price: c.sum || '' }]; ui.ipiDraft = { date: today(), contractId: c.id, client: c.client, clientInn: c.clientInn, clientType: c.clientType }; return openDrawer('ipInvoice', null); }
+    case 'ipiOpen': { const x = ipI(id); ui.ipLines = (x?.lines || []).map(l => ({ ...l })); ui.ipiDraft = null; return openDrawer('ipInvoice', id); }
+    case 'iplAdd': (ui.ipLines = ui.ipLines || []).push({ name: '', qty: 1, unit: 'шт', price: '' }); return ipiRedraw();
+    case 'iplDel': ui.ipLines.splice(Number(id), 1); return ipiRedraw();
+    case 'ipiSave': try { const b = ipiBody(); if (!b.client.trim()) return fail('Укажите плательщика.'); if (!b.lines.some(l => (l.name || '').trim())) return fail('Добавьте строку с наименованием.'); await ipApi(id ? 'PUT' : 'POST', '/invoices' + (id ? '/' + id : ''), b); closeDrawer(); render(); toast(id ? 'Счёт сохранён' : 'Счёт добавлен'); } catch(x) { fail(errText(x)); } return;
+    case 'ipiDel': try { await ipApi('DELETE', '/invoices/' + id); closeDrawer(); render(); toast('Счёт удалён'); } catch(x) { toast(errText(x)); } return;
+    case 'ipiPrint': { const x = ipI(id); if (x) ipPrintInvoice(x); return; }
+    case 'ipiF': ui.ipiF = id; return render();
+    case 'ipnAdd': try { await ipApi('POST', '/incomes', { date: ipv('ipn-date'), sum: ipv('ipn-sum'), from: $('ipn-from').value, comment: ipv('ipn-comment') }); render(); toast('Доход добавлен'); } catch(x) { toast(errText(x)); } return;
+    case 'ipnDel': try { await ipApi('DELETE', '/incomes/' + id); render(); toast('Удалено'); } catch(x) { toast(errText(x)); } return;
+    case 'ipdF': ui.ipdF = id; return render();
+    case 'ipdFor': { const [k, oid] = id.split('|'); ui.ipdPre = k === 'c' ? { kind: 'contract', contractId: oid } : { kind: 'invoice', invoiceId: oid, contractId: ipI(oid)?.contractId || '' }; closeDrawer(); location.hash = '#ipd'; return; }
+    case 'ipdDel': try { await ipApi('DELETE', '/docs/' + id); render(); toast('Документ удалён'); } catch(x) { toast(errText(x)); } return;
+    case 'ippSave': try { await ipApi('PUT', '/profile', { status: $('ipp-status').value, name: ipv('ipp-name'), inn: ipv('ipp-inn'), ogrnip: ipv('ipp-ogrnip'), address: ipv('ipp-address'), city: ipv('ipp-city'), phone: ipv('ipp-phone'), email: ipv('ipp-email'), bank: ipv('ipp-bank'), bik: ipv('ipp-bik'), account: ipv('ipp-account'), corr: ipv('ipp-corr'), taxRate: ipv('ipp-rate') }); render(); toast('Реквизиты сохранены'); } catch(x) { fail(errText(x)); } return;
+  }
+  return false;
+}
+
 /* ===== «Написать администратору»: a user ↔ the administrators of the organization, an administrator ↔ the system administrator ===== */
 let CHAT = null;
 async function chatLoad(){ try { CHAT = await api('GET', '/api/chat'); } catch(e) { return; } chatBadges(); if (ui.drawer?.kind === 'chat' && !ui.drawer.id) renderDrawer(); }
@@ -6294,6 +6543,8 @@ document.addEventListener('dragover', e => { if (e.target.closest?.('.chatbody')
 document.addEventListener('drop', e => { if (!e.target.closest?.('.chatbody')) return; e.preventDefault(); const F = [...(e.dataTransfer?.files || [])]; if (F.length) chatAttach(F); });
 function renderDrawer(){
   const D = $('drawer'), d = ui.drawer; if (!d) return;
+  if (d.kind === 'ipContract') { const c = d.id && ipC(d.id); D.innerHTML = dh(c ? `Договор № ${esc(c.no)}` : 'Новый договор') + ipContractHtml(c); return; }
+  if (d.kind === 'ipInvoice') { const x = d.id && ipI(d.id); D.innerHTML = dh(x ? `Счёт № ${esc(x.no)}` : 'Новый счёт') + ipInvoiceHtml(x); return; }
   if (d.kind === 'helpDoc') { D.innerHTML = dh('📘 Инструкция пользователя') + `<div class="d-body helpbody"><div class="row-g"><a class="btn sm" href="/help/instruction.html" target="_blank" rel="noopener">Открыть в новой вкладке</a><span class="dim">Для печати откройте в новой вкладке и нажмите Ctrl+P</span></div><iframe class="helpframe" src="/help/instruction.html" title="Инструкция пользователя"></iframe></div>`; return; }
   if (d.kind === 'chat') {
     if (!d.id) { const L = CHAT?.inbox || [];
@@ -6646,7 +6897,7 @@ function renderDrawer(){
       ${pf ? '<p class="box wide" style="margin:0;font-size:13px">Заполнено по запросу пробного доступа — проверьте, укажите срок доступа, логин и пароль администратора.</p>' : ''}
       <label class="wide">Название организации<input class="in" id="o-name" value="${pf ? esc(pf.name) : v(o,'name')}" required></label>
       <fieldset class="wide otype"><legend>Тип системы</legend>
-        ${[['all', 'Все сервисы', 'Работы, заказы, склад, контрагенты, счета, план-график, карта объектов, задачи.'], ['requests', 'Управление заявками', 'Пользователь создаёт заявку и выбирает исполнителя, исполнитель отмечает её выполнение.'], ['transport', 'Транспортная организация', 'Спецтехника и грузоперевозки: заказы, диспетчерская, транспорт и ТО, водители, путевые листы, чеки, отчёты по выручке и расходам.']].map(([k, l, h]) => `<label><input type="radio" name="o-type" value="${k}" ${(o?.type || pf?.type || 'all') === k ? 'checked' : ''}> <span><b>${l}</b><small class="dim">${h}</small></span></label>`).join('')}
+        ${[['all', 'Все сервисы', 'Работы, заказы, склад, контрагенты, счета, план-график, карта объектов, задачи.'], ['requests', 'Управление заявками', 'Пользователь создаёт заявку и выбирает исполнителя, исполнитель отмечает её выполнение.'], ['transport', 'Транспортная организация', 'Спецтехника и грузоперевозки: заказы, диспетчерская, транспорт и ТО, водители, путевые листы, чеки, отчёты по выручке и расходам.'], ['ip', 'ИП / самозанятый', 'Договоры, счета на оплату, расчёт налога 6 %, сканы договоров, счетов, актов, чеков и дополнительных соглашений.']].map(([k, l, h]) => `<label><input type="radio" name="o-type" value="${k}" ${(o?.type || pf?.type || 'all') === k ? 'checked' : ''}> <span><b>${l}</b><small class="dim">${h}</small></span></label>`).join('')}
         ${o ? '<small class="dim">Смена типа не удаляет данные: при возврате они снова будут видны.</small>' : ''}</fieldset>
       <fieldset class="wide otype secbox" id="o-secs" ${(o?.type || 'all') !== 'all' ? 'hidden' : ''}><legend>Какие вкладки и подвкладки видит организация</legend>${secTree(o?.hide || [])}<small class="dim">Снятая галочка скрывает раздел у всех пользователей организации. Администратор организации может дополнительно закрыть разделы отдельным пользователям.</small></fieldset>
       <label>Доступ до (включительно)<input class="in" type="date" id="o-until" value="${v(o,'until')}"><small class="dim" style="font-size:12px">Пусто — без срока. После этой даты всем в организации покажется сообщение о блокировке.</small></label>
@@ -7436,6 +7687,7 @@ async function act(el){
   const a = el.dataset.act, id = el.dataset.id;
   if (el.dataset.arm && !el.classList.contains('armed')) { disarm(); el.classList.add('armed'); el.textContent = 'Точно удалить?'; ui.armed = el.dataset.arm; return; }
   disarm();
+  if (/^ip[a-z]/.test(a || '') && (await ipAct(a, id, el)) !== false) return;
   switch (a) {
     case 'close': return closeDrawer();
     case 'genPass': { const inp = document.querySelector(id); if (!inp) return; inp.type = 'text'; inp.value = makePassword(); inp.dispatchEvent(new Event('input', { bubbles:true })); inp.focus(); inp.select(); toast('Пароль создан — передайте его пользователю. После сохранения посмотреть его будет нельзя.'); return; }
@@ -8514,6 +8766,7 @@ function route(){
     setTimeout(() => { if (eqOf(id)) { ui.reqEq = id; openDrawer('reqForm'); } else toast('Оборудование не найдено или закреплено за другим пользователем'); }, 600); }
   const h = /^eq-/.test(h0) ? 'req' : h0;
   ui.view = me?.sys ? (['orgs', 'server', 'trials'].includes(h) ? h : 'orgs')
+    : ipMode() ? (ipNav().includes(h) ? h : 'ipc')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
     : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'mods', 'snmap'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
@@ -8633,11 +8886,11 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server', 'trials'].includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials'].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
+    a.hidden = u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
   ['orgsTab', 'serverTab', 'trialsTab'].forEach(id => { const t = $(id); if (t && !u.sys) t.hidden = true; });   // the tabs of the system administrator — only his
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (transMode() && !isWorker()) { const st = document.querySelector('#views a[data-v=stock]'); if (st) st.href = '#cps'; }
-  if (!u.sys && !reqMode() && !transMode() && !isWorker()) {
+  if (!u.sys && !reqMode() && !transMode() && !ipMode() && !isWorker()) {
     const pl = planTabsList(), pt = $('planTab'); pt.hidden = !pl.length; if (pl.length) pt.href = '#' + pl[0][0];
     // «Учётка» is shown while any of its sub-tabs is open (the warehouse sections, «Контрагенты», receipts, waybills)
     const st = document.querySelector('#views a[data-v=stock]'), sf = stockFirst(); if (st) { st.hidden = !sf; st.href = '#' + (sf || 'stock'); }
@@ -8647,7 +8900,7 @@ async function start(u){
   document.body.classList.toggle('worker', isWorker());
   ui.usersList = null; userDataReset(); ui.vShow = {};
   $('loginView').hidden = true; $('app').hidden = false;
-  route(); chatLoad().then(() => { ui.chatN = CHAT?.unread || 0; });
+  IP = null; route(); chatLoad().then(() => { ui.chatN = CHAT?.unread || 0; });
   if (u.sys) { mode = 'live'; render(); }
   else try { await refresh(); } catch(e) { $('banner').hidden = false; $('banner').textContent = errText(e); }
   clearInterval(poll);
