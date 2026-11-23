@@ -4943,9 +4943,9 @@ function snLabel(x){
   return c;
 }
 /* ===== the modem USR-G771 on a COM port (Web Serial: Chrome/Edge, HTTPS or localhost): 8 data bits, no parity, 1 stop bit =====
-   «+++» → «a» → «a» → «+ok» — the AT command mode; the IP-address commands are tried in turn until an IPv4 address comes back; then the closing commands (by default «AT+Z» — the restart, it also leaves the AT mode) */
-const SNM_DEF = { auto: false, baud: 115200, port: 0, cmds: 'AT+CGPADDR=1\nAT+CGPADDR', after: 'AT+Z', wait: 30 };
-let SNM = (() => { try { return { ...SNM_DEF, ...JSON.parse(localStorage.getItem('snModem') || '{}') }; } catch(e) { return { ...SNM_DEF }; } })();
+   every command ends with a carriage return: «+++» — the AT command mode, «AT+CIP» — the IP address (repeated until it comes), «AT+ENTM» — leave the AT mode, «AT+Z» — the restart */
+const SNM_DEF = { v: 2, auto: false, baud: 115200, port: 0, enter: '+++', cmds: 'AT+CIP', after: 'AT+ENTM\nAT+Z', wait: 30 };
+let SNM = (() => { try { const o = JSON.parse(localStorage.getItem('snModem') || '{}'); if (o.v !== 2) { delete o.cmds; delete o.after; } return { ...SNM_DEF, ...o, v: 2 }; } catch(e) { return { ...SNM_DEF }; } })();
 const snmSave = () => { try { localStorage.setItem('snModem', JSON.stringify(SNM)); } catch(e) {} };
 let SN_PORTS = [], snmBusy = false, snmLog = [], snmSt = { t: '', c: '' };
 const snSerialOk = () => !!(window.isSecureContext && navigator.serial);
@@ -4966,13 +4966,14 @@ function snModemHtml(){
     </div>
     <p class="snmst ${snmSt.c}" id="sn-mst">${esc(snmSt.t || (SNM.auto ? 'После сканирования сим-карты программа сама подключится к модему, получит IP-адрес, запишет строку и скопирует этикетку.' : ''))}</p>
     <details style="margin-top:6px"><summary style="cursor:pointer" class="dim">Команды модема и журнал обмена</summary>
-      <div class="snin" style="margin-top:8px"><label><span class="flab">Команды получения IP (по одной в строке, пробуются по очереди)</span><textarea class="in mono" id="sn-cmds" rows="3" data-ph-keep>${esc(SNM.cmds)}</textarea></label>
-        <label><span class="flab">Команды после получения IP (выход из режима AT и перезагрузка)</span><textarea class="in mono" id="sn-after" rows="2" data-ph-keep>${esc(SNM.after)}</textarea></label>
+      <div class="snin" style="margin-top:8px"><label><span class="flab">Вход в режим AT-команд</span><input class="in mono" id="sn-enter" data-ph-keep value="${esc(SNM.enter)}"></label>
+        <label><span class="flab">Команды получения IP (по одной в строке, пробуются по очереди)</span><textarea class="in mono" id="sn-cmds" rows="3" data-ph-keep>${esc(SNM.cmds)}</textarea></label>
+        <label><span class="flab">Команды после получения IP (выход из режима AT и перезагрузка, по очереди)</span><textarea class="in mono" id="sn-after" rows="2" data-ph-keep>${esc(SNM.after)}</textarea></label>
         <label style="max-width:260px"><span class="flab">Ждать IP от модема, секунд</span><input class="in" id="sn-wait" type="number" min="3" max="180" value="${+SNM.wait || 30}"></label>
         <button class="btn sm ghost" data-act="snmDefaults" style="justify-self:start">Вернуть команды по умолчанию</button></div>
       <pre class="snlog" id="sn-log">${esc(snmLog.join('\n')) || 'Журнал пуст'}</pre></details></details>`;
 }
-const snmRedraw = () => { const m = $('sn-modem'); if (!m) return; const f = document.activeElement; if (f && m.contains(f) && /^(sn-cmds|sn-after|sn-wait)$/.test(f.id)) return; m.innerHTML = snModemHtml(); };
+const snmRedraw = () => { const m = $('sn-modem'); if (!m) return; const f = document.activeElement; if (f && m.contains(f) && /^(sn-enter|sn-cmds|sn-after|sn-wait)$/.test(f.id)) return; m.innerHTML = snModemHtml(); };
 const snmStatus = (t, c = '') => { snmSt = { t, c }; const e = $('sn-mst'); if (e) { e.textContent = t; e.className = 'snmst ' + c; } };
 const snmLogAdd = l => { snmLog.push(new Date().toTimeString().slice(0, 8) + ' ' + l); snmLog = snmLog.slice(-80); const e = $('sn-log'); if (e) { e.textContent = snmLog.join('\n'); e.scrollTop = e.scrollHeight; } };
 const snmLines = t => String(t || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
@@ -4988,15 +4989,13 @@ async function snModemIp(port, baud){
   const take = () => { const t = buf; buf = ''; snmLines(t).forEach(l => snmLogAdd('← ' + l)); return t; };
   const at = async (cmd, ms = 2500) => { buf = ''; await send(cmd + '\r'); await wait(/(\+ok|\bOK\b|ERR|ERROR)/i, ms); await sleep(120); return take(); };
   try {
-    // the AT command mode: silence, «+++», the answer «a», «a», the answer «+ok»; a modem already in the AT mode answers «AT» at once
-    await sleep(300); buf = ''; await send('+++');
-    if (await wait(/a/, 1500)) { take(); buf = ''; await send('a'); if (!(await wait(/\+ok/i, 1500))) { take(); throw new Error('Модем не подтвердил вход в режим AT-команд («+ok»)'); } take(); }
-    else { take(); const r = await at('AT', 1500); if (!/(\+ok|\bOK\b)/i.test(r)) throw new Error('Модем не отвечает — проверьте COM-порт, скорость и питание'); }
+    // the AT command mode: a pause, then «+++» with a carriage return; whatever the modem answers goes to the log
+    await sleep(300); buf = ''; let heard = false; await send((SNM.enter || '+++') + '\r'); await wait(/\S/, 1500); await sleep(300); heard = /\S/.test(buf); take();
     snmStatus('Модем в режиме AT-команд, ждём IP-адрес…');
     const cmds = snmLines(SNM.cmds), end = Date.now() + Math.min(180, Math.max(3, +SNM.wait || 30)) * 1000; let ip = '';
     if (!cmds.length) throw new Error('Не указаны команды получения IP');
-    while (!ip && Date.now() < end) { for (const c of cmds) { ip = snmIpOf((await at(c)).replace(c, '')); if (ip) break; } if (!ip) { snmStatus('Модем ещё не получил IP-адрес — ждём…'); await sleep(2000); } }
-    if (!ip) throw new Error('Модем не сообщил IP-адрес за ' + (+SNM.wait || 30) + ' с');
+    while (!ip && Date.now() < end) { for (const c of cmds) { const r = await at(c); if (/\S/.test(r)) heard = true; ip = snmIpOf(r.replace(c, '')); if (ip) break; } if (!ip) { snmStatus('Модем ещё не получил IP-адрес — ждём…'); await sleep(2000); } }
+    if (!ip) { for (const c of snmLines(SNM.after).filter(c => /ENTM/i.test(c))) await at(c, 2000); throw new Error(heard ? 'Модем не сообщил IP-адрес за ' + (+SNM.wait || 30) + ' с — ответы в журнале обмена' : 'Модем не отвечает — проверьте COM-порт, скорость и питание'); }
     // leave the AT command mode and restart the modem
     for (const c of snmLines(SNM.after)) { await at(c, 2000); }
     return ip;
@@ -5022,6 +5021,7 @@ document.addEventListener('change', e => { const t = e.target; if (!t || !t.id) 
   if (t.id === 'sn-auto') { SNM.auto = t.checked; snmSave(); snmStatus(''); snmRedraw(); if (SNM.auto && !SN_PORTS.length) snmStatus('Выберите COM-порт модема', 'err'); else if (SNM.auto && ui.snPend?.iccid && !ui.snIp4On) snAutoIp(); }
   else if (t.id === 'sn-port') { SNM.port = +t.value || 0; snmSave(); }
   else if (t.id === 'sn-baud') { SNM.baud = +t.value === 9600 ? 9600 : 115200; snmSave(); }
+  else if (t.id === 'sn-enter') { SNM.enter = t.value.trim() || '+++'; snmSave(); }
   else if (t.id === 'sn-cmds' || t.id === 'sn-after') { SNM[t.id === 'sn-cmds' ? 'cmds' : 'after'] = t.value; snmSave(); }
   else if (t.id === 'sn-wait') { SNM.wait = Math.min(180, Math.max(3, +t.value || 30)); snmSave(); } });
 async function snCopyTxt(t){
@@ -7978,7 +7978,7 @@ async function act(el){
     case 'snmToggle': ui.snmOpen = !el.parentElement.open; return;
     case 'snmPick': try { const pt = await navigator.serial.requestPort(); await snPortsLoad(); SNM.port = Math.max(0, SN_PORTS.indexOf(pt)); snmSave(); snmRedraw(); snmStatus('COM-порт выбран: ' + snPortName(pt, SNM.port), 'ok'); } catch(e) { if (e && e.name !== 'NotFoundError') toast(e.message || 'Не удалось выбрать порт'); } return;
     case 'snmGet': return snAutoIp();
-    case 'snmDefaults': SNM.cmds = SNM_DEF.cmds; SNM.after = SNM_DEF.after; SNM.wait = SNM_DEF.wait; snmSave(); snmRedraw(); return;
+    case 'snmDefaults': SNM.enter = SNM_DEF.enter; SNM.cmds = SNM_DEF.cmds; SNM.after = SNM_DEF.after; SNM.wait = SNM_DEF.wait; snmSave(); snmRedraw(); return;
     case 'snLblPng': { const x = SNMAP.find(e => e.id === id); if (!x) return; snLabel(x).toBlob(bl => { const a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = `Этикетка ${x.imei || x.sn || x.no}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }, 'image/png'); return; }
     case 'snLblCopy': { const x = SNMAP.find(e => e.id === id); if (!x) return; const ok = await snCopyImg(snLabel(x)); toast(ok === 'img' ? 'Этикетка скопирована — вставьте её (Ctrl+V)' : ok === 'html' ? 'Скопирована только для Word/Excel — для других программ нажмите «⬇ Этикетка»' : 'Не удалось скопировать — нажмите «⬇ Этикетка»'); return; }
     case 'snCopyHost': toast(await snCopyTxt(location.origin) ? 'Адрес скопирован' : location.origin); return;
