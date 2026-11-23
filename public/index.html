@@ -5059,7 +5059,16 @@ function snfOpen(){
     if (b.dataset.f === 'close') dl.close();
     else if (b.dataset.f === 'del') { e.preventDefault(); if (!confirm('Удалить конфигурацию?')) return; try { SNCFG = (await api('DELETE', '/api/snmap/cfg/' + b.dataset.id)).list; if (snf.sel === b.dataset.id) snf.sel = SNCFG[0]?.id || ''; snfDraw(); } catch(err) { toast(errText(err)); } }
     else if (b.dataset.f === 'go') snfFlash(); });
-  dl.showModal(); if (!SNCFG) snfLoad(); else snfLoad();
+  dl.showModal(); snfPlace(); snfLoad();
+  const onR = () => snfPlace(); addEventListener('resize', onR); addEventListener('scroll', onR, true); dl.addEventListener('close', () => { removeEventListener('resize', onR); removeEventListener('scroll', onR, true); });
+}
+// the window stands over the panel «Модем USR-G771» (its left top corner and width); on a narrow screen — in the middle
+function snfPlace(){
+  const d = document.getElementById('snfDlg'), m = document.querySelector('.snmod'); if (!d) return;
+  const W = innerWidth, r = m && m.getBoundingClientRect();
+  if (!r || W < 700 || !r.width) { d.style.cssText = ''; return; }
+  const w = Math.min(W - 16, Math.max(r.width, 460)), left = Math.max(8, Math.min(r.left, W - w - 8)), top = Math.max(8, Math.min(r.top, innerHeight - 120));
+  d.style.cssText = `position:fixed;margin:0;inset:auto;left:${left}px;top:${top}px;width:${w}px;max-width:${w}px;max-height:${innerHeight - top - 8}px;overflow:auto`;
 }
 async function snfFlash(){
   const x = SNCFG && SNCFG.find(e => e.id === snf.sel), port = SN_PORTS[SNM.port]; if (!x || !port || snf.busy || snmBusy) return;
