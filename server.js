@@ -103,7 +103,10 @@ function cleanJob(d){
   if ('orderId' in d) out.orderId = d.orderId && db.orders[d.orderId] ? d.orderId : null;
   if ('leaderId' in d) { const l = orgUsers().find(u => u.id === d.leaderId); out.leaderId = l && HEAD(l) ? l.id : null; }
   // a work: «Производство», «Монтаж» or both; the customer; documents
-  if ('kind' in d) out.kind = ['prod', 'mount', 'both'].includes(d.kind) ? d.kind : 'mount';
+  // «Эксплуатация» — a work of requests: each request has an executor and a vehicle
+  if ('kind' in d) out.kind = ['prod', 'mount', 'both', 'ops'].includes(d.kind) ? d.kind : 'mount';
+  // a priority work goes to the top of the list
+  if ('priority' in d) out.priority = !!d.priority;
   if ('customerId' in d) out.customerId = d.customerId && db.counterparties[d.customerId] ? d.customerId : null;
   if ('docs' in d) out.docs = (Array.isArray(d.docs) ? d.docs : []).filter(f => f && db.files[f.id]).slice(0, 200)
     .map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), size: db.files[f.id].size, type: db.files[f.id].type, at: db.files[f.id].at, by: db.files[f.id].by }));
@@ -2460,6 +2463,37 @@ async function api(req, res, url) {
     if (!ed) return fail(res, 403, 'Чек-лист меняет руководитель или администратор');
     if (m === 'PATCH') { const b = await readJsonBody(req) || {}, t = String(b.text ?? '').trim().slice(0, 300); if (!t) return fail(res, 400, 'Пустой пункт — удалите его'); it.text = t; it.editedAt = now; return out(); }
     if (m === 'DELETE') { L.splice(L.indexOf(it), 1); return out(); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Эксплуатация»: the requests of a work — what to do, by when, the executor (he becomes a worker of the work and sees it) and the vehicle, the state */
+  if (p[1] === 'jobs' && p[3] === 'reqs') {
+    const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
+    const own = it => it && it.assignee === user.id;
+    const L = j.reqs = Array.isArray(j.reqs) ? j.reqs : [], now = new Date().toISOString();
+    const t = (v, n) => String(v ?? '').trim().slice(0, n), day = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : '';
+    const who = v => v && orgUsers().some(u => u.id === v) ? String(v) : '';
+    const veh = v => taskVehicles(v ? [v] : [])[0] || '';
+    const out = () => { j.updatedAt = now; j.updatedBy = user.id; saveDb(); return send(res, 200, { ok: true, reqs: L, workers: j.workers || [], rev: db.rev }); };
+    const addWorker = id => { if (id && !(j.workers || []).includes(id)) j.workers = [...(j.workers || []), id]; };
+    if (m === 'POST' && !p[4]) {
+      if (!mayEditJob(user, j)) return fail(res, 403, 'Заявки добавляет руководитель или администратор');
+      const b = await readJsonBody(req) || {}, text = t(b.text, 3000); if (!text) return fail(res, 400, 'Напишите, что нужно сделать');
+      if (L.length >= 5000) return fail(res, 400, 'Слишком много заявок');
+      const x = { id: newId(), no: (L.reduce((a, r) => Math.max(a, r.no || 0), 0) + 1), text, address: t(b.address, 500), due: day(b.due), assignee: who(b.assignee), vehicle: veh(b.vehicle), status: 'new', comment: t(b.comment, 3000), at: now, by: user.id };
+      L.push(x); addWorker(x.assignee); return out();
+    }
+    const it = p[4] && L.find(x => x.id === p[4]); if (!it) return fail(res, 404, 'Заявка не найдена — обновите страницу');
+    if (m === 'PATCH') {
+      if (!(mayEditJob(user, j) || own(it))) return fail(res, 403, 'Заявку меняет руководитель, администратор или её исполнитель');
+      const b = await readJsonBody(req) || {}, head = mayEditJob(user, j);
+      if (head) { if (b.text !== undefined) { const v = t(b.text, 3000); if (!v) return fail(res, 400, 'Пустая заявка — удалите её'); it.text = v; }
+        if (b.address !== undefined) it.address = t(b.address, 500); if (b.due !== undefined) it.due = day(b.due);
+        if (b.assignee !== undefined) { it.assignee = who(b.assignee); addWorker(it.assignee); } if (b.vehicle !== undefined) it.vehicle = veh(b.vehicle); }
+      if (b.comment !== undefined) it.comment = t(b.comment, 3000);
+      if (b.status !== undefined && ['new', 'work', 'done'].includes(b.status)) { it.status = b.status; it.doneAt = b.status === 'done' ? now : null; it.doneBy = b.status === 'done' ? user.id : null; }
+      it.editedAt = now; it.editedBy = user.id; return out();
+    }
+    if (m === 'DELETE') { if (!mayEditJob(user, j)) return fail(res, 403, 'Удаляет руководитель или администратор'); L.splice(L.indexOf(it), 1); return out(); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'jobs' && p[3] === 'list' && ['todo', 'buy'].includes(p[4])) {
