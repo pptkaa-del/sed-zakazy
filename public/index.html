@@ -4841,7 +4841,7 @@ const SN_IP1 = 10, SN_IP2 = 178, snOct = v => /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d
 const snIp = s => String(s || '').replace(/\s+/g, '').replace(/[юЮ,бБ]/g, '.').toUpperCase();
 const snIpOk = v => /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(v) || (/^[0-9A-F:]+$/.test(v) && v.includes(':') && v.length >= 3);
 const snDup = (k, v, self) => Array.isArray(SNMAP) && v ? SNMAP.find(e => e.id !== self && e[k] === v) : null;
-const snQrText = x => `IMEI:${x.imei},SN:${x.sn},ICCID:${x.iccid}`;
+const snQrText = x => `IMEI:${x.imei},SN:${x.sn}`;
 function vSnmap(){
   if (!SNMAP) { loadSnmap(); return '<div class="empty">Загружаем…</div>'; }
   if (SNMAP.err) return `<div class="empty"><h3>Раздел недоступен</h3>${esc(SNMAP.err)}</div>`;
@@ -4918,7 +4918,8 @@ function snLabel(x){
   const W = 680, H = 520, K = 2, c = document.createElement('canvas'); c.width = W * K; c.height = H * K;
   const g = c.getContext('2d'); g.scale(K, K); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = g.strokeStyle = '#000'; g.textBaseline = 'alphabetic';
   const F = (sz, fam = '"Times New Roman", Times, serif') => g.font = `bold ${sz}px ${fam}`;
-  const txt = (t, x, y, sz, max, al = 'left') => { F(sz); while (max && g.measureText(t).width > max && sz > 10) F(--sz); g.textAlign = al; g.fillText(t, x, y); };
+  // the text is bold and thickened with an outline of its own colour — reads well after printing on a thermal printer
+  const txt = (t, x, y, sz, max, al = 'left') => { F(sz); while (max && g.measureText(t).width > max && sz > 10) F(--sz); g.textAlign = al; g.lineJoin = 'round'; g.lineWidth = Math.max(0.8, sz * 0.035); g.fillText(t, x, y); g.strokeText(t, x, y); };
   txt('VBox коммуникатор (модем)', W / 2, 52, 40, W - 20, 'center');
   [['Model: VBox'], ['Type: -E'], ['Input: DC9-36V'], ['IMEI: ' + (x.imei || '—')], ['SN: ' + (x.sn || '—')], ['Serial Param: 115200/N/8/1']].forEach(([t], i) => txt(t, 16, 120 + i * 45.5, 26, 400));
   // the QR code without the white border (the label is white itself)
@@ -4931,7 +4932,7 @@ function snLabel(x){
   g.fillRect(130 - R - 6, cy - 6, R + 4, 12);
   // RoHS: the tick and the word
   g.beginPath(); g.moveTo(210, 405); g.lineTo(225, 398); g.lineTo(235, 418); g.lineTo(262, 374); g.lineTo(272, 381); g.lineTo(237, 438); g.closePath(); g.fill();
-  F(28, 'Arial, Helvetica, sans-serif'); g.textAlign = 'center'; g.fillText('RoHS', 232, 466);
+  F(28, 'Arial, Helvetica, sans-serif'); g.textAlign = 'center'; g.lineWidth = 1.4; g.fillText('RoHS', 232, 466); g.strokeText('RoHS', 232, 466);
   // ЕАС
   const ey = 377, eh = 90, sw = 8, lw = 26;
   let ex = 300; g.fillRect(ex, ey, sw, eh); [0, (eh - sw) / 2, eh - sw].forEach(d => g.fillRect(ex, ey + d, lw, sw));
