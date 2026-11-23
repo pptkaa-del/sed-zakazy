@@ -2534,6 +2534,7 @@ function jobStaffTab(j){
     ${jobPlanBox(j)}
     ${ed ? `<div class="jpcard">${jobPlanNew(j.kind || 'mount', j, true)}</div>` : ''}
     ${kitBox(j)}
+    ${isMount(j) ? jobPhotoBox(j) : ''}
     ${isMount(j) ? jobAssignBox(j) : ''}`;
 }
 function orderDetail(o, win){
@@ -6652,7 +6653,7 @@ function vPlan(){
 
 /* ---------- drawer ---------- */
 function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const WIN = k => k === 'job' || k === 'prodWin'; if (WIN(kind)) ui.drawerBack = null; else if (ui.drawer && WIN(ui.drawer.kind) && ui.drawer.ctx !== 'full') ui.drawerBack = { ...ui.drawer };   // a form opened from the window returns to it
-  $('drawer').classList.toggle('jobwin', (kind === 'job' && ctx !== 'full') || kind === 'prodWin' || kind === 'jobForm');   /* a new work — the same window as an opened one */ const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
+  $('drawer').classList.toggle('jobwin', (kind === 'job' && ctx !== 'full') || kind === 'prodWin' || kind === 'jobForm' || (kind === 'writeoff' && !!ui.drawerBack && WIN(ui.drawerBack.kind)));   /* a new work — the same window as an opened one */ const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
   if (kind === 'ipContract' || kind === 'ipInvoice') $('drawer').classList.add('wide'); $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
@@ -6667,7 +6668,9 @@ function closeDrawer(){
   if (back && ui.drawer && !['job', 'prodWin'].includes(ui.drawer.kind) && (back.kind === 'job' ? jobOf(back.id) : ord(back.id))) return openDrawer(back.kind, back.id, back.ctx);
   $('drawer').classList.remove('jobwin'); ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const renderDrawerBase = renderDrawer;
-renderDrawer = function(){ renderDrawerBase(); supMarkAll(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
+renderDrawer = function(){ renderDrawerBase(); supMarkAll();
+  // the write-off list opened from the window of a production or a work: «← Назад» returns there
+  if (ui.drawer?.kind === 'writeoff' && ['prodWin', 'job'].includes(ui.drawerBack?.kind)) { const b = $('drawer').querySelector('.d-body'); if (b && !b.querySelector('.woback')) b.insertAdjacentHTML('afterbegin', `<div class="row-g woback"><button class="btn sm" type="button" data-act="drawerBack">← Назад ${ui.drawerBack.kind === 'prodWin' ? 'в производство' : 'в работу'}</button></div>`); } if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
 const opt = (obj, sel) => Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?'selected':''}>${v}</option>`).join('');
 // where an invoice goes: an order (production), or a work without production («job:<id>»); opened from a work — that work is chosen
@@ -7640,8 +7643,7 @@ function renderDrawer(){
           <table class="pers"><tbody>${Object.entries(byPerson).sort((x, y) => (x[0] ? 0 : 1) - (y[0] ? 0 : 1) || who(x[0]).localeCompare(who(y[0]), 'ru')).map(([id, r]) => `<tr><td>${id ? esc(who(id)) : '<span class="warn-t">без исполнителя</span>'}</td><td class="mono">${r.c} / ${r.t}</td></tr>`).join('')}</tbody></table>`
           : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Карта объектов»: выделите точки → «Добавить точки к работе».</p>'}
         <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${HEADish() && closed ? `<button class="btn sm" data-act="jobDone" data-id="${j.id}">Выполненные точки · ${closed}</button>` : ''}${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в карте объектов</button>` : ''}</div></div>
-      ${isMount(j) ? jobMatBox(j) : ''}
-      ${jobPhotoBox(j)}` : ''}
+      ${isMount(j) ? jobMatBox(j) : ''}` : ''}
       </div>
       <div class="err" id="ferr"></div>
       <div class="row-g">${ed ? (j.status === 'done' ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Вернуть в работу</button>` : `<button class="btn sm ok" data-act="jobStatus" data-id="${j.id}|done">✓ Работа выполнена</button>`) : ''}
@@ -8391,6 +8393,7 @@ async function act(el){
     case 'calDay': document.activeElement?.blur?.(); ui.calD = id; ui.calM = id.slice(0, 7); ui.calEd = null; return render();
     case 'calMon': { const [y, m] = (ui.calM || today().slice(0, 7)).split('-').map(Number), t = new Date(y, m - 1 + Number(id), 1); ui.calM = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`; return render(); }
     case 'calSave': return calSave();
+    case 'drawerBack': { const b = ui.drawerBack; if (!b) return closeDrawer(); ui.drawerBack = null; return openDrawer(b.kind, b.id, b.ctx); }
     case 'jobPrio': { const j = jobOf(id); if (!j) return; try { await upd('jobs', id, { priority: !j.priority }); renderDrawer(); toast(j.priority ? 'Работа приоритетная — она в начале списка' : 'Приоритет снят'); } catch(e) { toast(errText(e)); } return; }
     case 'jrqAdd': { const g = k => ($(k)?.value || '').trim(); if (!g('rq-text')) { $('rq-text')?.focus(); return toast('Напишите, что нужно сделать'); }
       document.activeElement?.blur?.(); try { await jreqApi(id, 'POST', '', { text: g('rq-text'), address: g('rq-addr'), due: g('rq-due'), assignee: g('rq-as'), vehicle: g('rq-veh') }); renderDrawer(); toast('Заявка добавлена'); } catch(e) { toast(errText(e)); } return; }
