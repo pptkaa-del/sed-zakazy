@@ -1480,9 +1480,9 @@ const PLAN_KIND = { prod:'Изготовление', mount:'Монтаж' };
 /* «План-график» in the form of a work: the employees and the vehicles taking part and the dates — the work goes into the plan as a task;
    when editing, a task of the work is chosen (its data fill the fields and are changed on «Сохранить») or «+ Новая задача» is added */
 const jpTasks = j => j ? S.tasks.filter(t => t.jobId === j.id).sort((a, b) => String(a.start).localeCompare(String(b.start))) : [];
-function jobPlanNew(kind, j){
-  const T = jpTasks(j), t = T[0] || null, st = t?.start || today(), on = !j || T.length > 0;
-  return `<fieldset class="wide jfplan"><legend><label class="chk"><input type="checkbox" id="jp-on" ${on ? 'checked' : ''}> ${j ? (T.length ? 'Изменить в план-графике' : 'Внести в план-график') : 'Сразу внести в план-график'}</label></legend>
+function jobPlanNew(kind, j, card){
+  const T = jpTasks(j), t = T[0] || null, st = t?.start || today(), on = card || !j || T.length > 0;
+  return `<fieldset class="wide jfplan"><legend>${card ? `Сотрудники, транспорт и даты в план-графике` : `<label class="chk"><input type="checkbox" id="jp-on" ${on ? 'checked' : ''}> ${j ? (T.length ? 'Изменить в план-графике' : 'Внести в план-график') : 'Сразу внести в план-график'}</label>`}</legend>
     <div id="jp-box" class="form" ${on ? '' : 'hidden'} style="padding:0">
       ${T.length ? `<label class="wide">Задача в план-графике<select class="in" id="jp-task">${T.map(x => `<option value="${x.id}">${esc((PLAN_KIND[x.kind] || '') + ' · ' + x.title + ' · ' + fmtD(x.start) + ' – ' + fmtD(x.end))}</option>`).join('')}<option value="new">+ Новая задача</option></select></label>` : ''}
       <div class="wide" id="jp-kind-w" ${kind === 'both' ? '' : 'hidden'}><span style="font-size:13px;color:var(--ink-2)">Задача в графике</span><div class="seg kindseg" style="margin-top:6px">${Object.entries(PLAN_KIND).map(([k, n]) => { const c = (t?.kind || 'mount') === k; return `<label class="${c ? 'on' : ''}"><input type="radio" name="jp-kind" value="${k}" ${c ? 'checked' : ''}> ${n}</label>`; }).join('')}</div></div>
@@ -1491,7 +1491,17 @@ function jobPlanNew(kind, j){
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействованы сотрудники</span><div class="tstaff">${STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<label class="chk"><input type="checkbox" name="jp-staff" value="${u.id}" ${(t?.staff || []).includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('') || '<span class="dim">Сотрудников нет</span>'}</div></div>
       <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействован транспорт</span>${VEH_BRIEF.length ? `<div class="tstaff">${VEH_BRIEF.map(v => `<label class="chk"><input type="checkbox" name="jp-veh" value="${v.id}" ${(t?.vehicles || []).includes(v.id) ? 'checked' : ''}> ${esc(v.name)}${v.plate ? ` <small class="dim">${esc(v.plate)}</small>` : ''}</label>`).join('')}</div>` : '<div class="dim" style="margin-top:6px">Транспорта нет</div>'}</div>
       <label class="wide chk"><input type="checkbox" id="jp-we" ${t && taskWe(t) ? 'checked' : ''}> В том числе выходные дни <small class="dim">— без отметки выходные и праздники в графике не заполняются</small></label>
+      ${card ? `<div class="wide row-g"><button class="btn primary sm" data-act="jpCardSave" data-id="${j.id}">${T.length ? 'Сохранить в план-графике' : 'Внести в план-график'}</button></div>` : ''}
     </div></fieldset>`;
+}
+// the data of the block; a string — the error
+function jpRead(root, kindV){
+  const g = id => (root.querySelector('#' + id)?.value || '').trim();
+  const jp = { task: g('jp-task'), start: g('jp-start'), end: g('jp-end'), kind: kindV === 'both' ? (root.querySelector('[name=jp-kind]:checked')?.value || 'mount') : kindV,
+    staff: [...root.querySelectorAll('input[name=jp-staff]:checked')].map(x => x.value), vehicles: [...root.querySelectorAll('input[name=jp-veh]:checked')].map(x => x.value), weekends: !!root.querySelector('#jp-we')?.checked };
+  if (!jp.start || !jp.end) return 'Укажите даты начала и окончания в блоке «План-график».';
+  if (jp.end < jp.start) return 'План-график: окончание не может быть раньше начала.';
+  return jp;
 }
 // another task of the work is chosen in the form — its data go into the fields
 function jpFill(tid){
@@ -7494,11 +7504,12 @@ function renderDrawer(){
           <table class="pers"><tbody>${Object.entries(byPerson).sort((x, y) => (x[0] ? 0 : 1) - (y[0] ? 0 : 1) || who(x[0]).localeCompare(who(y[0]), 'ru')).map(([id, r]) => `<tr><td>${id ? esc(who(id)) : '<span class="warn-t">без исполнителя</span>'}</td><td class="mono">${r.c} / ${r.t}</td></tr>`).join('')}</tbody></table>`
           : '<p class="dim" style="margin:0">Точек пока нет. Добавьте их на вкладке «Карта объектов»: выделите точки → «Добавить точки к работе».</p>'}
         <div class="row-g"><button class="btn sm primary" data-act="jobReport" data-id="${j.id}">Отчёт</button>${HEADish() && closed ? `<button class="btn sm" data-act="jobDone" data-id="${j.id}">Выполненные точки · ${closed}</button>` : ''}${canEdit() ? `<button class="btn sm" data-act="gotoDtJob" data-id="${j.id}">Открыть в карте объектов</button>` : ''}</div></div>
-      ${jobPlanBox(j)}
       ${isMount(j) ? jobMatBox(j) : ''}
       ${jobPhotoBox(j)}
       ${jobAssignBox(j)}
       ${P.length ? `<div class="box"><h4>Где</h4>${jobPlacesHtml(j)}</div>` : ''}` : ''}
+      ${jobPlanBox(j)}
+      ${ed ? `<div class="jpcard">${jobPlanNew(j.kind || 'mount', j, true)}</div>` : ''}
       <div class="err" id="ferr"></div>
       <div class="row-g">${ed ? (j.status === 'done' ? `<button class="btn sm" data-act="jobStatus" data-id="${j.id}|work">Вернуть в работу</button>` : `<button class="btn sm ok" data-act="jobStatus" data-id="${j.id}|done">✓ Работа выполнена</button>`) : ''}
         ${ed ? `<button class="btn sm" data-act="editJob" data-id="${j.id}">Изменить</button>${armBtn('job', 'Удалить работу', 'delJob', j.id)}` : ''}
@@ -7891,9 +7902,8 @@ async function onSubmit(e){
       const files = [...($('j-files').files || [])];
       for (const fl of files) { fail(`Загружаем «${fl.name}»…`); const u = await upload(fl); docs.push({ id:u.id, name:u.name }); }
       // «Сразу внести в план-график» — checked before the work is created
-      const jp = $('jp-on')?.checked ? { task: $('jp-task')?.value || '', start: val('jp-start'), end: val('jp-end'), kind: kindV === 'both' ? (f.querySelector('[name=jp-kind]:checked')?.value || 'mount') : kindV,
-        staff: [...f.querySelectorAll('input[name=jp-staff]:checked')].map(x => x.value), vehicles: [...f.querySelectorAll('input[name=jp-veh]:checked')].map(x => x.value), weekends: !!$('jp-we')?.checked } : null;
-      if (jp) { if (!jp.start || !jp.end) return fail('Укажите даты начала и окончания в блоке «План-график» или снимите отметку «Сразу внести в план-график».'); if (jp.end < jp.start) return fail('План-график: окончание не может быть раньше начала.'); }
+      const jp = $('jp-on')?.checked ? jpRead(f, kindV) : null;
+      if (typeof jp === 'string') return fail(jp + ' Или снимите отметку в этом блоке.');
       const prog = $('j-prog') ? $('j-prog').value.trim() : undefined;
       if (prog !== undefined && prog !== '' && !(Number(prog) >= 0 && Number(prog) <= 100)) return fail('Процент выполнения — от 0 до 100.');
       const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs,
@@ -8240,6 +8250,9 @@ async function act(el){
     case 'calDay': document.activeElement?.blur?.(); ui.calD = id; ui.calM = id.slice(0, 7); ui.calEd = null; return render();
     case 'calMon': { const [y, m] = (ui.calM || today().slice(0, 7)).split('-').map(Number), t = new Date(y, m - 1 + Number(id), 1); ui.calM = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`; return render(); }
     case 'calSave': return calSave();
+    case 'jpCardSave': { const j = jobOf(id), box = document.querySelector('#drawer .jpcard'); if (!j || !box) return;
+      const jp = jpRead(box, j.kind || 'mount'); if (typeof jp === 'string') return toast(jp);
+      el.disabled = true; try { const msg = await jpApply(j.id, jp, j.title, new Date().toISOString()); renderDrawer(); toast(msg.replace(/^, внесена в план-график/, 'Задача внесена в план-график').replace(/^, задача/, 'Задача')); } catch(e) { toast(errText(e)); el.disabled = false; } return; }
     case 'calEdit': document.activeElement?.blur?.(); ui.calEd = id; render(); $('cal-title')?.focus(); return;
     case 'calCancel': document.activeElement?.blur?.(); ui.calEd = null; return render();
     case 'calDel': try { CAL = (await api('DELETE', '/api/cal/' + id)).list; if (ui.calEd === id) ui.calEd = null; render(); toast('Запись удалена'); } catch(e) { toast(errText(e)); } return;
