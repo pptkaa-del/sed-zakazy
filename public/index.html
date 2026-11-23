@@ -1475,18 +1475,40 @@ const CP_ROLES = { customer:'Заказчик', supplier:'Поставщик', c
 // plan-schedule task types: «Изготовление» and «Монтаж»; «Закупка» and «Работа» stay only for tasks made before
 const KIND = { prod:'Изготовление', mount:'Монтаж', buy:'Закупка', work:'Работа' };
 const PLAN_KIND = { prod:'Изготовление', mount:'Монтаж' };
-/* «План-график» in the form of a new work: the employees and the vehicles taking part and the dates — the work goes into the plan at once as a task */
-function jobPlanNew(kind){
-  const st = today(), sv = ui.jpSave || {};
-  return `<fieldset class="wide jfplan"><legend><label class="chk"><input type="checkbox" id="jp-on" ${sv.on === false ? '' : 'checked'}> Сразу внести в план-график</label></legend>
-    <div id="jp-box" class="form" ${sv.on === false ? 'hidden' : ''} style="padding:0">
-      <div class="wide" id="jp-kind-w" ${kind === 'both' ? '' : 'hidden'}><span style="font-size:13px;color:var(--ink-2)">Задача в графике</span><div class="seg kindseg" style="margin-top:6px">${Object.entries(PLAN_KIND).map(([k, n], i) => `<label class="${i === 1 ? 'on' : ''}"><input type="radio" name="jp-kind" value="${k}" ${i === 1 ? 'checked' : ''}> ${n}</label>`).join('')}</div></div>
+/* «План-график» in the form of a work: the employees and the vehicles taking part and the dates — the work goes into the plan as a task;
+   when editing, a task of the work is chosen (its data fill the fields and are changed on «Сохранить») or «+ Новая задача» is added */
+const jpTasks = j => j ? S.tasks.filter(t => t.jobId === j.id).sort((a, b) => String(a.start).localeCompare(String(b.start))) : [];
+function jobPlanNew(kind, j){
+  const T = jpTasks(j), t = T[0] || null, st = t?.start || today(), on = !j || T.length > 0;
+  return `<fieldset class="wide jfplan"><legend><label class="chk"><input type="checkbox" id="jp-on" ${on ? 'checked' : ''}> ${j ? (T.length ? 'Изменить в план-графике' : 'Внести в план-график') : 'Сразу внести в план-график'}</label></legend>
+    <div id="jp-box" class="form" ${on ? '' : 'hidden'} style="padding:0">
+      ${T.length ? `<label class="wide">Задача в план-графике<select class="in" id="jp-task">${T.map(x => `<option value="${x.id}">${esc((PLAN_KIND[x.kind] || '') + ' · ' + x.title + ' · ' + fmtD(x.start) + ' – ' + fmtD(x.end))}</option>`).join('')}<option value="new">+ Новая задача</option></select></label>` : ''}
+      <div class="wide" id="jp-kind-w" ${kind === 'both' ? '' : 'hidden'}><span style="font-size:13px;color:var(--ink-2)">Задача в графике</span><div class="seg kindseg" style="margin-top:6px">${Object.entries(PLAN_KIND).map(([k, n]) => { const c = (t?.kind || 'mount') === k; return `<label class="${c ? 'on' : ''}"><input type="radio" name="jp-kind" value="${k}" ${c ? 'checked' : ''}> ${n}</label>`; }).join('')}</div></div>
       <label>Начало<input class="in" type="date" id="jp-start" value="${esc(st)}"></label>
-      <label>Окончание<input class="in" type="date" id="jp-end" value="${esc(dstr(dnum(st) + 7))}"><small class="dim" style="font-size:12px">По умолчанию — срок окончания работ</small></label>
-      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействованы сотрудники</span><div class="tstaff">${STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<label class="chk"><input type="checkbox" name="jp-staff" value="${u.id}"> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('') || '<span class="dim">Сотрудников нет</span>'}</div></div>
-      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействован транспорт</span>${VEH_BRIEF.length ? `<div class="tstaff">${VEH_BRIEF.map(v => `<label class="chk"><input type="checkbox" name="jp-veh" value="${v.id}"> ${esc(v.name)}${v.plate ? ` <small class="dim">${esc(v.plate)}</small>` : ''}</label>`).join('')}</div>` : '<div class="dim" style="margin-top:6px">Транспорта нет</div>'}</div>
-      <label class="wide chk"><input type="checkbox" id="jp-we"> В том числе выходные дни <small class="dim">— без отметки выходные и праздники в графике не заполняются</small></label>
+      <label>Окончание<input class="in" type="date" id="jp-end" value="${esc(t?.end || (j?.due && j.due >= st ? j.due : dstr(dnum(st) + 7)))}" ${t ? 'data-touched="1"' : ''}>${t ? '' : '<small class="dim" style="font-size:12px">По умолчанию — срок окончания работ</small>'}</label>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействованы сотрудники</span><div class="tstaff">${STAFF.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(u => `<label class="chk"><input type="checkbox" name="jp-staff" value="${u.id}" ${(t?.staff || []).includes(u.id) ? 'checked' : ''}> ${esc(u.name)} <small class="dim">${esc(ROLE_NAMES[u.role] || '')}</small></label>`).join('') || '<span class="dim">Сотрудников нет</span>'}</div></div>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Задействован транспорт</span>${VEH_BRIEF.length ? `<div class="tstaff">${VEH_BRIEF.map(v => `<label class="chk"><input type="checkbox" name="jp-veh" value="${v.id}" ${(t?.vehicles || []).includes(v.id) ? 'checked' : ''}> ${esc(v.name)}${v.plate ? ` <small class="dim">${esc(v.plate)}</small>` : ''}</label>`).join('')}</div>` : '<div class="dim" style="margin-top:6px">Транспорта нет</div>'}</div>
+      <label class="wide chk"><input type="checkbox" id="jp-we" ${t && taskWe(t) ? 'checked' : ''}> В том числе выходные дни <small class="dim">— без отметки выходные и праздники в графике не заполняются</small></label>
     </div></fieldset>`;
+}
+// another task of the work is chosen in the form — its data go into the fields
+function jpFill(tid){
+  const t = S.tasks.find(x => x.id === tid), f = $('jp-box'); if (!f) return;
+  const st = t?.start || today(), e = $('jp-end');
+  $('jp-start').value = st; e.value = t?.end || dstr(dnum(st) + 7); if (t) e.dataset.touched = '1'; else delete e.dataset.touched;
+  f.querySelectorAll('[name=jp-staff]').forEach(x => x.checked = !!t && (t.staff || []).includes(x.value));
+  f.querySelectorAll('[name=jp-veh]').forEach(x => x.checked = !!t && (t.vehicles || []).includes(x.value));
+  $('jp-we').checked = !!t && taskWe(t);
+  f.querySelectorAll('[name=jp-kind]').forEach(x => { x.checked = x.value === (t?.kind || 'mount'); x.closest('label').classList.toggle('on', x.checked); });
+}
+// the task of the plan from the block: a new one or the chosen one is changed; the answer — a piece of the message
+async function jpApply(jobId, jp, title, now){
+  let tid = jp.task && jp.task !== 'new' ? jp.task : '';
+  const old = tid && S.tasks.find(t => t.id === tid);
+  if (old) await upd('tasks', tid, { kind: jp.kind, staff: jp.staff, vehicles: jp.vehicles, start: jp.start, end: jp.end, weekends: jp.weekends, people: [...jp.staff].sort().join() !== [...(old.staff || [])].sort().join() ? jp.staff.length || Number(old.people) || 0 : Number(old.people) || 0 });   // «своих людей» follows the employees only when they are changed
+  else { tid = await add('tasks', { jobId, kind: jp.kind, staff: jp.staff, vehicles: jp.vehicles, resp: '', title, start: jp.start, end: jp.end, done: false, weekends: jp.weekends, people: jp.staff.length, brigades: 0, contractors: false, contractorsNote: '', createdAt: now }); }
+  const busy = jp.vehicles.flatMap(vid => S.tasks.filter(o => o.id !== tid && !o.done && (o.vehicles || []).includes(vid) && o.start <= jp.end && o.end >= jp.start).map(o => `«${vehLabel(vid)}» — «${o.title}»`));
+  return (old ? `, задача план-графика изменена (${fmtD(jp.start)} – ${fmtD(jp.end)})` : `, внесена в план-график (${fmtD(jp.start)} – ${fmtD(jp.end)})`) + (busy.length ? '. Внимание, транспорт уже занят в эти дни: ' + busy.slice(0, 3).join('; ') : '');
 }
 const planKinds = j => { const k = j ? j.kind || 'mount' : 'both'; return k === 'prod' ? { prod:PLAN_KIND.prod } : k === 'mount' ? { mount:PLAN_KIND.mount } : PLAN_KIND; };
 const ROLE_NAMES = { admin:'Администратор', head:'Руководитель', office:'Сотрудник офиса', accountant:'Бухгалтер', worker:'Сотрудник', contractor:'Подрядчик' };
@@ -7423,7 +7445,7 @@ function renderDrawer(){
       <label class="wide">Документы<input class="in" type="file" id="j-files" accept="${ACCEPT}" multiple>${j && (j.docs || []).length ? `<small class="dim" style="font-size:12px">Уже загружено: ${j.docs.length}. Новые файлы добавятся к ним.</small>` : ''}</label>
       <label class="wide" id="j-photos-w" ${kind === 'prod' ? 'hidden' : ''}>Какие фото нужны на каждой точке — по одному в строке<textarea class="in" id="j-photos" rows="3">${esc(j ? (j.photoSpec || []).join('\n') : 'Общий вид\nДо замены\nПосле замены')}</textarea><small class="dim" style="font-size:12px">Сотрудник увидит эти пункты в окне точки. Пусто — фото не обязательны.</small></label>
       <label class="wide">Описание (необязательно)<textarea class="in" id="j-desc" rows="2">${esc(j?.description || '')}</textarea></label>
-      ${!j && canEdit() ? jobPlanNew(kind) : ''}
+      ${canEdit() ? jobPlanNew(kind, j) : ''}
       </div>
       ${kind !== 'prod' ? '<p class="hint" style="margin:0">Точки к работе добавляются на вкладке «Карта объектов», там же их назначают сотрудникам.</p>' : ''}
       <div class="err" id="ferr"></div>
@@ -7794,7 +7816,7 @@ async function onSubmit(e){
       const files = [...($('j-files').files || [])];
       for (const fl of files) { fail(`Загружаем «${fl.name}»…`); const u = await upload(fl); docs.push({ id:u.id, name:u.name }); }
       // «Сразу внести в план-график» — checked before the work is created
-      const jp = !d.id && $('jp-on')?.checked ? { start: val('jp-start'), end: val('jp-end'), kind: kindV === 'both' ? (f.querySelector('[name=jp-kind]:checked')?.value || 'mount') : kindV,
+      const jp = $('jp-on')?.checked ? { task: $('jp-task')?.value || '', start: val('jp-start'), end: val('jp-end'), kind: kindV === 'both' ? (f.querySelector('[name=jp-kind]:checked')?.value || 'mount') : kindV,
         staff: [...f.querySelectorAll('input[name=jp-staff]:checked')].map(x => x.value), vehicles: [...f.querySelectorAll('input[name=jp-veh]:checked')].map(x => x.value), weekends: !!$('jp-we')?.checked } : null;
       if (jp) { if (!jp.start || !jp.end) return fail('Укажите даты начала и окончания в блоке «План-график» или снимите отметку «Сразу внести в план-график».'); if (jp.end < jp.start) return fail('План-график: окончание не может быть раньше начала.'); }
       const prog = $('j-prog') ? $('j-prog').value.trim() : undefined;
@@ -7804,14 +7826,11 @@ async function onSubmit(e){
         features:($('j-feat').value || '').trim(), happening:($('j-happen').value || '').trim(), ...(prog !== undefined ? { progress: prog === '' ? null : Math.round(Number(prog)) } : {}), ...(!old || old.status !== $('j-status').value ? { status: $('j-status').value } : {}),
         photoSpec: kindV === 'prod' ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
-      if (d.id) { const was = old?.status; await upd('jobs', d.id, data); if (data.status === 'done' && was !== 'done') { openDrawer('warranty', d.id); toast('Работа выполнена — установите гарантийный срок'); } else { openDrawer('job', d.id); toast('Работа сохранена'); } }
+      if (d.id) { const was = old?.status; await upd('jobs', d.id, data); const planMsg = jp ? (fail('Вносим в план-график…'), await jpApply(d.id, jp, data.title, now)) : '';
+        if (data.status === 'done' && was !== 'done') { openDrawer('warranty', d.id); toast('Работа выполнена — установите гарантийный срок' + planMsg); } else { openDrawer('job', d.id); toast('Работа сохранена' + planMsg); } }
       else { const id = await add('jobs', data);
         let planMsg = '';
-        if (jp) { fail('Вносим в план-график…');
-          await add('tasks', { jobId: id, kind: jp.kind, staff: jp.staff, vehicles: jp.vehicles, resp: '', title: data.title, start: jp.start, end: jp.end, done: false, weekends: jp.weekends, people: jp.staff.length, brigades: 0, contractors: false, contractorsNote: '', createdAt: now });
-          const tid = S.tasks.find(t => t.jobId === id)?.id;
-          const busy = jp.vehicles.flatMap(vid => S.tasks.filter(o => o.id !== tid && !o.done && (o.vehicles || []).includes(vid) && o.start <= jp.end && o.end >= jp.start).map(o => `«${vehLabel(vid)}» — «${o.title}»`));
-          planMsg = `, внесена в план-график (${fmtD(jp.start)} – ${fmtD(jp.end)})` + (busy.length ? '. Внимание, транспорт уже занят в эти дни: ' + busy.slice(0, 3).join('; ') : ''); }
+        if (jp) { fail('Вносим в план-график…'); planMsg = await jpApply(id, { ...jp, task: '' }, data.title, now); }
         ui.jpSave = null; openDrawer('job', id); const o = ord(jobOf(id)?.orderId); toast((o ? `Работа создана, заказ на производство ${o.number} создан` : 'Работа создана') + planMsg + (kindV === 'prod' || /транспорт уже занят/.test(planMsg) ? '' : ' — добавьте к ней точки на вкладке «Карта объектов»')); }
     }
     if (kind === 'income') {
@@ -8904,6 +8923,7 @@ document.addEventListener('change', async e => {
     try { const r = await api('PATCH', '/api/notes/' + nid, { share }); const n = NOTES.find(x => x.id === nid); if (n) Object.assign(n, r.note); toast('Участники изменены'); } catch(err) { toast(errText(err)); } return; }
   if (t.id === 'rep-day') { ui.repDay = t.value || today(); return renderDrawer(); }
   if (t.id === 'jp-on') { $('jp-box').hidden = !t.checked; return; }
+  if (t.id === 'jp-task') { jpFill(t.value); return; }
   if (t.name === 'jp-kind') { t.closest('.kindseg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); return; }
   if (t.id === 'jp-end') { t.dataset.touched = '1'; return; }
   if (t.id === 'j-due' && $('jp-end') && !$('jp-end').dataset.touched && t.value && t.value >= ($('jp-start')?.value || '')) { $('jp-end').value = t.value; return; }
