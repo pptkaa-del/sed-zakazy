@@ -272,6 +272,8 @@ table.lines tr.ln-miss td{background:var(--warn-soft)}table.lines tr.ln-miss td:
 .wpanel{padding:14px 18px 16px;background:var(--paper);border-top:1px dashed var(--rule);display:flex;flex-direction:column;gap:14px}.wp-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.wp-col{display:flex;flex-direction:column;gap:12px}
 .wpanel h5{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}.wp-desc{margin:0;white-space:pre-wrap}.wl-ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}.wl-th{display:flex;margin-top:4px}.wl-th img{width:64px;height:48px}
 @media (max-width:900px){.wjr{grid-template-columns:1fr 1fr}.wjr.whead{display:none}.wjr>.wl-name{grid-column:1/-1}.wjr [data-l]::before{content:attr(data-l);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2)}.wp-grid{grid-template-columns:1fr}}
+/* the card of a work: a window over the list (on a phone — the whole screen) */
+:root aside.drawer.jobwin{inset:3vh auto auto 50%;transform:translateX(-50%);width:min(1000px,96vw);max-width:none;height:calc(94dvh / var(--pz,1))!important;border-radius:12px;border:1px solid var(--rule);box-shadow:var(--shadow)}@media (max-width:700px){:root aside.drawer.jobwin{inset:0;transform:none;width:100%;height:calc(100dvh / var(--pz,1))!important;border-radius:0}}
 aside.drawer.whole{inset:0;width:100%;max-width:none;height:100%;height:100dvh;border-radius:0;z-index:3000}.scrim.whole{z-index:2999}aside.drawer.whole .d-body{max-width:1100px;width:100%;margin:0 auto}
 .devgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .devcard{padding:14px 16px;display:flex;flex-direction:column;gap:6px;cursor:pointer}.devcard:hover{border-color:var(--stamp)}.devcard h3{margin:0;font-size:17px}.devcard p{margin:0;color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
@@ -1596,16 +1598,28 @@ function errText(err){
   return (err?.message || 'Нет связи с сервером').replace(/\.$/,'') + '.';
 }
 /* ---------- editing a text right where it is shown: double click, Enter saves (Shift+Enter — a new line in long texts), Esc cancels ---------- */
-const edAttr = (col, id, field, multi) => canEdit() || col === 'notes' ? `data-ed="${col}|${esc(id)}|${field}${multi ? '|m' : ''}" title="Дважды щёлкните, чтобы изменить"` : '';
-const edValue = (col, id, field) => { const x = col === 'snmap' ? (Array.isArray(SNMAP) ? SNMAP : []).find(n => n.id === id) : col === 'notes' ? NOTES.find(n => n.id === id) : (S[col] || []).find(d => d.id === id); return x ? String(x[field] ?? '') : ''; };
+// the 4th argument: true — a long text, or the kind of the field: 'date', 'num', 'sel' (the choices — edOpts), 'cp' (a counterparty by name)
+const edAttr = (col, id, field, multi) => canEdit() || col === 'notes' ? `data-ed="${col}|${esc(id)}|${field}${multi === true ? '|m' : multi ? '|' + multi : ''}" title="Дважды щёлкните, чтобы изменить"` : '';
+const edOpts = (col, field) => col === 'jobs' && field === 'kind' ? Object.entries(WORK_KIND) : col === 'jobs' && field === 'status' ? Object.entries(JOB_ST).filter(([k]) => k !== 'done') : [];
+const edValue = (col, id, field) => { const x = col === 'snmap' ? (Array.isArray(SNMAP) ? SNMAP : []).find(n => n.id === id) : col === 'notes' ? NOTES.find(n => n.id === id) : (S[col] || []).find(d => d.id === id); if (!x) return '';
+  if (col === 'jobs' && field === 'customerId') return cpOf(x.customerId)?.name || '';
+  if (col === 'jobs' && field === 'photoSpec') return (x.photoSpec || []).join('\n');
+  if (col === 'jobs' && field === 'kind') return x.kind || 'mount';
+  return String(x[field] ?? ''); };
 let edActive = null;
 document.addEventListener('dblclick', e => {
   const el = e.target.closest('[data-ed]'); if (!el || edActive) return;
   e.preventDefault(); window.getSelection()?.removeAllRanges();
   const [col, id, field, m] = el.dataset.ed.split('|'), multi = m === 'm', old = edValue(col, id, field);
-  const inp = document.createElement(multi ? 'textarea' : 'input'); inp.className = 'in ed-in'; inp.value = old; if (multi) inp.rows = Math.min(8, Math.max(2, old.split('\n').length + 1));
+  let inp;
+  if (m === 'sel') { inp = document.createElement('select'); edOpts(col, field).forEach(([k, l]) => { const o = document.createElement('option'); o.value = k; o.textContent = l; inp.appendChild(o); }); inp.value = old; }
+  else { inp = document.createElement(multi ? 'textarea' : 'input'); if (m === 'date') inp.type = 'date'; if (m === 'num') { inp.type = 'number'; inp.min = '0'; }
+    if (m === 'cp') { const dl = document.createElement('datalist'); dl.id = 'ed-cp-list'; cpsSorted().forEach(c => { const o = document.createElement('option'); o.value = c.name; dl.appendChild(o); }); el.appendChild(dl); inp.setAttribute('list', 'ed-cp-list'); inp.placeholder = 'Контрагент'; }
+    inp.value = old; if (multi) inp.rows = Math.min(8, Math.max(2, old.split('\n').length + 1)); }
+  inp.className = 'in ed-in';
   const keep = document.createElement('span'); keep.dataset.keep = ''; keep.style.display = 'contents'; keep.appendChild(inp);
-  edActive = { el, html: el.innerHTML }; el.innerHTML = ''; el.appendChild(keep); el.classList.add('editing'); inp.focus(); inp.select();
+  edActive = { el, html: el.innerHTML }; const dlist = el.querySelector('#ed-cp-list'); el.innerHTML = ''; el.appendChild(keep); if (dlist) el.appendChild(dlist); el.classList.add('editing'); inp.focus(); inp.select?.();
+  if (m === 'sel') inp.addEventListener('change', () => finish(true));
   let done = false;
   const finish = async save => {
     if (done) return; done = true; const v = inp.value.trim(); edActive = null; el.classList.remove('editing');
@@ -1614,8 +1628,17 @@ document.addEventListener('dblclick', e => {
     try {
       if (col === 'snmap') { const r = await api('PUT', '/api/snmap/' + id, { [field]: field === 'ip' ? snIp(v) : v }); const i = SNMAP.findIndex(x => x.id === id); if (i >= 0) SNMAP[i] = r.item; }
       else if (col === 'notes') { const r = await api('PATCH', '/api/notes/' + id, { [field]: v }); const n = NOTES.find(x => x.id === id); if (n) Object.assign(n, r.note); }
-      else await upd(col, id, { [field]: v });
-      toast('Сохранено');
+      else if (m === 'date' && v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) { toast('Неверная дата'); }
+      else if (m === 'num' && v !== '' && !(Number(v) >= 0)) { toast('Нужно число не меньше 0'); }
+      else if (col === 'jobs' && field === 'progress' && v !== '' && Number(v) > 100) { toast('Процент выполнения — от 0 до 100'); }
+      else {
+        let val = v;
+        if (m === 'num') val = v === '' ? null : Math.round(Number(v));
+        if (col === 'jobs' && field === 'photoSpec') val = v.split('\n').map(x => x.trim()).filter(Boolean);
+        if (m === 'cp') { if (!v) val = null; else { const c = cpByName(v); val = c ? c.id : await add('counterparties', { name: v, roles: ['customer'], contacts: [], contracts: [], createdAt: new Date().toISOString() }); } }
+        await upd(col, id, { [field]: val });
+        toast('Сохранено');
+      }
     } catch(err) { toast(errText(err)); }
     inp.blur(); render(); if (ui.drawer) renderDrawer();
   };
@@ -2825,7 +2848,7 @@ function vWorkList(){
   const warn = WP.length ? `<div class="box wpend"><b>Выполнены работы — установите гарантийный срок:</b>${WP.map(j => ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">№ ${jobNo(j)} · ${esc(j.title)}</button>`).join('')}</div>` : '';
   if (!L.length) return head + warn + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
   return head + warn + `<section class="card wtable"><div class="wjr whead"><span>Работа</span><span>Что происходит</span><span>Что нужно сделать</span><span>Что нужно купить</span><span>Сроки</span><span>Выполнено</span><span>Статус</span></div>
-    ${L.map(j => wlRow(j) + (ui.wlOpen === j.id ? wlPanel(j) : '')).join('')}</section>`;
+    ${L.map(wlRow).join('')}</section>`;
 }
 /* the percent of a work: by the done points when there are points, otherwise entered by hand («вручную») */
 function jobPct(j){
@@ -2841,7 +2864,8 @@ const wlBrief = (L, word) => { const open = (L || []).filter(x => !x.done), all 
 function wlRow(j){
   const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), od = overdue(j);
   const left = j.due && j.status !== 'done' ? Math.round((Date.parse(j.due) - Date.parse(today())) / 864e5) : null;
-  return `<div class="wjr click ${ui.wlOpen === j.id ? 'open' : ''}" data-act="wlToggle" data-id="${j.id}" role="button" tabindex="0" aria-expanded="${ui.wlOpen === j.id}">
+  // a click opens the card of the work as a window over the list — everything is seen and changed there
+  return `<div class="wjr click" data-act="openJob" data-id="${j.id}" role="button" tabindex="0" title="Открыть работу">
     <div class="wl-name"><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}</small></div>
     <div class="wl-happen" data-l="Что происходит">${j.happening ? esc(j.happening) : '<span class="dim">—</span>'}</div>
     <div class="wl-list" data-l="Сделать">${wlBrief(j.todo, 'сделано')}</div>
@@ -6306,6 +6330,7 @@ function vUsers(){
 /* ===== «Что взять с собой»: the manager makes the checklist, every employee of the work ticks what he has packed (each for himself) ===== */
 const kitMine = x => !!(x.got && me && x.got[me.id]);
 function kitBox(j){
+  if ((j.kind || 'mount') === 'prod') return '';   // «Что взять с собой» — only for a mounting work
   const L = j.kit || [], ed = mayEditJob(j), mine = onJob(j), W = [...new Set([...(j.workers || []), ...(j.leaderId ? [j.leaderId] : [])])];
   if (!L.length && !ed) return '';
   const item = x => { const got = Object.keys(x.got || {}).filter(id => W.includes(id) || id === me.id), names = got.map(who).join(', ');
@@ -6321,7 +6346,7 @@ function kitBox(j){
 }
 // the same checklist in the interface of an employee: what to take for each of his works
 function kitWHtml(jobs){
-  const J = jobs.filter(j => (j.kit || []).length && (!ui.wJob || ui.wJob === j.id)); if (!J.length) return '';
+  const J = jobs.filter(j => (j.kind || 'mount') !== 'prod' && (j.kit || []).length && (!ui.wJob || ui.wJob === j.id)); if (!J.length) return '';
   return J.map(j => { const L = j.kit, n = L.filter(kitMine).length;
     return `<div class="wkit"><h3>🎒 Взять с собой${J.length > 1 || !ui.wJob ? ` · № ${jobNo(j)}` : ''} <span class="dim">${n} из ${L.length}</span></h3>
       <ul>${L.map(x => `<li><label class="${kitMine(x) ? 'got' : ''}"><input type="checkbox" data-kit="${j.id}|${x.id}" ${kitMine(x) ? 'checked' : ''}> <span>${esc(x.text)}</span></label></li>`).join('')}</ul>
@@ -6498,7 +6523,7 @@ function vPlan(){
 }
 
 /* ---------- drawer ---------- */
-function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
+function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() && phoneLayout()); $('drawer').classList.toggle('jobwin', kind === 'job' && ctx !== 'full'); const whole = (kind === 'job' && ctx === 'full') || kind === 'refView' || kind === 'eqCard' || kind === 'helpDoc';
   if (kind === 'ipContract' || kind === 'ipInvoice') $('drawer').classList.add('wide'); $('drawer').classList.toggle('whole', whole); $('scrim').classList.toggle('whole', whole); $('drawer').classList.toggle('full', full); $('scrim').classList.toggle('full', full); $('drawer').classList.toggle('wide', kind === 'dev' || kind === 'devForm' || kind === 'writeoff' || kind === 'acctImport' || kind === 'income' || kind === 'receipt' || kind === 'invoiceForm' || kind === 'jobReport' || kind === 'jobDone' || kind === 'catEdit' || kind === 'catalog');
   if (kind === 'jobForm') { const j = id && jobOf(id); ui.jPlaces = j ? (j.places || []).map(x => ({ ...x })) : []; }
   if (kind === 'invoiceForm') { ui.supAuto = null; const i = id && inv(id); ui.invItems = i ? (i.items || []).map(x => ({ ...x })) : []; ui.invInn = i?.supplierInn || ''; }
@@ -6508,7 +6533,7 @@ function openDrawer(kind, id, ctx){ const full = kind === 'wdo' || (isWorker() &
   if (kind === 'wdo') { $('drawer').scrollTop = 0; $('drawer').querySelector('.d-body')?.scrollTo?.(0, 0); const first = $('drawer').querySelector('.slots li:not(.ok) label, .slots label, .upl2 label'); if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); } return; }
   setTimeout(() => { if ($('drawer').contains(document.activeElement)) return; const f = $('drawer').querySelector('.d-body input:not([type=file]):not([type=hidden]),.d-body select,.d-body textarea,.d-body button'); f && f.focus(); }, 40); }
 function closeDrawer(){
-  eqScanStop(); if (mini) { try { mini.remove(); } catch(e){} mini = null; } ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
+  eqScanStop(); if (mini) { try { mini.remove(); } catch(e){} mini = null; } $('drawer').classList.remove('jobwin'); ui.drawer = null; ui.armed = null; $('scrim').hidden = true; $('drawer').hidden = true; }
 const renderDrawerBase = renderDrawer;
 renderDrawer = function(){ renderDrawerBase(); supMarkAll(); if (ui.drawer && (ui.drawer.kind === 'job' || ui.drawer.kind === 'jobForm')) mountMini(); else if (mini) { try { mini.remove(); } catch(e){} mini = null; } };
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
@@ -7442,16 +7467,20 @@ function renderDrawer(){
       <div class="row-g"><span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${overdue(j) ? '<span class="chip c-bad">Срок прошёл</span>' : ''}</div>
       <h3 style="margin:0;font-size:20px" ${edAttr('jobs', j.id, 'title')}>${esc(j.title)}</h3>
       <dl class="kv">
-        <dt>Контрагент</dt><dd>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
-        <dt>Срок окончания</dt><dd>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
+        ${ed ? `<dt>Тип работы</dt><dd ${edAttr('jobs', j.id, 'kind', 'sel')}>${esc(WORK_KIND[j.kind || 'mount'])}</dd>
+        <dt>Статус</dt><dd ${j.status === 'done' ? '' : edAttr('jobs', j.id, 'status', 'sel')}>${esc(JOB_ST[j.status] || '')}${j.status === 'done' ? ' <small class="dim">— «Вернуть в работу» внизу</small>' : ''}</dd>` : ''}
+        <dt>Контрагент</dt><dd ${ed ? edAttr('jobs', j.id, 'customerId', 'cp') : ''}>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
+        <dt>Срок окончания</dt><dd ${ed ? edAttr('jobs', j.id, 'due', 'date') : ''}>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
+        ${ed && !P.length ? `<dt>Выполнено, %</dt><dd ${edAttr('jobs', j.id, 'progress', 'num')}>${j.progress != null && j.progress !== '' ? esc(String(j.progress)) + ' %' : '<span class="dim">не указано</span>'}</dd>` : ''}
         ${j.kind === 'prod' || j.kind === 'both' ? `<dt>Производство</dt><dd>${ord(j.orderId) ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${j.orderId}">Открыть производство</button> <span class="dim">${esc(ordName(ord(j.orderId)))} · изделий: ${(ord(j.orderId).products || []).length}</span>` : '<span class="dim">' + (j.noOrder ? 'заказ удалён' : 'создаётся…') + '</span>'}</dd>` : ''}
         <dt>Создал</dt><dd>${esc(who(j.createdBy))}${j.createdAt ? ' · ' + esc(fmtDT(j.createdAt)) : ''}</dd>
         ${j.status === 'done' && j.doneAt ? `<dt>Выполнена</dt><dd>${esc(fmtDT(j.doneAt))}</dd>` : ''}
         ${j.status === 'done' ? `<dt>Гарантия</dt><dd>${j.warrantyUntil ? `до ${fmtD(j.warrantyUntil)} · ${onWarranty(j) ? `<span class="${wDays(j) <= 30 ? 'warn-t' : 'ok-t'}">на гарантии, осталось ${wDays(j)} дн.</span>` : '<span class="dim">закончилась, работа в архиве</span>'}` : '<span class="dim">не установлена — работа в архиве</span>'}${j.warrantyNote ? `<br><small class="dim">${esc(j.warrantyNote)}</small>` : ''}${canEdit() ? ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">${j.warrantyUntil ? 'Изменить' : 'Установить'}</button>` : ''}</dd>` : ''}
       </dl>
       ${jobMinBox(j)}
-      ${j.features ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Ключевые особенности</b><div style="white-space:pre-wrap">${esc(j.features)}</div></div>` : ''}
-      ${j.happening ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Что происходит</b><div style="white-space:pre-wrap">${esc(j.happening)}</div></div>` : ''}
+      ${j.features || ed ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Ключевые особенности</b><div style="white-space:pre-wrap" class="${j.features ? '' : 'dim'}" ${ed ? edAttr('jobs', j.id, 'features', true) : ''}>${j.features ? esc(j.features) : 'Дважды щёлкните, чтобы добавить'}</div></div>` : ''}
+      ${j.happening || ed ? `<div class="box" style="padding:8px 12px"><b style="font-size:13px">Что происходит</b><div style="white-space:pre-wrap" class="${j.happening ? '' : 'dim'}" ${ed ? edAttr('jobs', j.id, 'happening', true) : ''}>${j.happening ? esc(j.happening) : 'Дважды щёлкните, чтобы добавить'}</div></div>` : ''}
+      ${ed ? '<p class="dim" style="margin:0;font-size:12px">Поля меняются двойным щелчком по надписи: Enter — сохранить, Esc — отменить.</p>' : ''}
       ${j.description || canEdit() ? `<p class="jdesc ${j.description ? '' : 'dim'}" ${edAttr('jobs', j.id, 'description', true)}>${j.description ? esc(j.description) : 'Описание — дважды щёлкните, чтобы добавить'}</p>` : ''}
       ${kitBox(j)}
       ${jobListBox(j, 'todo')}
@@ -8331,7 +8360,7 @@ async function act(el){
     case 'editJob': ui.jPhotoEdit = null; ui.jfKind = null; return openDrawer('jobForm', id);
     case 'openJob': ui.jPhotoEdit = null; return openDrawer('job', id);
     case 'wlToggle': ui.wlOpen = ui.wlOpen === id ? null : id; return render();
-    case 'wlFull': ui.jPhotoEdit = null; return openDrawer('job', id, 'full');
+    case 'wlFull': ui.jPhotoEdit = null; return openDrawer('job', id);
     case 'openPlace': return openDrawer('place', id);
     case 'phEdit': ui.jPhotoEdit = id; ui.jPhotoRows = [...(jobOf(id)?.photoSpec || [])]; if (!ui.jPhotoRows.length) ui.jPhotoRows = ['']; renderDrawer(); setTimeout(() => document.querySelector('[data-ph]')?.focus(), 30); return;
     case 'phCancel': ui.jPhotoEdit = null; return renderDrawer();
