@@ -2529,11 +2529,14 @@ function orderDataBox(o){
 }
 // the production of an order in the same window as the card of a work
 function prodWinOpen(oid){ ui.order = oid; ui.orderTab = 'main'; remember(); openDrawer('prodWin', oid); }
-const jobTabs = (j, cur) => `<div class="seg jtabs" role="tablist" aria-label="Разделы работы"><button role="tab" data-act="jobTabWork" data-id="${j.id}" class="${cur === 'work' ? 'on' : ''}" aria-selected="${cur === 'work'}">🛠 Работа</button><button role="tab" data-act="jobTabStaff" data-id="${j.id}" class="${cur === 'staff' ? 'on' : ''}" aria-selected="${cur === 'staff'}">👷 Сотрудники${jobPeople(j).length ? ` <span class="dim">${jobPeople(j).length}</span>` : ''}</button>${j.kind === 'both' ? `<button role="tab" data-act="jobTabProd" data-id="${j.id}" class="${cur === 'prod' ? 'on' : ''}" aria-selected="${cur === 'prod'}">🏭 Производство${ord(j.orderId) ? ` <span class="dim">${esc(ord(j.orderId).number)}</span>` : ''}</button>` : ''}</div>`;
+// the employees taking part: those marked in the tasks of the plan of the work (and the executors of its requests)
+const jobStaffIds = j => [...new Set([...S.tasks.filter(t => t.jobId === j.id).flatMap(t => t.staff || []), ...(j.reqs || []).map(x => x.assignee)].filter(id => id && STAFF.some(u => u.id === id)))];
+const jobTabs = (j, cur) => { const n = jobStaffIds(j).length;
+  return `<div class="seg jtabs" role="tablist" aria-label="Разделы работы"><button role="tab" data-act="jobTabWork" data-id="${j.id}" class="${cur === 'work' ? 'on' : ''}" aria-selected="${cur === 'work'}">🛠 ${isOps(j) ? 'Эксплуатация' : j.kind === 'prod' ? 'Работа' : 'Монтаж'}</button><button role="tab" data-act="jobTabStaff" data-id="${j.id}" class="${cur === 'staff' ? 'on' : ''}" aria-selected="${cur === 'staff'}">👷 Сотрудники${n ? ` <span class="dim">${n}</span>` : ''}</button>${j.kind === 'both' ? `<button role="tab" data-act="jobTabProd" data-id="${j.id}" class="${cur === 'prod' ? 'on' : ''}" aria-selected="${cur === 'prod'}">🏭 Производство</button>` : ''}</div>`; };
 // the tab «Сотрудники» of a work: the minimum of points a day, the employees and the vehicles in the plan, what to take, the points without an executor
 function jobStaffTab(j){
-  const ed = mayEditJob(j), ppl = jobPeople(j);
-  return `<div class="box"><h4>Участники${ppl.length ? ' · ' + ppl.length : ''}</h4>${ppl.length ? ppl.map(id => `<span class="wchip">${esc(who(id))}${id === j.leaderId ? ' (рук.)' : ''}</span>`).join(' ') : '<span class="dim">Никто не назначен — отметьте сотрудников в блоке план-графика ниже.</span>'}</div>
+  const ed = mayEditJob(j), ppl = jobStaffIds(j).sort((a, b) => who(a).localeCompare(who(b), 'ru'));
+  return `<div class="box"><h4>Задействованные сотрудники${ppl.length ? ' · ' + ppl.length : ''}</h4>${ppl.length ? ppl.map(id => `<span class="wchip">${esc(who(id))}</span>`).join(' ') : '<span class="dim">Никто не задействован — отметьте сотрудников в блоке «Сотрудники, транспорт и даты в план-графике» ниже.</span>'}</div>
     ${isMount(j) ? jobMinBox(j) : ''}
     ${jobPlanBox(j)}
     ${ed ? `<div class="jpcard">${jobPlanNew(j.kind || 'mount', j, true)}</div>` : ''}
