@@ -5898,7 +5898,12 @@ function nsFormHtml(x){
             ${cmd(cmdexe, 'Для командной строки Windows (cmd.exe).')}
             ${cmd(nd, 'Если на сервере есть Node.js: скачайте <a href="/netshare/netshare-agent.js" download>netshare-agent.js</a> и запустите в папке с ним.')}</details></li>
         <li><b>Откройте обратный SSH-туннель</b> во втором окне PowerShell (OpenSSH есть в Windows 10 / Server 2019 и новее). На этом сервере нужен пользователь SSH, например <span class="mono">tunnel</span>, со входом по ключу — его создаёт администратор сервера:
-          ${cmd(ssh, '')}</li>
+          ${cmd(ssh, 'Команда — одной строкой, целиком (при вставке она не должна разрываться).')}
+          <details><summary class="linkish">Пишет «ssh не распознано как имя командлета…»?</summary>
+            <p style="margin:6px 0">В Windows нет клиента OpenSSH. Откройте PowerShell <b>от имени администратора</b> (правой кнопкой по «PowerShell» → «Запуск от имени администратора») и установите его — нужен интернет, 1–2 минуты:</p>
+            ${cmd('Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0', 'Windows 10, 11, Server 2019 и новее. Потом закройте PowerShell, откройте заново и повторите команду туннеля.')}
+            ${cmd('& "$env:WINDIR\\System32\\OpenSSH\\ssh.exe" -V', 'Проверка: должна появиться версия (например OpenSSH_for_Windows_9.5). Если клиент установлен, а «ssh» всё равно не находится — запускайте туннель с полным путём: замените в команде ssh на «& "$env:WINDIR\\System32\\OpenSSH\\ssh.exe"».')}
+            <p style="margin:6px 0">Windows Server 2016 и старше: установите OpenSSH вручную — архив <span class="mono">OpenSSH-Win64.zip</span> со страницы <a href="https://github.com/PowerShell/Win32-OpenSSH/releases" target="_blank" rel="noopener">github.com/PowerShell/Win32-OpenSSH/releases</a>, распакуйте в <span class="mono">C:\Program Files\OpenSSH</span> и запускайте <span class="mono">"C:\Program Files\OpenSSH\ssh.exe"</span> с теми же параметрами.</p></details></li>
         <li>Когда оба окна работают, на вкладке появится «● подключено». Чтобы подключение работало постоянно, добавьте обе команды в Планировщик заданий Windows (при входе в систему).</li></ol></div>`; })() : ''}</div>`;
 }
 async function nsTokLoad(id){ try { ui.nsToken = (await api('GET', `/api/netshare/${id}/token`)).token; } catch(e) { toast(errText(e)); } renderDrawer(); }
