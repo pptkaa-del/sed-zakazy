@@ -818,6 +818,8 @@ async function api(req, res, url) {
       if (b.role === 'contractor' && !/^\d{4}-\d{2}-\d{2}$/.test(String(b.accessUntil || ''))) return fail(res, 400, 'Для подрядчика укажите, до какой даты у него доступ');
       const nu = addUser(String(b.login), b.role, String(b.name).trim(), String(b.password), user.orgId);
       if (b.role === 'contractor') nu.accessUntil = String(b.accessUntil);
+      // made from a counterparty «Подрядчик» — the link is kept (the card of the counterparty lists its users)
+      if (b.cpId && db.counterparties[b.cpId]) { nu.cpId = String(b.cpId); saveUsers(); }
       nu.hide = cleanHide(b.hide); saveUsers();
       return send(res, 200, adminUser(nu));
     }
@@ -3091,7 +3093,7 @@ const MAP = {
   maxZoom: Number(process.env.MAP_MAX_ZOOM || 19),
 };
 const meInfo = u => { const o = orgById(u.orgId), st = orgState(o); return { ...publicUser(u), actingSys: !!u.actingSys, prefs: u.prefs || {}, map: MAP, sys: !!u.sys, hide: u.sys ? [] : hiddenFor(u), org: o ? { id: o.id, name: o.name, until: o.until || '', type: orgType(u), hide: o.hide || [] } : null, orgWarn: st.warn || '' }; };
-const adminUser = u => ({ ...publicUser(u), sys: !!u.sys, hide: u.hide || [], accessUntil: u.accessUntil || '', expired: !!contractorExpired(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
+const adminUser = u => ({ ...publicUser(u), cpId: u.cpId || null, sys: !!u.sys, hide: u.hide || [], accessUntil: u.accessUntil || '', expired: !!contractorExpired(u), blocked: !!u.blocked, lastLoginAt: u.lastLoginAt || null, createdAt: u.createdAt || null });
 
 /* Remember that the accountant has opened the invoice file(s) */
 function markSeen(user, fileIds) {
