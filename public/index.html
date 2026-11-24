@@ -3022,7 +3022,7 @@ function wlRows(L){
     return `<div class="wjgrp ${shut ? 'shut' : ''}" data-act="wlGrpFold" data-id="${esc(id)}" role="button" tabindex="0" aria-expanded="${!shut}"><span class="wjg-arr">${shut ? '▸' : '▾'}</span><b>📁 ${esc(name)}</b><span class="dim">${list.length} ${plural(list.length, 'работа', 'работы', 'работ')}${open !== list.length ? ` · в работе и в планах ${open}` : ''}</span>${pr ? `<span class="prio" title="Приоритетных: ${pr}">❗${pr > 1 ? pr : ''}</span>` : ''}</div>${shut ? '' : list.map(wlRow).join('')}`; };
   const out = jgSorted().map(g => { const list = L.filter(j => j.groupId === g.id); return list.length ? head(g.id, g.name, list) : ''; }).join('');
   const rest = L.filter(j => !jgOf(j.groupId));
-  return out + (rest.length ? head('_', 'Без группы', rest) : '');
+  return (rest.length ? head('_', 'Без группы', rest) : '') + out;   // the works without a group — first
 }
 /* ===== «Производство»: all the productions in work as a table — the products (positions and pieces), the dates; a click shows the composition and the files of the products ===== */
 // the source of «Экран производства»: all the data for a manager or an office user; an employee gets a short copy from the server
