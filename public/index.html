@@ -5706,6 +5706,18 @@ async function vaultDel(kind, id){ try { await api('DELETE', `/api/vault/${kind}
 /* «Сетевая папка»: the tree of a folder of another server — the agent there answers through a reverse SSH tunnel */
 let NETSHARES = [];
 const nsKey = (id, p) => id + '|' + p;
+// a file of the network folder: asked first — an error (no tunnel, an old agent, the file is busy) is said in words; the file itself goes to the browser
+document.addEventListener('click', async e => {
+  const a = e.target.closest('a[data-nsdl]'); if (!a) return; e.preventDefault();
+  if (a.dataset.busy) return; a.dataset.busy = '1'; const name = a.dataset.nsdl; toast('Скачиваем «' + name + '»…');
+  try {
+    const r = await fetch(a.href, { credentials: 'same-origin' });
+    if (!r.ok) { let m = ''; try { m = (await r.json()).error; } catch(x) {} throw new Error(m || 'Ошибка сервера ' + r.status); }
+    const bl = await r.blob(), u = URL.createObjectURL(bl), l = document.createElement('a'); l.href = u; l.download = name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
+    toast('Скачано: ' + name + ' · ' + nsSize(bl.size));
+  } catch(err) { toast('Не удалось скачать «' + name + '»: ' + (err.message || err)); }
+  finally { delete a.dataset.busy; }
+});
 const nsJoin = (a, b) => a ? a + '/' + b : b;
 const nsSize = n => n == null ? '' : n < 1024 ? n + ' Б' : n < 1048576 ? (n / 1024).toFixed(1).replace('.', ',') + ' КБ' : n < 1073741824 ? (n / 1048576).toFixed(1).replace('.', ',') + ' МБ' : (n / 1073741824).toFixed(2).replace('.', ',') + ' ГБ';
 const nsIco = e => e.dir ? '📁' : /\.(pdf)$/i.test(e.name) ? '📕' : /\.(xlsx?|csv|ods)$/i.test(e.name) ? '📊' : /\.(docx?|odt|rtf|txt)$/i.test(e.name) ? '📄' : /\.(png|jpe?g|gif|bmp|webp|tiff?)$/i.test(e.name) ? '🖼' : /\.(zip|rar|7z|tar|gz)$/i.test(e.name) ? '🗜' : /\.(dwg|dxf)$/i.test(e.name) ? '📐' : '📎';
@@ -5725,7 +5737,7 @@ function nsTree(sh, p, depth){
   if (!V.length) return `<li class="nsmsg dim" style="--d:${depth}">${L.length ? 'Ничего не найдено' : 'Папка пуста'}</li>`;
   return V.map(e => { const pp = nsJoin(p, e.name), k = nsKey(sh.id, pp), isOpen = e.dir && open[k];
     return `<li><div class="nsrow ${e.dir ? 'dir' : ''}" style="--d:${depth}" ${e.dir ? `data-act="nsToggle" data-id="${esc(sh.id + '|' + pp)}" role="button" tabindex="0" aria-expanded="${!!isOpen}"` : ''}>
-      <span class="nscar">${e.dir ? (isOpen ? '▾' : '▸') : ''}</span><span class="nsico">${e.dir && isOpen ? '📂' : nsIco(e)}</span>${e.dir ? `<span class="nsname">${esc(e.name)}</span>` : `<span class="nsname"><a class="nsdl" href="/api/netshare/${esc(sh.id)}/file?path=${encodeURIComponent(pp)}" download="${esc(e.name)}" title="Скачать «${esc(e.name)}»">${esc(e.name)}</a><a class="nsdlb" href="/api/netshare/${esc(sh.id)}/file?path=${encodeURIComponent(pp)}" download="${esc(e.name)}" title="Скачать" aria-label="Скачать">⬇</a></span>`}
+      <span class="nscar">${e.dir ? (isOpen ? '▾' : '▸') : ''}</span><span class="nsico">${e.dir && isOpen ? '📂' : nsIco(e)}</span>${e.dir ? `<span class="nsname">${esc(e.name)}</span>` : `<span class="nsname"><a class="nsdl" href="/api/netshare/${esc(sh.id)}/file?path=${encodeURIComponent(pp)}" data-nsdl="${esc(e.name)}" title="Скачать «${esc(e.name)}»">${esc(e.name)}</a><a class="nsdlb" href="/api/netshare/${esc(sh.id)}/file?path=${encodeURIComponent(pp)}" data-nsdl="${esc(e.name)}" title="Скачать" aria-label="Скачать">⬇</a></span>`}
       <small class="nsmeta">${e.dir ? '' : nsSize(e.size)}</small><small class="nsmeta">${e.mtime ? esc(fmtDT(e.mtime)) : ''}</small></div>
       ${isOpen ? `<ul class="nstree">${nsTree(sh, pp, depth + 1)}</ul>` : ''}</li>`; }).join('') + (c.total > c.entries.length ? `<li class="nsmsg dim" style="--d:${depth}">Показаны первые ${c.entries.length} из ${c.total}</li>` : '');
 }
