@@ -1689,7 +1689,7 @@ async function refresh(){
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   // the names of old points kept the reminder «(замена 2 модемов)» — it is not shown any more
   S.jobs.forEach(j => (j.places || []).forEach(x => { if (x.label && /\(замена \d+ модем/.test(x.label)) x.label = x.label.replace(/ ?\(замена \d+ модем[а-я]*\)/g, ''); }));
-  STAFF = d.staff || []; JGROUPS = d.jobGroups || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; JGROUPS = d.jobGroups || []; PS_DATA = d.prodScr || null; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || transMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -1737,7 +1737,7 @@ const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['p
   ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['mods', 'Дополнительные модули']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
-const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
+const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || !g[2].length || g[2].some(([s]) => can(top + ':' + s))); };   // a tab without sub-tabs is open by itself
 const VIEW_KEY = { prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
 // «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
 const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
@@ -3006,19 +3006,24 @@ function wlRows(L){
   return out + (rest.length ? head('_', 'Без группы', rest) : '');
 }
 /* ===== «Производство»: all the productions in work as a table — the products (positions and pieces), the dates; a click shows the composition and the files of the products ===== */
+// the source of «Экран производства»: all the data for a manager or an office user; an employee gets a short copy from the server
+let PS_DATA = null;
+const psJobs = () => PS_DATA ? PS_DATA.jobs : S.jobs;
+const psOrd = id => PS_DATA ? PS_DATA.orders.find(o => o.id === id) : ord(id);
+const psCust = j => j.custName ?? cpOf(j.customerId)?.name ?? '';
 function vProdScr(){
   const F = ui.psF || 'active', q = (ui.psq || '').trim().toLowerCase();
-  const all = S.jobs.filter(j => ['prod', 'both'].includes(j.kind) && ord(j.orderId));
-  const L = all.filter(j => (F === 'all' || (F === 'work' ? j.status === 'work' : j.status !== 'done')) && (!q || [j.title, jobNo(j), ord(j.orderId)?.number, cpOf(j.customerId)?.name, ...(ord(j.orderId)?.products || []).map(p => p.name)].join(' ').toLowerCase().includes(q))).sort(jobSort);
+  const all = psJobs().filter(j => ['prod', 'both'].includes(j.kind) && psOrd(j.orderId));
+  const L = all.filter(j => (F === 'all' || (F === 'work' ? j.status === 'work' : j.status !== 'done')) && (!q || [j.title, jobNo(j), psOrd(j.orderId)?.number, psCust(j), ...(psOrd(j.orderId)?.products || []).map(p => p.name)].join(' ').toLowerCase().includes(q))).sort(jobSort);
   const cnt = f => all.filter(j => f === 'all' || (f === 'work' ? j.status === 'work' : j.status !== 'done')).length;
   const head = `<div class="toolbar"><span data-keep style="display:contents"><input class="in" id="psq" type="search" placeholder="Поиск: работа, заказ, изделие, заказчик" aria-label="Поиск" value="${esc(ui.psq || '')}" style="flex:1 1 220px;max-width:340px"></span>
     <div class="seg">${[['active', 'Текущие'], ['work', 'В работе'], ['all', 'Все']].map(([k, l]) => `<button data-act="psF" data-id="${k}" class="${F === k ? 'on' : ''}">${l} <span class="dim">${cnt(k)}</span></button>`).join('')}</div></div>`;
   if (!L.length) return head + `<div class="empty"><h3>${all.length ? 'Ничего не найдено' : 'Производства пока нет'}</h3>${all.length ? 'Измените фильтр или строку поиска.' : 'Здесь появятся работы с типом «Производство» и «Производство и монтаж».'}</div>`;
   const td = today();
-  const row = j => { const o = ord(j.orderId), P = o.products || [], pcs = sum(P, p => p.qty), due = j.due || o.deadline || '', left = due && j.status !== 'done' ? dnum(due) - dnum(td) : null, open = ui.psOpen === j.id, pc = jobPct(j);
+  const row = j => { const o = psOrd(j.orderId), P = o.products || [], pcs = sum(P, p => p.qty), due = j.due || o.deadline || '', left = due && j.status !== 'done' ? dnum(due) - dnum(td) : null, open = ui.psOpen === j.id, pc = jobPct(j);
     return `<tr class="psrow ${open ? 'open' : ''} ${jobPrio(j) ? 'isprio' : ''}" data-act="psOpen" data-id="${j.id}" role="button" tabindex="0" aria-expanded="${open}">
       <td class="mono dim">${open ? '▾' : '▸'} ${jobNo(j)}</td>
-      <td>${prioMark(j)}<b>${esc(j.title)}</b><small>${[cpOf(j.customerId)?.name, jgOf(j.groupId) && '📁 ' + jgOf(j.groupId).name, j.kind === 'both' && 'с монтажом'].filter(Boolean).map(esc).join(' · ') || '&nbsp;'}</small></td>
+      <td>${prioMark(j)}<b>${esc(j.title)}</b><small>${[psCust(j), jgOf(j.groupId) && '📁 ' + jgOf(j.groupId).name, j.kind === 'both' && 'с монтажом'].filter(Boolean).map(esc).join(' · ') || '&nbsp;'}</small></td>
       <td class="mono">${esc(o.number)}</td>
       <td class="r"><b class="mono">${fmtQty(pcs)}</b> шт<small>${P.length} ${plural(P.length, 'позиция', 'позиции', 'позиций')}</small></td>
       <td class="${left !== null && left < 0 ? 'bad-t' : ''}">${due ? `<b>до ${fmtD(due)}</b><small>${left === null ? '' : left < 0 ? 'просрочено на ' + (-left) + ' дн.' : left === 0 ? 'сегодня' : 'осталось ' + left + ' дн.'}</small>` : '<span class="dim">срок не указан</span>'}</td>
@@ -3026,16 +3031,16 @@ function vProdScr(){
       <td><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span></td></tr>
       ${open ? `<tr class="psdet"><td colspan="7">${psDetail(j, o)}</td></tr>` : ''}`; };
   return head + `<section class="card pstable"><div class="tscroll"><table class="comp ps"><thead><tr><th>№</th><th>Работа</th><th>Заказ</th><th class="r">Изделий</th><th>Срок</th><th>Выполнено</th><th>Статус</th></tr></thead><tbody>${L.map(row).join('')}</tbody></table></div></section>
-    <p class="dim" style="font-size:13px">Щелчок по строке — состав изделий и их файлы; ещё щелчок — свернуть. Изменить заказ — «Открыть производство».</p>`;
+    <p class="dim" style="font-size:13px">Щелчок по строке — состав изделий и их файлы; ещё щелчок — свернуть. ${canEdit() ? 'Изменить заказ — «Открыть производство».' : ''}</p>`;
 }
 // the composition of each product of the order (on one piece and on all) and its files
 function psDetail(j, o){
   const P = o.products || [];
-  return `<div class="psd"><div class="row-g" style="justify-content:space-between;align-items:center"><b>Изделия · ${P.length}</b><button class="btn sm primary" data-act="gotoOrder" data-id="${o.id}">Открыть производство</button></div>
+  return `<div class="psd"><div class="row-g" style="justify-content:space-between;align-items:center"><b>Изделия · ${P.length}</b>${canEdit() ? `<button class="btn sm primary" data-act="gotoOrder" data-id="${o.id}">Открыть производство</button>` : ''}</div>
     ${P.length ? P.map(p => { const C = p.components || [], F = p.files || [], k = Number(p.qty) || 0;
       return `<div class="psp"><h4>${esc(p.name || 'Без названия')} <span class="dim mono">× ${fmtQty(p.qty)} ${esc(p.unit || 'шт')}</span></h4>${p.note ? `<p class="dim" style="margin:0 0 6px;white-space:pre-wrap">${esc(p.note)}</p>` : ''}
         ${C.length ? `<table class="comp"><thead><tr><th>№</th><th>Компонент</th><th class="r">На 1 ${esc(p.unit || 'шт')}</th><th>Ед.</th><th class="r">Всего на ${fmtQty(k)}</th></tr></thead><tbody>${C.map((c, i) => `<tr><td class="n">${i + 1}</td><td>${esc(c.name)}</td><td class="r mono">${fmtQty(c.qty)}</td><td>${esc(c.unit || 'шт')}</td><td class="r mono">${fmtQty((Number(c.qty) || 0) * k)}</td></tr>`).join('')}</tbody></table>` : '<p class="dim" style="margin:0">Состав не указан.</p>'}
-        <div class="psf"><b>Файлы изделия${F.length ? ' · ' + F.length : ''}</b> ${F.length ? `<ul class="files">${F.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)}</small></li>`).join('')}</ul>` : '<span class="dim">нет</span>'}</div></div>`; }).join('') : '<p class="dim">Изделий в заказе нет — добавьте их в «Открыть производство» → «Продукция».</p>'}</div>`;
+        <div class="psf"><b>Файлы изделия${F.length ? ' · ' + F.length : ''}</b> ${F.length ? `<ul class="files">${F.map(f => `<li><a href="${esc(fileUrl(f))}" target="_blank" rel="noopener">${esc(f.name)}</a><small>${fmtSize(f.size)}</small></li>`).join('')}</ul>` : '<span class="dim">нет</span>'}</div></div>`; }).join('') : '<p class="dim">Изделий в заказе нет.</p>'}</div>`;
 }
 function wlRow(j){
   const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), od = overdue(j);
@@ -8296,7 +8301,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ...(isHead() ? [['prodscr', 'Экран производства']] : []), ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
+const startViews = () => [['works', 'Работы'], ['prodscr', 'Экран производства'], ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -9477,8 +9482,8 @@ function route(){
     : ipMode() ? (ipNav().includes(h) ? h : 'ipc')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'mods', 'snmap', 'match'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
-    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || (h === 'prodscr' && isHead() && viewOk(h)) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'prodscr', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'mods', 'snmap', 'match'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
+    : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || (h === 'prodscr' && viewOk(h)) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
     const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', mods: 'mods', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
@@ -9597,7 +9602,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts', 'prodscr'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
+    a.hidden = u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs', 'prodscr'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
   ['orgsTab', 'serverTab', 'trialsTab'].forEach(id => { const t = $(id); if (t && !u.sys) t.hidden = true; });   // the tabs of the system administrator — only his
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (transMode() && !isWorker()) { const st = document.querySelector('#views a[data-v=stock]'); if (st) st.href = '#cps'; }
