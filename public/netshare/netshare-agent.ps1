@@ -1,6 +1,6 @@
 ﻿<#
   Агент «Сетевая папка» для программы «Управление предприятием» (Windows, без установки Node.js).
-  Слушает только 127.0.0.1 и отдаёт список файлов и папок (только чтение).
+  Слушает только 127.0.0.1 и отдаёт список файлов и папок и сами файлы для скачивания (только чтение).
   Программа обращается к нему через обратный SSH-туннель (OpenSSH есть в Windows 10 / Server 2019 и новее):
     ssh -N -R 127.0.0.1:<порт на сервере программы>:127.0.0.1:<порт агента> <пользователь>@<сервер программы>
   Запуск:
@@ -16,7 +16,7 @@ function Test-Inside([string]$child, [string]$root) {
 }
 function Send-Json($stream, [int]$code, $obj) {
   $body = [System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $obj -Depth 5 -Compress))
-  $status = @{ 200 = 'OK'; 400 = 'Bad Request'; 403 = 'Forbidden'; 404 = 'Not Found'; 405 = 'Method Not Allowed'; 500 = 'Internal Server Error' }[$code]
+  $status = @{ 200 = 'OK'; 400 = 'Bad Request'; 403 = 'Forbidden'; 404 = 'Not Found'; 405 = 'Method Not Allowed'; 409 = 'Conflict'; 500 = 'Internal Server Error' }[$code]
   $head = [System.Text.Encoding]::ASCII.GetBytes("HTTP/1.1 $code $status`r`nContent-Type: application/json; charset=utf-8`r`nContent-Length: $($body.Length)`r`nConnection: close`r`n`r`n")
   $stream.Write($head, 0, $head.Length); $stream.Write($body, 0, $body.Length); $stream.Flush()
 }
@@ -35,14 +35,28 @@ while ($true) {
     if ($headers['x-token'] -cne $Token) { Send-Json $stream 403 @{ ok = $false; error = 'Неверный ключ агента' }; continue }
     $target = $parts[1]; $qi = $target.IndexOf('?'); $pathPart = if ($qi -ge 0) { $target.Substring(0, $qi) } else { $target }
     $q = @{}; if ($qi -ge 0) { foreach ($kv in $target.Substring($qi + 1) -split '&') { $p = $kv -split '=', 2; if ($p.Count -eq 2) { $q[$p[0]] = [System.Uri]::UnescapeDataString($p[1].Replace('+', ' ')) } } }
-    if ($pathPart -eq '/ping') { Send-Json $stream 200 @{ ok = $true; agent = 'sed-netshare'; v = 1; platform = 'win32'; host = $env:COMPUTERNAME }; continue }
-    if ($pathPart -ne '/list') { Send-Json $stream 404 @{ ok = $false; error = 'Не найдено' }; continue }
+    if ($pathPart -eq '/ping') { Send-Json $stream 200 @{ ok = $true; agent = 'sed-netshare'; v = 2; platform = 'win32'; host = $env:COMPUTERNAME }; continue }
+    if ($pathPart -ne '/list' -and $pathPart -ne '/file') { Send-Json $stream 404 @{ ok = $false; error = 'Не найдено' }; continue }
     $root = "$($q['root'])"; $sub = "$($q['path'])"
     if (-not $root) { Send-Json $stream 400 @{ ok = $false; error = 'Не указан диск или папка' }; continue }
     if ($allowList.Count -gt 0 -and -not ($allowList | Where-Object { Test-Inside $root $_ })) { Send-Json $stream 403 @{ ok = $false; error = 'Этот диск или папка не разрешены агенту (-Allow)' }; continue }
     if (($sub -split '[\\/]') -contains '..') { Send-Json $stream 400 @{ ok = $false; error = 'Недопустимый путь' }; continue }
     $full = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($root, $sub))
     if (-not (Test-Inside $full $root)) { Send-Json $stream 400 @{ ok = $false; error = 'Недопустимый путь' }; continue }
+    if ($pathPart -eq '/file') {
+      # a file for download: the bytes as they are, the name and the size in the headers
+      if (-not [System.IO.File]::Exists($full)) { Send-Json $stream 404 @{ ok = $false; error = 'Файл не найден' }; continue }
+      try { $fs = [System.IO.File]::Open($full, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite) }
+      catch [System.UnauthorizedAccessException] { Send-Json $stream 403 @{ ok = $false; error = 'Нет доступа к файлу' }; continue }
+      catch { Send-Json $stream 409 @{ ok = $false; error = 'Файл занят другой программой' }; continue }
+      try {
+        $client.SendTimeout = 60000
+        $nm = [System.Uri]::EscapeDataString([System.IO.Path]::GetFileName($full))
+        $head = [System.Text.Encoding]::ASCII.GetBytes("HTTP/1.1 200 OK`r`nContent-Type: application/octet-stream`r`nContent-Length: $($fs.Length)`r`nX-Name: $nm`r`nConnection: close`r`n`r`n")
+        $stream.Write($head, 0, $head.Length); $fs.CopyTo($stream, 65536); $stream.Flush()
+      } finally { $fs.Close() }
+      continue
+    }
     if (-not [System.IO.Directory]::Exists($full)) { Send-Json $stream 404 @{ ok = $false; error = 'Папка не найдена' }; continue }
     try {
       $items = @([System.IO.DirectoryInfo]::new($full).GetFileSystemInfos() | Select-Object -First 5000)
