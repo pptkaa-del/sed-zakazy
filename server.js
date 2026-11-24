@@ -243,6 +243,10 @@ function rollbackIncome(lines, user){
 }
 /* The order's purchase lines bought by this invoice get its supplier and number:
    lines whose name matches a line of the invoice, or that already carry its number; a line with a supplier is left alone */
+// «Изменения» of a work: who changed what and when; the last 300 entries
+const short = v => v == null ? '' : Array.isArray(v) ? (v.length ? String(v.length) : '') : typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v).slice(0, 300);
+function jobLog(j, user, e){ if (!j) return; j.history = (Array.isArray(j.history) ? j.history : []).concat({ at: new Date().toISOString(), by: user.id, ...e }).slice(-300); }
+function diffOf(old, patch, skip = []){ return Object.keys(patch).filter(k => !skip.includes(k) && JSON.stringify(old[k] ?? null) !== JSON.stringify(patch[k] ?? null)).map(k => ({ f: k, from: short(old[k]), to: short(patch[k]) })); }
 const jobToOrderSt = st => st === 'done' ? 'closed' : st === 'work' ? 'work' : 'new';
 function fillOrderSuppliers(inv){
   const o = inv && db.orders[inv.orderId];
@@ -2523,7 +2527,7 @@ async function api(req, res, url) {
       const b = await readJsonBody(req) || {}, text = t(b.text, 3000); if (!text) return fail(res, 400, 'Напишите, что нужно сделать');
       if (L.length >= 5000) return fail(res, 400, 'Слишком много заявок');
       const x = { id: newId(), no: (L.reduce((a, r) => Math.max(a, r.no || 0), 0) + 1), text, address: t(b.address, 500), due: day(b.due), assignee: who(b.assignee), vehicle: veh(b.vehicle), status: 'new', comment: t(b.comment, 3000), at: now, by: user.id };
-      L.push(x); addWorker(x.assignee); return out();
+      L.push(x); addWorker(x.assignee); jobLog(j, user, { t: 'req', act: 'add', no: x.no, text: x.text.slice(0, 300) }); return out();
     }
     const it = p[4] && L.find(x => x.id === p[4]); if (!it) return fail(res, 404, 'Заявка не найдена — обновите страницу');
     if (m === 'PATCH') {
@@ -2534,9 +2538,9 @@ async function api(req, res, url) {
         if (b.assignee !== undefined) { it.assignee = who(b.assignee); addWorker(it.assignee); } if (b.vehicle !== undefined) it.vehicle = veh(b.vehicle); }
       if (b.comment !== undefined) it.comment = t(b.comment, 3000);
       if (b.status !== undefined && ['new', 'work', 'done'].includes(b.status)) { it.status = b.status; it.doneAt = b.status === 'done' ? now : null; it.doneBy = b.status === 'done' ? user.id : null; }
-      it.editedAt = now; it.editedBy = user.id; return out();
+      it.editedAt = now; it.editedBy = user.id; jobLog(j, user, { t: 'req', act: 'edit', no: it.no, text: String(it.text || '').slice(0, 300), ch: Object.keys(b).filter(k => ['text', 'address', 'due', 'assignee', 'vehicle', 'comment', 'status'].includes(k)).map(k => ({ f: k, to: short(b[k]) })) }); return out();
     }
-    if (m === 'DELETE') { if (!mayEditJob(user, j)) return fail(res, 403, 'Удаляет руководитель или администратор'); L.splice(L.indexOf(it), 1); return out(); }
+    if (m === 'DELETE') { if (!mayEditJob(user, j)) return fail(res, 403, 'Удаляет руководитель или администратор'); jobLog(j, user, { t: 'req', act: 'del', no: it.no, text: String(it.text || '').slice(0, 300) }); L.splice(L.indexOf(it), 1); return out(); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'jobs' && p[3] === 'list' && ['todo', 'buy'].includes(p[4])) {
@@ -2551,19 +2555,22 @@ async function api(req, res, url) {
       const b = await readJsonBody(req), text = String(b.text || '').trim().slice(0, 2000);
       if (!text && !(b.links || []).length && !(b.files || []).length) return fail(res, 400, 'Напишите, что нужно');
       L.push({ id: newId(), text, done: false, at: now, by: user.id, ...(k === 'buy' ? { links: links(b.links), files: files(b.files) } : {}) });
+      jobLog(j, user, { t: 'list', k, act: 'add', text: text.slice(0, 300) });
       return out();
     }
     const it = p[5] && L.find(x => x.id === p[5]); if (!it) return fail(res, 404, 'Пункт не найден — обновите страницу');
     if (m === 'PATCH') {
       const b = await readJsonBody(req);
       if (b.text !== undefined) { const t = String(b.text).trim().slice(0, 2000); if (!t && !(it.links || []).length && !(it.files || []).length) return fail(res, 400, 'Пустой пункт — удалите его'); it.text = t; }
+      if (b.text !== undefined && String(b.text).trim() !== it.text) jobLog(j, user, { t: 'list', k, act: 'edit', text: String(b.text).trim().slice(0, 300), from: String(it.text || '').slice(0, 300) });
+      if (b.done !== undefined && !!b.done !== !!it.done) jobLog(j, user, { t: 'list', k, act: b.done ? 'done' : 'undone', text: String(it.text || '').slice(0, 300) });
       if (b.done !== undefined) { it.done = !!b.done; it.doneAt = it.done ? now : null; it.doneBy = it.done ? user.id : null; }
       if (k === 'buy' && b.links !== undefined) it.links = links(b.links);
       if (k === 'buy' && b.files !== undefined) it.files = files(b.files);
       it.editedAt = now; it.editedBy = user.id;
       return out();
     }
-    if (m === 'DELETE') { L.splice(L.indexOf(it), 1); return out(); }
+    if (m === 'DELETE') { jobLog(j, user, { t: 'list', k, act: 'del', text: String(it.text || '').slice(0, 300) }); L.splice(L.indexOf(it), 1); return out(); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'jobs' && p[3] === 'places' && p[4]) {
@@ -2698,7 +2705,8 @@ async function api(req, res, url) {
     let cpCreated = false;
     if (col === 'invoices') { const sup = ensureSupplier(data.supplier, data.supplierInn, user, `Добавлен по счёту № ${data.number || '—'}`); data.supplierId = sup.id; cpCreated = sup.created; }
     const nid = newId(); db[col][nid] = data;
-    if (col === 'jobs') { delete data.orderId; ensureJobOrder(data, nid, user); }
+    if (col === 'jobs') { delete data.orderId; ensureJobOrder(data, nid, user); jobLog(data, user, { t: 'created' }); }
+    if (col === 'tasks' && db.jobs[data.jobId]) jobLog(db.jobs[data.jobId], user, { t: 'task', act: 'add', title: data.title, kind: data.kind, start: data.start, end: data.end });
     const linesFilled = col === 'invoices' ? fillOrderSuppliers(data) : 0;
     saveDb();
     return send(res, 200, { id: nid, rev: db.rev, cpCreated, linesFilled });
@@ -2738,6 +2746,7 @@ async function api(req, res, url) {
         c.doneAt = c.status === 'done' ? t : null; c.doneBy = c.status === 'done' ? user.id : null;
       }
       delete c.orderId;   // the order of a work is made and kept by the server
+      { const ch = diffOf(j, c, ['history', 'updatedAt', 'updatedBy', 'doneAt', 'doneBy', 'startedAt', 'startedBy', 'woDraft']); if (ch.length) jobLog(j, user, { t: 'job', ch }); }
       Object.assign(j, c, { updatedAt: new Date().toISOString(), updatedBy: user.id });
       if (c.places) jobWorkersFromPlaces(j);
       ensureJobOrder(j, id, user, c);
@@ -2787,6 +2796,8 @@ async function api(req, res, url) {
     if (col === 'invoices' && patch.supplier !== undefined && (normName(patch.supplier) !== normName(db.invoices[id].supplier) || !db.invoices[id].supplierId)) {
       const sup = ensureSupplier(patch.supplier, patch.supplierInn, user, `Добавлен по счёту № ${patch.number || db.invoices[id].number || '—'}`); patch.supplierId = sup.id; cpCreated = sup.created;
     }
+    if (col === 'orders') { const ch = diffOf(db.orders[id], patch, ['updatedAt', 'updatedBy', 'products', 'components', 'specs', 'woDraft', 'woMap', 'woFull']); const j = Object.values(db.jobs || {}).find(x => x.orderId === id); if (ch.length && j) jobLog(j, user, { t: 'order', ch }); }
+    if (col === 'tasks') { const t = db.tasks[id], ch = diffOf(t, patch, ['updatedAt', 'updatedBy', 'contractorsNote']); if (ch.length && db.jobs[t.jobId || patch.jobId]) jobLog(db.jobs[t.jobId || patch.jobId], user, { t: 'task', act: 'edit', title: t.title, kind: t.kind, ch }); }
     Object.assign(db[col][id], patch, { updatedAt: new Date().toISOString(), updatedBy: user.id });
     // a production work and its order have one status: the work's («Выполнена» — the order is closed)
     if (col === 'jobs' && 'status' in patch) { const o = db.jobs[id].orderId && db.orders[db.jobs[id].orderId]; if (o) o.status = jobToOrderSt(patch.status); }
@@ -2811,6 +2822,7 @@ async function api(req, res, url) {
     // a deleted order of a work is not made again automatically
     if (col === 'orders') for (const j of Object.values(db.jobs || {})) if (j.orderId === id) { j.orderId = null; j.noOrder = true; }
     if (col === 'jobs' && d.orderId && db.orders[d.orderId] && db.orders[d.orderId].jobId === id) delete db.orders[d.orderId].jobId;
+    if (col === 'tasks' && db.jobs[d.jobId]) jobLog(db.jobs[d.jobId], user, { t: 'task', act: 'del', title: d.title, kind: d.kind, start: d.start, end: d.end });
     delete db[col][id]; saveDb();
     return send(res, 200, { ok: true, rev: db.rev });
   }
