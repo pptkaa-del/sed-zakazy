@@ -107,6 +107,8 @@ function cleanJob(d){
   if ('kind' in d) out.kind = ['prod', 'mount', 'both', 'ops'].includes(d.kind) ? d.kind : 'mount';
   // a priority work goes to the top of the list
   if ('priority' in d) out.priority = !!d.priority;
+  // «Производство»: how many products the work makes
+  if ('qty' in d) out.qty = d.qty === null || d.qty === '' || !(Number(d.qty) > 0) ? null : Math.min(1e7, Math.round(Number(d.qty) * 1000) / 1000);
   // the group of a work («Группы» in «Работы»)
   if ('groupId' in d) out.groupId = d.groupId && (db.jobGroups || []).some(g => g.id === d.groupId) ? String(d.groupId) : null;
   if ('customerId' in d) out.customerId = d.customerId && db.counterparties[d.customerId] ? d.customerId : null;
@@ -976,8 +978,8 @@ async function api(req, res, url) {
     if (FIELD(user) && sees(user, 'prodscr')) {
       const J = listOf('jobs').filter(j => ['prod', 'both'].includes(j.kind) && j.orderId && db.orders[j.orderId]);
       out.prodScr = { jobs: J.map(j => { const P = j.places || [], c = P.filter(x => x.doneAt).length;
-          return { id: j.id, no: j.no, title: j.title, kind: j.kind, status: j.status, due: j.due || '', priority: !!j.priority, groupId: j.groupId || null, orderId: j.orderId, custName: (db.counterparties[j.customerId] || {}).name || '', places: [], progress: P.length ? Math.round(c / P.length * 100) : j.progress ?? null }; }),
-        orders: J.map(j => { const o = db.orders[j.orderId]; return { id: j.orderId, number: o.number, deadline: o.deadline || '', products: (o.products || []).map(p => ({ id: p.id, name: p.name, qty: p.qty, unit: p.unit, note: p.note, components: p.components || [], files: p.files || [] })) }; }) };
+          return { id: j.id, no: j.no, title: j.title, kind: j.kind, status: j.status, due: j.due || '', qty: j.qty || null, priority: !!j.priority, groupId: j.groupId || null, orderId: j.orderId, custName: (db.counterparties[j.customerId] || {}).name || '', places: [], progress: P.length ? Math.round(c / P.length * 100) : j.progress ?? null }; }),
+        orders: J.map(j => { const o = db.orders[j.orderId]; return { id: j.orderId, number: o.number, deadline: o.deadline || '', products: (o.products || []).map(p => ({ id: p.id, productId: p.productId || null, name: p.name, qty: p.qty, unit: p.unit, note: p.note, components: p.components || [], files: p.files || [] })) }; }) };
     }
     if (FIELD(user)) out.notes = (db.notes || []).filter(n => n.type === 'shared' && n.assignee === user.id);
     else if (sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && ((n.share || []).includes(user.id) || n.assignee === user.id)));
