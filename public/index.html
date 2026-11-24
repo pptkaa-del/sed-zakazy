@@ -2936,7 +2936,9 @@ document.addEventListener('dblclick', e => {
   const open = (j[k] || []).filter(x => !x.done); el.style.maxHeight = ''; el.classList.add('exp');
   el.innerHTML = `<div class="wle" data-keep>${open.map(x => `<textarea class="in sm wl-ta" rows="1" data-wle="${x.id}" aria-label="Пункт">${esc(x.text || '')}</textarea>`).join('')}<textarea class="in sm wl-ta" rows="1" data-wle="" placeholder="${k === 'buy' ? 'Что купить' : 'Что сделать'} — Enter" aria-label="Новый пункт" data-ph-keep></textarea><small class="dim">Enter — сохранить, пустое поле — удалить пункт, Esc — закрыть</small></div>`;
   const box = el.querySelector('.wle'), fit = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; };
-  box.querySelectorAll('textarea').forEach(fit); box.addEventListener('input', ev => ev.target.matches('textarea') && fit(ev.target)); (box.querySelector('[data-wle=""]')).focus();
+  box.querySelectorAll('textarea').forEach(fit); box.addEventListener('input', ev => ev.target.matches('textarea') && fit(ev.target));
+  // moving to another field (a click, Enter, Tab): the cursor at the end; clicks inside the field already chosen keep the place clicked
+  box.addEventListener('focusin', ev => { const t = ev.target; if (!t.matches('textarea')) return; setTimeout(() => { if (document.activeElement === t) { const n = t.value.length; t.setSelectionRange(n, n); } }, 0); }); (box.querySelector('[data-wle=""]')).focus();
   const save = async inp => { const id = inp.dataset.wle, v = inp.value.trim(), it = id && (j[k] || []).find(x => x.id === id);
     try { if (!id) { if (!v) return false; await jlApi(jid, k, 'POST', '', { text: v, links: [] }); inp.value = ''; toast('Пункт добавлен'); return true; }
       if (!it || v === (it.text || '')) return false;
