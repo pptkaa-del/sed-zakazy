@@ -5887,7 +5887,7 @@ function nsFormHtml(x){
       const ps = `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\\Downloads\\netshare-agent.ps1" -Token ${T} -Port 8765 -Allow "${R}"`;
       const cmdexe = `powershell -ExecutionPolicy Bypass -File "%USERPROFILE%\\Downloads\\netshare-agent.ps1" -Token ${T} -Port 8765 -Allow "${R}"`;
       const nd = `node netshare-agent.js --token ${T} --port 8765 --allow "${R}"`;
-      const ssh = `ssh -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -R 127.0.0.1:${port}:127.0.0.1:8765 tunnel@${host}`;
+      const ssh = `ssh -i "$env:USERPROFILE\\.ssh\\netshare" -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -R 127.0.0.1:${port}:127.0.0.1:8765 tunnel@${host}`;
       return `<div class="box nshow"><h4>Как подключить файловый сервер</h4>
       <p style="margin:0">Ключ агента: <code class="mono">${esc(T)}</code> <button class="linkish" data-act="nsCopy" data-id="${esc(T)}">📋 скопировать</button> · ${armBtn('nst:' + x.id, 'выдать новый ключ', 'nsTokNew', x.id, 'linkish')}</p>
       <ol class="nssteps">
@@ -5897,7 +5897,13 @@ function nsFormHtml(x){
           <details><summary class="linkish">другие варианты: командная строка (cmd), Node.js</summary>
             ${cmd(cmdexe, 'Для командной строки Windows (cmd.exe).')}
             ${cmd(nd, 'Если на сервере есть Node.js: скачайте <a href="/netshare/netshare-agent.js" download>netshare-agent.js</a> и запустите в папке с ним.')}</details></li>
-        <li><b>Откройте обратный SSH-туннель</b> во втором окне PowerShell (OpenSSH есть в Windows 10 / Server 2019 и новее). На этом сервере нужен пользователь SSH, например <span class="mono">tunnel</span>, со входом по ключу — его создаёт администратор сервера:
+        <li><b>Создайте ключ туннеля</b> на файловом сервере (один раз): в PowerShell выполните команду, на вопрос о пароле ключа дважды нажмите Enter, затем покажите ключ и скопируйте всю строку <span class="mono">ssh-ed25519 …</span>:
+          ${cmd('mkdir "$env:USERPROFILE\\.ssh" -Force', '')}
+          ${cmd('ssh-keygen -t ed25519 -f "$env:USERPROFILE\\.ssh\\netshare"', '')}
+          ${cmd('Get-Content "$env:USERPROFILE\\.ssh\\netshare.pub"', '')}</li>
+        <li><b>Добавьте ключ на этот сервер</b> (один раз, администратор сервера, под root): в команде замените <span class="mono">ssh-ed25519 AAAA…</span> на скопированную строку. Будет создан пользователь <span class="mono">tunnel</span> — без входа в консоль, только этот туннель на порт ${esc(String(port))}:
+          ${cmd(`sudo bash /opt/sed-zakazy/install.sh --tunnel-key "ssh-ed25519 AAAA…" --tunnel-port ${port}`, 'Если программа установлена на виртуальный хостинг (без root), создать такого пользователя нельзя — нужен свой сервер.')}</li>
+        <li><b>Откройте обратный SSH-туннель</b> во втором окне PowerShell (OpenSSH есть в Windows 10 / Server 2019 и новее):
           ${cmd(ssh, 'Команда — одной строкой, целиком (при вставке она не должна разрываться).')}
           <details><summary class="linkish">Пишет «ssh не распознано как имя командлета…»?</summary>
             <p style="margin:6px 0">В Windows нет клиента OpenSSH. Откройте PowerShell <b>от имени администратора</b> (правой кнопкой по «PowerShell» → «Запуск от имени администратора») и установите его — нужен интернет, 1–2 минуты:</p>

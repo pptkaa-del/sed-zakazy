@@ -3,6 +3,11 @@
 #
 #   bash install.sh [домен] [--email почта] [--port 80] [--no-auto-update] [--mode shared|server] [--branch main]
 #                   [--archive https://другой-сервер/sed-zakazy.tar.gz | /путь/к/архиву.zip] [--archive-password пароль | -]
+#   bash install.sh --tunnel-key "ssh-ed25519 AAAA… имя" [--tunnel-port 20001]
+#
+# --tunnel-key: только создать на этом сервере пользователя tunnel для «Сетевой папки» (обратный SSH-туннель
+#   с файлового сервера) и добавить ему ключ. Пользователь не может войти в консоль и выполнять команды —
+#   только открыть один туннель на 127.0.0.1:порт (--tunnel-port, по умолчанию 20001). Установка не запускается.
 #
 # --archive: код берётся не из GitHub, а из архива (.tar.gz или .zip) по ссылке или из файла;
 #   автообновление тогда следит за этим архивом и ставит его, когда он изменился.
@@ -43,6 +48,9 @@ AUTO=1
 MODE=""
 ARCHIVE=""
 ARCHIVE_PASS=""
+TUNNEL_KEY=""
+TUNNEL_SET=0
+TUNNEL_PORT=20001
 NODE_NEW="20.18.1"
 NODE_OLD="16.20.2"
 
@@ -60,11 +68,49 @@ while [ $# -gt 0 ]; do
     --archive-password) ARCHIVE_PASS="${2:-}"; shift 2 ;;
     --port)   HTTP_PORT="${2:-}"; shift 2 ;;
     --no-auto-update) AUTO=0; shift ;;
-    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --tunnel-key) TUNNEL_KEY="${2:-}"; TUNNEL_SET=1; shift 2 ;;
+    --tunnel-port) TUNNEL_PORT="${2:-}"; shift 2 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) die "Неизвестный параметр $1" ;;
     *)  DOMAIN="$1"; shift ;;
   esac
 done
+# ---------- «Сетевая папка»: the user tunnel with the key of a file server (only a reverse tunnel), and nothing else ----------
+if [ "$TUNNEL_SET" = 1 ]; then
+  [ -n "$TUNNEL_KEY" ] || die "После --tunnel-key укажите открытый ключ файлового сервера в кавычках: --tunnel-key \"ssh-ed25519 AAAA…\""
+  [ "$(id -u)" = 0 ] || die "Пользователя tunnel создаёт root: sudo bash install.sh --tunnel-key \"…\""
+  TUNNEL_KEY="$(printf '%s' "$TUNNEL_KEY" | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+  printf '%s' "$TUNNEL_KEY" | LC_ALL=C grep -qE '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)) [A-Za-z0-9+/=]{40,}( [^"]*)?$' \
+    || die "Это не открытый ключ SSH. Нужна вся строка из файла .pub, она начинается с ssh-ed25519 (или ssh-rsa) — в кавычках"
+  printf '%s' "$TUNNEL_PORT" | LC_ALL=C grep -qE '^[0-9]+$' && [ "$TUNNEL_PORT" -ge 1024 ] && [ "$TUNNEL_PORT" -le 65535 ] || die "--tunnel-port — число от 1024 до 65535"
+  say "Пользователь tunnel для «Сетевой папки» (порт $TUNNEL_PORT)"
+  if id tunnel >/dev/null 2>&1; then ok "пользователь tunnel уже есть"
+  else
+    NOLOGIN="$(command -v nologin || echo /usr/sbin/nologin)"; [ -x "$NOLOGIN" ] || NOLOGIN=/bin/false
+    useradd -m -s "$NOLOGIN" tunnel && ok "создан пользователь tunnel (без входа в консоль)"
+  fi
+  TH="$(getent passwd tunnel | cut -d: -f6)"; [ -n "$TH" ] || TH=/home/tunnel
+  install -d -m 700 -o tunnel -g tunnel "$TH/.ssh"
+  AK="$TH/.ssh/authorized_keys"; touch "$AK"
+  KEYBODY="$(printf '%s' "$TUNNEL_KEY" | awk '{print $2}')"
+  # the same key again — its line is replaced (a new port), other file servers stay
+  grep -v -F "$KEYBODY" "$AK" > "$AK.tmp" || true
+  printf 'restrict,port-forwarding,permitlisten="127.0.0.1:%s" %s\n' "$TUNNEL_PORT" "$TUNNEL_KEY" >> "$AK.tmp"
+  mv "$AK.tmp" "$AK"; chown tunnel:tunnel "$AK"; chmod 600 "$AK"
+  ok "ключ добавлен: только туннель на 127.0.0.1:$TUNNEL_PORT ($(grep -c . "$AK") ключ(ей) у tunnel)"
+  if command -v sshd >/dev/null 2>&1; then
+    CFG="$(sshd -T 2>/dev/null || true)"
+    printf '%s\n' "$CFG" | grep -qi '^allowtcpforwarding no' && warn "В /etc/ssh/sshd_config запрещены туннели (AllowTcpForwarding no) — поставьте yes и выполните: systemctl reload ssh"
+    AU="$(printf '%s\n' "$CFG" | awk 'tolower($1)=="allowusers"{ $1=""; print }')"
+    if [ -n "$AU" ] && ! printf '%s' "$AU" | grep -qw tunnel; then warn "В sshd_config задан AllowUsers без tunnel — добавьте tunnel в строку AllowUsers и выполните: systemctl reload ssh"; fi
+    printf '%s\n' "$CFG" | grep -qi '^pubkeyauthentication no' && warn "Вход по ключу выключен (PubkeyAuthentication no) — поставьте yes и выполните: systemctl reload ssh"
+  fi
+  HOSTNAME_SHOW="${DOMAIN:-$(hostname -f 2>/dev/null || hostname)}"
+  echo
+  ok "Готово. На файловом сервере запустите туннель (одной строкой):"
+  echo "    ssh -i \"\$env:USERPROFILE\\.ssh\\netshare\" -N -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -R 127.0.0.1:$TUNNEL_PORT:127.0.0.1:8765 tunnel@$HOSTNAME_SHOW"
+  exit 0
+fi
 if [ "$ARCHIVE_PASS" = "-" ]; then
   # asked from the keyboard (also under «curl … | sudo bash»); the restart of the script with its new copy gets the typed one
   if { : </dev/tty; } 2>/dev/null; then read -r -s -p "Пароль архива: " ARCHIVE_PASS </dev/tty; echo >/dev/tty; else ARCHIVE_PASS=""; fi
