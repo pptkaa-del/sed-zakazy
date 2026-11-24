@@ -1366,7 +1366,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wover" data-v="wover" hidden>Ненорм. день</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
-      <a href="#prodscr" data-v="prodscr" id="prodTab">Производство</a>
+      <a href="#prodscr" data-v="prodscr" id="prodTab">Экран производства</a>
       <a href="#stock" data-v="stock">Учётка <span class="badge" id="payBadge" hidden title="Счета к оплате"></span></a>
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#staff" data-v="staff" id="staffTab" hidden>Сотрудники</a>
@@ -8296,7 +8296,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ...(isHead() ? [['prodscr', 'Производство']] : []), ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
+const startViews = () => [['works', 'Работы'], ...(isHead() ? [['prodscr', 'Экран производства']] : []), ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
