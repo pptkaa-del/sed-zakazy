@@ -1361,7 +1361,29 @@ async function api(req, res, url) {
       const entries = (Array.isArray(r.entries) ? r.entries : []).slice(0, 5000).map(e => ({ name: String(e.name || '').slice(0, 500), dir: !!e.dir, size: Number.isFinite(e.size) ? e.size : null, mtime: typeof e.mtime === 'string' ? e.mtime.slice(0, 40) : null }));
       return send(res, 200, { ok: true, path: sub, total: Number(r.total) || entries.length, entries });
     }
-    if (p[3] === 'ping' && m === 'GET') { const r = await nsAgent(x, '/ping', {}); return send(res, 200, { ok: !!r.ok && r.agent === 'sed-netshare', host: r.ok ? String(r.host || '').slice(0, 100) : '', platform: r.ok ? String(r.platform || '').slice(0, 20) : '', error: r.ok ? '' : r.error }); }
+    // a file of the network folder: the agent sends it through the tunnel, the server passes it on to the browser as it comes
+    if (p[3] === 'file' && m === 'GET') {
+      const sub = String(url.searchParams.get('path') || '').slice(0, 2000);
+      if (!sub || sub.split(/[\\/]/).includes('..')) return fail(res, 400, 'Недопустимый путь');
+      const token = (vaultDec(x.token) || {}).t || '';
+      return new Promise(done => {
+        const rq = http.get({ host: NS_HOST, port: x.port, path: '/file?' + new URLSearchParams({ root: x.root, path: sub }).toString(), headers: { 'X-Token': token, Host: 'localhost' }, timeout: 30000 }, r => {
+          if (r.statusCode !== 200 || !/octet-stream/.test(r.headers['content-type'] || '')) {
+            const ch = []; r.on('data', c => { if (ch.length < 200) ch.push(c); }); r.on('end', () => { let e = ''; try { e = JSON.parse(Buffer.concat(ch).toString('utf8')).error || ''; } catch {}
+              if (r.statusCode === 404 && e === 'Не найдено') e = 'Агент старой версии не умеет отдавать файлы — скачайте netshare-agent заново (инструкция подключения) и перезапустите его';
+              fail(res, r.statusCode === 404 ? 404 : r.statusCode === 403 ? 403 : 400, e || 'Агент вернул ошибку'); done(); });
+            return;
+          }
+          const name = decodeURIComponent(String(r.headers['x-name'] || '') || '') || sub.split(/[\\/]/).pop() || 'file', ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+          res.writeHead(200, { 'Content-Type': 'application/octet-stream', ...(r.headers['content-length'] ? { 'Content-Length': r.headers['content-length'] } : {}),
+            'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+          rq.setTimeout(0); r.pipe(res); r.on('end', done); r.on('error', () => { res.destroy(); done(); }); res.on('close', () => { rq.destroy(); done(); });
+        });
+        rq.on('timeout', () => { rq.destroy(); if (!res.headersSent) fail(res, 504, 'Агент не ответил за 30 секунд'); done(); });
+        rq.on('error', e => { if (!res.headersSent) fail(res, 502, e.code === 'ECONNREFUSED' ? 'Нет подключения: туннель не открыт или агент не запущен' : 'Нет подключения: ' + e.code); else res.destroy(); done(); });
+      });
+    }
+    if (p[3] === 'ping' && m === 'GET') { const r = await nsAgent(x, '/ping', {}); return send(res, 200, { ok: !!r.ok && r.agent === 'sed-netshare', host: r.ok ? String(r.host || '').slice(0, 100) : '', platform: r.ok ? String(r.platform || '').slice(0, 20) : '', v: r.ok ? Number(r.v) || 1 : 0, error: r.ok ? '' : r.error }); }
     if (!HEAD(user)) return fail(res, 403, 'Подключения настраивает руководитель или администратор');
     if (p[3] === 'token' && m === 'GET') return send(res, 200, { token: (vaultDec(x.token) || {}).t || '' });
     if (p[3] === 'token' && m === 'POST') { const t = crypto.randomBytes(24).toString('base64url'); x.token = vaultEnc({ t }); saveDb(); return send(res, 200, { ok: true, token: t, rev: db.rev }); }
