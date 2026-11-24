@@ -563,7 +563,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .legbtn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--sheet);font:inherit;font-size:13px;cursor:pointer;color:inherit}.legbtn i{width:10px;height:10px;display:inline-block}.legbtn.off{opacity:.4;text-decoration:line-through}
 .worow{display:grid;grid-template-columns:minmax(0,1fr) 90px 220px auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}.worow:first-child{border-top:0}.worow small{display:block}@media (max-width:820px){.worow{grid-template-columns:1fr auto}}
 .calwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:12px;align-items:start}@media (max-width:900px){.calwrap{grid-template-columns:minmax(0,1fr)}}.calhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}.calhead b{font-size:18px;min-width:150px;text-align:center}.calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.calw{font-size:12px;color:var(--ink-2);text-align:center;padding:2px 0}.calc{position:relative;display:flex;flex-direction:column;align-items:stretch;text-align:left;min-height:86px;padding:4px 5px;border:1px solid var(--rule);border-radius:6px;background:var(--sheet);color:var(--ink);font:inherit;cursor:pointer;overflow:hidden;min-width:0}.calc.off{background:var(--mute-soft)}.calc.out{opacity:.45}.calc.tod .caln{background:var(--stamp);color:var(--stamp-ink);border-radius:10px;padding:0 6px}.calc.sel{outline:2px solid var(--stamp);outline-offset:-2px}.caln{font-weight:700;font-size:13px;align-self:flex-start}.calcnt{display:none;position:absolute;right:4px;top:4px;font-size:11px;background:var(--stamp);color:var(--stamp-ink);border-radius:8px;padding:0 5px}.call{display:flex;flex-direction:column;gap:1px;margin-top:2px;font-size:11.5px;line-height:1.25}.call span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.call .done{text-decoration:line-through;opacity:.6}.call .due{color:var(--warn)}@media (max-width:600px){.calc{min-height:48px}.call{display:none}.calcnt{display:block;top:auto;bottom:3px;right:3px}}.call2{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.call2 li{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--rule);border-radius:8px}.call2 li.done .calx{text-decoration:line-through;opacity:.6}.call2 li.ed{border-color:var(--stamp);background:var(--stamp-soft)}.call2 li.due{background:var(--warn-soft)}.calx{flex:1;min-width:0;word-break:break-word}.calcm{white-space:pre-wrap;color:var(--ink-2);font-size:13px;margin-top:2px}.calf{display:flex;flex-direction:column;gap:8px}.calf label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}/* «Что происходит», «сделать», «купить»: the whole cell catches the clicks; not higher than the cell «Работа», the rest hidden under «…» */
-.wjr>.wl-ed{align-self:stretch;position:relative;overflow:hidden;cursor:pointer;border-radius:6px;margin:-4px;padding:4px}.wjr>.wl-ed.clip:not(.exp)::after{content:'… ещё';position:absolute;right:0;bottom:0;padding:0 6px 0 18px;font-size:12px;color:var(--stamp);background:linear-gradient(90deg,transparent,var(--sheet) 14px)}.wjr>.wl-ed.exp{max-height:none!important}.wle{display:flex;flex-direction:column;gap:4px}.wle .in{font-size:13px;padding:4px 6px}
+.wjr>.wl-ed{align-self:stretch;position:relative;overflow:hidden;cursor:pointer;border-radius:6px;margin:-4px;padding:4px}.wjr>.wl-ed.clip:not(.exp)::after{content:'… ещё';position:absolute;right:0;bottom:0;padding:0 6px 0 18px;font-size:12px;color:var(--stamp);background:linear-gradient(90deg,transparent,var(--sheet) 14px)}.wjr>.wl-ed.exp{max-height:none!important}.wle{display:flex;flex-direction:column;gap:4px}.wle .in{font-size:13px;padding:4px 6px}.wl-ta{resize:none;overflow:hidden;min-height:0!important;white-space:pre-wrap;overflow-wrap:anywhere;width:100%;box-sizing:border-box;line-height:1.35;font:inherit;font-size:13px}
 /* the confirmation of a deletion: red in every theme */
 :root .armed,:root .btn.armed,:root button.armed,:root [data-arm].armed{background:#D32F2F!important;border-color:#B71C1C!important;color:#fff!important;background-image:none!important;text-shadow:none!important}
 dialog.askdel{border:0;border-radius:12px;padding:0;max-width:min(440px,calc(100vw - 32px));box-shadow:0 12px 40px rgba(0,0,0,.35)}dialog.askdel::backdrop{background:rgba(20,30,50,.5)}dialog.askdel .ad{background:#D32F2F;color:#fff;padding:18px 20px}dialog.askdel h3{margin:0 0 8px;color:#fff;font-size:18px}dialog.askdel p{margin:0 0 16px;white-space:pre-wrap;line-height:1.45}dialog.askdel .row-g{justify-content:flex-end;gap:8px}dialog.askdel button{font:inherit;border-radius:8px;padding:8px 16px;cursor:pointer}dialog.askdel .no{background:#fff;color:#111;border:1px solid #fff}dialog.askdel .yes{background:#7F0000;color:#fff;border:1px solid #fff;font-weight:700}
@@ -1627,7 +1627,7 @@ document.addEventListener('dblclick', e => {
   const el = e.target.closest('[data-ed]'); if (!el || edActive) return;
   e.preventDefault(); window.getSelection()?.removeAllRanges();
   const [col, id, field, m] = el.dataset.ed.split('|'), multi = m === 'm', old = edValue(col, id, field);
-  if (el.classList.contains('wl-ed')) ui.wlExp.delete(wlKey(el));
+  const wlc = el.classList.contains('wl-ed'); if (wlc) { ui.wlExp.delete(wlKey(el)); el.style.maxHeight = ''; el.classList.add('exp'); }
   let inp;
   if (m === 'sel') { inp = document.createElement('select'); edOpts(col, field).forEach(([k, l]) => { const o = document.createElement('option'); o.value = k; o.textContent = l; inp.appendChild(o); }); inp.value = old; }
   else { inp = document.createElement(multi ? 'textarea' : 'input'); if (m === 'date') inp.type = 'date'; if (m === 'num') { inp.type = 'number'; inp.min = '0'; }
@@ -1635,7 +1635,8 @@ document.addEventListener('dblclick', e => {
     inp.value = old; if (multi) inp.rows = Math.min(8, Math.max(2, old.split('\n').length + 1)); }
   inp.className = 'in ed-in';
   const keep = document.createElement('span'); keep.dataset.keep = ''; keep.style.display = 'contents'; keep.appendChild(inp);
-  edActive = { el, html: el.innerHTML }; const dlist = el.querySelector('#ed-cp-list'); el.innerHTML = ''; el.appendChild(keep); if (dlist) el.appendChild(dlist); el.classList.add('editing'); inp.focus(); inp.select?.();
+  if (wlc && multi) { const fit = () => { inp.style.height = 'auto'; inp.style.height = inp.scrollHeight + 2 + 'px'; }; inp.classList.add('wl-ta'); inp.addEventListener('input', fit); setTimeout(fit, 0); }
+  edActive = { el, html: el.innerHTML }; const dlist = el.querySelector('#ed-cp-list'); el.innerHTML = ''; el.appendChild(keep); if (dlist) el.appendChild(dlist); el.classList.add('editing'); inp.focus(); if (wlc && inp.setSelectionRange) { const n = inp.value.length; inp.setSelectionRange(n, n); } else inp.select?.();
   if (m === 'sel') inp.addEventListener('change', () => finish(true));
   let done = false;
   const finish = async save => {
@@ -2932,9 +2933,10 @@ const wlBrief = (L, word) => { const open = (L || []).filter(x => !x.done), all 
 document.addEventListener('dblclick', e => {
   const el = e.target.closest('[data-wlist]'); if (!el || el.querySelector('.wle')) return; e.preventDefault(); window.getSelection()?.removeAllRanges();
   const [jid, k] = el.dataset.wlist.split('|'), j = jobOf(jid); if (!j) return; ui.wlExp.delete(wlKey(el));
-  const open = (j[k] || []).filter(x => !x.done);
-  el.innerHTML = `<div class="wle" data-keep>${open.map(x => `<input class="in sm" data-wle="${x.id}" value="${esc(x.text || '')}" aria-label="Пункт">`).join('')}<input class="in sm" data-wle="" placeholder="${k === 'buy' ? 'Что купить' : 'Что сделать'} — Enter" aria-label="Новый пункт" data-ph-keep><small class="dim">Enter — сохранить, пустое поле — удалить пункт, Esc — закрыть</small></div>`;
-  const box = el.querySelector('.wle'); (box.querySelector('[data-wle=""]')).focus();
+  const open = (j[k] || []).filter(x => !x.done); el.style.maxHeight = ''; el.classList.add('exp');
+  el.innerHTML = `<div class="wle" data-keep>${open.map(x => `<textarea class="in sm wl-ta" rows="1" data-wle="${x.id}" aria-label="Пункт">${esc(x.text || '')}</textarea>`).join('')}<textarea class="in sm wl-ta" rows="1" data-wle="" placeholder="${k === 'buy' ? 'Что купить' : 'Что сделать'} — Enter" aria-label="Новый пункт" data-ph-keep></textarea><small class="dim">Enter — сохранить, пустое поле — удалить пункт, Esc — закрыть</small></div>`;
+  const box = el.querySelector('.wle'), fit = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; };
+  box.querySelectorAll('textarea').forEach(fit); box.addEventListener('input', ev => ev.target.matches('textarea') && fit(ev.target)); (box.querySelector('[data-wle=""]')).focus();
   const save = async inp => { const id = inp.dataset.wle, v = inp.value.trim(), it = id && (j[k] || []).find(x => x.id === id);
     try { if (!id) { if (!v) return false; await jlApi(jid, k, 'POST', '', { text: v, links: [] }); inp.value = ''; toast('Пункт добавлен'); return true; }
       if (!it || v === (it.text || '')) return false;
@@ -2953,12 +2955,15 @@ const wlKey = c => (c.closest('.wjr')?.dataset.id || '') + '|' + (c.dataset.l ||
 function wlClamp(){
   document.querySelectorAll('.wtable .wjr:not(.whead)').forEach(r => { const n = r.querySelector('.wl-name'); if (!n) return;
     const h = innerWidth > 900 ? Math.max(48, n.offsetHeight) : 120;
-    r.querySelectorAll('.wl-ed').forEach(c => { const key = wlKey(c);
+    r.querySelectorAll('.wl-ed').forEach(c => { const key = wlKey(c); if (c.querySelector('.ed-in,.wle')) return;   // being edited — whole
       if (ui.wlExp.has(key)) { c.classList.add('exp'); c.style.maxHeight = ''; c.classList.toggle('clip', true); return; }
       const lh = parseFloat(getComputedStyle(c).lineHeight) || 19;   // whole lines only
       c.classList.remove('exp'); c.style.maxHeight = (Math.max(2, Math.floor(h / lh)) * lh + 8) + 'px'; c.classList.toggle('clip', c.scrollHeight > c.clientHeight + 2); }); });
 }
 addEventListener('resize', () => { if (document.querySelector('.wtable')) wlClamp(); });
+document.addEventListener('click', e => { if (!ui.wlExp.size) return; const c = e.target.closest?.('.wl-ed.exp');
+  ui.wlExp.forEach(k => { if (!c || wlKey(c) !== k) ui.wlExp.delete(k); });
+  if (document.querySelector('.wtable')) wlClamp(); }, true);
 function wlRow(j){
   const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), od = overdue(j);
   const left = j.due && j.status !== 'done' ? Math.round((Date.parse(j.due) - Date.parse(today())) / 864e5) : null;
