@@ -2868,6 +2868,16 @@ function vCps(){
     <section class="odetail">${c ? cpDetail(c) : `<div class="empty"><h3>Выберите контрагента</h3>Слева список организаций. Откройте карточку, чтобы посмотреть контакты и загрузить договоры.</div>`}</section>
   </div>`;
 }
+// «Подрядчик» in «Контрагенты»: the administrator makes its people users with the role «Подрядчик»
+const ruLat = t => String(t || '').toLowerCase().replace(/[а-яё]/g, ch => ({ а:'a', б:'b', в:'v', г:'g', д:'d', е:'e', ё:'e', ж:'zh', з:'z', и:'i', й:'y', к:'k', л:'l', м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'h', ц:'ts', ч:'ch', ш:'sh', щ:'sch', ъ:'', ы:'y', ь:'', э:'e', ю:'yu', я:'ya' })[ch] ?? '').replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '').slice(0, 30);
+function cpUsersBox(c, cts){
+  if (me?.role !== 'admin' || !(c.roles || []).includes('contractor')) return '';
+  if (!ui.usersList) { loadUsers().then(() => { if (ui.view === 'cps') render(); }); }
+  const U = (ui.usersList || []).filter(u => u.cpId === c.id), has = n => (ui.usersList || []).some(u => u.name.trim().toLowerCase() === String(n || '').trim().toLowerCase());
+  return `<section class="card"><div class="ch"><h3>👤 Пользователи-подрядчики <span class="dim">${U.length || ''}</span></h3><button class="btn sm primary" data-act="cpUser" data-id="${c.id}|">+ Добавить в пользователи</button></div>
+    ${U.length ? `<ul class="files">${U.map(u => `<li><b>${esc(u.name)}</b> <span class="mono dim">${esc(u.login)}</span><small>${u.accessUntil ? (u.expired ? '<span class="bad-t">доступ закончился ' + fmtD(u.accessUntil) + '</span>' : 'доступ до ' + fmtD(u.accessUntil)) : ''}${u.blocked ? ' · заблокирован' : ''}</small><button class="btn sm ghost" data-act="userEdit" data-id="${u.id}">Изменить</button></li>`).join('')}</ul>` : '<p class="dim" style="margin:0">Пользователей пока нет. Подрядчик войдёт в программу и увидит только назначенные ему работы.</p>'}
+    ${cts.filter(k => k.name && !has(k.name)).length ? `<div class="row-g" style="margin-top:8px">${cts.map((k, i) => k.name && !has(k.name) ? `<button class="btn sm" data-act="cpUser" data-id="${c.id}|${i}">👤 ${esc(k.name)} — сделать пользователем</button>` : '').join('')}</div>` : ''}</section>`;
+}
 function cpDetail(c){
   const orders = ordersSorted().filter(o => o.customerId === c.id);
   const ks = (c.contracts || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
@@ -2876,6 +2886,7 @@ function cpDetail(c){
   <div class="ohead"><div style="min-width:0"><h2><span ${edAttr('counterparties', c.id, 'name')}>${esc(c.name)}</span>${exTag(c)}</h2>
       <div class="roles-chips" style="margin-top:6px">${(c.roles||[]).map(r => `<span class="chip c-info">${CP_ROLES[r]||r}</span>`).join('') || '<span class="dim">Роль не указана</span>'}</div></div>
     <div class="row-g"><button class="btn sm" data-act="editCp" data-id="${c.id}">Изменить</button></div></div>
+  ${cpUsersBox(c, cts)}
   <section class="card"><div class="ch"><h3>Контактные данные <span class="dim">${cts.length||''}</span></h3><button class="btn sm primary" data-act="newContact" data-id="${c.id}">+ Контакт</button></div>
     ${c.inn ? `<p class="site">ИНН: <span class="mono">${esc(c.inn)}</span></p>` : ''}${c.note ? `<p class="site dim">${esc(c.note)}</p>` : ''}
     ${c.site ? `<p class="site">Сайт: <a href="${esc(siteUrl(c.site))}" target="_blank" rel="noopener">${esc(c.site)}</a></p>` : ''}
@@ -7898,13 +7909,14 @@ function renderDrawer(){
       <div class="row-g"><button class="btn primary" type="submit">${t?'Сохранить':'Добавить в график'}</button><button class="btn" type="button" data-act="close">Отмена</button>${t?armBtn('task','Удалить','delTask',t.id):''}</div></form>`;
   }
   if (d.kind === 'userForm') {
-    const u = (ui.usersList || []).find(x => x.id === d.id);
+    const u = (ui.usersList || []).find(x => x.id === d.id), pre = !u && ui.ufPrefill;   // «из контрагента»: the name, the login and the role are offered
     const self = u && u.id === me.id;
-    D.innerHTML = dh(u ? 'Пользователь: ' + esc(u.name) : 'Новый пользователь') + `<form class="d-body" data-form="userForm"><div class="form">
-      <label class="wide">Имя<input class="in" id="uf-name" value="${v(u,'name')}" required></label>
-      <label>Логин (латиницей)<input class="in" id="uf-login" value="${v(u,'login')}" autocomplete="off" required></label>
-      <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(roleNames(), u?.role || 'worker')}</select></label>
-      <label class="wide" id="uf-until-w" ${(u?.role || 'worker') === 'contractor' ? '' : 'hidden'}>Доступ подрядчика до (включительно)<input class="in" type="date" id="uf-until" value="${esc(u?.accessUntil || '')}"><small class="dim" style="font-size:12px">На следующий день вход для подрядчика закроется.</small></label>
+    D.innerHTML = dh(u ? 'Пользователь: ' + esc(u.name) : pre ? 'Новый пользователь-подрядчик' : 'Новый пользователь') + `<form class="d-body" data-form="userForm"><div class="form">
+      ${pre ? `<p class="hint wide" style="margin:0">Из контрагента «${esc(cpOf(pre.cpId)?.name || '')}» — пользователь будет связан с ним и появится в его карточке.</p>` : ''}
+      <label class="wide">Имя<input class="in" id="uf-name" value="${pre ? esc(pre.name) : v(u,'name')}" required></label>
+      <label>Логин (латиницей)<input class="in" id="uf-login" value="${pre ? esc(pre.login) : v(u,'login')}" autocomplete="off" required></label>
+      <label>Роль<select class="in" id="uf-role" ${self?'disabled':''}>${opt(roleNames(), u?.role || (pre ? 'contractor' : 'worker'))}</select></label>
+      <label class="wide" id="uf-until-w" ${(u?.role || (pre ? 'contractor' : 'worker')) === 'contractor' ? '' : 'hidden'}>Доступ подрядчика до (включительно)<input class="in" type="date" id="uf-until" value="${esc(u?.accessUntil || (pre ? dstr(dnum(today()) + 90) : ''))}"><small class="dim" style="font-size:12px">На следующий день вход для подрядчика закроется.</small></label>
       <label class="wide">${u ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль, не короче 8 символов'}<span class="pwrow"><input class="in mono" id="uf-pass" autocomplete="new-password" ${u?'':'required'}><span class="pwgen"><button type="button" class="btn sm" data-act="genPass" data-id="#uf-pass" title="Создать надёжный пароль">Сгенерировать</button><button type="button" class="btn sm ghost" data-act="copyPass" data-id="#uf-pass" title="Скопировать пароль">Копировать</button></span></span></label></div>
       <p class="hint dim" id="uf-info" style="margin:0">${esc(roleInfo(u?.role || 'worker'))}</p>
       ${reqMode() || transMode() ? '' : `<fieldset class="wide otype secbox" id="uf-secs"><legend>Какие вкладки и подвкладки видит пользователь</legend>${secTree(u?.hide || [], me.org?.hide || [])}<small class="dim">Показаны разделы, открытые организации. Права роли действуют как прежде: например, «Списание материалов» видят только администратор, руководитель и бухгалтер.</small></fieldset>`}
@@ -8274,10 +8286,11 @@ async function onSubmit(e){
         await api('PATCH', '/api/users/' + d.id, body);
         toast('Сохранено');
       } else {
-        await api('POST', '/api/users', { ...body, password:pw });
-        toast('Пользователь добавлен');
+        const cpId = ui.ufPrefill?.cpId || null;
+        await api('POST', '/api/users', { ...body, password:pw, ...(cpId ? { cpId } : {}) });
+        toast('Пользователь добавлен' + (cpId ? ` — подрядчик «${cpOf(cpId)?.name || ''}»` : ''));
       }
-      closeDrawer(); await loadUsers();
+      ui.ufPrefill = null; closeDrawer(); await loadUsers(); if (ui.view === 'cps') render();
     }
     if (kind === 'password') {
       await api('POST', '/api/password', { current:$('pw-cur').value, next:$('pw-new').value });
@@ -8520,6 +8533,8 @@ async function act(el){
     case 'calDay': document.activeElement?.blur?.(); ui.calD = id; ui.calM = id.slice(0, 7); ui.calEd = null; return render();
     case 'calMon': { const [y, m] = (ui.calM || today().slice(0, 7)).split('-').map(Number), t = new Date(y, m - 1 + Number(id), 1); ui.calM = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`; return render(); }
     case 'calSave': return calSave();
+    case 'cpUser': { const [cid, i] = id.split('|'), c = cpOf(cid); if (!c) return; const k = i !== '' ? contactsOf(c)[Number(i)] : null, name = (k && k.name) || c.name;
+      ui.ufPrefill = { cpId: cid, name, login: ruLat(name) || 'podryadchik' }; return openDrawer('userForm'); }
     case 'psF': ui.psF = id; return render();
     case 'psOpen': ui.psOpen = ui.psOpen === id ? null : id; return render();
     case 'wlGrp': ui.wlByGroup = id === '1'; return render();
@@ -8751,7 +8766,7 @@ async function act(el){
     case 'delPoint': try { map.closePopup(); await del('points', id); if (ui.point === id) ui.point = null; toast('Точка удалена'); } catch(e) { toast(errText(e)); } return;
     case 'logout': await api('POST','/api/logout').catch(() => {}); return showLogin();
     case 'password': return openDrawer('password');
-    case 'userNew': return openDrawer('userForm');
+    case 'userNew': ui.ufPrefill = null; return openDrawer('userForm');
     case 'initImport': ui.acct = null; return openDrawer('acctImport', null, 'initial');
     case 'afF': ui.afF = id; return render();
     case 'afReload': ui.admFiles = null; return render();
