@@ -1366,6 +1366,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wover" data-v="wover" hidden>Ненорм. день</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
+      <a href="#prodscr" data-v="prodscr" id="prodTab">Производство</a>
       <a href="#stock" data-v="stock">Учётка <span class="badge" id="payBadge" hidden title="Счета к оплате"></span></a>
       <a href="#cps" data-v="cps">Контрагенты</a>
       <a href="#staff" data-v="staff" id="staffTab" hidden>Сотрудники</a>
@@ -1737,7 +1738,7 @@ const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['s
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || g[2].some(([s]) => can(top + ':' + s))); };
-const VIEW_KEY = { works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
+const VIEW_KEY = { prodscr: 'works:works', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
 // «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
 const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
 const viewOk = v => ckView(v) ? can('stock:' + v) : !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
@@ -1753,9 +1754,9 @@ const secHide = root => [...root.querySelectorAll('[data-sec]')].filter(i => !i.
 /* «Склад»: the warehouse, the write-off lists and the invoices in one tab */
 const STOCK_VIEWS = ['stock', 'inc', 'wo', 'pay'];
 // a manager: «Загрузить чек» is a sub-tab of «Склад»; «Разработки» — of «Задачи»; «План-график», «По проектам», «Сотрудники» — of «Планирование и аналитика»
-const PLAN_VIEWS = ['plan', 'prodscr', 'staffp', 'staff'];
+const PLAN_VIEWS = ['plan', 'staffp', 'staff'];
 const inStockGroup = v => STOCK_VIEWS.includes(v) || (['checks', 'trips', 'cps'].includes(v) && !isWorker());
-const planTabsList = () => [['plan', 'План-график', can('plan')], ['prodscr', '🏭 Производство', isHead() && can('works:works')], ['staffp', 'По проектам', isHead() && can('staffp')], ['staff', 'Сотрудники', isHead() && can('staff')]].filter(x => x[2]);
+const planTabsList = () => [['plan', 'План-график', can('plan')], ['staffp', 'По проектам', isHead() && can('staffp')], ['staff', 'Сотрудники', isHead() && can('staff')]].filter(x => x[2]);
 const planTabs = () => `<nav class="seg stabs" aria-label="Планирование и аналитика">${planTabsList().map(([k, l]) => `<a href="#${k}" class="${ui.view === k ? 'on' : ''}" ${ui.view === k ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
 /* «Администрирование» (the administrator): users, the initial balances from 1C, the files of the organization */
 const ADMIN_VIEWS = ['users', 'admInit', 'admFiles'];
@@ -8295,7 +8296,7 @@ function prefsSave(patch){
   PREFS = { ...PREFS, ...patch };
   clearTimeout(prefsT); prefsT = setTimeout(() => api('PUT', '/api/prefs', PREFS).catch(e => toast(errText(e))), 400);
 }
-const startViews = () => [['works', 'Работы'], ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
+const startViews = () => [['works', 'Работы'], ...(isHead() ? [['prodscr', 'Производство']] : []), ['stock', 'Учётка → Склад'], ['cps', 'Контрагенты'], ['inc', 'Учётка → Приходы'], ['pay', 'Учётка → Счета'], ['wo', 'Учётка → Списание материалов'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['notes', 'Мои задачи']];
 const segOn = el => el.parentElement.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b === el); b.setAttribute('aria-pressed', String(b === el)); });
 function prefsChanged(){ applyPrefs(); if (ui.view === 'dt' && DT.loaded) renderDt(); else render(); if (wMap) setTimeout(() => { wFitMap(); }, 0); }
 
@@ -9200,7 +9201,7 @@ document.addEventListener('input', e => {
   if (t.id === 'reqq') { ui.reqQ = t.value; const pos = t.selectionStart; $('view').innerHTML = vReq(); const n = $('reqq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'spq') { ui.spq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaffProj(); const n = $('spq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'stq') { ui.stq = t.value; const pos = t.selectionStart; $('view').innerHTML = vStaff(); const n = $('stq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
-  if (t.id === 'psq') { ui.psq = t.value; const pos = t.selectionStart; $('view').innerHTML = planTabs() + vProdScr(); const n = $('psq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
+  if (t.id === 'psq') { ui.psq = t.value; const pos = t.selectionStart; $('view').innerHTML = vProdScr(); const n = $('psq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.id === 'wlq') { ui.wlq = t.value; const pos = t.selectionStart; $('view').innerHTML = vWorkList(); const n = $('wlq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
   if (t.dataset.ph !== undefined && ui.jPhotoRows) { ui.jPhotoRows[Number(t.dataset.ph)] = t.value; return; }
   if (t.id === 'jq') { ui.jq = t.value; const pos = t.selectionStart; $('view').innerHTML = vJobs(); const n = $('jq'); n.focus(); try { n.setSelectionRange(pos, pos); } catch(e){} return; }
@@ -9596,7 +9597,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
+    a.hidden = u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts', 'prodscr'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
   ['orgsTab', 'serverTab', 'trialsTab'].forEach(id => { const t = $(id); if (t && !u.sys) t.hidden = true; });   // the tabs of the system administrator — only his
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (transMode() && !isWorker()) { const st = document.querySelector('#views a[data-v=stock]'); if (st) st.href = '#cps'; }
