@@ -2004,6 +2004,9 @@ async function api(req, res, url) {
       // a new file of the same objects keeps who they were assigned to
       const prev = new Map(((db.dt && db.dt.points) || []).filter(x => x.assignee).map(x => [x.no, x]));
       points.forEach(x => { const o = prev.get(x.no); if (o && !x.assignee) Object.assign(x, { assignee: o.assignee, assignedAt: o.assignedAt, assignedBy: o.assignedBy }); });
+      // the comments of the points stay (they are kept on the server only, the file does not bring them)
+      const pc = new Map(((db.dt && db.dt.points) || []).filter(x => (x.comments || []).length).map(x => [x.no, x.comments]));
+      points.forEach(x => { if (pc.has(x.no)) x.comments = pc.get(x.no); });
       db.dt = { points, file: String(b.file || '').slice(0, 200), at: new Date().toISOString(), by: user.id,
         classifiedAt: b.classifiedAt || null, radius: b.radius || null, source: String(b.source || '').slice(0, 200) };
       saveDb();
@@ -2091,6 +2094,18 @@ async function api(req, res, url) {
       return send(res, 200, { ok: true, count: n, rev: db.rev });
     }
     /* a point added by hand on the map, and removing a point */
+    /* the comments of a point: anybody who sees the map writes; the author or a manager deletes */
+    if (p[2] === 'comment') {
+      const b = await readJsonBody(req) || {}, pt = db.dt && (db.dt.points || []).find(x => x.no === String(b.no || ''));
+      if (!pt) return fail(res, 404, 'Точка не найдена — обновите страницу');
+      pt.comments = Array.isArray(pt.comments) ? pt.comments : [];
+      if (m === 'POST') { const text = String(b.text || '').trim().slice(0, 2000); if (!text) return fail(res, 400, 'Напишите комментарий'); if (pt.comments.length >= 500) return fail(res, 400, 'Слишком много комментариев');
+        pt.comments.push({ id: newId(), text, by: user.id, at: new Date().toISOString() }); saveDb(); return send(res, 200, { ok: true, comments: pt.comments, rev: db.rev }); }
+      if (m === 'DELETE') { const c = pt.comments.find(x => x.id === b.id); if (!c) return fail(res, 404, 'Комментарий не найден');
+        if (c.by !== user.id && !canEdit(user)) return fail(res, 403, 'Удалить может автор или руководитель');
+        pt.comments = pt.comments.filter(x => x !== c); saveDb(); return send(res, 200, { ok: true, comments: pt.comments, rev: db.rev }); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
     if (m === 'POST' && p[2] === 'point') {
       if (!canEdit(user)) return fail(res, 403, 'Добавлять точки может администратор');
       const b = await readJsonBody(req), lat = Number(b.lat), lng = Number(b.lng), no = String(b.no ?? '').trim().slice(0, 60);
