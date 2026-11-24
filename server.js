@@ -243,6 +243,7 @@ function rollbackIncome(lines, user){
 }
 /* The order's purchase lines bought by this invoice get its supplier and number:
    lines whose name matches a line of the invoice, or that already carry its number; a line with a supplier is left alone */
+const jobToOrderSt = st => st === 'done' ? 'closed' : st === 'work' ? 'work' : 'new';
 function fillOrderSuppliers(inv){
   const o = inv && db.orders[inv.orderId];
   if (!o || !Array.isArray(o.components) || !String(inv.supplier || '').trim()) return 0;
@@ -888,6 +889,8 @@ async function api(req, res, url) {
       for (const j of Object.values(db.jobs || {})) for (const pl of j.places || []) if (pl.dtNo && !pl.need && nd.has(pl.dtNo)) { pl.need = nd.get(pl.dtNo); ch = true; }
       if (ch) saveDb();
     }
+    // the order of a production work follows the status of the work (they could part before)
+    { let ch = false; for (const j of Object.values(db.jobs || {})) { const o = j.orderId && db.orders[j.orderId]; if (o && o.status !== jobToOrderSt(j.status)) { o.status = jobToOrderSt(j.status); ch = true; } } if (ch) saveDb(); }
     // production is part of «Работы»: an order without a work gets one
     if (HEAD(user)) { let ch = false; const linked = new Set(Object.values(db.jobs || {}).map(j => j.orderId).filter(Boolean));
       for (const [oid, o] of Object.entries(db.orders || {})) if (!linked.has(oid) && !o.jobId) {
@@ -2768,6 +2771,9 @@ async function api(req, res, url) {
       const sup = ensureSupplier(patch.supplier, patch.supplierInn, user, `Добавлен по счёту № ${patch.number || db.invoices[id].number || '—'}`); patch.supplierId = sup.id; cpCreated = sup.created;
     }
     Object.assign(db[col][id], patch, { updatedAt: new Date().toISOString(), updatedBy: user.id });
+    // a production work and its order have one status: the work's («Выполнена» — the order is closed)
+    if (col === 'jobs' && 'status' in patch) { const o = db.jobs[id].orderId && db.orders[db.jobs[id].orderId]; if (o) o.status = jobToOrderSt(patch.status); }
+    if (col === 'orders' && 'status' in patch) { const j = Object.values(db.jobs || {}).find(x => x.orderId === id); if (j && jobToOrderSt(j.status) !== patch.status) j.status = patch.status === 'closed' ? 'done' : patch.status === 'work' ? 'work' : (j.status === 'wait' ? 'wait' : 'new'); }
     const linesFilled = col === 'invoices' && ['supplier', 'number', 'items', 'orderId'].some(k => k in patch) ? fillOrderSuppliers(db[col][id]) : 0;
     saveDb();
     return send(res, 200, { ok: true, rev: db.rev, cpCreated, linesFilled });

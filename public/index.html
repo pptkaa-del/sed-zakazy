@@ -2521,7 +2521,8 @@ function orderDataBox(o){
   return `<div class="box odata"><h4>Данные заказа</h4><dl class="kv">
     ${(() => { const jj = S.jobs.find(x => x.orderId === o.id || x.id === o.jobId); return jj ? `<dt>Группа</dt><dd ${edAttr('jobs', jj.id, 'groupId', 'sel')}>${jgOf(jj.groupId) ? '📁 ' + esc(jgOf(jj.groupId).name) : `<span class="dim">без группы${!JGROUPS.length ? ' — создайте группы кнопкой «📁 Группы» над списком работ' : ''}</span>`}</dd>` : ''; })()}
     ${f('Идентификатор', 'number', '', esc(o.number || ''))}
-    ${f('Статус', 'status', 'sel', esc(ORDER_ST[o.status] || ''))}
+    ${(() => { const jj = S.jobs.find(x => x.orderId === o.id || x.id === o.jobId);
+      return jj ? `<dt>Статус</dt><dd ${jj.status === 'done' ? '' : edAttr('jobs', jj.id, 'status', 'sel')}>${esc(JOB_ST[jj.status] || '')} ${jj.status === 'done' ? `<button class="btn sm" data-act="jobStatus" data-id="${jj.id}|work">Вернуть в работу</button>` : `<button class="btn sm ok" data-act="jobStatus" data-id="${jj.id}|done">✓ Работа выполнена</button>`}</dd>` : f('Статус', 'status', 'sel', esc(ORDER_ST[o.status] || '')); })()}
     ${f('Наименование', 'title', '', esc(o.title || ''))}
     ${f('Номер заказа', 'orderNo', '', esc(o.orderNo || ''), o.orderNo ? '' : '— для рамочных договоров')}
     ${f('Заказчик / получатель', 'customerId', 'cp', esc(custName(o)))}
@@ -2597,7 +2598,7 @@ function orderDetail(o, win){
       <h2>${esc(o.number)} · <span ${edAttr('orders', o.id, 'title')}>${esc(o.title)}</span>${exTag(o)}</h2>
       <div class="dim">${[o.orderNo && 'Номер заказа: <b style="color:var(--ink)">'+esc(o.orderNo)+'</b>', custName(o) && 'Заказчик: '+(o.customerId && cpOf(o.customerId) ? `<a href="#cps" data-act="gotoCp" data-id="${o.customerId}">${esc(custName(o))}</a>` : esc(custName(o))), o.deadline && 'Срок сдачи: '+fmtD(o.deadline), jobOf(o.jobId) && (win ? `Работа: № ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}` : `Работа: <a href="#works" data-act="openJob" data-id="${o.jobId}">№ ${jobNo(jobOf(o.jobId))} · ${esc(jobOf(o.jobId).title)}</a>`)].filter(Boolean).join(' · ')}</div>
       <div class="bill">${billText(o) ? `Выставлен счёт заказчику <b>№ <span class="mono">${esc(o.billNo)}</span></b>${o.billDate?' от '+fmtD(o.billDate):''}` : '<span class="dim">Счёт заказчику не выставлен</span>'}</div></div>
-    <div class="row-g"><span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span>${win ? '' : `<button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button>`}<button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
+    <div class="row-g">${jj ? `<span class="chip ${JOB_CHIP[jj.status] || ''}">${esc(JOB_ST[jj.status] || '')}</span>` : `<span class="chip c-${o.status}">${ORDER_ST[o.status]||''}</span>`}${win ? '' : `<button class="btn sm" data-act="editOrder" data-id="${o.id}">Изменить</button>`}<button class="btn sm" data-act="writeoff" data-id="${o.id}">Список для списания${o.writeoff ? ' ✓' : ''}</button></div>
   </div>
   ${win && jj && canEdit() ? `<div class="row-g"><button class="btn sm ${jgOf(jj.groupId) ? '' : 'ghost'}" data-act="jgPick" data-id="${jj.id}" title="Добавить в группу">📁 ${jgOf(jj.groupId) ? esc(jgOf(jj.groupId).name) : 'В группу'}</button></div>` : ''}
   ${win ? orderDataBox(o) : ''}
