@@ -563,7 +563,7 @@ select.f{border:1px solid var(--rule);background:var(--sheet);border-radius:8px;
 .legbtn{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--sheet);font:inherit;font-size:13px;cursor:pointer;color:inherit}.legbtn i{width:10px;height:10px;display:inline-block}.legbtn.off{opacity:.4;text-decoration:line-through}
 .worow{display:grid;grid-template-columns:minmax(0,1fr) 90px 220px auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--rule-2)}.worow:first-child{border-top:0}.worow small{display:block}@media (max-width:820px){.worow{grid-template-columns:1fr auto}}
 .calwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:12px;align-items:start}@media (max-width:900px){.calwrap{grid-template-columns:minmax(0,1fr)}}.calhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}.calhead b{font-size:18px;min-width:150px;text-align:center}.calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.calw{font-size:12px;color:var(--ink-2);text-align:center;padding:2px 0}.calc{position:relative;display:flex;flex-direction:column;align-items:stretch;text-align:left;min-height:86px;padding:4px 5px;border:1px solid var(--rule);border-radius:6px;background:var(--sheet);color:var(--ink);font:inherit;cursor:pointer;overflow:hidden;min-width:0}.calc.off{background:var(--mute-soft)}.calc.out{opacity:.45}.calc.tod .caln{background:var(--stamp);color:var(--stamp-ink);border-radius:10px;padding:0 6px}.calc.sel{outline:2px solid var(--stamp);outline-offset:-2px}.caln{font-weight:700;font-size:13px;align-self:flex-start}.calcnt{display:none;position:absolute;right:4px;top:4px;font-size:11px;background:var(--stamp);color:var(--stamp-ink);border-radius:8px;padding:0 5px}.call{display:flex;flex-direction:column;gap:1px;margin-top:2px;font-size:11.5px;line-height:1.25}.call span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.call .done{text-decoration:line-through;opacity:.6}.call .due{color:var(--warn)}@media (max-width:600px){.calc{min-height:48px}.call{display:none}.calcnt{display:block;top:auto;bottom:3px;right:3px}}.call2{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.call2 li{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--rule);border-radius:8px}.call2 li.done .calx{text-decoration:line-through;opacity:.6}.call2 li.ed{border-color:var(--stamp);background:var(--stamp-soft)}.call2 li.due{background:var(--warn-soft)}.calx{flex:1;min-width:0;word-break:break-word}.calcm{white-space:pre-wrap;color:var(--ink-2);font-size:13px;margin-top:2px}.calf{display:flex;flex-direction:column;gap:8px}.calf label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}/* «Что происходит», «сделать», «купить»: the whole cell catches the clicks; not higher than the cell «Работа», the rest hidden under «…» */
-.wjr>.wl-ed{align-self:stretch;position:relative;overflow:hidden;cursor:pointer;border-radius:6px;margin:-4px;padding:4px}.wjr>.wl-ed.clip:not(.exp)::after{content:'… ещё';position:absolute;right:0;bottom:0;padding:0 6px 0 18px;font-size:12px;color:var(--stamp);background:linear-gradient(90deg,transparent,var(--sheet) 14px)}.wjr>.wl-ed.exp{max-height:none!important}.wle{display:flex;flex-direction:column;gap:4px}.wle .in{font-size:13px;padding:4px 6px}.wl-pct{cursor:pointer}.wl-ta{resize:none;overflow:hidden;min-height:0!important;white-space:pre-wrap;overflow-wrap:anywhere;width:100%;box-sizing:border-box;line-height:1.35;font:inherit;font-size:13px}
+.wjr>.wl-ed{align-self:stretch;position:relative;overflow:hidden;cursor:pointer;border-radius:6px;margin:-4px;padding:4px}.wjr>.wl-ed.clip:not(.exp)::after{content:'… ещё';position:absolute;right:0;bottom:0;padding:0 6px 0 18px;font-size:12px;color:var(--stamp);background:linear-gradient(90deg,transparent,var(--sheet) 14px)}.wjr>.wl-ed.exp{max-height:none!important}.wle{display:flex;flex-direction:column;gap:4px}.wle .in{font-size:13px;padding:4px 6px}.wjgrp{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--mute-soft);border-top:1px solid var(--rule);cursor:pointer;user-select:none}.wjgrp b{font-size:15px}.wjg-arr{width:14px;color:var(--ink-2)}.jgdlg{width:min(520px,calc(100vw - 32px))}.jglist{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.jglist li{display:flex;align-items:center;gap:8px}.jglist .in{flex:1 1 auto}.wl-pct{cursor:pointer}.wl-ta{resize:none;overflow:hidden;min-height:0!important;white-space:pre-wrap;overflow-wrap:anywhere;width:100%;box-sizing:border-box;line-height:1.35;font:inherit;font-size:13px}
 /* the confirmation of a deletion: red in every theme */
 :root .armed,:root .btn.armed,:root button.armed,:root [data-arm].armed{background:#D32F2F!important;border-color:#B71C1C!important;color:#fff!important;background-image:none!important;text-shadow:none!important}
 dialog.askdel{border:0;border-radius:12px;padding:0;max-width:min(440px,calc(100vw - 32px));box-shadow:0 12px 40px rgba(0,0,0,.35)}dialog.askdel::backdrop{background:rgba(20,30,50,.5)}dialog.askdel .ad{background:#D32F2F;color:#fff;padding:18px 20px}dialog.askdel h3{margin:0 0 8px;color:#fff;font-size:18px}dialog.askdel p{margin:0 0 16px;white-space:pre-wrap;line-height:1.45}dialog.askdel .row-g{justify-content:flex-end;gap:8px}dialog.askdel button{font:inherit;border-radius:8px;padding:8px 16px;cursor:pointer}dialog.askdel .no{background:#fff;color:#111;border:1px solid #fff}dialog.askdel .yes{background:#7F0000;color:#fff;border:1px solid #fff;font-weight:700}
@@ -1548,7 +1548,7 @@ const ROLE_INFO = {
 };
 
 const S = { projects:[], orders:[], invoices:[], tasks:[], counterparties:[], points:[], stock:[], jobs:[], products:[], receipts:[] };
-let STAFF = [];
+let STAFF = [], JGROUPS = [];
 let META = {};
 let me = null, rev = -1, mode = 'loading';
 const isHead = () => me && (me.role === 'admin' || me.role === 'head' || me.role === 'office');
@@ -1615,7 +1615,7 @@ function errText(err){
 /* ---------- editing a text right where it is shown: double click, Enter saves (Shift+Enter — a new line in long texts), Esc cancels ---------- */
 // the 4th argument: true — a long text, or the kind of the field: 'date', 'num', 'sel' (the choices — edOpts), 'cp' (a counterparty by name)
 const edAttr = (col, id, field, multi) => canEdit() || col === 'notes' ? `data-ed="${col}|${esc(id)}|${field}${multi === true ? '|m' : multi ? '|' + multi : ''}" title="Дважды щёлкните, чтобы изменить"` : '';
-const edOpts = (col, field) => col === 'jobs' && field === 'progress' ? [['', '— не указано —'], ...Array.from({ length: 11 }, (_, i) => [String(i * 10), i * 10 + ' %'])] : col === 'orders' && field === 'status' ? Object.entries(ORDER_ST) : col === 'jobs' && field === 'kind' ? Object.entries(WORK_KIND) : col === 'jobs' && field === 'status' ? Object.entries(JOB_ST).filter(([k]) => k !== 'done') : [];
+const edOpts = (col, field) => col === 'jobs' && field === 'groupId' ? [['', '— без группы —'], ...jgSorted().map(g => [g.id, g.name])] : col === 'jobs' && field === 'progress' ? [['', '— не указано —'], ...Array.from({ length: 11 }, (_, i) => [String(i * 10), i * 10 + ' %'])] : col === 'orders' && field === 'status' ? Object.entries(ORDER_ST) : col === 'jobs' && field === 'kind' ? Object.entries(WORK_KIND) : col === 'jobs' && field === 'status' ? Object.entries(JOB_ST).filter(([k]) => k !== 'done') : [];
 const edValue = (col, id, field) => { const x = col === 'snmap' ? (Array.isArray(SNMAP) ? SNMAP : []).find(n => n.id === id) : col === 'notes' ? NOTES.find(n => n.id === id) : (S[col] || []).find(d => d.id === id); if (!x) return '';
   if (col === 'jobs' && field === 'customerId') return cpOf(x.customerId)?.name || '';
   if (col === 'orders' && field === 'customerId') return custName(x);
@@ -1653,6 +1653,7 @@ document.addEventListener('dblclick', e => {
       else {
         let val = v;
         if (m === 'num' || (col === 'jobs' && field === 'progress')) val = v === '' ? null : Math.round(Number(v));
+        if (col === 'jobs' && field === 'groupId') val = v || null;
         if (col === 'jobs' && field === 'photoSpec') val = v.split('\n').map(x => x.trim()).filter(Boolean);
         if (m === 'cp') { if (!v) val = null; else { const c = cpByName(v); val = c ? c.id : await add('counterparties', { name: v, roles: ['customer'], contacts: [], contracts: [], createdAt: new Date().toISOString() }); } }
         const dupNo = col === 'orders' && field === 'number' && S.orders.find(x => x.id !== id && String(x.number || '').trim().toLowerCase() === v.toLowerCase());
@@ -1687,7 +1688,7 @@ async function refresh(){
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   // the names of old points kept the reminder «(замена 2 модемов)» — it is not shown any more
   S.jobs.forEach(j => (j.places || []).forEach(x => { if (x.label && /\(замена \d+ модем/.test(x.label)) x.label = x.label.replace(/ ?\(замена \d+ модем[а-я]*\)/g, ''); }));
-  STAFF = d.staff || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; JGROUPS = d.jobGroups || []; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || transMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -2517,6 +2518,7 @@ const saveFeatures = (oid, F) => guard(upd('orders', oid, { features: F }));
 function orderDataBox(o){
   const f = (l, field, kind, html, hint) => `<dt>${l}</dt><dd ${edAttr('orders', o.id, field, kind)}>${html || '<span class="dim">не заполнено</span>'}${hint ? ` <small class="dim">${hint}</small>` : ''}</dd>`;
   return `<div class="box odata"><h4>Данные заказа</h4><dl class="kv">
+    ${(() => { const jj = S.jobs.find(x => x.orderId === o.id || x.id === o.jobId); return jj ? `<dt>Группа</dt><dd ${edAttr('jobs', jj.id, 'groupId', 'sel')}>${jgOf(jj.groupId) ? '📁 ' + esc(jgOf(jj.groupId).name) : `<span class="dim">без группы${!JGROUPS.length ? ' — создайте группы кнопкой «📁 Группы» над списком работ' : ''}</span>`}</dd>` : ''; })()}
     ${f('Идентификатор', 'number', '', esc(o.number || ''))}
     ${f('Статус', 'status', 'sel', esc(ORDER_ST[o.status] || ''))}
     ${f('Наименование', 'title', '', esc(o.title || ''))}
@@ -2530,6 +2532,24 @@ function orderDataBox(o){
 }
 // the production of an order in the same window as the card of a work
 function prodWinOpen(oid){ ui.order = oid; ui.orderTab = 'main'; remember(); openDrawer('prodWin', oid); }
+// «📁 Группы»: create, rename (a double click or the field), delete — a deleted group leaves its works without a group
+function jgDlg(){
+  document.getElementById('jgDlg')?.remove();
+  const d = document.createElement('dialog'); d.id = 'jgDlg'; d.className = 'snlbl jgdlg'; document.body.appendChild(d);
+  const cnt = id => S.jobs.filter(j => j.groupId === id).length;
+  const draw = () => { d.innerHTML = `<h3>📁 Группы работ</h3><p class="dim" style="margin:4px 0 10px">Работу добавляют в группу в её карточке (строка «Группа», двойной щелчок) или в форме новой работы. В списке работ — «📁 По группам».</p>
+    <div class="row-g"><input class="in" id="jg-new" maxlength="100" placeholder="Название новой группы" style="flex:1 1 200px" data-ph-keep><button class="btn primary" data-g="add">+ Группа</button></div>
+    ${JGROUPS.length ? `<ul class="jglist">${jgSorted().map(g => `<li><input class="in" data-gname="${g.id}" value="${esc(g.name)}" maxlength="100" aria-label="Название группы"><span class="dim">${cnt(g.id)} ${plural(cnt(g.id), 'работа', 'работы', 'работ')}</span><button class="btn sm ghost" data-g="del" data-id="${g.id}" title="Удалить группу">✕</button></li>`).join('')}</ul>` : '<p class="dim">Групп пока нет.</p>'}
+    <div class="row-g" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-g="close">Закрыть</button></div>`; };
+  const save = async (method, url, body, msg) => { try { JGROUPS = (await api(method, url, body)).jobGroups; await refresh(); draw(); render(); toast(msg); } catch(e) { toast(errText(e)); } };
+  d.addEventListener('click', async e => { const b = e.target.closest('[data-g]'); if (!b) return;
+    if (b.dataset.g === 'close') return d.close();
+    if (b.dataset.g === 'add') { const v = d.querySelector('#jg-new').value.trim(); if (!v) return d.querySelector('#jg-new').focus(); await save('POST', '/api/jobgroups', { name: v }, 'Группа создана'); d.querySelector('#jg-new')?.focus(); }
+    if (b.dataset.g === 'del') { const g = jgOf(b.dataset.id); if (!g || !(await askDel(`Удалить группу «${g.name}»?` + (cnt(g.id) ? `\n\nРаботы группы (${cnt(g.id)}) останутся — без группы.` : '')))) return; await save('DELETE', '/api/jobgroups/' + g.id, null, 'Группа удалена'); } });
+  d.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'jg-new') { e.preventDefault(); d.querySelector('[data-g=add]').click(); } if (e.key === 'Enter' && e.target.dataset.gname) { e.preventDefault(); e.target.blur(); } });
+  d.addEventListener('change', e => { const id = e.target.dataset.gname; if (!id) return; const v = e.target.value.trim(), g = jgOf(id); if (!g || v === g.name) return; if (!v) { e.target.value = g.name; return toast('Название не может быть пустым'); } save('PATCH', '/api/jobgroups/' + id, { name: v }, 'Группа переименована'); });
+  d.addEventListener('close', () => d.remove()); draw(); d.showModal(); d.querySelector('#jg-new').focus();
+}
 // the employees taking part: those marked in the tasks of the plan of the work (and the executors of its requests)
 const jobStaffIds = j => [...new Set([...S.tasks.filter(t => t.jobId === j.id).flatMap(t => t.staff || []), ...(j.reqs || []).map(x => x.assignee)].filter(id => id && STAFF.some(u => u.id === id)))];
 const jobTabs = (j, cur) => { const n = jobStaffIds(j).length;
@@ -2914,13 +2934,15 @@ function vWorkList(){
     <span data-keep style="display:contents"><input class="in" id="wlq" type="search" aria-label="Поиск работ" value="${esc(ui.wlq || '')}" style="flex:1 1 200px;min-width:0;max-width:320px"></span>
     <div class="seg">${[['all', 'Все типы'], ...Object.entries(WORK_KIND)].map(([k, l]) => `<button data-act="wlKind" data-id="${k}" class="${K === k ? 'on' : ''}">${l}${k !== 'all' ? ` (${base.filter(j => (j.kind || 'mount') === k).length})` : ''}</button>`).join('')}</div>
     <div class="seg">${[['active', 'Текущие'], ['new', 'В планах'], ['wait', 'Ожидание старта'], ['work', 'В работе'], ['warranty', 'На гарантии'], ['archive', 'Архив'], ['all', 'Все']].map(([k, l]) => `<button data-act="wlSt" data-id="${k}" class="${St === k ? 'on' : ''}">${l} <span class="dim">${S.jobs.filter(j => jobStOk(j, k)).length}</span></button>`).join('')}</div>
+    ${JGROUPS.length ? `<div class="seg"><button data-act="wlGrp" data-id="0" class="${ui.wlByGroup === false ? 'on' : ''}">Списком</button><button data-act="wlGrp" data-id="1" class="${ui.wlByGroup !== false ? 'on' : ''}">📁 По группам</button></div>` : ''}
+    ${canEdit() ? `<button class="btn" data-act="jgManage" title="Создать, переименовать или удалить группы работ">📁 Группы${JGROUPS.length ? ' · ' + JGROUPS.length : ''}</button>` : ''}
     ${canEdit() ? '<button class="btn primary" data-act="newJob">+ Работа</button>' : ''}</div>`;
   if (!S.jobs.length) return head + `<div class="empty"><h3>Работ пока нет</h3>${canEdit() ? 'Создайте работу: тип (производство, монтаж или оба), контрагент, название проекта, документы и срок окончания. Для монтажа точки добавляются на вкладке «Карта объектов».' : 'Работы создаёт администратор.'}</div>`;
   const WP = canEdit() ? S.jobs.filter(warrantyPending) : [];
   const warn = WP.length ? `<div class="box wpend"><b>Выполнены работы — установите гарантийный срок:</b>${WP.map(j => ` <button class="btn sm" data-act="warrOpen" data-id="${j.id}">№ ${jobNo(j)} · ${esc(j.title)}</button>`).join('')}</div>` : '';
   if (!L.length) return head + warn + '<div class="empty"><h3>Ничего не найдено</h3>Измените фильтр или строку поиска.</div>';
   return head + warn + `<section class="card wtable"><div class="wjr whead"><span>Работа</span><span>Что происходит</span><span>Что нужно сделать</span><span>Что нужно купить</span><span>Сроки</span><span>Выполнено</span><span>Статус</span></div>
-    ${L.map(wlRow).join('')}</section>`;
+    ${wlRows(L)}</section>`;
 }
 /* the percent of a work: by the done points when there are points, otherwise entered by hand («вручную») */
 function jobPct(j){
@@ -2970,12 +2992,24 @@ addEventListener('resize', () => { if (document.querySelector('.wtable')) wlClam
 document.addEventListener('click', e => { if (!ui.wlExp.size) return; const c = e.target.closest?.('.wl-ed.exp');
   ui.wlExp.forEach(k => { if (!c || wlKey(c) !== k) ui.wlExp.delete(k); });
   if (document.querySelector('.wtable')) wlClamp(); }, true);
+// the rows of the works table: by groups (a group header can be folded) or as one list
+const jgOf = id => JGROUPS.find(g => g.id === id) || null;
+const jgSorted = () => JGROUPS.slice().sort((a, b) => a.name.localeCompare(b.name, 'ru', { numeric: true }));
+function wlRows(L){
+  if (!JGROUPS.length || ui.wlByGroup === false) return L.map(wlRow).join('');
+  ui.wlGrpShut = ui.wlGrpShut || new Set();
+  const head = (id, name, list) => { const shut = ui.wlGrpShut.has(id), open = list.filter(j => j.status !== 'done').length, pr = list.filter(jobPrio).length;
+    return `<div class="wjgrp ${shut ? 'shut' : ''}" data-act="wlGrpFold" data-id="${esc(id)}" role="button" tabindex="0" aria-expanded="${!shut}"><span class="wjg-arr">${shut ? '▸' : '▾'}</span><b>📁 ${esc(name)}</b><span class="dim">${list.length} ${plural(list.length, 'работа', 'работы', 'работ')}${open !== list.length ? ` · в работе и в планах ${open}` : ''}</span>${pr ? `<span class="prio" title="Приоритетных: ${pr}">❗${pr > 1 ? pr : ''}</span>` : ''}</div>${shut ? '' : list.map(wlRow).join('')}`; };
+  const out = jgSorted().map(g => { const list = L.filter(j => j.groupId === g.id); return list.length ? head(g.id, g.name, list) : ''; }).join('');
+  const rest = L.filter(j => !jgOf(j.groupId));
+  return out + (rest.length ? head('_', 'Без группы', rest) : '');
+}
 function wlRow(j){
   const P = j.places || [], c = P.filter(x => x.doneAt).length, cp = cpOf(j.customerId), od = overdue(j);
   const left = j.due && j.status !== 'done' ? Math.round((Date.parse(j.due) - Date.parse(today())) / 864e5) : null;
   // a click opens the card of the work as a window over the list — everything is seen and changed there
   return `<div class="wjr click" data-act="openJob" data-id="${j.id}" role="button" tabindex="0" title="Открыть работу">
-    <div class="wl-name ${jobPrio(j) ? 'isprio' : ''}">${prioMark(j)}<span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}</small></div>
+    <div class="wl-name ${jobPrio(j) ? 'isprio' : ''}">${prioMark(j)}<span class="chip ${WORK_CHIP[j.kind || 'mount']}">${esc(WORK_KIND[j.kind || 'mount'])}</span><b>№ ${jobNo(j)} · ${esc(j.title)}</b><small>${cp ? esc(cp.name) : 'контрагент не указан'}${jgOf(j.groupId) && ui.wlByGroup === false ? ` · 📁 ${esc(jgOf(j.groupId).name)}` : ''}</small></div>
     <div class="wl-happen wl-ed" data-l="Что происходит" data-act="wlCell" ${canEdit() ? edAttr('jobs', j.id, 'happening', true) : ''}>${j.happening ? esc(j.happening) : '<span class="dim">—</span>'}</div>
     <div class="wl-list wl-ed" data-l="Сделать" data-act="wlCell" ${mayEditJob(j) || onJob(j) ? `data-wlist="${j.id}|todo" title="Дважды щёлкните, чтобы изменить или добавить пункт"` : ''}>${wlBrief(j.todo, 'сделано')}</div>
     <div class="wl-list wl-ed" data-l="Купить" data-act="wlCell" ${mayEditJob(j) || onJob(j) ? `data-wlist="${j.id}|buy" title="Дважды щёлкните, чтобы изменить или добавить пункт"` : ''}>${wlBrief(j.buy, 'куплено')}</div>
@@ -7644,6 +7678,7 @@ function renderDrawer(){
       <dl class="kv">
         ${ed ? `<dt>Тип работы</dt><dd ${edAttr('jobs', j.id, 'kind', 'sel')}>${esc(WORK_KIND[j.kind || 'mount'])}</dd>
         <dt>Статус</dt><dd ${j.status === 'done' ? '' : edAttr('jobs', j.id, 'status', 'sel')}>${esc(JOB_ST[j.status] || '')}${j.status === 'done' ? ' <small class="dim">— «Вернуть в работу» внизу</small>' : ''}</dd>` : ''}
+        ${ed || jgOf(j.groupId) ? `<dt>Группа</dt><dd ${ed ? edAttr('jobs', j.id, 'groupId', 'sel') : ''}>${jgOf(j.groupId) ? '📁 ' + esc(jgOf(j.groupId).name) : `<span class="dim">без группы${ed && !JGROUPS.length ? ' — создайте группы кнопкой «📁 Группы» над списком работ' : ''}</span>`}</dd>` : ''}
         <dt>Контрагент</dt><dd ${ed ? edAttr('jobs', j.id, 'customerId', 'cp') : ''}>${cp ? `<a href="#cps" data-act="gotoCp" data-id="${cp.id}">${esc(cp.name)}</a>` : '<span class="dim">не указан</span>'}</dd>
         <dt>Срок окончания</dt><dd ${ed ? edAttr('jobs', j.id, 'due', 'date') : ''}>${j.due ? fmtD(j.due) : '<span class="dim">не указан</span>'}</dd>
         ${ed && !P.length ? `<dt>Выполнено, %</dt><dd ${edAttr('jobs', j.id, 'progress', 'num')}>${j.progress != null && j.progress !== '' ? esc(String(j.progress)) + ' %' : '<span class="dim">не указано</span>'}</dd>` : ''}
@@ -7687,6 +7722,7 @@ function renderDrawer(){
       <label class="wide">Что происходит<textarea class="in" id="j-happen" rows="2" maxlength="2000" placeholder="Текущее состояние: что сейчас делается, чего ждём">${esc(j?.happening || '')}</textarea></label>
       ${j && (j.places || []).length ? '' : `<label>Процент выполнения, % <small class="dim" style="font-size:12px">вручную — пока нет точек</small><input class="in mono" type="number" min="0" max="100" step="1" id="j-prog" value="${esc(j?.progress ?? '')}"></label>`}
       <label>Срок окончания работ<input class="in" type="date" id="j-due" value="${v(j,'due')}"></label>
+      ${JGROUPS.length ? `<label>Группа<select class="in" id="j-group"><option value="">— без группы —</option>${jgSorted().map(g => `<option value="${g.id}" ${(j?.groupId || ui.jfGroup || '') === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label>` : ''}
       <label class="wide chk"><input type="checkbox" id="j-prio" ${j?.priority ? 'checked' : ''}> ❗ Приоритетная работа <small class="dim">— в начале списка работ, отмечена восклицательным знаком</small></label>
       <label id="j-min-w" ${['prod', 'ops'].includes(kind) ? 'hidden' : ''}>Минимум точек в день <small class="dim" style="font-size:12px">на одного сотрудника</small><input class="in mono" type="number" min="0" max="10000" step="1" id="j-min" value="${esc(j?.minPerDay ?? '')}" placeholder="не задан"></label>
       <label>Статус<select class="in" id="j-status">${Object.entries(JOB_ST).filter(([k]) => j || k !== 'done').map(([k, l]) => `<option value="${k}" ${(j?.status || 'new') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -8074,7 +8110,7 @@ async function onSubmit(e){
       const data = { kind:kindV, title:val('j-title'), customerId, due:val('j-due'), description:($('j-desc').value || '').trim(), docs,
         minPerDay: $('j-min') && $('j-min').value.trim() !== '' ? Math.round(Number($('j-min').value)) : null,
         features:($('j-feat').value || '').trim(), happening:($('j-happen').value || '').trim(), ...(prog !== undefined ? { progress: prog === '' ? null : Math.round(Number(prog)) } : {}), ...(!old || old.status !== $('j-status').value ? { status: $('j-status').value } : {}),
-        priority: !!$('j-prio')?.checked,
+        priority: !!$('j-prio')?.checked, ...($('j-group') ? { groupId: $('j-group').value || null } : {}),
         photoSpec: ['prod', 'ops'].includes(kindV) ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
       if (d.id) { const was = old?.status; await upd('jobs', d.id, data); const planMsg = jp ? (fail('Вносим в план-график…'), await jpApply(d.id, jp, data.title, now)) : '';
@@ -8419,6 +8455,9 @@ async function act(el){
     case 'calDay': document.activeElement?.blur?.(); ui.calD = id; ui.calM = id.slice(0, 7); ui.calEd = null; return render();
     case 'calMon': { const [y, m] = (ui.calM || today().slice(0, 7)).split('-').map(Number), t = new Date(y, m - 1 + Number(id), 1); ui.calM = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`; return render(); }
     case 'calSave': return calSave();
+    case 'wlGrp': ui.wlByGroup = id === '1'; return render();
+    case 'wlGrpFold': ui.wlGrpShut = ui.wlGrpShut || new Set(); ui.wlGrpShut.has(id) ? ui.wlGrpShut.delete(id) : ui.wlGrpShut.add(id); return render();
+    case 'jgManage': return jgDlg();
     case 'drawerBack': { const b = ui.drawerBack; if (!b) return closeDrawer(); ui.drawerBack = null; return openDrawer(b.kind, b.id, b.ctx); }
     case 'jobPrio': { const j = jobOf(id); if (!j) return; try { await upd('jobs', id, { priority: !j.priority }); renderDrawer(); toast(j.priority ? 'Работа приоритетная — она в начале списка' : 'Приоритет снят'); } catch(e) { toast(errText(e)); } return; }
     case 'jrqAdd': { const g = k => ($(k)?.value || '').trim(); if (!g('rq-text')) { $('rq-text')?.focus(); return toast('Напишите, что нужно сделать'); }
