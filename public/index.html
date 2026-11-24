@@ -4215,6 +4215,8 @@ function lblTf0(t, k0 = 1){
   return `translate(${dx}${u},${dy}${u})`;
 }
 function printLabels(t, nums, scan, date){
+  // «Копий»: each label is printed so many times one after another (the serial number is the same)
+  const copies = Math.max(1, Math.min(50, Math.floor(Number(ui.lblCopies) || 1))); if (copies > 1) nums = nums.flatMap(n => Array(copies).fill(n));
   const fr = document.createElement('iframe'); fr.setAttribute('aria-hidden', 'true');
   fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
   document.body.appendChild(fr);
@@ -4246,7 +4248,8 @@ function vLabels(){
       <section class="card lblprevbox"><div class="lblstage" id="lbl-stage"><div id="lbl-prev">${lblPreview()}</div></div>
         <div class="lblprint">
           <button class="btn ok lblnext" data-act="lblNext">🖨 Печать следующей · <span class="mono" id="lbl-nextno">${esc(lblSerial(t, t.serial.next))}</span></button>
-          <label class="lblcnt">Штук<input class="in mono" id="lbl-count" type="number" min="1" max="500" value="${esc(ui.lblCount || 1)}"></label>
+          <label class="lblcnt" title="Сколько изделий — столько новых серийных номеров подряд">Изделий<input class="in mono" id="lbl-count" type="number" min="1" max="500" value="${esc(ui.lblCount || 1)}"></label>
+          <label class="lblcnt" title="Сколько одинаковых этикеток печатать на каждое изделие (номер один и тот же)">Копий<input class="in mono" id="lbl-copies" type="number" min="1" max="50" value="${esc(ui.lblCopies || 1)}"></label>
           <span class="row-g"><input class="in mono" id="lbl-re" placeholder="№ для повтора" style="width:150px" list="lbl-mans"><button class="btn sm" data-act="lblReprint">Повторить печать</button></span>
         </div>
         <div class="lblman lbldate"><label>Дата на этикетке<input class="in" type="date" id="lbl-date" value="${esc(ui.lblDate || today())}"></label>
@@ -8790,7 +8793,7 @@ async function act(el){
         printLabels(t, r.nums, scan); lblScanDone(scan, r.serials[0]);
         const L = LABELS.find(x => x.id === ui.lblId), at = new Date().toISOString(); r.serials.forEach(sn => { LABEL_SN[sn] = [ui.lblId, at, me.id]; });
         [L, t].forEach(x => { if (!x) return; x.serial.next = r.next; x.prints = (x.prints || []).concat({ at, by: me.id, from: r.from, count: r.count, skipped: r.skipped.length ? r.skipped : undefined }); });
-        $('view').innerHTML = refTabs() + vLabels(); toast(`Отправлено на печать: ${r.serials[0]}${r.count > 1 ? ' – ' + r.serials[r.serials.length - 1] : ''}${r.skipped.length ? ` (пропущены уже напечатанные: ${r.skipped.slice(0, 5).join(', ')}${r.skipped.length > 5 ? '…' : ''})` : ''}`); refresh().catch(() => {});
+        $('view').innerHTML = refTabs() + vLabels(); toast(`Отправлено на печать: ${r.serials[0]}${r.count > 1 ? ' – ' + r.serials[r.serials.length - 1] : ''}${Number(ui.lblCopies) > 1 ? (c => ` · по ${c} ${plural(c, 'копии', 'копии', 'копий')}`)(Math.min(50, Math.floor(Number(ui.lblCopies)))) : ''}${r.skipped.length ? ` (пропущены уже напечатанные: ${r.skipped.slice(0, 5).join(', ')}${r.skipped.length > 5 ? '…' : ''})` : ''}`); refresh().catch(() => {});
       } catch(e) { if (!lblScanDupShow(e, 'lblNextForce')) toast(errText(e)); } return; }
     case 'lblReprint': { const t = lblDraft(), raw = ($('lbl-re')?.value || '').trim(); if (!raw) return toast('Введите номер для повтора');
       // «125» means the 125th number of this label; anything else is taken as the printed text
@@ -9117,6 +9120,7 @@ document.addEventListener('input', e => {
   if (t.id === 'w-comment') { ui.wComment = t.value; return; }
   if (t.dataset.lb) { lblChange(t.dataset.lb, t); return; }
   if (t.id === 'lbl-count') { ui.lblCount = t.value; return; }
+  if (t.id === 'lbl-copies') { ui.lblCopies = t.value; return; }
   if (t.id === 'f-sup' || t.id === 'wb-sup') { if (t.id === 'wb-sup' && ui.incWb) { const v = t.value.trim(); if (v !== ui.incWb.supplier) ui.incWb.inn = ''; ui.incWb.supplier = v; } supMarkAll(); return; }
   if (t.id === 'lbl-date') { ui.lblDate = t.value && t.value !== today() ? t.value : ''; lblDateNote(); return; }
   if (t.id === 'lbl-scan') { ui.lblScan = t.value.trim(); const p = $('lbl-prev'); if (p) p.innerHTML = lblPreview(); const c = $('lbl-scancheck'); if (c) c.innerHTML = lblScanCheck(lblDraft(), ui.lblScan); return; }
