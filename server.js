@@ -107,6 +107,8 @@ function cleanJob(d){
   if ('kind' in d) out.kind = ['prod', 'mount', 'both', 'ops'].includes(d.kind) ? d.kind : 'mount';
   // a priority work goes to the top of the list
   if ('priority' in d) out.priority = !!d.priority;
+  // the group of a work («Группы» in «Работы»)
+  if ('groupId' in d) out.groupId = d.groupId && (db.jobGroups || []).some(g => g.id === d.groupId) ? String(d.groupId) : null;
   if ('customerId' in d) out.customerId = d.customerId && db.counterparties[d.customerId] ? d.customerId : null;
   if ('docs' in d) out.docs = (Array.isArray(d.docs) ? d.docs : []).filter(f => f && db.files[f.id]).slice(0, 200)
     .map(f => ({ id: f.id, name: String(f.name || db.files[f.id].name).slice(0, 200), size: db.files[f.id].size, type: db.files[f.id].type, at: db.files[f.id].at, by: db.files[f.id].by }));
@@ -947,6 +949,7 @@ async function api(req, res, url) {
       out.vehicles = sees(user, 'transport:cars') || sees(user, 'transport:parts') ? Object.entries(db.vehicles || {}).map(([id, v]) => ({ id, ...v })) : [];
       out.parts = sees(user, 'transport:parts') ? (Array.isArray(db.parts) ? db.parts : []) : [];
     }
+    out.jobGroups = Array.isArray(db.jobGroups) ? db.jobGroups : [];
     if (FIELD(user)) out.notes = (db.notes || []).filter(n => n.type === 'shared' && n.assignee === user.id);
     else if (sees(user, 'notes')) out.notes = (db.notes || []).filter(n => n.by === user.id || (n.type === 'shared' && ((n.share || []).includes(user.id) || n.assignee === user.id)));
     return send(res, 200, out);
@@ -2466,6 +2469,19 @@ async function api(req, res, url) {
     return fail(res, 405, 'Метод не поддерживается');
   }
   /* «Эксплуатация»: the requests of a work — what to do, by when, the executor (he becomes a worker of the work and sees it) and the vehicle, the state */
+  /* «Группы» of works: a name; a work has «groupId»; a deleted group leaves its works without a group */
+  if (p[1] === 'jobgroups') {
+    if (!canEdit(user)) return fail(res, 403, 'Группы меняет руководитель или администратор');
+    const G = db.jobGroups = Array.isArray(db.jobGroups) ? db.jobGroups : [], nm = v => String(v ?? '').trim().slice(0, 100);
+    const out = () => { saveDb(); return send(res, 200, { ok: true, jobGroups: G, rev: db.rev }); };
+    const same = (n, self) => G.find(g => g !== self && g.name.toLowerCase() === n.toLowerCase());
+    if (m === 'POST' && !p[2]) { const n = nm((await readJsonBody(req) || {}).name); if (!n) return fail(res, 400, 'Укажите название группы'); if (same(n)) return fail(res, 400, 'Такая группа уже есть'); if (G.length >= 500) return fail(res, 400, 'Слишком много групп');
+      G.push({ id: newId(), name: n, at: new Date().toISOString(), by: user.id }); return out(); }
+    const g = p[2] && G.find(x => x.id === p[2]); if (!g) return fail(res, 404, 'Группа не найдена — обновите страницу');
+    if (m === 'PATCH') { const n = nm((await readJsonBody(req) || {}).name); if (!n) return fail(res, 400, 'Укажите название группы'); if (same(n, g)) return fail(res, 400, 'Такая группа уже есть'); g.name = n; return out(); }
+    if (m === 'DELETE') { G.splice(G.indexOf(g), 1); for (const j of Object.values(db.jobs || {})) if (j.groupId === g.id) j.groupId = null; return out(); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
   if (p[1] === 'jobs' && p[3] === 'reqs') {
     const j = db.jobs[p[2]]; if (!j) return fail(res, 404, 'Работа не найдена');
     const own = it => it && it.assignee === user.id;
