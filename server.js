@@ -247,6 +247,19 @@ function rollbackIncome(lines, user){
 const short = v => v == null ? '' : Array.isArray(v) ? (v.length ? String(v.length) : '') : typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v).slice(0, 300);
 function jobLog(j, user, e){ if (!j) return; j.history = (Array.isArray(j.history) ? j.history : []).concat({ at: new Date().toISOString(), by: user.id, ...e }).slice(-300); }
 function diffOf(old, patch, skip = []){ return Object.keys(patch).filter(k => !skip.includes(k) && JSON.stringify(old[k] ?? null) !== JSON.stringify(patch[k] ?? null)).map(k => ({ f: k, from: short(old[k]), to: short(patch[k]) })); }
+// the due date of a work moved: its plan tasks follow — the last ones end on the new date, none ends later, a start is not after the end
+function shiftPlan(j, newDue, user){
+  if (!j || !/^\d{4}-\d{2}-\d{2}$/.test(newDue || '')) return 0;
+  const T = Object.values(db.tasks || {}).filter(t => t.jobId === j.__id && !t.done && /^\d{4}-\d{2}-\d{2}$/.test(t.end || ''));
+  if (!T.length) return 0;
+  const maxEnd = T.reduce((a, t) => t.end > a ? t.end : a, ''); let n = 0;
+  for (const t of T) { const was = { start: t.start, end: t.end };
+    if (t.end === maxEnd || t.end > newDue) t.end = newDue;
+    if (t.start && t.start > t.end) t.start = t.end;
+    if (t.start !== was.start || t.end !== was.end) { n++; t.updatedAt = new Date().toISOString(); t.updatedBy = user.id;
+      jobLog(j, user, { t: 'task', act: 'edit', title: t.title, kind: t.kind, ch: [...(t.start !== was.start ? [{ f: 'start', from: was.start, to: t.start }] : []), { f: 'end', from: was.end, to: t.end }], auto: true }); } }
+  return n;
+}
 const jobToOrderSt = st => st === 'done' ? 'closed' : st === 'work' ? 'work' : 'new';
 function fillOrderSuppliers(inv){
   const o = inv && db.orders[inv.orderId];
@@ -2747,11 +2760,14 @@ async function api(req, res, url) {
       }
       delete c.orderId;   // the order of a work is made and kept by the server
       { const ch = diffOf(j, c, ['history', 'updatedAt', 'updatedBy', 'doneAt', 'doneBy', 'startedAt', 'startedBy', 'woDraft']); if (ch.length) jobLog(j, user, { t: 'job', ch }); }
+      const dueMoved = 'due' in c && c.due && c.due !== j.due;
       Object.assign(j, c, { updatedAt: new Date().toISOString(), updatedBy: user.id });
+      let planMoved = 0;
+      if (dueMoved) { j.__id = id; planMoved = shiftPlan(j, c.due, user); delete j.__id; const o = j.orderId && db.orders[j.orderId]; if (o && o.deadline !== c.due) o.deadline = c.due; }
       if (c.places) jobWorkersFromPlaces(j);
       ensureJobOrder(j, id, user, c);
       saveDb();
-      return send(res, 200, { ok: true, rev: db.rev });
+      return send(res, 200, { ok: true, rev: db.rev, planMoved });
     }
     if (col === 'points') {
       const pt = db.points[id];
@@ -2796,7 +2812,10 @@ async function api(req, res, url) {
     if (col === 'invoices' && patch.supplier !== undefined && (normName(patch.supplier) !== normName(db.invoices[id].supplier) || !db.invoices[id].supplierId)) {
       const sup = ensureSupplier(patch.supplier, patch.supplierInn, user, `Добавлен по счёту № ${patch.number || db.invoices[id].number || '—'}`); patch.supplierId = sup.id; cpCreated = sup.created;
     }
-    if (col === 'orders') { const ch = diffOf(db.orders[id], patch, ['updatedAt', 'updatedBy', 'products', 'components', 'specs', 'woDraft', 'woMap', 'woFull']); const j = Object.values(db.jobs || {}).find(x => x.orderId === id); if (ch.length && j) jobLog(j, user, { t: 'order', ch }); }
+    let planMoved = 0;
+    if (col === 'orders') { const ch = diffOf(db.orders[id], patch, ['updatedAt', 'updatedBy', 'products', 'components', 'specs', 'woDraft', 'woMap', 'woFull']); const jid = Object.keys(db.jobs || {}).find(k => db.jobs[k].orderId === id), j = jid && db.jobs[jid]; if (ch.length && j) jobLog(j, user, { t: 'order', ch });
+      // «Срок сдачи» of the order is the due date of its work: the work and its plan move
+      if (j && patch.deadline && patch.deadline !== db.orders[id].deadline) { if (j.due !== patch.deadline) { jobLog(j, user, { t: 'job', ch: [{ f: 'due', from: j.due || '', to: patch.deadline }], auto: true }); j.due = patch.deadline; } j.__id = jid; planMoved = shiftPlan(j, patch.deadline, user); delete j.__id; } }
     if (col === 'tasks') { const t = db.tasks[id], ch = diffOf(t, patch, ['updatedAt', 'updatedBy', 'contractorsNote']); if (ch.length && db.jobs[t.jobId || patch.jobId]) jobLog(db.jobs[t.jobId || patch.jobId], user, { t: 'task', act: 'edit', title: t.title, kind: t.kind, ch }); }
     Object.assign(db[col][id], patch, { updatedAt: new Date().toISOString(), updatedBy: user.id });
     // a production work and its order have one status: the work's («Выполнена» — the order is closed)
@@ -2804,7 +2823,7 @@ async function api(req, res, url) {
     if (col === 'orders' && 'status' in patch) { const j = Object.values(db.jobs || {}).find(x => x.orderId === id); if (j && jobToOrderSt(j.status) !== patch.status) j.status = patch.status === 'closed' ? 'done' : patch.status === 'work' ? 'work' : (j.status === 'wait' ? 'wait' : 'new'); }
     const linesFilled = col === 'invoices' && ['supplier', 'number', 'items', 'orderId'].some(k => k in patch) ? fillOrderSuppliers(db[col][id]) : 0;
     saveDb();
-    return send(res, 200, { ok: true, rev: db.rev, cpCreated, linesFilled });
+    return send(res, 200, { ok: true, rev: db.rev, cpCreated, linesFilled, planMoved });
   }
   if (m === 'DELETE') {
     const d = db[col][id];

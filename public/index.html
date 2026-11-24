@@ -1659,7 +1659,8 @@ document.addEventListener('dblclick', e => {
         if (m === 'cp') { if (!v) val = null; else { const c = cpByName(v); val = c ? c.id : await add('counterparties', { name: v, roles: ['customer'], contacts: [], contracts: [], createdAt: new Date().toISOString() }); } }
         const dupNo = col === 'orders' && field === 'number' && S.orders.find(x => x.id !== id && String(x.number || '').trim().toLowerCase() === v.toLowerCase());
         if (dupNo) toast(`Идентификатор ${v} уже есть у заказа «${dupNo.title}»`);
-        else { await upd(col, id, { [field]: val, ...(col === 'orders' && field === 'customerId' ? { customer: val ? cpOf(val)?.name || v : '' } : {}) }); toast('Сохранено'); }
+        else { const r = await upd(col, id, { [field]: val, ...(col === 'orders' && field === 'customerId' ? { customer: val ? cpOf(val)?.name || v : '' } : {}) });
+          if (r && r.planMoved) { await refresh(); toast(`Сохранено. План-график сдвинут под новый срок: задач ${r.planMoved}`); } else { if (['due', 'deadline'].includes(field)) await refresh(); toast('Сохранено'); } }
       }
     } catch(err) { toast(errText(err)); }
     inp.blur(); render(); if (ui.drawer) renderDrawer();
@@ -2559,6 +2560,8 @@ function jhLine(e){
   if (e.t === 'job') return `Изменена работа<ul>${ch}</ul>`;
   if (e.t === 'order') return `Изменён заказ на производство<ul>${ch}</ul>`;
   if (e.t === 'list') return `${L[e.k] || ''}: ${A[e.act] || e.act} «${esc(e.text || '')}»${e.from ? ` <span class="dim">(было «${esc(e.from)}»)</span>` : ''}`;
+  if (e.t === 'task' && e.auto) return `План-график: задача «${esc(PLAN_KIND[e.kind] || '')}» сдвинута под новый срок<ul>${ch}</ul>`;
+  if (e.t === 'job' && e.auto) return `Срок работы изменён по сроку сдачи заказа<ul>${ch}</ul>`;
   if (e.t === 'task') return `План-график: ${({ add: 'добавлена задача', edit: 'изменена задача', del: 'удалена задача' })[e.act] || e.act} «${esc(PLAN_KIND[e.kind] || '')}»${e.start ? ` ${fmtD(e.start)} – ${fmtD(e.end)}` : ''}${ch ? `<ul>${ch}</ul>` : ''}`;
   if (e.t === 'req') return `Заявка № ${esc(String(e.no || ''))}: ${({ add: 'добавлена', edit: 'изменена', del: 'удалена' })[e.act] || e.act} «${esc(e.text || '')}»${ch ? `<ul>${ch}</ul>` : ''}`;
   return esc(e.t || '');
@@ -8246,7 +8249,7 @@ async function onSubmit(e){
         priority: !!$('j-prio')?.checked, ...($('j-group') ? { groupId: $('j-group').value || null } : {}),
         photoSpec: ['prod', 'ops'].includes(kindV) ? (old?.photoSpec || []) : ($('j-photos').value || '').split('\n').map(x => x.trim()).filter(Boolean) };
       ui.jfKind = null;
-      if (d.id) { const was = old?.status; await upd('jobs', d.id, data); const planMsg = jp ? (fail('Вносим в план-график…'), await jpApply(d.id, jp, data.title, now)) : '';
+      if (d.id) { const was = old?.status; const ur = await upd('jobs', d.id, data); if (ur?.planMoved) { await refresh(); setTimeout(() => toast(`План-график сдвинут под новый срок: задач ${ur.planMoved}`), 2900); } const planMsg = jp ? (fail('Вносим в план-график…'), await jpApply(d.id, jp, data.title, now)) : '';
         if (data.status === 'done' && was !== 'done') { openDrawer('warranty', d.id); toast('Работа выполнена — установите гарантийный срок' + planMsg); } else { openDrawer('job', d.id); toast('Работа сохранена' + planMsg); } }
       else { const id = await add('jobs', data);
         let planMsg = '';
