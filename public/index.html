@@ -9611,6 +9611,8 @@ document.addEventListener('change', async e => {
   }
   if (t.dataset.up === 'dtfile' || t.dataset.up === 'dtmarked') {
     const file = t.files[0]; if (!file) return; t.value = '';
+    // a new file of points: the map shows all of them (not only the points of a work chosen before, not only the selected ones) and fits to them
+    ui.dtJob = null; ui.dtOnlySel = false; ui.dtQ = ''; dtFitted = false;
     try {
       const { points, bad, flags } = dtParse(await readTable(file, { fills:true }));
       if (t.dataset.up === 'dtmarked' && !flags) return toast('В файле нет отметок. Нужны столбцы «МКАД», «ТТК», «Эстакада» со значениями «да»/«нет» и координаты. Файл только с координатами загрузите кнопкой «Загрузить точки без отметок».');
