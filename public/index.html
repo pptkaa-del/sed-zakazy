@@ -971,7 +971,8 @@ table.wo tr.short td{background:var(--bad-soft);color:var(--bad)}table.wo tr.acc
 .leaflet-tile-pane{filter:var(--tile-filter)}
 .leaflet-container{font:inherit}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--sheet);color:var(--ink);box-shadow:var(--shadow)}
-.leaflet-popup-content{margin:12px 14px;min-width:220px;font-size:14px;line-height:1.45}
+.leaflet-popup-content{margin:12px 14px;min-width:220px;font-size:14px;line-height:1.45;max-height:min(62vh,560px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+#dtmap.moving,#dtmap.moving .leaflet-interactive{cursor:crosshair}#dtmap.moving{box-shadow:0 0 0 3px var(--warn)}.dtmovebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin-bottom:6px;border-radius:8px;background:var(--warn-soft);font-size:14px}
 .leaflet-container a.leaflet-popup-close-button{color:var(--ink-2)}
 .leaflet-bar a,.leaflet-bar a:hover{background:var(--sheet);color:var(--ink);border-color:var(--rule)}
 .leaflet-control-attribution{background:color-mix(in srgb,var(--sheet) 80%,transparent)!important;color:var(--ink-2)}
@@ -1442,6 +1443,11 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 </div>
 
 <script src="/vendor/leaflet/leaflet.js"></script>
+<script>
+/* a popup on a phone: touches and the wheel inside it scroll the popup, they do not drag or zoom the map (all the maps of the program) */
+if (window.L && L.Map) L.Map.addInitHook(function(){ this.on('popupopen', e => { const c = e.popup.getElement(); if (!c || c._keep) return; c._keep = true;
+  ['touchstart', 'pointerdown', 'mousedown', 'dblclick'].forEach(t => c.addEventListener(t, x => x.stopPropagation())); L.DomEvent.disableScrollPropagation(c); }); });
+</script>
 <script src="/vendor/qrcode/qrcode.js"></script>
 <script src="/vendor/qrcode/qrcode_UTF8.js"></script>
 <script>
@@ -3517,7 +3523,8 @@ function ensureDtMap(){
     renderDt(); toast(n ? `Выделено ещё ${n}, всего ${dtSel.size}` : 'В области нет видимых точек');
   };
   box.addEventListener('pointerup', finish, true); box.addEventListener('pointercancel', finish, true);
-  dtMap.on('click', e => { if (!ui.dtAdding) return; ui.dtAdding = false; renderDt(); openDrawer('dtAdd', null, { lat: e.latlng.lat, lng: e.latlng.lng }); });
+  dtMap.on('click', e => { if (ui.dtMoving != null) return dtMoveTo(e.latlng);
+    if (!ui.dtAdding) return; ui.dtAdding = false; renderDt(); openDrawer('dtAdd', null, { lat: e.latlng.lat, lng: e.latlng.lng }); });
 }
 const canCheckDt = () => canEdit();
 // «8357/8393»: two objects at one place — two modems to replace
@@ -3559,6 +3566,20 @@ async function dtCmtSend(i, del){
     if (!del) setTimeout(() => document.getElementById('dtc-' + i)?.focus(), 50); toast(del ? 'Комментарий удалён' : 'Комментарий добавлен'); } catch(e) { toast(errText(e)); }
 }
 document.addEventListener('keydown', e => { const i = e.target?.dataset?.dtc; if (i !== undefined && e.key === 'Enter') { e.preventDefault(); dtCmtSend(Number(i)); } });
+// a point shown: fly to it and open its window
+function dtShowPoint(i){ const pt = DT.points[i]; if (!pt || !dtMap) return; dtMap.once('moveend', () => dtMarks.get(pt.no + '|' + i)?.openPopup()); dtMap.flyTo([pt.lat, pt.lng], Math.max(dtMap.getZoom(), 16), { duration: .5 }); }
+// «✥ Переместить»: the next click on the map is the new place of the point
+async function dtMoveTo(ll){
+  const i = ui.dtMoving, pt = DT.points[i]; ui.dtMoving = null; $('dtmap')?.classList.remove('moving'); document.getElementById('dtMoveBar')?.remove(); if (!pt) return;
+  try { const r = await api('PATCH', '/api/dt/edit', { no: pt.no, lat: ll.lat, lng: ll.lng }); await loadDt(); if (r.jobs) await refresh(); dtShowPoint(r.i); toast(`Точка ${pt.no} перемещена${r.jobs ? ` (и в работах: ${r.jobs})` : ''}`); }
+  catch(e) { toast(errText(e)); }
+}
+function dtMoveStart(i){
+  const pt = DT.points[i]; if (!pt) return; ui.dtMoving = i; ui.dtAdding = false; dtMap?.closePopup(); $('dtmap')?.classList.add('moving');
+  document.getElementById('dtMoveBar')?.remove(); const b = document.createElement('div'); b.id = 'dtMoveBar'; b.className = 'dtmovebar';
+  b.innerHTML = `✥ Щёлкните на карте новое место точки <b>${esc(pt.no)}</b> <button class="btn sm" data-act="dtMoveCancel">Отмена</button>`; $('dtmap')?.parentElement?.insertBefore(b, $('dtmap'));
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.dtMoving != null) { ui.dtMoving = null; $('dtmap')?.classList.remove('moving'); document.getElementById('dtMoveBar')?.remove(); } });
 function dtPopup(p, i){
   return `<div class="pp"><h4>Объект ${esc(p.no)}</h4>
     <div class="row-g">${(p.cats || []).map(c => `<span class="chip" style="background:${DT_COLOR[c]};color:${c === 'check' ? '#3a2c00' : '#fff'}">${c === 'bridge' ? 'Эстакада' : DT_CAT[c]}</span>`).join('')}${dtCatOf(p) === 'road' ? `<span class="chip" style="background:${DT_COLOR.road};color:#fff">Дорога</span>` : ''}</div>
@@ -3571,6 +3592,7 @@ function dtPopup(p, i){
     ${canCheckDt() ? `<button class="linkish" data-act="dtSelOne" data-id="${esc(p.no)}">${dtSel.has(p.no) ? 'Убрать из выделения' : 'Добавить в выделение'}</button>` : ''}
     ${p.addedAt ? `<small class="dim">Добавлена вручную: ${esc(who(p.addedBy))}, ${esc(fmtDT(p.addedAt))}</small>` : ''}
     ${dtCheckBox(p, i)}
+    ${canCheckDt() ? `<div class="row-g"><button class="btn sm" data-act="dtEdit" data-id="${i}">✎ Изменить</button><button class="btn sm" data-act="dtMove" data-id="${i}" title="Щёлкните потом на карте новое место точки">✥ Переместить</button></div>` : ''}
     ${dtCmtBox(p, i)}
     <div class="row-g"><a class="btn sm" href="https://yandex.ru/maps/?pt=${p.lng},${p.lat}&z=18&l=map" target="_blank" rel="noopener">Яндекс.Карты</a><a class="btn sm" href="https://yandex.ru/maps/?rtext=~${p.lat},${p.lng}&rtt=auto" target="_blank" rel="noopener">Маршрут</a>${canEdit() && ui.dtEdit !== i ? armBtn('dtdel:' + i, 'Удалить точку', 'dtDel', String(i), 'btn sm danger') : ''}</div></div>`;
 }
@@ -7629,15 +7651,17 @@ function renderDrawer(){
       <div class="row-g"><button class="btn primary" type="submit">Назначить</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'dtAdd') {
-    const c = d.ctx;
-    D.innerHTML = dh('Новая точка') + `<form class="d-body" data-form="dtAdd"><div class="form">
-      <label class="wide">Номер объекта<input class="in mono" id="dta-no" required autocomplete="off"><small class="dim" style="font-size:12px">Два объекта в одном месте — через «/», например 8357/8393.</small></label>
+    const ep = d.id != null && d.id !== '' ? DT.points[Number(d.id)] : null, c = ep ? { lat: ep.lat, lng: ep.lng } : d.ctx;
+    const tv = ep ? ((ep.cats || []).includes('other') ? 'other' : (ep.cats || []).filter(x => x !== 'check').join(',')) : '';
+    D.innerHTML = dh(ep ? 'Изменить точку ' + esc(ep.no) : 'Новая точка') + `<form class="d-body" data-form="dtAdd"><div class="form">
+      <label class="wide">Номер объекта<input class="in mono" id="dta-no" required autocomplete="off" value="${ep ? esc(ep.no) : ''}"><small class="dim" style="font-size:12px">Два объекта в одном месте — через «/», например 8357/8393.</small></label>
       <label class="wide">Координаты (широта, долгота)<input class="in mono" id="dta-xy" value="${c ? `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}` : ''}" required></label>
-      <label class="wide">Дорога (необязательно)<input class="in" id="dta-road"></label>
-      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Тип</span><div class="dtq-b" style="margin-top:6px">${DT_ANSWERS.map(([v, l], k) => { const cs = v ? v.split(',') : []; return `<label class="btn sm" style="--c:${DT_COLOR[cs[0] || 'road']};border-color:var(--c);justify-content:flex-start"><input type="radio" name="dta-t" value="${v}" ${k === 0 ? 'checked' : ''}> ${l.replace('…', '')}</label>`; }).join('')}</div></div>
-      <label class="wide">Если «Другое» — что именно<input class="in" id="dta-other" maxlength="300"></label></div>
+      ${ep ? '<p class="hint wide" style="margin:0">Новые координаты — точка переместится на карте (и в работах, куда она добавлена). Переместить можно и щелчком по карте: кнопка «✥ Переместить» в окошке точки.</p>' : ''}
+      <label class="wide">Дорога (необязательно)<input class="in" id="dta-road" value="${ep ? esc(ep.road || '') : ''}"></label>
+      <div class="wide"><span style="font-size:13px;color:var(--ink-2)">Тип</span><div class="dtq-b" style="margin-top:6px">${DT_ANSWERS.map(([v, l], k) => { const cs = v ? v.split(',') : []; return `<label class="btn sm" style="--c:${DT_COLOR[cs[0] || 'road']};border-color:var(--c);justify-content:flex-start"><input type="radio" name="dta-t" value="${v}" ${(ep ? v === tv || (v === '' && !DT_ANSWERS.some(([w]) => w === tv)) : k === 0) ? 'checked' : ''}> ${l.replace('…', '')}</label>`; }).join('')}</div></div>
+      <label class="wide">Если «Другое» — что именно<input class="in" id="dta-other" maxlength="300" value="${ep ? esc(ep.other || '') : ''}"></label></div>
       <div class="err" id="ferr"></div>
-      <div class="row-g"><button class="btn primary" type="submit">Добавить точку</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
+      <div class="row-g"><button class="btn primary" type="submit">${ep ? 'Сохранить' : 'Добавить точку'}</button><button class="btn" type="button" data-act="close">Отмена</button></div></form>`;
   }
   if (d.kind === 'dtSave') {
     const P = DT.points, vis = P.filter(dtMatch), flag = P.filter(dtFlagged), chk = P.filter(p => (p.cats || []).includes('check'));
@@ -8203,6 +8227,9 @@ async function onSubmit(e){
       if (!m) return fail('Введите координаты в виде «55.751200, 37.618400».');
       const t = f.querySelector('[name=dta-t]:checked')?.value || '';
       if (t === 'other' && !val('dta-other')) return fail('Напишите, что именно «другое».');
+      const ep = d.id != null && d.id !== '' ? DT.points[Number(d.id)] : null;
+      if (ep) { const r = await api('PATCH', '/api/dt/edit', { no: ep.no, newNo: no, lat: num(m[1]), lng: num(m[2]), road: val('dta-road'), cats: t ? t.split(',') : [], other: val('dta-other') });
+        closeDrawer(); await loadDt(); if (r.jobs) await refresh(); dtShowPoint(r.i); toast(`Точка ${no} сохранена${r.jobs ? ` (и в работах: ${r.jobs})` : ''}`); return; }
       const r = await api('POST', '/api/dt/point', { no, lat: num(m[1]), lng: num(m[2]), road: val('dta-road'), cats: t ? t.split(',') : [], other: val('dta-other') });
       // a work is chosen on the map — the new point goes into it at once
       const JW = ui.dtJob && jobOf(ui.dtJob); let toJob = '';
@@ -8640,6 +8667,9 @@ async function act(el){
     case 'calSave': return calSave();
     case 'cpRole': ui.cpRole = id; return render();
     case 'dtCmt': return dtCmtSend(Number(id));
+    case 'dtEdit': dtMap?.closePopup(); return openDrawer('dtAdd', id, null);
+    case 'dtMove': return dtMoveStart(Number(id));
+    case 'dtMoveCancel': ui.dtMoving = null; $('dtmap')?.classList.remove('moving'); document.getElementById('dtMoveBar')?.remove(); return;
     case 'dtCmtDel': { const [i, cid] = id.split('|'); return dtCmtSend(Number(i), cid); }
     case 'cpUser': { const [cid, i] = id.split('|'), c = cpOf(cid); if (!c) return; const k = i !== '' ? contactsOf(c)[Number(i)] : null, name = (k && k.name) || c.name;
       ui.ufPrefill = { cpId: cid, name, login: ruLat(name) || 'podryadchik' }; return openDrawer('userForm'); }

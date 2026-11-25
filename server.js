@@ -2135,6 +2135,27 @@ async function api(req, res, url) {
       return send(res, 200, { ok: true, count: n, rev: db.rev });
     }
     /* a point added by hand on the map, and removing a point */
+    /* a point changed (the number, the coordinates — moved on the map, the road, the type): the works keep their copy of it in step */
+    if (m === 'PATCH' && p[2] === 'edit') {
+      if (!canEdit(user)) return fail(res, 403, 'Изменять точки может руководитель или администратор');
+      const b = await readJsonBody(req) || {}, pt = db.dt && (db.dt.points || []).find(x => x.no === String(b.no || ''));
+      if (!pt) return fail(res, 404, 'Точка не найдена — обновите страницу');
+      const oldNo = pt.no, nn = b.newNo !== undefined ? String(b.newNo).trim().slice(0, 60) : oldNo;
+      if (!nn) return fail(res, 400, 'Укажите номер объекта');
+      if (nn !== oldNo && db.dt.points.some(x => x.no === nn)) return fail(res, 409, `Объект ${nn} уже есть на карте`);
+      const lat = b.lat !== undefined ? Number(b.lat) : pt.lat, lng = b.lng !== undefined ? Number(b.lng) : pt.lng;
+      if (!(Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat || lng))) return fail(res, 400, 'Неверные координаты');
+      pt.no = nn; pt.lat = Math.round(lat * 1e6) / 1e6; pt.lng = Math.round(lng * 1e6) / 1e6;
+      if (b.road !== undefined) pt.road = String(b.road || '').trim().slice(0, 200);
+      if (b.cats !== undefined) { const cats = (Array.isArray(b.cats) ? b.cats : []).filter(c => ['mkad', 'ttk', 'bridge', 'other'].includes(c));
+        if (cats.includes('other') && !String(b.other || '').trim()) return fail(res, 400, 'Укажите, что именно «другое»');
+        pt.cats = cats.includes('other') ? ['other'] : cats; pt.other = cats.includes('other') ? String(b.other).trim().slice(0, 300) : ''; pt.dist = null; delete pt.checkedAt; delete pt.checkedBy; delete pt.checkedWas; }
+      pt.editedAt = new Date().toISOString(); pt.editedBy = user.id;
+      let jobsN = 0;
+      for (const j of Object.values(db.jobs || {})) { let ch = false; for (const pl of j.places || []) if (pl.dtNo === oldNo) { pl.dtNo = pt.no; pl.lat = pt.lat; pl.lng = pt.lng; pl.road = pt.road || ''; pl.cats = (pt.cats || []).slice(); if (String(pl.label || '').startsWith(oldNo)) pl.label = pt.no + String(pl.label).slice(oldNo.length); ch = true; }
+        if (ch) { jobsN++; j.updatedAt = pt.editedAt; } }
+      saveDb(); return send(res, 200, { ok: true, i: db.dt.points.indexOf(pt), point: pt, jobs: jobsN, rev: db.rev });
+    }
     /* the comments of a point: anybody who sees the map writes; the author or a manager deletes */
     if (p[2] === 'comment') {
       const b = await readJsonBody(req) || {}, pt = db.dt && (db.dt.points || []).find(x => x.no === String(b.no || ''));
