@@ -3642,7 +3642,7 @@ function renderDt(){
   const tc = k => PB.filter(p => dtTypeOk(p, k)).length;
   $('dtSel').innerHTML = !P.length ? '' : mk ? `<div class="dtmark">
     <div class="dtmark-row"><b>1. Какие точки размечать:</b><div class="seg">${[['all', 'Все'], ['road', 'Дороги'], ['mkad', 'МКАД'], ['ttk', 'ТТК'], ['bridge', 'Эстакады'], ['bridge_ring', 'Эстакады на МКАД и ТТК'], ...(tc('other') ? [['other', 'Другое']] : [])].map(([k, l]) => `<button data-act="dtMarkType" data-id="${k}" class="${mt === k ? 'on' : ''}">${l} <span class="dim">${tc(k)}</span></button>`).join('')}</div></div>
-    <div class="dtmark-row"><b>2. Выделите точки:</b> обведите область или щёлкайте по точкам <button class="btn sm" data-act="dtSelVisible">Выделить все показанные</button><button class="btn sm" data-act="dtSelClear" ${dtSel.size ? '' : 'disabled'}>Снять выделение</button><span class="dtselcount">Выделено: <b>${dtSel.size}</b></span></div>
+    <div class="dtmark-row"><b>2. Выделите точки:</b> обведите область или щёлкайте по точкам <button class="btn sm" data-act="dtSelVisible">Выделить все показанные</button><button class="btn sm" data-act="dtSelClear" ${dtSel.size ? '' : 'disabled'}>Снять выделение</button><span class="dtselcount">Выделено: <b>${dtSel.size}</b></span><button class="btn sm" data-act="dtCopySel" ${dtSel.size ? '' : 'disabled'}>📋 Скопировать номера</button></div>
     <div class="dtmark-row"><b>3. Поставьте пометку:</b><div class="dtneeds">${Object.entries(DT_NEED).map(([k, l]) => `<button class="needbtn" style="--c:${needColor(k)}" data-act="dtMarkSet" data-id="${k}" ${dtSel.size ? '' : 'disabled'}><i></i>${esc(l)} <span class="dim">${PB.filter(p => p.need === k).length}</span></button>`).join('')}<button class="needbtn none" data-act="dtMarkSet" data-id="" ${dtSel.size ? '' : 'disabled'}>Снять пометку</button><button class="btn sm" data-act="dtNeedNew">+ Своя пометка</button></div></div>
     <div class="dtmark-row dim">Размечено: ${PB.filter(p => DT_NEED[p.need]).length} из ${PB.length}. Когда закончите — «✓ Закончить разметку»: на карте будут все точки, раскрашенные по пометкам.</div></div>` : `
     <div class="seg" role="group" aria-label="Назначение">${[['all', 'Все'], ['any', `Назначенные ${nAsg}`], ['none', `Неназначенные ${P.length - nAsg}`]].map(([k, l]) => `<button data-act="dtAsg" data-id="${k}" class="${(ui.dtAsg || 'all') === k || (k === 'any' && A.includes(ui.dtAsg)) ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -3651,6 +3651,7 @@ function renderDt(){
     ${lead ? `<span class="dtsep"></span>
     <button class="btn ${ui.dtLasso ? 'primary' : ''}" data-act="dtLasso">${ui.dtLasso ? 'Закончить выделение' : '◌ Режим выделения'}</button>
     <span class="dtselcount">Выделено: <b>${dtSel.size}</b></span>
+    <button class="btn" data-act="dtCopySel" ${dtSel.size ? '' : 'disabled'} title="Номера выделенных точек — каждый с новой строки (вставляются в Excel столбиком)">📋 Скопировать номера</button>
     <button class="btn primary" data-act="dtAssign" ${dtSel.size ? '' : 'disabled'}>Назначить исполнителя…</button>
     <label class="chk" style="flex-direction:row;display:flex;gap:6px;font-size:14px;${dtSel.size ? '' : 'opacity:.5'}"><input type="checkbox" id="dtOnlySel" ${ui.dtOnlySel ? 'checked' : ''} ${dtSel.size ? '' : 'disabled'}> только выделенные</label>
     <select class="f" id="dtNeedSel" ${dtSel.size ? '' : 'disabled'} aria-label="Пометка для выделенных"><option value="">Пометка для выделенных…</option>${Object.entries(DT_NEED).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}<option value="-">Снять пометку</option></select>
@@ -8667,6 +8668,9 @@ async function act(el){
     case 'calSave': return calSave();
     case 'cpRole': ui.cpRole = id; return render();
     case 'dtCmt': return dtCmtSend(Number(id));
+    // the numbers of the selected points, in the order of the map list, one in a line (Excel takes them as a column)
+    case 'dtCopySel': { const nos = DT.points.filter(p => dtSel.has(p.no)).map(p => p.no); if (!nos.length) return toast('Выделите точки');
+      toast(await snCopyTxt(nos.join('\n')) ? `Скопировано номеров: ${nos.length}` : 'Не удалось скопировать'); return; }
     case 'dtEdit': dtMap?.closePopup(); return openDrawer('dtAdd', id, null);
     case 'dtMove': return dtMoveStart(Number(id));
     case 'dtMoveCancel': ui.dtMoving = null; $('dtmap')?.classList.remove('moving'); document.getElementById('dtMoveBar')?.remove(); return;
