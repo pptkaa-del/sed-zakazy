@@ -1474,6 +1474,9 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 /* a popup on a phone: touches and the wheel inside it scroll the popup, they do not drag or zoom the map (all the maps of the program) */
 /* a point window never gets taller than the map (on a phone the map is shorter than the screen): it lists inside itself and the
    buttons at its bottom («Удалить точку») stay reachable; then the map is moved once to show all of it */
+/* a phone: a finger is wide — the points of the canvas maps catch a tap 12 px around them */
+const ptMob = () => !!(window.matchMedia && matchMedia('(pointer: coarse)').matches) || innerWidth <= 900;
+if (window.L && L.Map) L.Map.addInitHook(function(){ if (ptMob() && this.options.preferCanvas && !this.options.renderer) this.options.renderer = L.canvas({ tolerance: 12, padding: .1 }); });
 const popFit = (map, pp) => { const n = pp && pp._contentNode; if (!n || !map._container) return; const h = map.getSize().y, o = pp.options || {}, pad = L.point(o.autoPanPadding || [5, 5]).y;
   n.style.maxHeight = Math.max(120, h - 24 - 22 - Math.abs((o.offset && L.point(o.offset).y) || 0) - pad * 2 - 30) + 'px'; try { pp._updateLayout(); pp._updatePosition(); pp._adjustPan(); } catch(err) {} };
 if (window.L && L.Map) L.Map.addInitHook(function(){ this.on('popupopen', e => setTimeout(() => popFit(this, e.popup), 0)); this.on('resize', () => { const pp = this._popup; if (pp && this.hasLayer(pp)) popFit(this, pp); });
@@ -3832,7 +3835,7 @@ function renderDt(){
       m.off('click', m._openPopup, m); m.on('click', ev => { if (ui.dtLasso) return; m.openPopup(ev.latlng); });   // in the selection mode the tap is handled by the area drawing (dtToggleSel)
       dtMarks.set(key, m);
     }
-    else { m.setLatLng([p.lat, p.lng]); m.setStyle(pinMode() ? { ...style, radius: Math.max(6, style.radius), weight: Math.max(1.5, style.weight) } : style); if (m.isPopupOpen()) m.setPopupContent(dtPopup(DT.points[i], i)); else m.setPopupContent(() => dtPopup(DT.points[i], i)); }
+    else { m.setLatLng([p.lat, p.lng]); m.setStyle(ptR(pinMode() ? { ...style, radius: Math.max(6, style.radius), weight: Math.max(1.5, style.weight) } : style)); if (m.isPopupOpen()) m.setPopupContent(dtPopup(DT.points[i], i)); else m.setPopupContent(() => dtPopup(DT.points[i], i)); }
     const show = dtMatch(p);
     if (show && !dtLayer.hasLayer(m)) dtLayer.addLayer(m); else if (!show && dtLayer.hasLayer(m)) dtLayer.removeLayer(m);
     if (show && ((byNeed ? nd : c !== 'road') || dtSel.has(p.no))) m.bringToFront();
@@ -4092,9 +4095,11 @@ L.Canvas.include({ _updatePin(layer){
 }
 const pinMode = () => (typeof PREFS !== 'undefined' && PREFS.marker) === 'pin';
 // a map point in the chosen style; drops are a little bigger so the head is easy to tap
-const mkPoint = (ll, style) => pinMode() && L.PinMarker ? new L.PinMarker(ll, { ...style, radius: Math.max(6, style.radius || 6), weight: Math.max(1.5, style.weight || 1) }) : L.circleMarker(ll, style);
-const popOff = () => pinMode() ? { offset: [0, -14] } : {};
-const tipOff = y => pinMode() ? [0, -22] : [0, y];
+// on a phone (a finger, not a mouse) the points are twice bigger
+const ptR = st => ptMob() ? { ...st, radius: (st.radius || 6) * 2, weight: Math.min((st.weight || 1) * 1.5, 5) } : st;
+const mkPoint = (ll, style) => pinMode() && L.PinMarker ? new L.PinMarker(ll, ptR({ ...style, radius: Math.max(6, style.radius || 6), weight: Math.max(1.5, style.weight || 1) })) : L.circleMarker(ll, ptR(style));
+const popOff = () => pinMode() ? { offset: [0, ptMob() ? -28 : -14] } : {};
+const tipOff = y => pinMode() ? [0, ptMob() ? -44 : -22] : [0, ptMob() ? y * 2 : y];
 const mayEditPoint = pt => me && (canEdit() || pt.createdBy === me.id);
 const ptOf = id => S.points.find(p => p.id === id);
 let map = null, markers = new Map(), ghost = null, fitted = false;
@@ -4226,7 +4231,7 @@ function renderMap(){
   if (!map._jobs) map._jobs = L.layerGroup().addTo(map);
   map._jobs.clearLayers();
   if (ui.mapF !== 'done') S.jobs.filter(j => j.status !== 'done').forEach(j => (j.places || []).forEach((pl, i) => {
-    ((j.places || []).length > 40 ? L.circleMarker([pl.lat, pl.lng], { radius:5, weight:1, color:'#fff', fillColor:'#3B47B8', fillOpacity:.9 }) : L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), title: j.title })).addTo(map._jobs)
+    ((j.places || []).length > 40 ? L.circleMarker([pl.lat, pl.lng], ptR({ radius:5, weight:1, color:'#fff', fillColor:'#3B47B8', fillOpacity:.9 })) : L.marker([pl.lat, pl.lng], { icon: PIN('job', i + 1), title: j.title })).addTo(map._jobs)
       .bindPopup(`<div class="pp"><h4>${esc(j.title)}</h4><span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span>${pl.label ? `<p>${esc(pl.label)}</p>` : ''}<small>Руководитель: ${esc(who(j.leaderId))}</small><small>Работники: ${esc((j.workers || []).map(who).join(', '))}</small><div class="row-g"><button class="btn sm" data-act="openJob" data-id="${j.id}">Открыть задачу</button></div></div>`, { minWidth:240 });
   }));
   if (!fitted && S.points.length) { fitted = true; map.fitBounds(L.latLngBounds(S.points.map(p => [p.lat, p.lng])).pad(0.2), { maxZoom:15 }); }
