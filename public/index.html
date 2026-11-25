@@ -1312,6 +1312,17 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 .msgrow{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}.msgrow select{flex:1;min-width:160px}
 .msgrow textarea{flex:1;min-width:0;resize:vertical}
 @media (max-width:720px){.msgs{grid-template-columns:1fr;height:calc(100dvh - 20px)}.msgs.open .msglist{display:none}.msgs:not(.open) .msgmain{display:none}.msgback{display:inline-block}.msg{max-width:92%}}
+.esthead{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.esthead select.f{min-width:220px;max-width:100%}
+.estsum{display:flex;gap:10px 24px;flex-wrap:wrap;align-items:flex-end;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px 16px;margin-bottom:10px}
+.estsum div{display:flex;flex-direction:column}.estsum small{color:var(--ink-2);font-size:12px}.estsum b{font-size:24px}.estsum .estoff{opacity:.5;text-decoration:line-through}.estonly{margin-left:auto}
+.estname{display:flex;gap:10px;align-items:flex-end;margin-bottom:10px}.estname label{display:flex;flex-direction:column;font-size:13px;color:var(--ink-2);flex:1;max-width:520px}
+.estbox{background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:12px;padding:12px}.estbox .tscroll{background:var(--sheet)}.esttbl{width:100%;border-collapse:collapse}.esttbl th,.esttbl td{padding:5px 8px;border-bottom:1px solid var(--rule-2);text-align:left;vertical-align:middle}.esttbl th{font-size:12px;color:var(--ink-2);font-weight:600}
+.esttbl td.mono{text-align:right;white-space:nowrap}.estnum{width:90px;text-align:right}.estw td{background:var(--paper)}.estm td:nth-child(2){padding-left:28px}.estm select{width:100%}
+.estadd select{color:var(--ink-2);max-width:520px}.estnew input{width:100%}.estact{white-space:nowrap;text-align:right}.estact .btn{margin-left:4px}
+.estdb td input.in{width:100%;min-width:80px}.estpick{position:relative}.estpick summary{cursor:pointer;font-size:13px;color:var(--ink-2);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.estpickl{position:absolute;z-index:20;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);padding:6px 10px;max-height:260px;overflow:auto;min-width:260px;display:flex;flex-direction:column;gap:4px}
+.estpickl .chk{display:flex;flex-direction:row;justify-content:flex-start;gap:6px;align-items:center;font-size:14px;text-align:left}.estpickl .chk input{width:auto;flex:none;margin:0}
+@media (max-width:700px){.estonly{margin-left:0}.estnum{width:58px}.esttbl:not(.estdb) th:nth-child(1),.esttbl:not(.estdb) td:nth-child(1),.esttbl:not(.estdb) th:nth-child(5),.esttbl:not(.estdb) td:nth-child(5){display:none}.esttbl th,.esttbl td{padding:4px 4px}.estm td:nth-child(2){padding-left:10px}.estbox{padding:8px}.estm select{min-width:110px}}
 </style>
 </head>
 <body>
@@ -1776,11 +1787,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['prodscr', 'Экран производства', []], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета'], ['checks', 'Чеки'], ['trips', 'Путевые листы']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['msgs', 'Сообщения'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['mods', 'Дополнительные модули']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['msgs', 'Сообщения'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['est', 'Быстрая смета'], ['mods', 'Дополнительные модули']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || !g[2].length || g[2].some(([s]) => can(top + ':' + s))); };   // a tab without sub-tabs is open by itself
-const VIEW_KEY = { msgs: 'msgs', prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
+const VIEW_KEY = { msgs: 'msgs', prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', est: 'refs:est', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
 // «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
 const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
 const viewOk = v => ckView(v) ? can('stock:' + v) : !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
@@ -1880,7 +1891,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'msgs' ? vMsgs() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'msgs' ? vMsgs() : ui.view === 'est' ? vEst() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   if (V.querySelector('.wtable')) wlClamp();
@@ -3260,6 +3271,126 @@ document.addEventListener('keydown', e => { if (ui.view === 'msgs' && e.target.i
 document.addEventListener('paste', async e => { if (ui.view !== 'msgs' || e.target.id !== 'msgText') return; const fs = [...(e.clipboardData?.files || [])]; if (!fs.length) return; e.preventDefault(); ui.msgDraft = e.target.value; ui.msgFiles = ui.msgFiles || [];
   for (const f of fs) try { const r = await upload(f); ui.msgFiles.push({ id: r.id, name: r.name, type: f.type || '', size: r.size }); } catch(err) { toast(errText(err)); } msgRender(); $('msgText')?.focus(); });
 
+/* ===== «Быстрая смета»: the base («БД») of works and materials — a material belongs to one or more works, a work may have several
+   materials; an estimate is made of the works of the base, each work brings its materials (only those of this work);
+   the cost of a line is the quantity by the price, the total is on top; «только работа» leaves the materials out ===== */
+let EST = null, estSaveT = null;
+const estApi = async (m, path, body) => api(m, '/api/est' + path, body);
+async function estLoad(){ try { EST = await estApi('GET', ''); } catch(e) { EST = EST || { works: [], mats: [], sheets: [], err: errText(e) }; } if (ui.view === 'est') render(); }
+const estW = id => (EST?.works || []).find(x => x.id === id), estM = id => (EST?.mats || []).find(x => x.id === id);
+const estMatsOf = wid => (EST?.mats || []).filter(x => (x.works || []).includes(wid)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+const estSheet = () => (EST?.sheets || []).find(x => x.id === ui.estId) || null;
+const estQ = v => { const n = Math.round((Number(v) || 0) * 1000) / 1000; return String(n).replace('.', ','); };
+const estPrice = v => (Number(v) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function estSum(sh){ let w = 0, mt = 0; (sh?.rows || []).forEach(r => { w += (r.qty || 0) * (r.price || 0); (r.mats || []).forEach(x => { mt += (x.qty || 0) * (x.price || 0); }); }); return { w, m: mt, all: w + (sh?.workOnly ? 0 : mt) }; }
+function estQueue(){ const sh = estSheet(); if (!sh) return; clearTimeout(estSaveT); $('estState') && ($('estState').textContent = 'сохраняется…');
+  estSaveT = setTimeout(async () => { try { await estApi('PATCH', '/sheets/' + sh.id, { name: sh.name, workOnly: sh.workOnly, rows: sh.rows }); $('estState') && ($('estState').textContent = '✓ сохранено'); } catch(e) { toast(errText(e)); $('estState') && ($('estState').textContent = '⚠ не сохранено'); } }, 600); }
+async function estNew(){ try { const r = await estApi('POST', '/sheets', { name: 'Смета от ' + fmtD(today()), rows: [] }); EST.sheets.unshift(r.sheet); ui.estId = r.id; render(); } catch(e) { toast(errText(e)); } }
+const estMatLine = (m, qty) => ({ id: 'l' + Math.random().toString(36).slice(2, 10), matId: m.id, name: m.name, unit: m.unit, price: m.price, qty, hand: false });
+function estTotalsDom(){ const sh = estSheet(); if (!sh) return; const t = estSum(sh);
+  $('estAll') && ($('estAll').textContent = money(t.all)); $('estWs') && ($('estWs').textContent = money(t.w)); $('estMs') && ($('estMs').textContent = money(t.m));
+  sh.rows.forEach(r => { const c = document.querySelector(`[data-estcost="${r.id}"]`); if (c) c.textContent = estPrice((r.qty || 0) * (r.price || 0));
+    (r.mats || []).forEach(x => { const c2 = document.querySelector(`[data-estcost="${x.id}"]`); if (c2) c2.textContent = estPrice((x.qty || 0) * (x.price || 0)); const q = document.querySelector(`input[data-estq="${r.id}|${x.id}"]`); if (q && document.activeElement !== q) q.value = estQ(x.qty); }); }); }
+function vEst(){
+  if (!EST) { estLoad(); return '<p class="muted">Загрузка сметы…</p>'; }
+  if (ui.estMode === 'db') return vEstDb();
+  if (!estSheet()) ui.estId = EST.sheets[0]?.id || null;
+  const sh = estSheet(), t = estSum(sh), wl = `<datalist id="estWl">${[...EST.works].sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(w => `<option value="${esc(w.name)}">${esc(w.unit || '')} · ${estPrice(w.price)} ₽</option>`).join('')}</datalist>`;
+  const head = `<div class="esthead"><select class="f" data-estsel aria-label="Смета">${EST.sheets.length ? '' : '<option value="">— смет нет —</option>'}${EST.sheets.map(x => `<option value="${esc(x.id)}" ${x.id === ui.estId ? 'selected' : ''}>${esc(x.name)} · ${fmtD((x.upd || x.at).slice(0, 10))}</option>`).join('')}</select>
+    <button class="btn" data-estact="new">＋ Новая смета</button><button class="btn" data-estact="db" title="База работ и материалов">🗄 БД</button>
+    ${sh ? `<button class="btn" data-estact="prices" title="Взять цены всех строк из БД">↻ Цены из БД</button><button class="btn" data-estact="print">🖨 Печать</button><button class="btn danger" data-estact="del">Удалить смету</button>` : ''}</div>`;
+  if (!sh) return head + `<div class="empty"><h3>Смет пока нет</h3>Создайте смету кнопкой «Новая смета». Работы и материалы для неё заносятся в «БД»${EST.works.length ? '' : ' — сейчас база пуста'}.</div>`;
+  const body = sh.rows.map((r, i) => { const ms = estMatsOf(r.workId), free = ms.filter(m => !(r.mats || []).some(x => x.matId === m.id));
+    return `<tr class="estw"><td class="mono">${i + 1}</td><td><b>${esc(r.name)}</b>${r.workId && !estW(r.workId) ? ' <small class="bad-t" title="Работа удалена из БД — цена осталась прежней">удалена из БД</small>' : ''}</td><td>${esc(r.unit || '')}</td>
+      <td><input class="in mono estnum" data-estq="${r.id}" value="${estQ(r.qty)}" inputmode="decimal"></td><td class="mono">${estPrice(r.price)}</td><td class="mono" data-estcost="${r.id}">${estPrice(r.qty * r.price)}</td>
+      <td class="estact">${i ? `<button class="icon" data-estact="up" data-id="${r.id}" title="Выше">↑</button>` : ''}<button class="icon" data-estact="rmw" data-id="${r.id}" title="Убрать работу вместе с её материалами">✕</button></td></tr>`
+      + (sh.workOnly ? '' : (r.mats || []).map(x => `<tr class="estm"><td></td><td><select class="in" data-estms="${r.id}|${x.id}" title="Материал этой работы">${ms.some(m => m.id === x.matId) ? '' : `<option value="">${esc(x.name)}</option>`}${ms.map(m => `<option value="${esc(m.id)}" ${m.id === x.matId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></td><td>${esc(x.unit || '')}</td>
+        <td><input class="in mono estnum" data-estq="${r.id}|${x.id}" value="${estQ(x.qty)}" inputmode="decimal"></td><td class="mono">${estPrice(x.price)}</td><td class="mono" data-estcost="${x.id}">${estPrice(x.qty * x.price)}</td>
+        <td class="estact"><button class="icon" data-estact="rmm" data-id="${r.id}|${x.id}" title="Убрать материал">✕</button></td></tr>`).join('')
+        + (free.length ? `<tr class="estm estadd"><td></td><td colspan="6"><select class="in" data-estaddm="${r.id}"><option value="">＋ материал к работе «${esc(r.name)}»…</option>${free.map(m => `<option value="${esc(m.id)}">${esc(m.name)} · ${esc(m.unit || '')} · ${estPrice(m.price)} ₽</option>`).join('')}</select></td></tr>` : '')); }).join('');
+  return head + wl + `<div class="estsum"><div><small>Общая стоимость${sh.workOnly ? ' (только работа)' : ''}</small><b id="estAll">${money(t.all)}</b></div><div><small>Работы</small><span id="estWs">${money(t.w)}</span></div><div class="${sh.workOnly ? 'estoff' : ''}"><small>Материалы${sh.workOnly ? ' — не учитываются' : ''}</small><span id="estMs">${money(t.m)}</span></div>
+      <label class="chk estonly"><input type="checkbox" data-estonly ${sh.workOnly ? 'checked' : ''}> Посчитать только работу (без материалов)</label></div>
+    <div class="estbox"><div class="estname"><label>Название сметы<input class="in" data-estname value="${esc(sh.name)}"></label><small class="dim" id="estState"></small></div>
+    <div class="tscroll"><table class="tbl esttbl"><thead><tr><th>№</th><th>Наименование</th><th>Ед.</th><th>Кол-во</th><th>Цена, ₽</th><th>Стоимость, ₽</th><th></th></tr></thead><tbody>${body}
+      <tr class="estnew"><td></td><td colspan="6"><input class="in" list="estWl" data-estaddw placeholder="${EST.works.length ? '＋ Добавить работу — начните вводить наименование и выберите из БД' : 'В БД нет работ — добавьте их кнопкой «🗄 БД»'}" ${EST.works.length ? '' : 'disabled'} autocomplete="off"></td></tr></tbody></table></div>
+    <p class="hint">Количество материала по умолчанию равно количеству работы и меняется вместе с ним, пока вы не исправите его вручную.</p></div>`;
+}
+function vEstDb(){
+  const tab = ui.estTab || 'works', ed = EST.canBase, q = (ui.estDbQ || '').trim().toLowerCase();
+  const wName = id => estW(id)?.name || '';
+  const L = (tab === 'works' ? EST.works : EST.mats).filter(x => !q || x.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const picks = (name, sel, all) => `<details class="estpick"><summary>${sel.length ? esc(sel.map(all === 'works' ? wName : id => estM(id)?.name || '').filter(Boolean).join(', ')) : (all === 'works' ? 'к каким работам относится…' : 'материалы этой работы…')}</summary><div class="estpickl">${(all === 'works' ? EST.works : EST.mats).slice().sort((a, b) => a.name.localeCompare(b.name, 'ru')).map(x => `<label class="chk"><input type="checkbox" name="${name}" value="${esc(x.id)}" ${sel.includes(x.id) ? 'checked' : ''}> ${esc(x.name)}</label>`).join('') || '<small class="dim">' + (all === 'works' ? 'Сначала добавьте работы' : 'Материалов пока нет') + '</small>'}</div></details>`;
+  const form = (x) => { const k = x ? x.id : 'new', links = tab === 'works' ? (x ? estMatsOf(x.id).map(m => m.id) : []) : (x?.works || []);
+    return `<tr class="estform" data-estrow="${k}"><td><input class="in" name="name" value="${esc(x?.name || '')}" placeholder="Наименование" ${x ? '' : 'autofocus'}></td><td><input class="in" name="unit" value="${esc(x?.unit || '')}" placeholder="шт, м, м², ч" list="estUnits"></td><td><input class="in mono" name="price" value="${x ? estQ(x.price) : ''}" placeholder="0,00" inputmode="decimal"></td>
+      <td>${picks('links', links, tab === 'works' ? 'mats' : 'works')}</td><td class="estact"><button class="btn sm primary" data-estact="dbsave" data-id="${k}">${x ? 'Сохранить' : 'Добавить'}</button>${x ? `<button class="btn sm" data-estact="dbcancel">Отмена</button>` : ''}</td></tr>`; };
+  const rows = L.map(x => ui.estEdit === x.id ? form(x) : `<tr><td>${esc(x.name)}</td><td>${esc(x.unit || '')}</td><td class="mono">${estPrice(x.price)}</td><td><small>${esc(tab === 'works' ? estMatsOf(x.id).map(m => m.name).join(', ') || '—' : (x.works || []).map(wName).filter(Boolean).join(', ') || '— не привязан к работам')}</small></td>
+    <td class="estact">${ed ? `<button class="icon" data-estact="dbedit" data-id="${x.id}" title="Изменить">✎</button><button class="icon" data-estact="dbdel" data-id="${x.id}" title="Удалить">🗑</button>` : ''}</td></tr>`).join('');
+  return `<div class="esthead"><button class="btn" data-estact="back">← К смете</button><nav class="seg"><a href="#est" data-estact="tab" data-id="works" class="${tab === 'works' ? 'on' : ''}">Работы · ${EST.works.length}</a><a href="#est" data-estact="tab" data-id="mats" class="${tab === 'mats' ? 'on' : ''}">Материалы · ${EST.mats.length}</a></nav>
+      <input class="in" data-estdbq placeholder="Поиск" value="${esc(ui.estDbQ || '')}" style="max-width:240px"></div>
+    <datalist id="estUnits">${['шт', 'м', 'м²', 'м³', 'п.м', 'кг', 'т', 'л', 'ч', 'компл', 'усл'].map(u => `<option value="${u}">`).join('')}</datalist>
+    ${ed ? '' : '<p class="hint">Базу меняют сотрудники офиса, руководитель или администратор.</p>'}
+    <div class="tscroll estbox"><table class="tbl esttbl estdb"><thead><tr><th>Наименование</th><th>Ед. изм.</th><th>Цена за ед., ₽</th><th>${tab === 'works' ? 'Материалы работы' : 'Относится к работам'}</th><th></th></tr></thead><tbody>${ed && !ui.estEdit ? form(null) : ''}${rows || `<tr><td colspan="5" class="dim">${q ? 'Ничего не найдено' : tab === 'works' ? 'Работ пока нет' : 'Материалов пока нет'}</td></tr>`}</tbody></table></div>`;
+}
+function estPrint(){ const sh = estSheet(); if (!sh) return; const t = estSum(sh); let n = 0;
+  const rows = sh.rows.map(r => `<tr><td>${++n}</td><td><b>${esc(r.name)}</b></td><td>${esc(r.unit)}</td><td>${estQ(r.qty)}</td><td>${estPrice(r.price)}</td><td>${estPrice(r.qty * r.price)}</td></tr>` + (sh.workOnly ? '' : (r.mats || []).map(x => `<tr class="m"><td></td><td>${esc(x.name)}</td><td>${esc(x.unit)}</td><td>${estQ(x.qty)}</td><td>${estPrice(x.price)}</td><td>${estPrice(x.qty * x.price)}</td></tr>`).join(''))).join('');
+  const w = open('', '_blank'); if (!w) return toast('Браузер не дал открыть окно печати');
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(sh.name)}</title><style>body{font:14px Arial,sans-serif;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px 6px;text-align:left}td:nth-child(n+4){text-align:right;white-space:nowrap}tr.m td:nth-child(2){padding-left:22px;color:#333}h2{margin:0 0 6px}</style>
+    <h2>${esc(sh.name)}</h2><p>Общая стоимость${sh.workOnly ? ' (только работа)' : ''}: <b>${money(t.all)}</b>${sh.workOnly ? '' : ` · работы ${money(t.w)} · материалы ${money(t.m)}`}</p><table><tr><th>№</th><th>Наименование</th><th>Ед.</th><th>Кол-во</th><th>Цена, ₽</th><th>Стоимость, ₽</th></tr>${rows}</table><script>print()<\/script>`); w.document.close(); }
+function estAddWork(t, quiet){ const sh = estSheet(); if (!sh) return; const v = t.value.trim().toLowerCase(); if (!v) return;
+  const hit = EST.works.filter(x => x.name.toLowerCase().includes(v)), w = EST.works.find(x => x.name.toLowerCase() === v) || (hit.length === 1 ? hit[0] : null);
+  if (!w) { if (!quiet) toast('Такой работы нет в БД — выберите из списка или добавьте её кнопкой «🗄 БД»'); return; }
+  t.value = '';
+  const r = { id: 'l' + Math.random().toString(36).slice(2, 10), workId: w.id, name: w.name, unit: w.unit, price: w.price, qty: 1, mats: estMatsOf(w.id).map(m => estMatLine(m, 1)) };
+  sh.rows.push(r); estQueue(); render(); const q = document.querySelector(`input[data-estq="${r.id}"]`); if (q) { q.focus(); q.select(); }
+  if (r.mats.length) toast(`Добавлена работа «${w.name}» и её материалы: ${r.mats.length}`); }
+document.addEventListener('click', async e => {
+  if (ui.view !== 'est') return; const t = e.target.closest('[data-estact]'); if (!t) return; e.preventDefault();
+  const a = t.dataset.estact, id = t.dataset.id, sh = estSheet();
+  try {
+    if (a === 'new') return estNew();
+    if (a === 'db') { ui.estMode = 'db'; ui.estEdit = null; return render(); }
+    if (a === 'back') { ui.estMode = ''; return render(); }
+    if (a === 'tab') { ui.estTab = id; ui.estEdit = null; return render(); }
+    if (a === 'print') return estPrint();
+    if (a === 'del') { if (!sh || !(await askDel(`Удалить смету «${sh.name}»?`))) return; await estApi('DELETE', '/sheets/' + sh.id); EST.sheets = EST.sheets.filter(x => x !== sh); ui.estId = EST.sheets[0]?.id || null; toast('Смета удалена'); return render(); }
+    if (a === 'prices') { if (!sh) return; let n = 0; sh.rows.forEach(r => { const w = estW(r.workId); if (w && (w.price !== r.price || w.unit !== r.unit || w.name !== r.name)) { Object.assign(r, { price: w.price, unit: w.unit, name: w.name }); n++; } (r.mats || []).forEach(x => { const m = estM(x.matId); if (m && (m.price !== x.price || m.unit !== x.unit || m.name !== x.name)) { Object.assign(x, { price: m.price, unit: m.unit, name: m.name }); n++; } }); }); estQueue(); render(); return toast(n ? 'Обновлено строк: ' + n : 'Цены совпадают с БД'); }
+    if (a === 'up') { const i = sh.rows.findIndex(r => r.id === id); if (i > 0) { [sh.rows[i - 1], sh.rows[i]] = [sh.rows[i], sh.rows[i - 1]]; estQueue(); render(); } return; }
+    if (a === 'rmw') { sh.rows = sh.rows.filter(r => r.id !== id); estQueue(); return render(); }
+    if (a === 'rmm') { const [rid, mid] = id.split('|'), r = sh.rows.find(x => x.id === rid); if (r) r.mats = r.mats.filter(x => x.id !== mid); estQueue(); return render(); }
+    if (a === 'dbedit') { ui.estEdit = id; render(); return document.querySelector(`[data-estrow="${id}"] input[name=name]`)?.focus(); }
+    if (a === 'dbcancel') { ui.estEdit = null; return render(); }
+    if (a === 'dbdel') { const tab = ui.estTab || 'works', x = (tab === 'works' ? estW : estM)(id); if (!x) return;
+      const used = EST.sheets.filter(s => s.rows.some(r => tab === 'works' ? r.workId === id : (r.mats || []).some(m => m.matId === id))).length;
+      if (!(await askDel(`Удалить ${tab === 'works' ? 'работу' : 'материал'} «${x.name}» из БД?${used ? `\nВстречается в сметах: ${used} — там строки останутся с прежней ценой.` : ''}`))) return;
+      const r = await estApi('DELETE', `/${tab}/${id}`); EST.works = r.works; EST.mats = r.mats; toast('Удалено'); return render(); }
+    if (a === 'dbsave') { const tab = ui.estTab || 'works', row = t.closest('[data-estrow]'), f = n => row.querySelector(`[name=${n}]`).value;
+      const links = [...row.querySelectorAll('input[name=links]:checked')].map(x => x.value), body = { name: f('name').trim(), unit: f('unit').trim(), price: num(f('price')) };
+      if (!body.name) return toast('Укажите наименование'); if (tab === 'works') body.mats = links; else body.works = links;
+      const r = id === 'new' ? await estApi('POST', '/' + tab, body) : await estApi('PATCH', `/${tab}/${id}`, body);
+      EST.works = r.works; EST.mats = r.mats; ui.estEdit = null; toast(id === 'new' ? 'Добавлено в БД' : 'Сохранено'); render(); if (id === 'new') document.querySelector('[data-estrow="new"] input[name=name]')?.focus(); return; }
+  } catch(err) { toast(errText(err)); }
+});
+document.addEventListener('change', async e => {
+  if (ui.view !== 'est') return; const t = e.target, d = t.dataset || {}, sh = estSheet();
+  if (d.estsel != null) { ui.estId = t.value; return render(); }
+  if (!sh) return;
+  if (d.estonly != null) { sh.workOnly = t.checked; estQueue(); return render(); }
+  if (d.estname != null) { sh.name = t.value.trim() || 'Смета'; estQueue(); const o = document.querySelector(`[data-estsel] option[value="${sh.id}"]`); if (o) o.textContent = sh.name; return; }
+  if (d.estaddw != null) return estAddWork(t);
+  if (d.estaddm) { const r = sh.rows.find(x => x.id === d.estaddm), m = estM(t.value); if (!r || !m) return; r.mats = r.mats || []; r.mats.push(estMatLine(m, r.qty)); estQueue(); return render(); }
+  if (d.estms) { const [rid, mid] = d.estms.split('|'), r = sh.rows.find(x => x.id === rid), x = r?.mats.find(y => y.id === mid), m = estM(t.value); if (!x || !m) return; Object.assign(x, { matId: m.id, name: m.name, unit: m.unit, price: m.price }); estQueue(); return render(); }
+  if (d.estq) { const q = document.activeElement === t ? null : t; if (q) q.value = estQ(num(t.value)); }
+});
+document.addEventListener('input', e => {
+  if (ui.view !== 'est') return; const t = e.target, d = t.dataset || {};
+  if (d.estdbq != null) { ui.estDbQ = t.value; const pos = t.selectionStart; render(); const n = document.querySelector('[data-estdbq]'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } return; }
+  if (d.estaddw != null) { if (!e.inputType || e.inputType === 'insertReplacementText') { const v = t.value.trim().toLowerCase(); if (EST.works.some(x => x.name.toLowerCase() === v)) estAddWork(t, true); } return; }
+  if (!d.estq) return; const sh = estSheet(); if (!sh) return; const [rid, mid] = d.estq.split('|'), r = sh.rows.find(x => x.id === rid); if (!r) return; const v = Math.max(0, num(t.value));
+  if (mid) { const x = r.mats.find(y => y.id === mid); if (x) { x.qty = v; x.hand = true; } }
+  else { r.qty = v; (r.mats || []).forEach(x => { if (!x.hand) x.qty = v; }); }
+  estTotalsDom(); estQueue();
+});
+document.addEventListener('keydown', e => { if (ui.view === 'est' && e.key === 'Enter' && e.target.dataset?.estaddw != null) { e.preventDefault(); return estAddWork(e.target); } if (ui.view === 'est' && e.key === 'Enter' && e.target.closest?.('.estform')) { e.preventDefault(); e.target.closest('.estform').querySelector('[data-estact=dbsave]')?.click(); } });
 function vProdScr(){
   const F = ui.psF || 'active', q = (ui.psq || '').trim().toLowerCase();
   const all = psJobs().filter(j => ['prod', 'both'].includes(j.kind) && psOrd(j.orderId));
@@ -5764,8 +5895,8 @@ async function snXlsx(){
   for (let r = 1; r < a.length; r++) for (let c = 0; c < 4; c++) { const ref = X.utils.encode_cell({ r, c }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
   X.utils.book_append_sheet(wb, ws, 'Этикетки для модемов'); X.writeFile(wb, `Этикетки для модемов — ${today()}.xlsx`);
 }
-const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'mods', 'snmap', 'match'];
-const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль'], ['mods', 'mods', '🧩 Дополнительные модули']];
+const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'mods', 'snmap', 'match'];
+const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль'], ['est', 'est', '🧮 Быстрая смета'], ['mods', 'mods', '🧩 Дополнительные модули']];
 const refTabsList = () => REF_TABS.filter(([, k]) => can('refs:' + k) && (k !== 'labels' || !isWorker()) && (k !== 'netshare' || isHead() || NETSHARES.length > 0) && (k !== 'ssh' || isHead()));
 const refTabs = () => { const cur = MOD_VIEWS.includes(ui.view) ? 'mods' : ui.view; return `<nav class="seg stabs" aria-label="Справочники и инструменты">${refTabsList().map(([v, , l]) => `<a href="#${v}" class="${cur === v ? 'on' : ''}" ${cur === v ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`; };
 /* «Дополнительные модули»: separate tools of their own; each opens on its own page under this tab */
@@ -6405,7 +6536,7 @@ function vTmine(){
 
 // the menu of a transport organization: a driver — his trips, waybills, receipts; the accountant — orders, «Учётка», reports; managers — all
 const transNav = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : me.role === 'accountant' ? ['tor', 'stock', 'trep', 'notes', 'refs'] : ['tor', 'disp', 'transport', 'stock', 'trep', 'notes', 'refs', ...(me.role === 'admin' ? ['users'] : [])];
-const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare', 'mods', 'snmap', 'match'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', 'mods', 'snmap', 'match', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
+const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare', 'est', 'mods', 'snmap', 'match'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', 'mods', 'snmap', 'match', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
 /* ===== «Оборудование» системы заявок: справочник с QR-кодами и историей проблем ===== */
 let REQ_EQ = [];
 const eqOf = id => REQ_EQ.find(e => e.id === id);
@@ -9830,17 +9961,18 @@ function route(){
     : ipMode() ? (ipNav().includes(h) ? h : 'ipc')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'prodscr', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'mods', 'snmap', 'match'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'prodscr', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'est', 'mods', 'snmap', 'match'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || (h === 'prodscr' && viewOk(h)) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
-    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', mods: 'mods', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
+    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', est: 'est', mods: 'mods', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
     ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
     try { history.replaceState(null, '', '#' + ui.view); } catch(e) {}
   }
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
   if (ui.view === 'msgs') msgLoad();
+  if (ui.view === 'est') estLoad();
   if (ui.view === 'admFiles') ui.admFiles = null;
   if (ui.view === 'orgs') loadOrgs();
   if (ui.view === 'dt' && !DT.loaded) loadDt();

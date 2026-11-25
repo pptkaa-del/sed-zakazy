@@ -481,7 +481,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], msgs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'mods'] };
+const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], msgs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'mods'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -831,7 +831,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password', 'trials'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap', 'cal', 'msgs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap', 'cal', 'msgs', 'est'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -2579,6 +2579,47 @@ async function api(req, res, url) {
     if (m === 'PATCH') { const n = nm((await readJsonBody(req) || {}).name); if (!n) return fail(res, 400, 'Укажите название группы'); if (same(n, g)) return fail(res, 400, 'Такая группа уже есть'); g.name = n; return out(); }
     if (m === 'DELETE') { G.splice(G.indexOf(g), 1); for (const j of Object.values(db.jobs || {})) if (j.groupId === g.id) j.groupId = null; return out(); }
     return fail(res, 405, 'Метод не поддерживается');
+  }
+  /* «Быстрая смета»: the base of works and materials (a material belongs to one or more works; a work has any number of materials)
+     and the estimates made of them */
+  if (p[1] === 'est') {
+    const E = db.est = db.est && typeof db.est === 'object' ? db.est : {}; ['works', 'mats', 'sheets'].forEach(k => { if (!Array.isArray(E[k])) E[k] = []; });
+    const now = new Date().toISOString(), str = (v, n) => String(v ?? '').trim().slice(0, n), num = v => { const x = Number(String(v ?? '').replace(',', '.').replace(/\s/g, '')); return isFinite(x) && x >= 0 ? Math.round(x * 100) / 100 : 0; };
+    const baseEd = !FIELD(user) && user.role !== 'executor';
+    const save = () => { const e = ctx(); writeJSON(e.file, e.db); e.stamp = stamp(e.file); };
+    const out = () => send(res, 200, { works: E.works, mats: E.mats, sheets: E.sheets.filter(x => !FIELD(user) || x.by === user.id || x.shared), canBase: baseEd });
+    if (m === 'GET' && !p[2]) return out();
+    const kind = p[2];
+    if (kind === 'works' || kind === 'mats') {
+      if (!baseEd) return fail(res, 403, 'Базу работ и материалов меняют сотрудники офиса, руководитель или администратор');
+      const L = E[kind], label = kind === 'works' ? 'Работа' : 'Материал';
+      const clean = (b, o = {}) => { const r = { name: str(b.name ?? o.name, 200), unit: str(b.unit ?? o.unit, 20), price: num(b.price ?? o.price) };
+        if (kind === 'mats') r.works = [...new Set((Array.isArray(b.works) ? b.works : o.works || []).map(String))].filter(id => E.works.some(w => w.id === id)); return r; };
+      const dup = (n, self) => L.find(x => x !== self && x.name.toLowerCase() === n.toLowerCase());
+      if (m === 'POST' && !p[3]) { const b = await readJsonBody(req) || {}, r = clean(b); if (!r.name) return fail(res, 400, 'Укажите наименование'); if (dup(r.name)) return fail(res, 400, label + ' «' + r.name + '» уже есть в базе'); if (L.length >= 20000) return fail(res, 400, 'Слишком много записей');
+        // a new work may be given its materials at once
+        const it = { id: newId(), ...r, at: now, by: user.id }; L.push(it);
+        if (kind === 'works' && Array.isArray(b.mats)) E.mats.forEach(x => { if (b.mats.includes(x.id) && !x.works.includes(it.id)) x.works.push(it.id); });
+        save(); return send(res, 200, { id: it.id, works: E.works, mats: E.mats }); }
+      const it = p[3] && L.find(x => x.id === p[3]); if (!it) return fail(res, 404, label + ' не найден' + (kind === 'works' ? 'а' : '') + ' — обновите страницу');
+      if (m === 'PATCH') { const b = await readJsonBody(req) || {}, r = clean(b, it); if (!r.name) return fail(res, 400, 'Укажите наименование'); if (dup(r.name, it)) return fail(res, 400, label + ' «' + r.name + '» уже есть в базе'); Object.assign(it, r);
+        if (kind === 'works' && Array.isArray(b.mats)) E.mats.forEach(x => { const has = x.works.includes(it.id), want = b.mats.includes(x.id); if (want && !has) x.works.push(it.id); if (!want && has) x.works = x.works.filter(w => w !== it.id); });
+        save(); return send(res, 200, { ok: true, works: E.works, mats: E.mats }); }
+      if (m === 'DELETE') { L.splice(L.indexOf(it), 1); if (kind === 'works') E.mats.forEach(x => { x.works = x.works.filter(w => w !== it.id); }); save(); return send(res, 200, { ok: true, works: E.works, mats: E.mats }); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
+    if (kind === 'sheets') {
+      const cleanRows = rows => (Array.isArray(rows) ? rows : []).slice(0, 1000).map(r => ({ id: str(r.id, 40) || newId(), workId: str(r.workId, 40), name: str(r.name, 200), unit: str(r.unit, 20), price: num(r.price), qty: num(r.qty),
+        mats: (Array.isArray(r.mats) ? r.mats : []).slice(0, 100).map(x => ({ id: str(x.id, 40) || newId(), matId: str(x.matId, 40), name: str(x.name, 200), unit: str(x.unit, 20), price: num(x.price), qty: num(x.qty), hand: !!x.hand })) }));
+      const clean = (b, o = {}) => ({ name: str(b.name ?? o.name, 200) || 'Смета', workOnly: b.workOnly !== undefined ? !!b.workOnly : !!o.workOnly, shared: b.shared !== undefined ? !!b.shared : o.shared !== false, rows: b.rows !== undefined ? cleanRows(b.rows) : o.rows || [] });
+      if (m === 'POST' && !p[3]) { if (E.sheets.length >= 5000) return fail(res, 400, 'Слишком много смет'); const it = { id: newId(), ...clean(await readJsonBody(req) || {}), by: user.id, at: now, upd: now }; E.sheets.unshift(it); save(); return send(res, 200, { id: it.id, sheet: it }); }
+      const it = p[3] && E.sheets.find(x => x.id === p[3]); if (!it || (FIELD(user) && it.by !== user.id && !it.shared)) return fail(res, 404, 'Смета не найдена — обновите страницу');
+      const mine = it.by === user.id || canEdit(user);
+      if (m === 'PATCH') { if (!mine && !baseEd) return fail(res, 403, 'Смету меняет её автор'); Object.assign(it, clean(await readJsonBody(req) || {}, it), { upd: now, updBy: user.id }); save(); return send(res, 200, { ok: true, sheet: it }); }
+      if (m === 'DELETE') { if (!mine) return fail(res, 403, 'Удалить смету может её автор, руководитель или администратор'); E.sheets.splice(E.sheets.indexOf(it), 1); save(); return send(res, 200, { ok: true }); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
+    return fail(res, 404, 'Не найдено');
   }
   if (p[1] === 'msgs') {
     const L = msgList(), now = new Date().toISOString();
