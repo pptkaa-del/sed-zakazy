@@ -2920,7 +2920,7 @@ function invRow(i, withPay){
   return `<div class="irow ${isAccountant() && unseen(i) ? 'unseen' : ''}" data-act="openInvoice" data-id="${i.id}" role="button" tabindex="0">
     <span class="ist"><span class="chip ${cc}">${cl}</span></span>
     <span class="inum"><b>№ <span class="mono">${esc(i.number)}</span></b><small>от ${fmtD(i.date)}</small></span>
-    <span class="isup"><b>${esc(i.supplier)}${exTag(i)}</b><small>${esc(i.purpose||'')}${!withPay||!o?'':''}</small></span>
+    <span class="isup"><b>${esc(i.supplier)}${exTag(i)}</b><small>${i.forNote ? esc('для: ' + i.forNote) + (i.purpose ? ' · ' : '') : ''}${esc(i.purpose||'')}${!withPay||!o?'':''}</small></span>
     <span class="idue"><small>${i.status==='paid'?'Оплачен':'Оплатить до'}</small>${fmtD(i.status==='paid'?i.paidAt:i.due)}</span>
     <span class="iamt mono">${money(i.amount)}</span>
     <span class="ifiles">${i.file?`<a href="${esc(fileUrl(i.file))}" target="_blank" rel="noopener">Счёт</a>`:'<span class="dim">нет файла</span>'}${i.receipt?`<a href="${esc(fileUrl(i.receipt))}" target="_blank" rel="noopener">Чек</a>`:''}${seenNote}</span>
@@ -4270,13 +4270,13 @@ function vPay(){
   if (!list.length) return head + `<div class="empty"><h3>${ui.payF==='topay'?'Все счета оплачены':'Нет счетов по этому фильтру'}</h3>Выберите другой фильтр или заказ.</div>`;
   const sorter = ui.payF === 'paid' ? (a,b) => (b.paidAt||'').localeCompare(a.paidAt||'') : (a,b) => (a.status===b.status?0:a.status==='topay'?-1:1) || (a.due||'9').localeCompare(b.due||'9');
   const groups = new Map();
-  list.forEach(i => { const k = i.orderId || (i.jobId ? 'job:' + i.jobId : '_'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  list.forEach(i => { const k = INV_FOR[i.forKind] ? 'for:' + i.forKind : i.orderId || (i.jobId ? 'job:' + i.jobId : '_'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
   const keys = [...groups.keys()].sort((a,b) => (ord(b)?.number||'').localeCompare(ord(a)?.number||'','ru',{numeric:true}));
   return head + keys.map(k => {
     const o = ord(k), is = groups.get(k).sort(sorter);
     const due = sum(is.filter(i => i.status==='topay'), i => i.amount);
     const gj = k.startsWith('job:') ? jobOf(k.slice(4)) : null;
-    return `<section class="pproj"><div class="pp-h"><h3>${gj ? `<button class="linkish" data-act="openJob" data-id="${gj.id}">${esc('Работа № ' + jobNo(gj) + ' · ' + gj.title)}</button>` : `<button class="linkish" data-act="gotoOrder" data-id="${k}">${esc(ordName(o))}</button>`}</h3>
+    return `<section class="pproj"><div class="pp-h"><h3>${k.startsWith('for:') ? esc('Закупка: ' + INV_FOR[k.slice(4)]) : gj ? `<button class="linkish" data-act="openJob" data-id="${gj.id}">${esc('Работа № ' + jobNo(gj) + ' · ' + gj.title)}</button>` : `<button class="linkish" data-act="gotoOrder" data-id="${k}">${esc(ordName(o))}</button>`}</h3>
       <span class="dim">${o?.billNo?`выставлен счёт № ${esc(o.billNo)}${o.billDate?' от '+fmtD(o.billDate):''} · `:''}к оплате <span class="mono" style="color:var(--ink)">${money(due)}</span></span></div>
       <div class="ilist">${is.map(i => invRow(i,true)).join('')}</div></section>`;
   }).join('');
@@ -7077,11 +7077,17 @@ renderDrawer = function(){ renderDrawerBase(); supMarkAll();
 const dh = title => `<div class="d-head"><h2>${title}</h2><button class="btn ghost" data-act="close" aria-label="Закрыть">✕</button></div>`;
 const opt = (obj, sel) => Object.entries(obj).map(([k,v]) => `<option value="${k}" ${k===sel?'selected':''}>${v}</option>`).join('');
 // where an invoice goes: an order (production), or a work without production («job:<id>»); opened from a work — that work is chosen
+/* «Закупка для»: an order, a work or one of the other purchases (the development of a product and «Иное» need a note) */
+const INV_FOR = { house: 'Хозяйственные нужды', dev: 'Разработка изделия', equip: 'Оборудование и инструмент', other: 'Иное' };
+const invForLabel = i => INV_FOR[i?.forKind] ? INV_FOR[i.forKind] + (i.forNote ? ': ' + i.forNote : '') : '';
+function invForNote(){ const k = ($('f-ord')?.value || '').startsWith('for:') ? $('f-ord').value.slice(4) : '', w = $('f-forbox'); if (!w) return;
+  w.hidden = !(k === 'dev' || k === 'other'); $('f-forlbl').textContent = k === 'dev' ? 'Какое изделие разрабатывается' : 'Что именно закупается'; $('f-fornote').required = !w.hidden;
+  $('f-fornote').setAttribute('list', k === 'dev' ? 'f-devlist' : ''); }
 function invTargetOpts(i, ctx){
   const cj = String(ctx || '').startsWith('job:') ? jobOf(String(ctx).slice(4)) : null;
-  const sel = i ? (i.orderId || (i.jobId ? 'job:' + i.jobId : '')) : cj ? (cj.orderId && ord(cj.orderId) ? cj.orderId : 'job:' + cj.id) : ctx;
+  const sel = i ? (INV_FOR[i.forKind] ? 'for:' + i.forKind : i.orderId || (i.jobId ? 'job:' + i.jobId : '')) : cj ? (cj.orderId && ord(cj.orderId) ? cj.orderId : 'job:' + cj.id) : ctx;
   const J = S.jobs.filter(j => !(j.orderId && ord(j.orderId)) && (j.status !== 'done' || 'job:' + j.id === sel)).sort((a, b) => (b.no || 0) - (a.no || 0));
-  return `<option value="">— выберите —</option><optgroup label="Производство (заказы)">${orderOpts(sel)}</optgroup>${J.length ? `<optgroup label="Работы">${J.map(j => `<option value="job:${j.id}" ${sel === 'job:' + j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}</optgroup>` : ''}`;
+  return `<option value="">— выберите —</option><optgroup label="Производство (заказы)">${orderOpts(sel)}</optgroup>${J.length ? `<optgroup label="Работы">${J.map(j => `<option value="job:${j.id}" ${sel === 'job:' + j.id ? 'selected' : ''}>${esc('№ ' + jobNo(j) + ' · ' + j.title)}</option>`).join('')}</optgroup>` : ''}<optgroup label="Другие закупки">${Object.entries(INV_FOR).map(([k, l]) => `<option value="for:${k}" ${sel === 'for:' + k ? 'selected' : ''}>${l}${k === 'dev' ? ' (указать какое)' : k === 'other' ? ' (указать что именно)' : ''}</option>`).join('')}</optgroup>`;
 }
 const invJob = i => i && (jobOf(i.jobId) || S.jobs.find(j => j.orderId && j.orderId === i.orderId)) || null;
 const orderOpts = sel => ordersSorted().map(o => `<option value="${o.id}" ${o.id===sel?'selected':''}>${esc(o.number+' · '+o.title)}</option>`).join('');
@@ -7751,7 +7757,9 @@ function renderDrawer(){
       <label class="wide">Файл счёта${i?.file?` (сейчас: ${esc(i.file.name)})`:''}<input class="in" type="file" id="f-file" accept="${ACCEPT}">
         <small class="dim" style="font-size:12px">Из PDF-счёта номер, сумма, дата и поставщик подставятся сами — проверьте их.</small></label>
       <div class="wide" id="f-parse" hidden></div>
-      <label class="wide">Заказ или работа<select class="in" id="f-ord" required>${invTargetOpts(i, d.ctx)}</select></label>
+      <label class="wide">Закупка для<select class="in" id="f-ord" required>${invTargetOpts(i, d.ctx)}</select></label>
+      <label class="wide" id="f-forbox" ${i?.forKind === 'dev' || i?.forKind === 'other' ? '' : 'hidden'}><span id="f-forlbl">${i?.forKind === 'dev' ? 'Какое изделие разрабатывается' : 'Что именно закупается'}</span><input class="in" id="f-fornote" value="${v(i,'forNote')}" autocomplete="off" ${i?.forKind === 'dev' ? 'list="f-devlist"' : ''}>
+        <datalist id="f-devlist">${[...new Set([...(DEVS || []).map(x => x.title || x.name), ...(S.products || []).map(x => x.name)].filter(Boolean))].slice(0, 500).map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist></label>
       <label>Номер счёта<input class="in" id="f-num" value="${v(i,'number')}" required></label>
       <label>Дата счёта<input class="in" type="date" id="f-date" value="${esc(i?.date || today())}"></label>
       <label class="wide">Поставщик<input class="in" id="f-sup" list="sup-list" autocomplete="off" value="${v(i,'supplier')}" required>
@@ -8122,7 +8130,7 @@ function renderDrawer(){
     D.innerHTML = dh(`Счёт № ${esc(i.number)} от ${fmtD(i.date)}`) + `<div class="d-body">
       <div><span class="chip ${cc}">${cl}</span>${exTag(i)}</div>
       <dl class="kv">
-        ${o || !invJob(i) ? `<dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${i.orderId}">${esc(o ? o.number+' · '+o.title : '—')}</a></dd>` : ''}${invJob(i) ? `<dt>Работа</dt><dd><a href="#works" data-act="openJob" data-id="${invJob(i).id}">${esc('№ ' + jobNo(invJob(i)) + ' · ' + invJob(i).title)}</a></dd>` : ''}
+        ${INV_FOR[i.forKind] ? `<dt>Закупка для</dt><dd>${esc(invForLabel(i))}</dd>` : ''}${INV_FOR[i.forKind] ? '' : o || !invJob(i) ? `<dt>Заказ</dt><dd><a href="#orders" data-act="gotoOrder" data-id="${i.orderId}">${esc(o ? o.number+' · '+o.title : '—')}</a></dd>` : ''}${invJob(i) ? `<dt>Работа</dt><dd><a href="#works" data-act="openJob" data-id="${invJob(i).id}">${esc('№ ' + jobNo(invJob(i)) + ' · ' + invJob(i).title)}</a></dd>` : ''}
         <dt>Поставщик</dt><dd>${esc(i.supplier)}</dd>
         <dt>Назначение</dt><dd>${esc(i.purpose||'—')}</dd>
         <dt>Сумма</dt><dd class="mono"><b>${money(i.amount)}</b></dd>
@@ -8497,14 +8505,15 @@ async function onSubmit(e){
       toast(`Оприходовано строк: ${r.lines}${r.created ? `, новых позиций склада: ${r.created}` : ''}`);
     }
     if (kind === 'invoice') {
-      const tv = val('f-ord'), tj = tv.startsWith('job:') ? jobOf(tv.slice(4)) : null, o = tj ? null : ord(tv);
-      if (!o && !tj) return fail('Выберите заказ или работу.');
+      const tv = val('f-ord'), fk = tv.startsWith('for:') ? tv.slice(4) : null, tj = tv.startsWith('job:') ? jobOf(tv.slice(4)) : null, o = tj || fk ? null : ord(tv);
+      if (!o && !tj && !fk) return fail('Выберите, для чего закупка.');
+      if ((fk === 'dev' || fk === 'other') && !val('f-fornote')) return fail(fk === 'dev' ? 'Укажите, какое изделие разрабатывается.' : 'Укажите, что именно закупается.');
       // opened from a work with production: the order is chosen, the work is kept
       const cj = String(d.ctx || '').startsWith('job:') ? jobOf(String(d.ctx).slice(4)) : null, oldI = d.id && inv(d.id);
-      const jobId = tj ? tj.id : (cj && cj.orderId === o.id ? cj.id : (oldI?.jobId && jobOf(oldI.jobId)?.orderId === o.id ? oldI.jobId : null));
+      const jobId = fk ? null : tj ? tj.id : (cj && cj.orderId === o.id ? cj.id : (oldI?.jobId && jobOf(oldI.jobId)?.orderId === o.id ? oldI.jobId : null));
       if (!val('f-num') || !val('f-sup')) return fail('Укажите номер счёта и поставщика.');
       if (!(num(val('f-amt')) > 0)) return fail('Укажите сумму счёта.');
-      const data = { orderId:o ? o.id : null, jobId, number:val('f-num'), date:val('f-date'), supplier:val('f-sup'), amount:num(val('f-amt')), due:val('f-due'), purpose:val('f-purp') };
+      const data = { orderId:o ? o.id : null, jobId, forKind: fk, forNote: fk === 'dev' || fk === 'other' ? val('f-fornote') : '', number:val('f-num'), date:val('f-date'), supplier:val('f-sup'), amount:num(val('f-amt')), due:val('f-due'), purpose:val('f-purp') };
       if (ui.invInn) data.supplierInn = ui.invInn;
       const old = d.id && inv(d.id);
       if (!old?.income) {
@@ -9650,6 +9659,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'wOrd') { ui.wOrd = t.value; return render(); }
   if (t.id === 'jW') { ui.jW = t.value; return render(); }
   if (t.id === 'payOrd') { ui.payOrd = t.value; return render(); }
+  if (t.id === 'f-ord') invForNote();
   if (t.id === 'planOrd') { ui.planOrd = t.value; return render(); }
   if (t.dataset.sec && !t.dataset.top) { t.closest('.secg')?.querySelectorAll('[data-top]').forEach(x => { x.disabled = !t.checked; }); return; }
   if (t.name === 'o-type') { const b = $('o-secs'); if (b) b.hidden = t.value !== 'all'; return; }
