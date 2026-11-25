@@ -1472,7 +1472,12 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 <script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 /* a popup on a phone: touches and the wheel inside it scroll the popup, they do not drag or zoom the map (all the maps of the program) */
-if (window.L && L.Map) L.Map.addInitHook(function(){ this.on('popupopen', e => { const c = e.popup.getElement(); if (!c || c._keep) return; c._keep = true;
+/* a point window never gets taller than the map (on a phone the map is shorter than the screen): it lists inside itself and the
+   buttons at its bottom («Удалить точку») stay reachable; then the map is moved once to show all of it */
+const popFit = (map, pp) => { const n = pp && pp._contentNode; if (!n || !map._container) return; const h = map.getSize().y, o = pp.options || {}, pad = L.point(o.autoPanPadding || [5, 5]).y;
+  n.style.maxHeight = Math.max(120, h - 24 - 22 - Math.abs((o.offset && L.point(o.offset).y) || 0) - pad * 2 - 30) + 'px'; try { pp._updateLayout(); pp._updatePosition(); pp._adjustPan(); } catch(err) {} };
+if (window.L && L.Map) L.Map.addInitHook(function(){ this.on('popupopen', e => setTimeout(() => popFit(this, e.popup), 0)); this.on('resize', () => { const pp = this._popup; if (pp && this.hasLayer(pp)) popFit(this, pp); });
+  this.on('popupopen', e => { const c = e.popup.getElement(); if (!c || c._keep) return; c._keep = true;
   ['touchstart', 'pointerdown', 'mousedown', 'dblclick'].forEach(t => c.addEventListener(t, x => x.stopPropagation())); L.DomEvent.disableScrollPropagation(c); }); });
 </script>
 <script src="/vendor/qrcode/qrcode.js"></script>
@@ -3822,7 +3827,7 @@ function renderDt(){
     let m = dtMarks.get(key);
     if (m && m._pin !== pinMode()) { dtLayer.removeLayer(m); dtMarks.delete(key); m = null; }   // the point style was changed in the settings
     if (!m) {
-      m = mkPoint([p.lat, p.lng], style); m._pin = pinMode(); m.bindPopup(() => dtPopup(DT.points[i], i), { minWidth:250, maxWidth:300, autoPanPadding:[24, 24], keepInView:true, ...popOff() }); m.bindTooltip(String(p.no), { direction:'top', offset:tipOff(-6) });
+      m = mkPoint([p.lat, p.lng], style); m._pin = pinMode(); m.bindPopup(() => dtPopup(DT.points[i], i), { minWidth:250, maxWidth:300, autoPanPadding:[16, 16], ...popOff() }); m.bindTooltip(String(p.no), { direction:'top', offset:tipOff(-6) });
       // in the selection mode a click selects / deselects the point instead of opening it
       m.off('click', m._openPopup, m); m.on('click', ev => { if (ui.dtLasso) return; m.openPopup(ev.latlng); });   // in the selection mode the tap is handled by the area drawing (dtToggleSel)
       dtMarks.set(key, m);
