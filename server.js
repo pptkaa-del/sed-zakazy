@@ -262,6 +262,15 @@ function shiftPlan(j, newDue, user){
       jobLog(j, user, { t: 'task', act: 'edit', title: t.title, kind: t.kind, ch: [...(t.start !== was.start ? [{ f: 'start', from: was.start, to: t.start }] : []), { f: 'end', from: was.end, to: t.end }], auto: true }); } }
   return n;
 }
+/* «Сообщения»: the common chat of the organization («all») and a chat of two users («u:<id>|<id>», the ids sorted);
+   a message may name a work (a project); files and photos — the files of the organization */
+// messages do not change the revision: the other users do not reload all the data for every message (they poll /api/rev → msgs, msgsLast)
+const msgSave = () => { const e = ctx(); writeJSON(e.file, e.db); e.stamp = stamp(e.file); };
+const msgChat = (a, b) => 'u:' + [a, b].sort().join('|');
+const msgSees = (u, x) => x.chat === 'all' || x.chat.slice(2).split('|').includes(u.id);
+const msgList = () => (Array.isArray(db.msgs) ? db.msgs : (db.msgs = []));
+function msgUnread(u){ const R = (db.msgRead || {})[u.id] || {}; return msgList().filter(x => x.by !== u.id && msgSees(u, x) && x.at > (R[x.chat] || '')).length; }
+const msgLast = u => { const L = msgList(); for (let i = L.length - 1; i >= 0; i--) if (msgSees(u, L[i])) return L[i].id; return ''; };
 const jobToOrderSt = st => st === 'done' ? 'closed' : st === 'work' ? 'work' : 'new';
 function fillOrderSuppliers(inv){
   const o = inv && db.orders[inv.orderId];
@@ -472,7 +481,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'mods'] };
+const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], msgs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'mods'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -822,7 +831,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password', 'trials'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap', 'cal'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap', 'cal', 'msgs'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -888,7 +897,7 @@ async function api(req, res, url) {
     }
     return fail(res, 405, 'Метод не поддерживается');
   }
-  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION, chat: chatUnread(user), ...(user.sys ? { trials: trialsNew() } : {}) });
+  if (p[1] === 'rev' && m === 'GET') return send(res, 200, { rev: db.rev, version: APP_VERSION, chat: chatUnread(user), msgs: user.sys ? 0 : msgUnread(user), msgsLast: user.sys ? '' : msgLast(user), ...(user.sys ? { trials: trialsNew() } : {}) });
   // «Запросы доступа»: the system administrator sees the requests, marks them (new / done / rejected), writes a note, deletes
   if (p[1] === 'trials') {
     if (!user.sys) return fail(res, 403, 'Запросы доступа видит администратор системы');
@@ -2569,6 +2578,27 @@ async function api(req, res, url) {
     const g = p[2] && G.find(x => x.id === p[2]); if (!g) return fail(res, 404, 'Группа не найдена — обновите страницу');
     if (m === 'PATCH') { const n = nm((await readJsonBody(req) || {}).name); if (!n) return fail(res, 400, 'Укажите название группы'); if (same(n, g)) return fail(res, 400, 'Такая группа уже есть'); g.name = n; return out(); }
     if (m === 'DELETE') { G.splice(G.indexOf(g), 1); for (const j of Object.values(db.jobs || {})) if (j.groupId === g.id) j.groupId = null; return out(); }
+    return fail(res, 405, 'Метод не поддерживается');
+  }
+  if (p[1] === 'msgs') {
+    const L = msgList(), now = new Date().toISOString();
+    db.msgRead = db.msgRead && typeof db.msgRead === 'object' ? db.msgRead : {}; const R = db.msgRead[user.id] = db.msgRead[user.id] || {};
+    const out = () => { const list = L.filter(x => msgSees(user, x)).slice(-3000), jobs = {}; list.forEach(x => { if (x.jobId && db.jobs[x.jobId]) jobs[x.jobId] = db.jobs[x.jobId].title || 'Работа'; });
+      return send(res, 200, { list, read: R, jobs, users: orgUsers().filter(u => !u.sys && !u.blocked).map(u => ({ id: u.id, name: u.name, role: u.role })) }); };
+    if (m === 'GET' && !p[2]) return out();
+    // «прочитано»: a chat is read up to now
+    if (p[2] === 'read' && m === 'POST') { const b = await readJsonBody(req) || {}, c = String(b.chat || ''); if (c !== 'all' && !(c.startsWith('u:') && c.slice(2).split('|').includes(user.id))) return fail(res, 400, 'Неизвестный чат'); R[c] = now; msgSave(); return send(res, 200, { ok: true, read: R }); }
+    if (m === 'POST' && !p[2]) {
+      const b = await readJsonBody(req) || {}, to = String(b.to || ''), text = String(b.text || '').trim().slice(0, 5000);
+      let chat = 'all'; if (to !== 'all') { const u = orgUsers().find(x => x.id === to && !x.sys); if (!u || u.id === user.id) return fail(res, 400, 'Получатель не найден'); chat = msgChat(user.id, u.id); }
+      const files = (Array.isArray(b.files) ? b.files : []).filter(f => f && db.files[f.id]).slice(0, 20).map(f => ({ id: f.id, name: String(db.files[f.id].name || f.name || 'файл').slice(0, 200), type: db.files[f.id].type || '', size: db.files[f.id].size || 0 }));
+      if (!text && !files.length) return fail(res, 400, 'Напишите сообщение или прикрепите файл');
+      const jobId = b.jobId && db.jobs[b.jobId] ? String(b.jobId) : null;
+      if (L.length >= 50000) L.splice(0, L.length - 49000);
+      L.push({ id: newId(), chat, by: user.id, at: now, text, jobId, files }); R[chat] = now; msgSave(); return out();
+    }
+    const x = p[2] && L.find(e => e.id === p[2]); if (!x || !msgSees(user, x)) return fail(res, 404, 'Сообщение не найдено');
+    if (m === 'DELETE') { if (x.by !== user.id && user.role !== 'admin') return fail(res, 403, 'Удалить может автор или администратор'); L.splice(L.indexOf(x), 1); msgSave(); return out(); }
     return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'jobs' && p[3] === 'reqs') {

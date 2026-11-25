@@ -1286,6 +1286,32 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
   .mchip,.modems{font-size:13px}
   .d-head h2{font-size:22px}
 }
+.msgs{display:grid;grid-template-columns:260px 1fr;gap:10px;height:calc(100vh - 190px);min-height:380px}
+.msglist{overflow:auto;border:1px solid var(--rule);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:3px;background:var(--sheet)}
+.msgq{margin:4px 0}
+.msgchat{display:flex;flex-wrap:wrap;align-items:center;gap:4px;text-align:left;border:0;background:none;padding:7px 8px;border-radius:8px;cursor:pointer;color:inherit;font:inherit}
+.msgchat:hover{background:var(--hover,rgba(0,0,0,.05))}.msgchat.on{background:var(--accent-soft,rgba(37,99,235,.12))}
+.msgchat b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.msgchat small{flex-basis:100%;opacity:.65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgmain{display:flex;flex-direction:column;min-width:0;border:1px solid var(--rule);border-radius:10px;background:var(--sheet);overflow:hidden}
+.msgtop{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--rule)}.msgtop b{flex:1}.msgtop select{max-width:45%}
+.msgback{display:none}
+.msgbody{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px}
+.msgday{align-self:center;font-size:12px;opacity:.6;margin:6px 0}
+.msg{max-width:min(620px,85%);align-self:flex-start;background:var(--hover,rgba(0,0,0,.05));border-radius:10px;padding:6px 10px}
+.msg.mine{align-self:flex-end;background:var(--accent-soft,rgba(37,99,235,.12))}
+.msghd{display:flex;align-items:center;gap:6px;font-size:13px}.msghd small{opacity:.6}
+.msgdel{border:0;background:none;cursor:pointer;opacity:0;padding:0 2px;margin-left:auto}.msg:hover .msgdel{opacity:.7}
+.msgjob{border:1px solid var(--rule);background:var(--sheet);border-radius:999px;padding:1px 8px;font-size:12px;cursor:pointer;margin:3px 0;color:inherit}
+.msgtxt{white-space:pre-wrap;word-break:break-word}
+.msgfiles{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.msgimg{position:relative}.msgimg img{max-width:220px;max-height:180px;border-radius:8px;display:block;object-fit:cover}
+.msgfile{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:3px 8px;font-size:13px}
+.msgrm{border:0;background:var(--bad);color:#fff;border-radius:999px;cursor:pointer;font-size:11px;padding:0 5px}.msgimg .msgrm{position:absolute;top:3px;right:3px}
+.msgform{border-top:1px solid var(--rule);padding:8px;display:flex;flex-direction:column;gap:6px}
+.msgform .msgfiles img{max-width:90px;max-height:70px}
+.msgrow{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}.msgrow select{flex:1;min-width:160px}
+.msgrow textarea{flex:1;min-width:0;resize:vertical}
+@media (max-width:720px){.msgs{grid-template-columns:1fr;height:calc(100dvh - 20px)}.msgs.open .msglist{display:none}.msgs:not(.open) .msgmain{display:none}.msgback{display:inline-block}.msg{max-width:92%}}
 </style>
 </head>
 <body>
@@ -1383,6 +1409,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#trips" data-v="trips" hidden>Загрузить путевой лист</a>
       <a href="#trep" data-v="trep" hidden>Отчёты</a>
       <a href="#refs" data-v="refs" id="refsTab" hidden>Справочники и инструменты</a>
+      <a href="#msgs" data-v="msgs" id="msgsTab" hidden>💬 Сообщения <span class="badge" id="msgBadge" hidden></span></a>
       <a href="#users" data-v="users" id="usersTab" hidden>Администрирование</a>
       <a href="#orgs" data-v="orgs" id="orgsTab" hidden>Организации</a>
       <a href="#server" data-v="server" id="serverTab" hidden>Сервер</a>
@@ -1741,11 +1768,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['prodscr', 'Экран производства', []], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета'], ['checks', 'Чеки'], ['trips', 'Путевые листы']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['mods', 'Дополнительные модули']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['msgs', 'Сообщения'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['mods', 'Дополнительные модули']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || !g[2].length || g[2].some(([s]) => can(top + ':' + s))); };   // a tab without sub-tabs is open by itself
-const VIEW_KEY = { prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
+const VIEW_KEY = { msgs: 'msgs', prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
 // «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
 const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
 const viewOk = v => ckView(v) ? can('stock:' + v) : !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
@@ -1845,7 +1872,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'msgs' ? vMsgs() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   if (V.querySelector('.wtable')) wlClamp();
@@ -3111,6 +3138,120 @@ function psRows(L, row){
     return `<tr class="psgrp" data-act="psGrp" data-id="${esc(k)}" role="button" tabindex="0" aria-expanded="${!shut}"><td class="mono dim">${shut ? '▸' : '▾'}</td><td colspan="2"><b>📦 ${esc(names)}</b><small>${g.length} ${plural(g.length, 'проект', 'проекта', 'проектов')}: ${g.map(x => esc(x.title)).join(', ')}</small></td><td class="r"><b class="mono">${fmtQty(tot)}</b> шт<small>всего</small></td><td>${dues.length ? `<b>с ${fmtD(dues[0])}</b><small>ближайший срок</small>` : '<span class="dim">—</span>'}</td><td></td><td></td></tr>` + (shut ? '' : g.map(x => row(x, true)).join(''));
   }).join('');
 }
+/* ===== «Сообщения»: the common chat of the organization and the chats of two users; a message may name a work (a project)
+   and carry files and photos ===== */
+let MSGS = null;
+const msgChatOf = uid => uid === 'all' ? 'all' : 'u:' + [me.id, uid].sort().join('|');
+const msgPeer = chat => chat === 'all' ? 'all' : chat.slice(2).split('|').find(x => x !== me.id) || me.id;
+const msgUser = id => (MSGS?.users || []).find(u => u.id === id);
+const msgName = id => msgUser(id)?.name || names[id] || 'Пользователь';
+function msgUnreadOf(chat){ const R = MSGS?.read || {}; return (MSGS?.list || []).filter(x => x.chat === chat && x.by !== me.id && x.at > (R[chat] || '')).length; }
+const msgTotal = () => (MSGS?.list || []).filter(x => x.by !== me.id && x.at > ((MSGS.read || {})[x.chat] || '')).length;
+function msgBadge(n){ const b = $('msgBadge'); if (!b) return; b.hidden = !n; b.textContent = n > 99 ? '99+' : n; }
+async function msgLoad(){
+  try { MSGS = await api('GET', '/api/msgs'); } catch(e) { return; }
+  if (ui.view === 'msgs') { await msgMarkRead(); msgRedraw(); }
+  ui.msgsN = msgTotal(); msgBadge(ui.msgsN);
+}
+async function msgMarkRead(){
+  const c = ui.msgChat || 'all'; if (!MSGS || !msgUnreadOf(c)) return;
+  try { const r = await api('POST', '/api/msgs/read', { chat: c }); MSGS.read = r.read; ui.msgsN = msgTotal(); msgBadge(ui.msgsN); } catch(e) {}
+}
+const msgSize = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : n >= 1024 ? Math.round(n / 1024) + ' КБ' : n + ' Б';
+const msgIsImg = f => /^image\//.test(f.type || '') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name || '');
+function msgJobName(id){ const j = jobOf(id); return j ? j.title || 'Работа' : (MSGS?.jobs || {})[id] || 'Работа'; }
+function msgFilesHtml(files, rm){
+  return (files || []).map((f, i) => msgIsImg(f)
+    ? `<span class="msgimg"><a href="/files/${esc(f.id)}" target="_blank" rel="noopener"><img src="/files/${esc(f.id)}" alt="${esc(f.name)}" loading="lazy"></a>${rm ? `<button class="msgrm" data-msgrm="${i}" title="Убрать">✕</button>` : ''}</span>`
+    : `<span class="msgfile">📎 <a href="/files/${esc(f.id)}" target="_blank" rel="noopener" download="${esc(f.name)}">${esc(f.name)}</a> <small>${msgSize(f.size || 0)}</small>${rm ? ` <button class="msgrm" data-msgrm="${i}" title="Убрать">✕</button>` : ''}</span>`).join('');
+}
+function msgChats(){
+  const L = MSGS?.list || [], last = {};
+  L.forEach(x => { last[x.chat] = x; });
+  const users = (MSGS?.users || []).filter(u => u.id !== me.id);
+  const q = (ui.msgQ || '').trim().toLowerCase();
+  const rows = users.map(u => ({ id: u.id, chat: msgChatOf(u.id), name: u.name })).filter(r => !q || r.name.toLowerCase().includes(q))
+    .sort((a, b) => ((last[b.chat]?.at || '') > (last[a.chat]?.at || '') ? 1 : (last[b.chat]?.at || '') < (last[a.chat]?.at || '') ? -1 : a.name.localeCompare(b.name, 'ru')));
+  const item = (id, chat, name, sub) => { const n = msgUnreadOf(chat), lx = last[chat];
+    return `<button class="msgchat${(ui.msgChat || 'all') === chat ? ' on' : ''}" data-msgto="${esc(id)}"><b>${esc(name)}</b>${n ? ` <span class="badge">${n}</span>` : ''}<small>${lx ? esc((lx.by === me.id ? 'Вы: ' : chat === 'all' ? msgName(lx.by).split(' ')[0] + ': ' : '') + (lx.text || (lx.files?.length ? '📎 файл' : '')).slice(0, 60)) : esc(sub || '')}</small></button>`; };
+  return item('all', 'all', '👥 Общий чат', 'все сотрудники организации') + `<input class="msgq" data-keep data-msgq placeholder="Найти сотрудника" value="${esc(ui.msgQ || '')}">` + rows.map(r => item(r.id, r.chat, r.name, ROLE_NAMES?.[msgUser(r.id)?.role] || '')).join('');
+}
+function msgThread(){
+  const chat = ui.msgChat || 'all', L = (MSGS?.list || []).filter(x => x.chat === chat && (!ui.msgJob || x.jobId === ui.msgJob));
+  if (!L.length) return `<p class="muted" style="text-align:center;margin:30px 0">${ui.msgJob ? 'По этой работе сообщений нет' : 'Сообщений пока нет — напишите первым'}</p>`;
+  let day = '';
+  return L.map(x => { const d = x.at.slice(0, 10), mine = x.by === me.id, h = d !== day ? `<div class="msgday">${fmtD(d)}</div>` : ''; day = d;
+    return h + `<div class="msg${mine ? ' mine' : ''}"><div class="msghd"><b>${esc(msgName(x.by))}</b> <small>${fmtDT(x.at).split(' ').pop()}</small>${mine || me.role === 'admin' ? ` <button class="msgdel" data-msgdel="${esc(x.id)}" title="Удалить сообщение">🗑</button>` : ''}</div>`
+      + (x.jobId ? `<button class="msgjob" data-msgjob="${esc(x.jobId)}" title="${jobOf(x.jobId) ? 'Открыть работу' : 'Показать сообщения по этой работе'}">📁 ${esc(msgJobName(x.jobId))}</button>` : '')
+      + (x.text ? `<div class="msgtxt">${esc(x.text).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`)}</div>` : '')
+      + (x.files?.length ? `<div class="msgfiles">${msgFilesHtml(x.files)}</div>` : '') + `</div>`; }).join('');
+}
+function vMsgs(){
+  setTimeout(msgScroll);
+  if (!MSGS) { msgLoad(); return '<p class="muted">Загрузка сообщений…</p>'; }
+  const chat = ui.msgChat || 'all', peer = msgPeer(chat), jobs = (S.jobs || []).filter(j => j.status !== 'done' || j.id === ui.msgJobSel).sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ru'));
+  const jl = jobs.map(j => `<option value="${esc(j.id)}" ${ui.msgJobSel === j.id ? 'selected' : ''}>${esc(j.title || 'Работа')}</option>`).join('');
+  const jobsInChat = [...new Set((MSGS.list || []).filter(x => x.chat === chat && x.jobId).map(x => x.jobId))];
+  return `<div class="msgs${ui.msgOpen ? ' open' : ''}"><aside class="msglist">${msgChats()}</aside><section class="msgmain">
+    <div class="msgtop"><button class="btn sm msgback" data-msgback>←</button><b>${chat === 'all' ? '👥 Общий чат' : esc(msgName(peer))}</b>
+      ${jobsInChat.length ? `<select data-msgfilter title="Показать сообщения по работе"><option value="">Все сообщения</option>${jobsInChat.map(id => `<option value="${esc(id)}" ${ui.msgJob === id ? 'selected' : ''}>📁 ${esc(msgJobName(id))}</option>`).join('')}</select>` : ''}</div>
+    <div class="msgbody" id="msgBody">${msgThread()}</div>
+    <div class="msgform" data-keep>
+      ${(ui.msgFiles || []).length ? `<div class="msgfiles">${msgFilesHtml(ui.msgFiles, true)}</div>` : ''}
+      <div class="msgrow"><select data-msgjobsel title="По какой работе (проекту) сообщение"><option value="">— без проекта —</option>${jl}</select>
+        <label class="btn sm" title="Прикрепить файлы">📎 Файл<input type="file" data-msgup multiple hidden></label>
+        <label class="btn sm" title="Прикрепить фото или снять камерой">📷 Фото<input type="file" data-msgup accept="image/*" multiple hidden></label></div>
+      <div class="msgrow"><textarea id="msgText" rows="2" placeholder="Сообщение… (Enter — отправить, Shift+Enter — новая строка)">${esc(ui.msgDraft || '')}</textarea><button class="btn primary" data-msgsend>Отправить</button></div>
+    </div></section></div>`;
+}
+// the form keeps focus from re-rendering (data-keep) — leave it before drawing the view anew
+const msgRender = () => { if (document.activeElement?.closest?.('.msgs')) document.activeElement.blur(); render(); };
+function msgScroll(){ const b = $('msgBody'); if (b) b.scrollTop = b.scrollHeight; }
+function msgRedraw(){
+  if (ui.view !== 'msgs') return;
+  const b = $('msgBody'), atEnd = !b || b.scrollHeight - b.scrollTop - b.clientHeight < 60, t = $('msgText'), focus = document.activeElement === t, pos = t ? [t.selectionStart, t.selectionEnd] : null;
+  if (t) ui.msgDraft = t.value;
+  const l = document.querySelector('.msglist'); if (l) { const qf = document.activeElement?.dataset?.msgq != null; l.innerHTML = msgChats(); if (qf) { const q = l.querySelector('[data-msgq]'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }
+  if (b) { const st = b.scrollTop; b.innerHTML = msgThread(); if (atEnd) msgScroll(); else b.scrollTop = st; }
+  if (focus && $('msgText')) { $('msgText').focus(); $('msgText').setSelectionRange(...pos); }
+}
+async function msgSend(){
+  const t = $('msgText'), text = (t?.value || '').trim(), files = ui.msgFiles || [];
+  if (ui.msgBusy) return; if (!text && !files.length) return toast('Напишите сообщение или прикрепите файл');
+  ui.msgBusy = true;
+  try { const r = await api('POST', '/api/msgs', { to: msgPeer(ui.msgChat || 'all'), text, jobId: ui.msgJobSel || null, files });
+    MSGS = r; ui.msgDraft = ''; ui.msgFiles = []; msgRender(); msgScroll(); $('msgText')?.focus();
+  } catch(e) { toast(errText(e)); } finally { ui.msgBusy = false; }
+}
+async function msgOpenChat(id){
+  ui.msgChat = msgChatOf(id); ui.msgJob = ''; ui.msgOpen = true; const t = $('msgText'); if (t) ui.msgDraft = t.value;
+  await msgMarkRead(); msgRender(); msgScroll(); if (innerWidth <= 720) document.querySelector('.msgs')?.scrollIntoView({ block: 'start' });
+}
+document.addEventListener('click', async e => {
+  if (ui.view !== 'msgs') return; const t = e.target.closest('[data-msgto],[data-msgsend],[data-msgdel],[data-msgjob],[data-msgrm],[data-msgback]'); if (!t) return;
+  const d = t.dataset;
+  if (d.msgto != null) return msgOpenChat(d.msgto);
+  if (d.msgsend != null) return msgSend();
+  if (d.msgback != null) { ui.msgOpen = false; return msgRender(); }
+  if (d.msgrm != null) { e.preventDefault(); const t2 = $('msgText'); if (t2) ui.msgDraft = t2.value; ui.msgFiles.splice(+d.msgrm, 1); return msgRender(); }
+  if (d.msgjob) { if (jobOf(d.msgjob)) return openDrawer('job', d.msgjob); ui.msgJob = d.msgjob; return msgRender(); }
+  if (d.msgdel) { if (!(await askDel('Удалить сообщение? Его не увидит никто из участников чата.'))) return; try { MSGS = await api('DELETE', '/api/msgs/' + d.msgdel); ui.msgsLast = null; msgRedraw(); toast('Сообщение удалено'); } catch(err) { toast(errText(err)); } return; }
+});
+document.addEventListener('change', async e => {
+  if (ui.view !== 'msgs') return; const t = e.target, d = t.dataset || {};
+  if (d.msgjobsel != null) { ui.msgJobSel = t.value; return; }
+  if (d.msgfilter != null) { ui.msgJob = t.value; return msgRedraw(); }
+  if (d.msgup != null) { const tx = $('msgText'); if (tx) ui.msgDraft = tx.value; ui.msgFiles = ui.msgFiles || [];
+    for (const f of t.files) { if (ui.msgFiles.length >= 20) { toast('Не больше 20 файлов в сообщении'); break; }
+      try { toast('Загрузка «' + f.name + '»…'); const r = await upload(f); ui.msgFiles.push({ id: r.id, name: r.name, type: f.type || '', size: r.size }); } catch(err) { toast(errText(err)); } }
+    t.value = ''; msgRender(); }
+});
+document.addEventListener('input', e => { if (ui.view !== 'msgs') return; if (e.target.dataset?.msgq != null) { ui.msgQ = e.target.value; msgRedraw(); } else if (e.target.id === 'msgText') ui.msgDraft = e.target.value; });
+document.addEventListener('keydown', e => { if (ui.view === 'msgs' && e.target.id === 'msgText' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); msgSend(); } });
+// a photo pasted from the clipboard into the message field
+document.addEventListener('paste', async e => { if (ui.view !== 'msgs' || e.target.id !== 'msgText') return; const fs = [...(e.clipboardData?.files || [])]; if (!fs.length) return; e.preventDefault(); ui.msgDraft = e.target.value; ui.msgFiles = ui.msgFiles || [];
+  for (const f of fs) try { const r = await upload(f); ui.msgFiles.push({ id: r.id, name: r.name, type: f.type || '', size: r.size }); } catch(err) { toast(errText(err)); } msgRender(); $('msgText')?.focus(); });
+
 function vProdScr(){
   const F = ui.psF || 'active', q = (ui.psq || '').trim().toLowerCase();
   const all = psJobs().filter(j => ['prod', 'both'].includes(j.kind) && psOrd(j.orderId));
@@ -9665,6 +9806,7 @@ function route(){
     setTimeout(() => { if (eqOf(id)) { ui.reqEq = id; openDrawer('reqForm'); } else toast('Оборудование не найдено или закреплено за другим пользователем'); }, 600); }
   const h = /^eq-/.test(h0) ? 'req' : h0;
   ui.view = me?.sys ? (['orgs', 'server', 'trials'].includes(h) ? h : 'orgs')
+    : h === 'msgs' && tabOpen('msgs') ? 'msgs'
     : ipMode() ? (ipNav().includes(h) ? h : 'ipc')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
@@ -9678,6 +9820,7 @@ function route(){
   }
   if (ui.view === 'server') loadStats();
   if (ui.view === 'users' && !ui.usersList) loadUsers();
+  if (ui.view === 'msgs') msgLoad();
   if (ui.view === 'admFiles') ui.admFiles = null;
   if (ui.view === 'orgs') loadOrgs();
   if (ui.view === 'dt' && !DT.loaded) loadDt();
@@ -9788,7 +9931,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs', 'prodscr'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
+    a.hidden = v === 'msgs' ? !!u.sys || !tabOpen('msgs') : u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs', 'prodscr'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
   ['orgsTab', 'serverTab', 'trialsTab'].forEach(id => { const t = $(id); if (t && !u.sys) t.hidden = true; });   // the tabs of the system administrator — only his
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (transMode() && !isWorker()) { const st = document.querySelector('#views a[data-v=stock]'); if (st) st.href = '#cps'; }
@@ -9803,6 +9946,7 @@ async function start(u){
   ui.usersList = null; userDataReset(); ui.vShow = {};
   $('loginView').hidden = true; $('app').hidden = false;
   IP = null; route(); chatLoad().then(() => { ui.chatN = CHAT?.unread || 0; });
+  ui.msgsN = null; ui.msgsLast = null; MSGS = null; if (!u.sys) msgLoad();
   if (u.sys) { mode = 'live'; render(); }
   else try { await refresh(); } catch(e) { $('banner').hidden = false; $('banner').textContent = errText(e); }
   clearInterval(poll);
@@ -9816,6 +9960,8 @@ async function start(u){
       // a new message: the counters, a notice, and the open conversation shows it at once
       if ((r.chat || 0) !== (ui.chatN || 0)) { if ((r.chat || 0) > (ui.chatN || 0) && ui.chatN != null) toast('✉ Новое сообщение — откройте меню пользователя'); ui.chatN = r.chat || 0; chatLoad(); }
       if (ui.drawer?.kind === 'chat' && ui.drawer.id) chatThread(ui.drawer.id, true);
+      // «Сообщения»: a new or deleted message — reload them; a notice for a new one when the tab is not open
+      if (!me.sys && ((r.msgs || 0) !== (ui.msgsN ?? -1) || (r.msgsLast || '') !== (ui.msgsLast ?? null))) { if ((r.msgs || 0) > (ui.msgsN || 0) && ui.msgsN != null && ui.view !== 'msgs') toast('💬 Новое сообщение — вкладка «Сообщения»'); ui.msgsLast = r.msgsLast || ''; await msgLoad(); }
       if (me.sys) { if (ui.view === 'server') loadStats();
         if (r.trials !== undefined) { if (ui.trialsN != null && r.trials > ui.trialsN) { toast('Новый запрос пробного доступа'); TRIALS = null; if (ui.view === 'trials') render(); } ui.trialsN = r.trials; trialsBadge(r.trials); } }
       else if (r.rev !== rev) await refresh();
