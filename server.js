@@ -2781,10 +2781,15 @@ async function api(req, res, url) {
     if (col === 'tasks') data.vehicles = taskVehicles(data.vehicles);
     if (col === 'invoices') {
       // an invoice belongs to an order, or to a work (a mounting work has no order); a work with production gives its order
+      if (INV_FOR[data.forKind]) {
+        data.forNote = String(data.forNote || '').trim().slice(0, 300);
+        if ((data.forKind === 'dev' || data.forKind === 'other') && !data.forNote) return fail(res, 400, data.forKind === 'dev' ? 'Укажите, какое изделие разрабатывается' : 'Укажите, для чего закупка');
+        data.orderId = null; data.jobId = null;
+      } else { delete data.forKind; delete data.forNote; }
       const job = data.jobId && db.jobs[data.jobId]; if (!job) data.jobId = null;
-      if (!data.orderId && job && job.orderId && db.orders[job.orderId]) data.orderId = job.orderId;
+      if (data.forKind) {} else if (!data.orderId && job && job.orderId && db.orders[job.orderId]) data.orderId = job.orderId;
       if (data.orderId && !db.orders[data.orderId]) return fail(res, 400, 'Заказ не найден');
-      if (!data.orderId && !job) return fail(res, 400, 'Выберите заказ или работу');
+      if (!data.orderId && !job && !data.forKind) return fail(res, 400, 'Выберите, для чего закупка');
       if (!data.orderId) data.orderId = null;
       data.projectId = data.orderId ? db.orders[data.orderId].projectId || null : null;
       data.status = 'topay'; [...PAY_FIELDS.slice(1), ...SEEN_FIELDS].forEach(f => delete data[f]);
@@ -2867,7 +2872,14 @@ async function api(req, res, url) {
     if (payKeys.length && !canPay(user)) return fail(res, 403, 'Отмечать оплату может только бухгалтер или администратор');
     const mayEdit = canEdit(user) || (col === 'invoices' && ownsInvoice(user, db[col][id]));
     if (keys.length > payKeys.length && !mayEdit) return fail(res, 403, 'Недостаточно прав');
-    if (col === 'invoices' && (patch.orderId !== undefined || patch.jobId !== undefined)) {
+    if (col === 'invoices' && patch.forKind !== undefined) {
+      if (INV_FOR[patch.forKind]) {
+        patch.forNote = String(patch.forNote ?? db[col][id].forNote ?? '').trim().slice(0, 300);
+        if ((patch.forKind === 'dev' || patch.forKind === 'other') && !patch.forNote) return fail(res, 400, patch.forKind === 'dev' ? 'Укажите, какое изделие разрабатывается' : 'Укажите, для чего закупка');
+        patch.orderId = null; patch.jobId = null; patch.projectId = null;
+      } else { patch.forKind = null; patch.forNote = ''; if (!patch.orderId && !patch.jobId) return fail(res, 400, 'Выберите, для чего закупка'); }
+    }
+    if (col === 'invoices' && !INV_FOR[patch.forKind] && (patch.orderId !== undefined || patch.jobId !== undefined)) {
       if (patch.jobId !== undefined && patch.jobId && !db.jobs[patch.jobId]) return fail(res, 400, 'Работа не найдена');
       const jobId = patch.jobId !== undefined ? patch.jobId || null : db[col][id].jobId || null;
       if (patch.jobId !== undefined) patch.jobId = jobId;
@@ -3487,6 +3499,10 @@ function crc32(buf) {
 const safeName = s => String(s || '').replace(/[\\/:*?"<>|\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'без названия';
 function writeAsync(res, buf) { return new Promise(r => { if (res.write(buf)) r(); else res.once('drain', r); }); }
 
+/* «Закупка для»: besides an order or a work an invoice may be for the household needs, the development of a product (which one),
+   equipment and tools, or something else (what exactly) */
+const INV_FOR = { house: 'Хозяйственные нужды', dev: 'Разработка изделия', equip: 'Оборудование и инструмент', other: 'Иное' };
+const invForLabel = i => INV_FOR[i.forKind] ? INV_FOR[i.forKind] + (i.forNote ? ': ' + i.forNote : '') : '';
 async function sendInvoicesZip(res, user, orderFilter) {
   const list = Object.entries(db.invoices).map(([id, i]) => ({ id, ...i }))
     .filter(i => i.status === 'topay' && (!orderFilter || i.orderId === orderFilter))
@@ -3531,7 +3547,7 @@ async function sendInvoicesZip(res, user, orderFilter) {
 
   for (const i of list) {
     const o = db.orders[i.orderId] || {};
-    const folder = safeName(`Заказ ${o.number || '—'} ${o.title || ''}`);
+    const folder = safeName(INV_FOR[i.forKind] ? INV_FOR[i.forKind] : `Заказ ${o.number || '—'} ${o.title || ''}`);
     let inZip = 'нет файла';
     const meta = i.file && db.files[i.file.id];
     if (meta) {
@@ -3546,7 +3562,7 @@ async function sendInvoicesZip(res, user, orderFilter) {
       } else inZip = 'файл не найден на сервере';
     }
     total += Number(i.amount) || 0;
-    rows.push([`${o.number || ''} ${o.title || ''}${o.orderNo ? ` (заказ № ${o.orderNo})` : ''}`.trim(), o.billNo ? `№ ${o.billNo}${o.billDate ? ' от ' + fmtD(o.billDate) : ''}` : '',
+    rows.push([INV_FOR[i.forKind] ? invForLabel(i) : `${o.number || ''} ${o.title || ''}${o.orderNo ? ` (заказ № ${o.orderNo})` : ''}`.trim(), o.billNo ? `№ ${o.billNo}${o.billDate ? ' от ' + fmtD(o.billDate) : ''}` : '',
       i.number, fmtD(i.date), i.supplier, i.purpose, money(i.amount), fmtD(i.due), inZip]);
   }
   rows.push(['Итого', '', '', '', '', '', money(total), '', '']);
