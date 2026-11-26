@@ -31,6 +31,7 @@ th{position:sticky;top:0;background:var(--sheet);font-size:12px;color:var(--ink2
 td{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}
 mark{background:var(--hit);color:inherit;border-radius:3px}
 tr:last-child td{border-bottom:0}
+.no{color:var(--ink2);text-align:right;width:1%}
 .empty{padding:30px;text-align:center;color:var(--ink2)}
 @media (max-width:600px){th,td{padding:6px 8px}td{font-size:13px}}
 </style>
@@ -52,7 +53,7 @@ tr:last-child td{border-bottom:0}
       <a class="btn primary" id="xl" href="/api/sn-guest/xlsx" download>⬇ Скачать Excel</a>
     </div>
     <p class="muted" id="cnt" style="margin:0 0 8px"></p>
-    <div class="wrap"><table><thead><tr><th>IMEI</th><th>SN</th><th>ICCID</th><th>IP-адрес</th></tr></thead><tbody id="tb"></tbody></table></div>
+    <div class="wrap"><table><thead><tr><th class="no">№</th><th>IMEI</th><th>SN</th><th>ICCID</th><th>IP-адрес</th></tr></thead><tbody id="tb"></tbody></table></div>
   </section>
 </main>
 <script>
@@ -65,7 +66,7 @@ async function call(m, url, body){
 }
 function showLogin(msg){ $('app').hidden = true; $('loginForm').hidden = false; $('lerr').textContent = msg || ''; $('lg').focus(); clearInterval(timer); }
 async function load(){
-  try { const d = await call('GET', '/api/sn-guest/list'); ITEMS = d.items || []; $('org').textContent = 'Модемы — ' + d.org; document.title = 'Модемы — ' + d.org;
+  try { const d = await call('GET', '/api/sn-guest/list'); ITEMS = (d.items || []).map((x, i) => ({ ...x, no: i + 1 })); $('org').textContent = 'Модемы — ' + d.org; document.title = 'Модемы — ' + d.org;
     $('loginForm').hidden = true; $('app').hidden = false; draw(); }
   catch(e) { if (e.status === 401) showLogin(e.message === 'Войдите' ? '' : e.message); else { $('cnt').textContent = e.message; } }
 }
@@ -76,8 +77,8 @@ function draw(){
   $('cnt').textContent = q ? `Найдено: ${L.length} из ${ITEMS.length}` : `Всего записей: ${ITEMS.length}`;
   $('xl').href = '/api/sn-guest/xlsx' + (q ? '?q=' + encodeURIComponent(q) : '');
   $('xl').textContent = q ? '⬇ Скачать найденное в Excel' : '⬇ Скачать Excel';
-  $('tb').innerHTML = L.length ? L.slice(0, 3000).map(x => `<tr><td>${mark(x.imei, q)}</td><td>${mark(x.sn, q)}</td><td>${mark(x.iccid, q)}</td><td>${mark(x.ip, q)}</td></tr>`).join('') + (L.length > 3000 ? `<tr><td colspan="4" class="empty">Показаны первые 3000 — уточните поиск или скачайте Excel</td></tr>` : '')
-    : `<tr><td colspan="4" class="empty">${q ? 'Ничего не найдено' : 'Записей пока нет'}</td></tr>`;
+  $('tb').innerHTML = L.length ? L.slice(0, 3000).map(x => `<tr><td class="no">${x.no}</td><td>${mark(x.imei, q)}</td><td>${mark(x.sn, q)}</td><td>${mark(x.iccid, q)}</td><td>${mark(x.ip, q)}</td></tr>`).join('') + (L.length > 3000 ? `<tr><td colspan="5" class="empty">Показаны первые 3000 — уточните поиск или скачайте Excel</td></tr>` : '')
+    : `<tr><td colspan="5" class="empty">${q ? 'Ничего не найдено' : 'Записей пока нет'}</td></tr>`;
 }
 $('q').addEventListener('input', draw);
 $('loginForm').addEventListener('submit', async e => { e.preventDefault(); $('lerr').textContent = '';
