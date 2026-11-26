@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Модемы</title>
+<style>
+:root{--bg:#F4F6F5;--sheet:#fff;--ink:#1A2230;--ink2:#556071;--rule:#DBE0E3;--rule2:#ECEFF1;--acc:#2F5BEA;--bad:#C62828;--hit:#FFF3B0}
+@media (prefers-color-scheme:dark){:root{--bg:#11151B;--sheet:#181E26;--ink:#E6EAF0;--ink2:#9AA5B4;--rule:#2C343F;--rule2:#222932;--acc:#6C8CFF;--bad:#FF6B6B;--hit:#5A4B00}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;margin:0}
+.muted{color:var(--ink2)}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:16px}
+.login{max-width:360px;margin:12vh auto 0;display:flex;flex-direction:column;gap:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink2)}
+input{font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:9px 11px;width:100%}
+input:focus{outline:2px solid var(--acc);outline-offset:-1px}
+button,.btn{font:inherit;font-weight:600;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:8px;padding:9px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.err{color:var(--bad);min-height:1.2em;font-size:14px}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.top h1{flex:1;min-width:180px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input{flex:1;min-width:200px;font-size:16px}
+.wrap{overflow-x:auto;background:var(--sheet);border:1px solid var(--rule);border-radius:12px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 12px;border-bottom:1px solid var(--rule2);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--sheet);font-size:12px;color:var(--ink2);text-transform:uppercase;letter-spacing:.04em}
+td{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}
+mark{background:var(--hit);color:inherit;border-radius:3px}
+tr:last-child td{border-bottom:0}
+.empty{padding:30px;text-align:center;color:var(--ink2)}
+@media (max-width:600px){th,td{padding:6px 8px}td{font-size:13px}}
+</style>
+</head>
+<body>
+<main>
+  <form class="card login" id="loginForm" hidden>
+    <h1>Таблица модемов</h1>
+    <p class="muted" style="margin:0">Войдите по логину и паролю, которые вам выдали.</p>
+    <label>Логин<input id="lg" autocomplete="username" autocapitalize="none" required></label>
+    <label>Пароль<input id="pw" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lerr"></div>
+    <button class="primary" type="submit">Войти</button>
+  </form>
+  <section id="app" hidden>
+    <div class="top"><h1 id="org">Модемы</h1><button id="out" type="button">Выйти</button></div>
+    <div class="bar">
+      <input id="q" type="search" placeholder="Быстрый поиск: IMEI, SN, ICCID или IP-адрес" autocomplete="off" aria-label="Поиск">
+      <a class="btn primary" id="xl" href="/api/sn-guest/xlsx" download>⬇ Скачать Excel</a>
+    </div>
+    <p class="muted" id="cnt" style="margin:0 0 8px"></p>
+    <div class="wrap"><table><thead><tr><th>IMEI</th><th>SN</th><th>ICCID</th><th>IP-адрес</th></tr></thead><tbody id="tb"></tbody></table></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+let ITEMS = [], timer = null;
+async function call(m, url, body){
+  const r = await fetch(url, { method: m, headers: body ? { 'Content-Type': 'application/json', 'X-Sed': '1' } : { 'X-Sed': '1' }, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw { status: r.status, message: j.error || 'Ошибка ' + r.status }; return j;
+}
+function showLogin(msg){ $('app').hidden = true; $('loginForm').hidden = false; $('lerr').textContent = msg || ''; $('lg').focus(); clearInterval(timer); }
+async function load(){
+  try { const d = await call('GET', '/api/sn-guest/list'); ITEMS = d.items || []; $('org').textContent = 'Модемы — ' + d.org; document.title = 'Модемы — ' + d.org;
+    $('loginForm').hidden = true; $('app').hidden = false; draw(); }
+  catch(e) { if (e.status === 401) showLogin(e.message === 'Войдите' ? '' : e.message); else { $('cnt').textContent = e.message; } }
+}
+const norm = v => String(v || '').toUpperCase().replace(/\s+/g, '');
+function mark(v, q){ const s = String(v || ''); if (!q) return esc(s); const i = s.toUpperCase().indexOf(q); return i < 0 ? esc(s) : esc(s.slice(0, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length)); }
+function draw(){
+  const q = norm($('q').value), L = q ? ITEMS.filter(x => [x.imei, x.sn, x.iccid, x.ip].some(v => norm(v).includes(q))) : ITEMS;
+  $('cnt').textContent = q ? `Найдено: ${L.length} из ${ITEMS.length}` : `Всего записей: ${ITEMS.length}`;
+  $('xl').href = '/api/sn-guest/xlsx' + (q ? '?q=' + encodeURIComponent(q) : '');
+  $('xl').textContent = q ? '⬇ Скачать найденное в Excel' : '⬇ Скачать Excel';
+  $('tb').innerHTML = L.length ? L.slice(0, 3000).map(x => `<tr><td>${mark(x.imei, q)}</td><td>${mark(x.sn, q)}</td><td>${mark(x.iccid, q)}</td><td>${mark(x.ip, q)}</td></tr>`).join('') + (L.length > 3000 ? `<tr><td colspan="4" class="empty">Показаны первые 3000 — уточните поиск или скачайте Excel</td></tr>` : '')
+    : `<tr><td colspan="4" class="empty">${q ? 'Ничего не найдено' : 'Записей пока нет'}</td></tr>`;
+}
+$('q').addEventListener('input', draw);
+$('loginForm').addEventListener('submit', async e => { e.preventDefault(); $('lerr').textContent = '';
+  try { await call('POST', '/api/sn-guest/login', { login: $('lg').value, password: $('pw').value }); $('pw').value = ''; await load(); clearInterval(timer); timer = setInterval(() => { if (!document.hidden) load(); }, 60000); }
+  catch(err) { $('lerr').textContent = err.message; } });
+$('out').addEventListener('click', async () => { try { await call('POST', '/api/sn-guest/logout'); } catch(e) {} ITEMS = []; $('tb').innerHTML = ''; showLogin(''); });
+load().then(() => { if (!$('app').hidden) timer = setInterval(() => { if (!document.hidden) load(); }, 60000); });
+</script>
+</body>
+</html>
