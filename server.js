@@ -1494,6 +1494,19 @@ async function api(req, res, url) {
     const pub = x => ({ id: x.id, imei: x.imei, sn: x.sn, iccid: x.iccid, ip: x.ip || '', at: x.at, by: x.by, updatedAt: x.updatedAt || null });
     const dup = (k, v, self) => v && L.find(e => e !== self && e[k] === v);
     if (m === 'GET' && !p[2]) return send(res, 200, { list: L.map(pub) });
+    // «Гостевая страница»: /comm with a login and a password of its own, for people outside the system (only IMEI, SN, ICCID, IP-адрес)
+    if (p[2] === 'guest') {
+      if (!HEAD(user)) return fail(res, 403, 'Гостевую страницу настраивает руководитель или администратор');
+      const info = () => { const G = db.snmapGuest; return G && G.hash ? { enabled: true, login: G.login, at: G.at, by: G.by, lastAt: G.lastAt || null, lastIp: G.lastIp || '' } : { enabled: false }; };
+      if (m === 'GET') return send(res, 200, info());
+      if (m === 'POST') { const b = await readJsonBody(req) || {}, login = String(b.login || '').trim().toLowerCase(), pw = String(b.password || '');
+        if (!/^[a-z0-9._-]{3,40}$/.test(login)) return fail(res, 400, 'Логин: 3–40 латинских букв, цифр, точек, дефисов');
+        if (pw.length < 4 || pw.length > 100) return fail(res, 400, 'Пароль — не короче 4 знаков');
+        const mine = ctx().id; for (const o of orgs) if (o.id !== mine) { const G = orgEntry(o.id).db.snmapGuest; if (G && G.login === login) return fail(res, 400, 'Такой логин гостевой страницы уже занят другой организацией'); }
+        db.snmapGuest = { login, ...hashPassword(pw), ver: crypto.randomBytes(6).toString('hex'), at: new Date().toISOString(), by: user.id }; saveDb(); return send(res, 200, info()); }
+      if (m === 'DELETE') { if (db.snmapGuest) { db.snmapGuest = null; saveDb(); } return send(res, 200, info()); }
+      return fail(res, 405, 'Метод не поддерживается');
+    }
     // «Доступ для другого сервера»: the manager turns it on, sees and copies the key, issues a new one or turns it off
     if (p[2] === 'api-key') {
       if (!HEAD(user)) return fail(res, 403, 'Доступ для другого сервера настраивает руководитель или администратор');
@@ -3649,7 +3662,7 @@ function serveFile(req, res, id) {
 }
 
 function serveStatic(req, res, pathname) {
-  let rel = pathname === '/' ? '/index.html' : pathname;
+  let rel = pathname === '/' ? '/index.html' : pathname === '/comm' || pathname === '/comm/' ? '/comm.html' : pathname;
   const fp = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^([/\\])+/, ''));
   if (!fp.startsWith(PUBLIC_DIR + path.sep)) return fail(res, 404, 'Не найдено');
   fs.readFile(fp, (err, buf) => {
@@ -3671,6 +3684,47 @@ const DEV_POWER = { 1: [false, false], 2: [true, true], 3: [false, true], 4: [tr
 /* the rows of «Этикетки для модемов» as JSON; the key goes in «Authorization: Bearer …» (or ?key=…); ?since=<time> — only rows added or changed after it */
 const snHash = t => crypto.createHash('sha256').update(String(t)).digest();
 const snRow = x => ({ imei: x.imei, sn: x.sn, iccid: x.iccid, ip: x.ip || '', at: x.at, updatedAt: x.updatedAt || x.at });
+/* the guest page /comm of «Этикетки для модемов»: a login and a password set by the manager of an organization (kept as a hash);
+   the guest sees only IMEI, SN, ICCID and IP-адрес of that organization, finds them and downloads Excel; a new password ends the old visits */
+const SNG_DAYS = 30;
+const sngCookie = (req, v, age) => `sng=${v}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${COOKIE_SECURE || (TRUST_PROXY && req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''}`;
+function sngSession(req) {
+  const m = /(?:^|;\s*)sng=([^;]+)/.exec(req.headers.cookie || ''); if (!m) return null;
+  const [orgId, exp, ver, sig] = m[1].split('.'); if (!sig) return null;
+  const want = Buffer.from(sign(`g.${orgId}.${exp}.${ver}`)), got = Buffer.from(sig);
+  if (want.length !== got.length || !crypto.timingSafeEqual(want, got) || Number(exp) < Date.now()) return null;
+  return { orgId, ver };
+}
+async function snGuest(req, res, url) {
+  const sub = url.pathname.split('/')[3] || '';
+  if (req.method !== 'GET' && req.headers['x-sed'] !== '1') return fail(res, 403, 'Запрос отклонён');
+  if (sub === 'login' && req.method === 'POST') {
+    const tk = 'sng|' + clientIp(req); if (throttled(tk)) return fail(res, 429, 'Слишком много неверных попыток. Подождите 10 минут.');
+    let b = {}; try { b = await readJsonBody(req) || {}; } catch { return fail(res, 400, 'Ожидается JSON'); }
+    const login = String(b.login || '').trim().toLowerCase(), pw = String(b.password || '');
+    for (const o of orgs) { const e = orgEntry(o.id), G = e.db.snmapGuest;
+      if (G && G.hash && G.login === login && checkPassword(G, pw)) {
+        const exp = Date.now() + SNG_DAYS * 864e5, body = `${o.id}.${exp}.${G.ver}`;
+        G.lastAt = new Date().toISOString(); G.lastIp = clientIp(req); writeJSON(e.file, e.db); e.stamp = stamp(e.file);
+        return send(res, 200, { ok: true, org: o.name }, { 'Set-Cookie': sngCookie(req, body + '.' + sign('g.' + body), SNG_DAYS * 86400) }); } }
+    (attempts.get(tk) || attempts.set(tk, []).get(tk)).push(Date.now()); return fail(res, 401, 'Неверный логин или пароль');
+  }
+  if (sub === 'logout') return send(res, 200, { ok: true }, { 'Set-Cookie': sngCookie(req, '', 0) });
+  const g = sngSession(req), o = g && orgById(g.orgId); if (!o) return fail(res, 401, 'Войдите');
+  return await als.run(orgEntry(g.orgId), async () => {
+    const G = db.snmapGuest; if (!G || G.ver !== g.ver) return fail(res, 401, 'Доступ изменён или выключен — войдите снова');
+    const st = orgState(o); if (st.blocked) return fail(res, 423, st.message);
+    const L = (Array.isArray(db.snmap) ? db.snmap : []).map(x => ({ imei: x.imei || '', sn: x.sn || '', iccid: x.iccid || '', ip: x.ip || '' }));
+    if (sub === 'list' && req.method === 'GET') return send(res, 200, { org: o.name, count: L.length, items: L });
+    if (sub === 'xlsx' && req.method === 'GET') {
+      const q = String(url.searchParams.get('q') || '').trim().toUpperCase().replace(/\s+/g, ''), R = q ? L.filter(x => [x.imei, x.sn, x.iccid, x.ip].some(v => String(v).toUpperCase().includes(q))) : L;
+      const buf = xlsxBuffer('Модемы', [['IMEI', 'SN', 'ICCID', 'IP-адрес'].map(v => ({ v, s: 1 })), ...R.map(x => [x.imei, x.sn, x.iccid, x.ip].map(v => ({ v, s: 2 })))], [20, 18, 24, 16]);
+      const name = `Модемы ${new Date().toISOString().slice(0, 10)}.xlsx`;
+      return send(res, 200, buf, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="modems.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}` });
+    }
+    return fail(res, 404, 'Не найдено');
+  });
+}
 async function snExport(req, res, url, o) {
   const st = orgState(o); if (st.blocked) return fail(res, 423, st.message);
   const A = db.snmapApi, m = String(req.headers.authorization || '').match(/^Bearer\s+(\S+)$/i), key = m ? m[1] : url.searchParams.get('key') || '';
@@ -3716,6 +3770,8 @@ function startServer() {
         if (!o || o.type !== 'requests' || !key) return fail(res, 404, 'Не найдено');
         return await als.run(orgEntry(orgId), async () => devIn(req, res, url, key));
       }
+      // the guest page of «Этикетки для модемов» (its own login, no session of the system)
+      if (url.pathname.startsWith('/api/sn-guest/')) return await snGuest(req, res, url);
       // «Этикетки для модемов» for another server: GET /api/sn-export/<organization> with the key of the organization (no session)
       if (url.pathname.startsWith('/api/sn-export/')) {
         const orgId = url.pathname.split('/')[3] || '', o = orgById(orgId);

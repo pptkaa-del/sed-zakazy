@@ -5562,6 +5562,7 @@ function vSnmap(){
     <div class="toolbar" style="margin-top:14px"><b>Записано: <span id="sn-cnt">${SNMAP.length}</span></b><span data-keep style="display:contents"><input class="in" id="snq" type="search" placeholder="Поиск по IMEI, SN, ICCID, IP" aria-label="Поиск" value="${esc(ui.snq || '')}" style="flex:1 1 200px;max-width:320px"></span>
       <button class="btn" data-act="snXlsx">⬇ Скачать Excel</button><button class="btn" data-act="snJson" title="Все записи в формате JSON">⬇ Скачать JSON</button></div>
     ${isHead() ? `<details class="card snapi" ${ui.snApiOpen ? 'open' : ''}><summary data-act="snApiToggle">🔌 Доступ для другого сервера (JSON по ссылке с ключом)</summary><div id="sn-api">${snApiHtml()}</div></details>` : ''}
+    ${isHead() ? `<details class="card snapi" ${ui.snGuestOpen ? 'open' : ''}><summary data-act="snGuestToggle">👁 Гостевая страница — просмотр таблицы по логину и паролю</summary><div id="sn-guest">${snGuestHtml()}</div></details>` : ''}
     <div id="sn-qr">${snQrHtml()}</div><div id="sn-tbl">${snTable()}</div>`;
 }
 const snPendHtml = () => ui.snPend ? `<div class="mono">IMEI: <b>${esc(ui.snPend.imei)}</b></div><div class="mono">SN: <b>${esc(ui.snPend.sn)}</b></div>${ui.snPend.iccid ? `<div class="mono">ICCID: <b>${esc(ui.snPend.iccid)}</b></div>` : ''}` : '';
@@ -5579,6 +5580,18 @@ function snApiHtml(){
     <div class="row-g" style="margin-top:8px">${armBtn('snApiNew', 'Выдать новый ключ', 'snApiOn', 'new', 'btn sm')}${armBtn('snApiOff', 'Выключить доступ', 'snApiOff', 'off', 'btn sm danger')}</div>
     <small class="dim">После нового ключа или выключения старый ключ перестаёт работать сразу.</small>`;
 }
+/* «Гостевая страница» /comm: people outside the system see IMEI, SN, ICCID, IP-адрес by a login and a password of their own */
+function snGuestHtml(){
+  const G = ui.snGuest; if (!G) return '<p class="dim">Загружаем…</p>'; if (G.err) return `<p class="err">${esc(G.err)}</p>`;
+  const url = location.origin + '/comm';
+  return `<p class="dim" style="margin:6px 0">Отдельная страница <a href="/comm" target="_blank" rel="noopener" class="mono">${esc(url)}</a> <button class="linkish" data-act="snGuestCopy" title="Скопировать адрес">📋</button> — без входа в систему, только таблица IMEI, SN, ICCID, IP-адрес с поиском и кнопкой «Скачать Excel». Ничего изменить там нельзя.</p>
+    ${G.enabled ? `<dl class="vkv snkv"><dt>Логин</dt><dd class="mono">${esc(G.login)}</dd><dt>Включено</dt><dd>${fmtDT(G.at)} · ${esc(who(G.by))}</dd><dt>Последний вход</dt><dd>${G.lastAt ? fmtDT(G.lastAt) + (G.lastIp ? ' · <span class="mono">' + esc(G.lastIp) + '</span>' : '') : '<span class="dim">ещё не входили</span>'}</dd></dl>` : '<p style="margin:6px 0"><b>Сейчас выключена.</b></p>'}
+    <div class="row-g" style="align-items:flex-end;flex-wrap:wrap;gap:8px" data-keep><label style="display:flex;flex-direction:column;font-size:13px">Логин<input class="in mono" id="sng-login" value="${esc(G.login || '')}" autocomplete="off" autocapitalize="none" style="width:160px"></label>
+      <label style="display:flex;flex-direction:column;font-size:13px">${G.enabled ? 'Новый пароль' : 'Пароль'}<input class="in mono" id="sng-pw" type="text" autocomplete="new-password" style="width:160px"></label>
+      <button class="btn sm primary" data-act="snGuestSave">${G.enabled ? 'Сохранить' : 'Включить'}</button>${G.enabled ? armBtn('snGuestOff', 'Выключить', 'snGuestOff', 'off', 'btn sm danger') : ''}</div>
+    <small class="dim">Пароль хранится в зашифрованном виде (его нельзя посмотреть — только задать новый). После смены пароля или выключения открытые гостевые страницы сразу просят войти снова.</small>`;
+}
+async function snGuestLoad(){ try { ui.snGuest = await api('GET', '/api/snmap/guest'); } catch(e) { ui.snGuest = { err: errText(e) }; } const b = $('sn-guest'); if (b) b.innerHTML = snGuestHtml(); }
 async function snApiLoad(){ try { ui.snApi = await api('GET', '/api/snmap/api-key'); } catch(e) { ui.snApi = { err: errText(e) }; } const b = $('sn-api'); if (b) b.innerHTML = snApiHtml(); }
 function snJson(){
   if (!SNMAP.length) return toast('Таблица пустая');
@@ -9025,6 +9038,11 @@ async function act(el){
     case 'snQrPng': { const x = SNMAP.find(e => e.id === id); if (!x) return; const a = document.createElement('a'); a.href = snCanvas(snQrText(x)).toDataURL('image/png'); a.download = `QR ${x.imei}.png`; document.body.appendChild(a); a.click(); a.remove(); return; }
     case 'snAll': ui.snAll = true; snRedraw(); return;
     case 'snJson': return snJson();
+    case 'snGuestToggle': ui.snGuestOpen = !el.closest('details')?.open; if (ui.snGuestOpen) snGuestLoad(); return;
+    case 'snGuestCopy': try { await navigator.clipboard.writeText(location.origin + '/comm'); toast('Адрес скопирован'); } catch(e) { toast(location.origin + '/comm'); } return;
+    case 'snGuestSave': { const login = $('sng-login').value.trim(), pw = $('sng-pw').value; if (!login || !pw) return toast('Укажите логин и пароль');
+      try { ui.snGuest = await api('POST', '/api/snmap/guest', { login, password: pw }); const b = $('sn-guest'); if (b) b.innerHTML = snGuestHtml(); toast('Гостевая страница включена — передайте адрес, логин и пароль'); } catch(e) { toast(errText(e)); } return; }
+    case 'snGuestOff': try { ui.snGuest = await api('DELETE', '/api/snmap/guest'); const b = $('sn-guest'); if (b) b.innerHTML = snGuestHtml(); toast('Гостевая страница выключена'); } catch(e) { toast(errText(e)); } return;
     case 'snApiToggle': ui.snApiOpen = !el.closest('details')?.open; if (ui.snApiOpen) snApiLoad(); return;
     case 'snApiShow': ui.snApiShow = !ui.snApiShow; { const b = $('sn-api'); if (b) b.innerHTML = snApiHtml(); } return;
     case 'snApiCopy': { const A = ui.snApi || {}, t = id === 'url' ? snApiUrl() : id === 'key' ? A.key : `curl -H "Authorization: Bearer ${A.key}" ${snApiUrl()}`; toast(await snCopyTxt(t) ? ({ url: 'Адрес', key: 'Ключ', curl: 'Команда' })[id] + ' скопирован' + (id === 'curl' ? 'а' : '') : 'Не удалось скопировать'); return; }
