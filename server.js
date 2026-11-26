@@ -3714,11 +3714,11 @@ async function snGuest(req, res, url) {
   return await als.run(orgEntry(g.orgId), async () => {
     const G = db.snmapGuest; if (!G || G.ver !== g.ver) return fail(res, 401, 'Доступ изменён или выключен — войдите снова');
     const st = orgState(o); if (st.blocked) return fail(res, 423, st.message);
-    const L = (Array.isArray(db.snmap) ? db.snmap : []).map(x => ({ imei: x.imei || '', sn: x.sn || '', iccid: x.iccid || '', ip: x.ip || '' }));
+    const L = (Array.isArray(db.snmap) ? db.snmap : []).map((x, i) => ({ no: i + 1, imei: x.imei || '', sn: x.sn || '', iccid: x.iccid || '', ip: x.ip || '' }));
     if (sub === 'list' && req.method === 'GET') return send(res, 200, { org: o.name, count: L.length, items: L });
     if (sub === 'xlsx' && req.method === 'GET') {
       const q = String(url.searchParams.get('q') || '').trim().toUpperCase().replace(/\s+/g, ''), R = q ? L.filter(x => [x.imei, x.sn, x.iccid, x.ip].some(v => String(v).toUpperCase().includes(q))) : L;
-      const buf = xlsxBuffer('Модемы', [['IMEI', 'SN', 'ICCID', 'IP-адрес'].map(v => ({ v, s: 1 })), ...R.map(x => [x.imei, x.sn, x.iccid, x.ip].map(v => ({ v, s: 2 })))], [20, 18, 24, 16]);
+      const buf = xlsxBuffer('Модемы', [['№', 'IMEI', 'SN', 'ICCID', 'IP-адрес'].map(v => ({ v, s: 1 })), ...R.map(x => [x.no, x.imei, x.sn, x.iccid, x.ip].map(v => ({ v, s: 2 })))], [7, 20, 18, 24, 16]);
       const name = `Модемы ${new Date().toISOString().slice(0, 10)}.xlsx`;
       return send(res, 200, buf, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="modems.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}` });
     }
