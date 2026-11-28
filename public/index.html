@@ -3436,16 +3436,33 @@ function calcRun(final){
 const EL_S = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300];
 const EL_RHO = { cu: 0.0175, al: 0.028 };   // Ом·мм²/м
 const EL_X = 0.00008;                      // Ом/м — the inductive resistance of a cable (0,08 Ом/км)
-const elDef = { ph: '1', u1: 230, u3: 400, mat: 'cu', mode: 'given', s: 2.5, lim: 5, n: 1, d: 0, p: 1, l: 50, cos: 0.95 };
+const elDef = { dist: 'ph', ph: '1', u1: 230, u3: 400, mat: 'cu', mode: 'given', s: 2.5, lim: 5, n: 1, d: 0, p: 1, l: 50, cos: 0.95 };
 const elV = k => calcSt.el?.[k] ?? elDef[k];
 function elDrop(o, S){
-  const U = o.ph === '3' ? o.u3 : o.u1, k = o.ph === '3' ? Math.sqrt(3) : 2, cos = Math.min(1, Math.max(0.1, o.cos)), sin = Math.sqrt(1 - cos * cos);
-  const I1 = (o.p * 1000) / ((o.ph === '3' ? Math.sqrt(3) : 1) * U * cos), r = EL_RHO[o.mat] / S;
-  let dU = 0; const pts = [];
-  for (let i = 0; i < o.n; i++) { const len = i === 0 ? o.l : o.d, cur = I1 * (o.n - i); dU += k * cur * (r * len * cos + EL_X * len * sin); pts.push({ no: i + 1, at: o.l + o.d * i, u: U - dU, pct: dU / U * 100 }); }
-  return { U, dU, pct: dU / U * 100, uEnd: U - dU, I: I1 * o.n, I1, pts, len: o.l + o.d * Math.max(0, o.n - 1) };
+  const cos = Math.min(1, Math.max(0.1, o.cos)), sin = Math.sqrt(1 - cos * cos), r = EL_RHO[o.mat] / S, len = i => i === 0 ? o.l : o.d, pts = [];
+  // three phases, single-phase consumers in turn on A, B, C, A…: phasors of the currents; the neutral carries their sum
+  if (o.ph === '3' && o.dist === 'ph') {
+    const U = o.u3 / Math.sqrt(3), I1 = (o.p * 1000) / (U * cos), phi = Math.acos(cos), th = [0, -2 * Math.PI / 3, 2 * Math.PI / 3], PH = ['A', 'B', 'C'];
+    const D = [[0, 0], [0, 0], [0, 0]], N = [0, 0]; let head = null;
+    for (let i = 0; i < o.n; i++) {
+      const Z = [r * len(i), EL_X * len(i)], cnt = [0, 0, 0]; for (let j = i; j < o.n; j++) cnt[j % 3]++;
+      const I = cnt.map((c, x) => [c * I1 * Math.cos(th[x] - phi), c * I1 * Math.sin(th[x] - phi)]), In = [I[0][0] + I[1][0] + I[2][0], I[0][1] + I[1][1] + I[2][1]];
+      const zm = c => [Z[0] * c[0] - Z[1] * c[1], Z[0] * c[1] + Z[1] * c[0]];
+      I.forEach((c, x) => { const d = zm(c); D[x][0] += d[0]; D[x][1] += d[1]; }); { const d = zm(In); N[0] += d[0]; N[1] += d[1]; }
+      if (!head) head = { cnt, In: Math.hypot(In[0], In[1]) };
+      const x = i % 3, re = U * Math.cos(th[x]) - D[x][0] - N[0], im = U * Math.sin(th[x]) - D[x][1] - N[1], u = Math.hypot(re, im);
+      pts.push({ no: i + 1, at: o.l + o.d * i, u, pct: (U - u) / U * 100, ph: PH[x] });
+    }
+    const last = pts[pts.length - 1], worst = pts.reduce((a, b) => b.pct > a.pct ? b : a, pts[0]);
+    return { U: Math.round(U * 10) / 10, dU: U - last.u, pct: worst.pct, lastPct: last.pct, uEnd: last.u, worst, I: Math.max(...head.cnt) * I1, IN: head.In, cnt: head.cnt, I1, pts, len: o.l + o.d * Math.max(0, o.n - 1), dist: true };
+  }
+  const U = o.ph === '3' ? o.u3 : o.u1, k = o.ph === '3' ? Math.sqrt(3) : 2;
+  const I1 = (o.p * 1000) / ((o.ph === '3' ? Math.sqrt(3) : 1) * U * cos);
+  let dU = 0;
+  for (let i = 0; i < o.n; i++) { const cur = I1 * (o.n - i); dU += k * cur * (r * len(i) * cos + EL_X * len(i) * sin); pts.push({ no: i + 1, at: o.l + o.d * i, u: U - dU, pct: dU / U * 100 }); }
+  return { U, dU, pct: dU / U * 100, lastPct: dU / U * 100, uEnd: U - dU, I: I1 * o.n, I1, pts, len: o.l + o.d * Math.max(0, o.n - 1) };
 }
-function elInputs(){ const n = x => num(x); return { ph: elV('ph'), u1: n(elV('u1')) || 230, u3: n(elV('u3')) || 400, mat: elV('mat'), mode: elV('mode'), s: n(elV('s')) || 2.5, lim: n(elV('lim')) || 5,
+function elInputs(){ const n = x => num(x); return { ph: elV('ph'), dist: elV('dist'), u1: n(elV('u1')) || 230, u3: n(elV('u3')) || 400, mat: elV('mat'), mode: elV('mode'), s: n(elV('s')) || 2.5, lim: n(elV('lim')) || 5,
   n: Math.max(1, Math.min(1000, Math.round(n(elV('n')) || 1))), d: Math.max(0, n(elV('d'))), p: Math.max(0, n(elV('p'))), l: Math.max(0, n(elV('l'))), cos: n(elV('cos')) || 1 }; }
 function elResult(){
   const o = elInputs(); if (!(o.p > 0)) return '<p class="hint">Укажите мощность потребителя.</p>'; if (!(o.l > 0) && !(o.d > 0 && o.n > 1)) return '<p class="hint">Укажите длину трассы.</p>';
@@ -3454,11 +3471,13 @@ function elResult(){
     if (!f) { const r = elDrop(o, EL_S[EL_S.length - 1]); return `<div class="elres bad"><b>Даже сечение ${EL_S[EL_S.length - 1]} мм² не укладывается в ${o.lim} %</b> — потери ${r.pct.toFixed(2).replace('.', ',')} %. Уменьшите длину или нагрузку, разделите линию или поднимите напряжение.</div>`; }
     S = f; pick = `<div><small>Сечение кабеля (подобрано)</small><b>${String(S).replace('.', ',')} мм²</b><small>минимальное стандартное, при котором потери ≤ ${o.lim} %</small></div>`; }
   const r = elDrop(o, S), ok = r.pct <= 5 ? 'ok' : r.pct <= 10 ? 'warn' : 'bad', f2 = v => v.toFixed(2).replace('.', ',');
-  return `<div class="elres ${ok}">${pick}<div><small>Напряжение на конечном потребителе</small><b>${f2(r.uEnd)} В</b><small>из ${r.U} В · падение ${f2(r.dU)} В</small></div>
-      <div><small>Потери напряжения</small><b>${f2(r.pct)} %</b><small>${ok === 'ok' ? 'в пределах 5 %' : ok === 'warn' ? 'больше 5 %, но в пределах 10 %' : 'больше 10 % — недопустимо'}</small></div>
-      <div><small>Ток в начале линии</small><b>${f2(r.I)} А</b><small>${o.ph === '3' ? 'в фазе' : ''} · общая мощность ${f2(o.p * o.n)} кВт</small></div>
+  const wd = r.dist && r.worst.no !== o.n;
+  return `<div class="elres ${ok}">${pick}<div><small>Напряжение на конечном потребителе${r.dist ? ` (№ ${o.n}, фаза ${r.pts[o.n - 1].ph})` : ''}</small><b>${f2(r.uEnd)} В</b><small>из ${String(r.U).replace('.', ',')} В${r.dist ? ' (фазное)' : ''} · падение ${f2(r.dU)} В</small></div>
+      <div><small>Потери напряжения${wd ? ' на конечном' : ''}</small><b>${f2(r.lastPct)} %</b><small>${wd ? `наибольшие — ${f2(r.pct)} % у потребителя № ${r.worst.no} (фаза ${r.worst.ph})` : ok === 'ok' ? 'в пределах 5 %' : ok === 'warn' ? 'больше 5 %, но в пределах 10 %' : 'больше 10 % — недопустимо'}</small></div>
+      <div><small>Ток в начале линии</small><b>${f2(r.I)} А</b><small>${r.dist ? `в наиболее нагруженной фазе · в нуле ${f2(r.IN)} А` : o.ph === '3' ? 'в фазе' : ''} · общая мощность ${f2(o.p * o.n)} кВт</small></div>
+      ${r.dist ? `<div><small>Потребители по фазам</small><b>A ${r.cnt[0]} · B ${r.cnt[1]} · C ${r.cnt[2]}</b><small>однофазные, подключены по очереди: 1 — A, 2 — B, 3 — C, 4 — A…</small></div>` : ''}
       <div><small>Длина линии до конечного потребителя</small><b>${String(Math.round(r.len * 10) / 10).replace('.', ',')} м</b><small>${o.mat === 'cu' ? 'медь' : 'алюминий'}, ${String(S).replace('.', ',')} мм²</small></div></div>
-    ${o.n > 1 ? `<details class="elpts"><summary>Напряжение у каждого потребителя</summary><div class="tscroll"><table class="tbl esttbl"><thead><tr><th>№</th><th>От источника, м</th><th>Напряжение, В</th><th>Потери, %</th></tr></thead><tbody>${r.pts.map(x => `<tr><td>${x.no}</td><td class="mono">${String(Math.round(x.at * 10) / 10).replace('.', ',')}</td><td class="mono">${f2(x.u)}</td><td class="mono">${f2(x.pct)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}`;
+    ${o.n > 1 ? `<details class="elpts"><summary>Напряжение у каждого потребителя</summary><div class="tscroll"><table class="tbl esttbl"><thead><tr><th>№</th>${r.dist ? '<th>Фаза</th>' : ''}<th>От источника, м</th><th>Напряжение, В</th><th>Потери, %</th></tr></thead><tbody>${r.pts.map(x => `<tr><td>${x.no}</td>${r.dist ? `<td>${x.ph}</td>` : ''}<td class="mono">${String(Math.round(x.at * 10) / 10).replace('.', ',')}</td><td class="mono">${f2(x.u)}</td><td class="mono">${f2(x.pct)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}`;
 }
 function vCalcEl(){
   const sel = (k, opts) => `<select class="in" data-el="${k}">${opts.map(([v, l]) => `<option value="${v}" ${String(elV(k)) === String(v) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
@@ -3467,6 +3486,7 @@ function vCalcEl(){
   return `<div class="elbox"><h3>Потеря напряжения в линии переменного тока</h3>
     <div class="elform">
       <label>Сеть${sel('ph', [['1', 'Однофазная'], ['3', 'Трёхфазная']])}</label>
+      ${ph3 ? `<label>Потребители${sel('dist', [['ph', 'Однофазные, распределены по фазам'], ['3', 'Трёхфазные']])}</label>` : ''}
       <label>Напряжение сети${ph3 ? inp('u3', 'В') : inp('u1', 'В')}</label>
       <label>Материал жил${sel('mat', [['cu', 'Медь'], ['al', 'Алюминий']])}</label>
       <label>Сечение кабеля${sel('mode', [['given', 'Указать сечение'], ['calc', 'Рассчитать сечение']])}</label>
@@ -3478,7 +3498,7 @@ function vCalcEl(){
       <label>Коэффициент мощности cos φ${inp('cos', '')}</label>
     </div>
     <div id="elOut">${elResult()}</div>
-    <p class="hint">Считается по участкам: от источника до первого потребителя — ток всех потребителей, дальше на каждом участке — ток оставшихся. ΔU = ${ph3 ? '√3' : '2'}·I·(R·cos φ + X·sin φ); R = ρ·l/S (ρ: медь 0,0175, алюминий 0,028 Ом·мм²/м), X = 0,08 Ом/км. Мощность — активная, нагрузка ${ph3 ? 'равномерная по фазам' : 'на одну фазу'}. Нагрев кабеля и допустимый ток здесь не проверяются.</p></div>`;
+    <p class="hint">Считается по участкам: от источника до первого потребителя — ток всех потребителей, дальше на каждом участке — ток оставшихся. ${ph3 && elV('dist') === 'ph' ? 'Трёхфазная сеть с однофазными потребителями: каждый потребитель подключён между своей фазой и нулём (фазное напряжение = линейное / √3), потребители идут по очереди на фазы A, B, C; токи фаз складываются как векторы, ток нуля — их сумма, падение напряжения в нуле учитывается (сечение нуля — как у фазы). Ток считается при номинальном напряжении.' : `ΔU = ${ph3 ? '√3' : '2'}·I·(R·cos φ + X·sin φ). Нагрузка ${ph3 ? 'трёхфазная, равномерная по фазам' : 'на одну фазу'}.`} R = ρ·l/S (ρ: медь 0,0175, алюминий 0,028 Ом·мм²/м), X = 0,08 Ом/км, мощность — активная. Нагрев кабеля и допустимый ток здесь не проверяются.</p></div>`;
 }
 function vCalc(){
   const t = calcSt.tab === 'el' ? 'el' : 'basic';
