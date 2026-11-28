@@ -3436,13 +3436,15 @@ function calcRun(final){
 const EL_S = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300];
 const EL_RHO = { cu: 0.0175, al: 0.028 };   // Ом·мм²/м
 const EL_X = 0.00008;                      // Ом/м — the inductive resistance of a cable (0,08 Ом/км)
-const elDef = { dist: 'ph', ph: '1', u1: 230, u3: 400, mat: 'cu', mode: 'given', s: 2.5, lim: 5, n: 1, d: 0, p: 1, l: 50, cos: 0.95 };
+const elDef = { dist: 'ph', ph: '1', u1: 230, u3: 400, mat: 'cu', mode: 'given', s: 2.5, lim: 5, n: 1, d: 0, p: 1000, l: 50, cos: 0.95 };
 const elV = k => calcSt.el?.[k] ?? elDef[k];
+// the power was in kW before: the kept value becomes watts once
+if (calcSt.el && calcSt.el.p != null && !calcSt.el.pW) { calcSt.el.p = String(Math.round(num(calcSt.el.p) * 1000)); calcSt.el.pW = 1; calcKeep(); }
 function elDrop(o, S){
   const cos = Math.min(1, Math.max(0.1, o.cos)), sin = Math.sqrt(1 - cos * cos), r = EL_RHO[o.mat] / S, len = i => i === 0 ? o.l : o.d, pts = [];
   // three phases, single-phase consumers in turn on A, B, C, A…: phasors of the currents; the neutral carries their sum
   if (o.ph === '3' && o.dist === 'ph') {
-    const U = o.u3 / Math.sqrt(3), I1 = (o.p * 1000) / (U * cos), phi = Math.acos(cos), th = [0, -2 * Math.PI / 3, 2 * Math.PI / 3], PH = ['A', 'B', 'C'];
+    const U = o.u3 / Math.sqrt(3), I1 = o.p / (U * cos), phi = Math.acos(cos), th = [0, -2 * Math.PI / 3, 2 * Math.PI / 3], PH = ['A', 'B', 'C'];
     const D = [[0, 0], [0, 0], [0, 0]], N = [0, 0]; let head = null;
     for (let i = 0; i < o.n; i++) {
       const Z = [r * len(i), EL_X * len(i)], cnt = [0, 0, 0]; for (let j = i; j < o.n; j++) cnt[j % 3]++;
@@ -3457,7 +3459,7 @@ function elDrop(o, S){
     return { U: Math.round(U * 10) / 10, dU: U - last.u, pct: worst.pct, lastPct: last.pct, uEnd: last.u, worst, I: Math.max(...head.cnt) * I1, IN: head.In, cnt: head.cnt, I1, pts, len: o.l + o.d * Math.max(0, o.n - 1), dist: true };
   }
   const U = o.ph === '3' ? o.u3 : o.u1, k = o.ph === '3' ? Math.sqrt(3) : 2;
-  const I1 = (o.p * 1000) / ((o.ph === '3' ? Math.sqrt(3) : 1) * U * cos);
+  const I1 = o.p / ((o.ph === '3' ? Math.sqrt(3) : 1) * U * cos);
   let dU = 0;
   for (let i = 0; i < o.n; i++) { const cur = I1 * (o.n - i); dU += k * cur * (r * len(i) * cos + EL_X * len(i) * sin); pts.push({ no: i + 1, at: o.l + o.d * i, u: U - dU, pct: dU / U * 100 }); }
   return { U, dU, pct: dU / U * 100, lastPct: dU / U * 100, uEnd: U - dU, I: I1 * o.n, I1, pts, len: o.l + o.d * Math.max(0, o.n - 1) };
@@ -3474,7 +3476,7 @@ function elResult(){
   const wd = r.dist && r.worst.no !== o.n;
   return `<div class="elres ${ok}">${pick}<div><small>Напряжение на конечном потребителе${r.dist ? ` (№ ${o.n}, фаза ${r.pts[o.n - 1].ph})` : ''}</small><b>${f2(r.uEnd)} В</b><small>из ${String(r.U).replace('.', ',')} В${r.dist ? ' (фазное)' : ''} · падение ${f2(r.dU)} В</small></div>
       <div><small>Потери напряжения${wd ? ' на конечном' : ''}</small><b>${f2(r.lastPct)} %</b><small>${wd ? `наибольшие — ${f2(r.pct)} % у потребителя № ${r.worst.no} (фаза ${r.worst.ph})` : ok === 'ok' ? 'в пределах 5 %' : ok === 'warn' ? 'больше 5 %, но в пределах 10 %' : 'больше 10 % — недопустимо'}</small></div>
-      <div><small>Ток в начале линии</small><b>${f2(r.I)} А</b><small>${r.dist ? `в наиболее нагруженной фазе · в нуле ${f2(r.IN)} А` : o.ph === '3' ? 'в фазе' : ''} · общая мощность ${f2(o.p * o.n)} кВт</small></div>
+      <div><small>Ток в начале линии</small><b>${f2(r.I)} А</b><small>${r.dist ? `в наиболее нагруженной фазе · в нуле ${f2(r.IN)} А` : o.ph === '3' ? 'в фазе' : ''} · общая мощность ${Math.round(o.p * o.n).toLocaleString('ru-RU')} Вт</small></div>
       ${r.dist ? `<div><small>Потребители по фазам</small><b>A ${r.cnt[0]} · B ${r.cnt[1]} · C ${r.cnt[2]}</b><small>однофазные, подключены по очереди: 1 — A, 2 — B, 3 — C, 4 — A…</small></div>` : ''}
       <div><small>Длина линии до конечного потребителя</small><b>${String(Math.round(r.len * 10) / 10).replace('.', ',')} м</b><small>${o.mat === 'cu' ? 'медь' : 'алюминий'}, ${String(S).replace('.', ',')} мм²</small></div></div>
     ${o.n > 1 ? `<details class="elpts"><summary>Напряжение у каждого потребителя</summary><div class="tscroll"><table class="tbl esttbl"><thead><tr><th>№</th>${r.dist ? '<th>Фаза</th>' : ''}<th>От источника, м</th><th>Напряжение, В</th><th>Потери, %</th></tr></thead><tbody>${r.pts.map(x => `<tr><td>${x.no}</td>${r.dist ? `<td>${x.ph}</td>` : ''}<td class="mono">${String(Math.round(x.at * 10) / 10).replace('.', ',')}</td><td class="mono">${f2(x.u)}</td><td class="mono">${f2(x.pct)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}`;
@@ -3492,7 +3494,7 @@ function vCalcEl(){
       <label>Сечение кабеля${sel('mode', [['given', 'Указать сечение'], ['calc', 'Рассчитать сечение']])}</label>
       ${calc ? `<label>Допустимые потери${sel('lim', [['5', '5 %'], ['10', '10 %']])}</label>` : `<label>Сечение жилы${sel('s', EL_S.map(x => [x, String(x).replace('.', ',') + ' мм²']))}</label>`}
       <label>Количество потребителей${inp('n', 'шт', 'inputmode="numeric"')}</label>
-      <label>Мощность одного потребителя${inp('p', 'кВт')}</label>
+      <label>Мощность одного потребителя${inp('p', 'Вт')}</label>
       <label>Длина трассы до первого потребителя${inp('l', 'м')}</label>
       <label>Расстояние между потребителями${inp('d', 'м', elInputs().n > 1 ? '' : 'disabled title="Нужно, когда потребителей больше одного"')}</label>
       <label>Коэффициент мощности cos φ${inp('cos', '')}</label>
@@ -3515,7 +3517,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => { if (ui.view !== 'calc') return; const t = e.target;
   if (t.id === 'calcIn') return calcRun();
-  if (t.dataset?.el && t.tagName === 'INPUT') { calcSt.el = calcSt.el || {}; calcSt.el[t.dataset.el] = t.value; calcKeep(); const o = $('elOut'); if (o) o.innerHTML = elResult();
+  if (t.dataset?.el && t.tagName === 'INPUT') { calcSt.el = calcSt.el || {}; calcSt.el[t.dataset.el] = t.value; calcSt.el.pW = 1; calcKeep(); const o = $('elOut'); if (o) o.innerHTML = elResult();
     if (t.dataset.el === 'n') { const dd = document.querySelector('[data-el=d]'); if (dd) dd.disabled = !(num(t.value) > 1); } } });
 document.addEventListener('change', e => { if (ui.view !== 'calc') return; const t = e.target;
   if (t.dataset?.el && t.tagName === 'SELECT') { calcSt.el = calcSt.el || {}; calcSt.el[t.dataset.el] = t.value; calcKeep(); render(); } });
