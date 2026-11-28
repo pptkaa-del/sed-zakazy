@@ -1323,6 +1323,17 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 .estpickl{position:absolute;z-index:20;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);padding:6px 10px;max-height:260px;overflow:auto;min-width:260px;display:flex;flex-direction:column;gap:4px}
 .estpickl .chk{display:flex;flex-direction:row;justify-content:flex-start;gap:6px;align-items:center;font-size:14px;text-align:left}.estpickl .chk input{width:auto;flex:none;margin:0}
 @media (max-width:700px){.estonly{margin-left:0}.estnum{width:58px}.esttbl:not(.estdb) th:nth-child(1),.esttbl:not(.estdb) td:nth-child(1),.esttbl:not(.estdb) th:nth-child(5),.esttbl:not(.estdb) td:nth-child(5){display:none}.esttbl th,.esttbl td{padding:4px 4px}.estm td:nth-child(2){padding-left:10px}.estbox{padding:8px}.estm select{min-width:110px}}
+.calcbox{max-width:420px;background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:12px;padding:14px}
+.calcscr{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.calcscr input{font-size:20px;text-align:right;width:100%}.calcscr output{text-align:right;font-size:26px;font-weight:700;min-height:34px;word-break:break-all}
+.calckeys{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.calckeys .btn{justify-content:center;font-size:20px;padding:12px 0}
+.calchist{display:flex;flex-direction:column;gap:4px;align-items:flex-start;margin-top:12px;max-width:420px}.calchist .linkish{text-align:left}
+.elbox{background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;max-width:980px}.elbox h3{margin:0 0 12px}
+.elform{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 16px;margin-bottom:14px}.elform label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-2)}
+.elin{display:flex;align-items:center;gap:6px}.elin input{flex:1;min-width:0;text-align:right}.elin span{min-width:28px;color:var(--ink-2)}
+.elres{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;border-radius:10px;padding:12px 14px;border:1px solid var(--rule);margin-bottom:10px}
+.elres div{display:flex;flex-direction:column}.elres small{color:var(--ink-2);font-size:12px}.elres b{font-size:22px}
+.elres.ok{background:rgba(46,160,67,.10);border-color:rgba(46,160,67,.45)}.elres.warn{background:rgba(214,150,0,.12);border-color:rgba(214,150,0,.5)}.elres.bad{background:rgba(211,47,47,.10);border-color:rgba(211,47,47,.5)}
+.elpts{margin-bottom:10px}.elpts summary{cursor:pointer;margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -1787,11 +1798,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['prodscr', 'Экран производства', []], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета'], ['checks', 'Чеки'], ['trips', 'Путевые листы']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['msgs', 'Сообщения'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['est', 'Быстрая смета'], ['mods', 'Дополнительные модули']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['msgs', 'Сообщения'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['est', 'Быстрая смета'], ['calc', 'Калькуляторы'], ['mods', 'Дополнительные модули']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || !g[2].length || g[2].some(([s]) => can(top + ':' + s))); };   // a tab without sub-tabs is open by itself
-const VIEW_KEY = { msgs: 'msgs', prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', est: 'refs:est', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
+const VIEW_KEY = { msgs: 'msgs', prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', est: 'refs:est', calc: 'refs:calc', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
 // «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
 const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
 const viewOk = v => ckView(v) ? can('stock:' + v) : !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
@@ -1891,7 +1902,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'msgs' ? vMsgs() : ui.view === 'est' ? vEst() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'msgs' ? vMsgs() : ui.view === 'est' ? vEst() : ui.view === 'calc' ? vCalc() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   if (V.querySelector('.wtable')) wlClamp();
@@ -3391,6 +3402,104 @@ document.addEventListener('input', e => {
   estTotalsDom(); estQueue();
 });
 document.addEventListener('keydown', e => { if (ui.view === 'est' && e.key === 'Enter' && e.target.dataset?.estaddw != null) { e.preventDefault(); return estAddWork(e.target); } if (ui.view === 'est' && e.key === 'Enter' && e.target.closest?.('.estform')) { e.preventDefault(); e.target.closest('.estform').querySelector('[data-estact=dbsave]')?.click(); } });
+/* ===== «Калькуляторы»: an ordinary calculator and «Расчёты электро» (the voltage drop of an AC line with equal consumers along it) ===== */
+const CALC_KEY = 'sed-calc', calcSt = (() => { try { return JSON.parse(localStorage.getItem(CALC_KEY)) || {}; } catch(e) { return {}; } })();
+const calcKeep = () => { try { localStorage.setItem(CALC_KEY, JSON.stringify(calcSt)); } catch(e) {} };
+// a small safe parser: + − × ÷ ^, brackets, a percent after a number, the decimal comma
+function calcEval(src){
+  const s = String(src).replace(/\s+/g, '').replace(/,/g, '.').replace(/[×xх]/gi, '*').replace(/[÷:]/g, '/').replace(/−/g, '-'); let i = 0;
+  const peek = () => s[i], eat = c => { if (s[i] === c) { i++; return true; } return false; };
+  const num = () => { const m = /^\d*\.?\d+(e[+-]?\d+)?|^\d+\./i.exec(s.slice(i)); if (!m) throw new Error('Ошибка в выражении'); i += m[0].length; return parseFloat(m[0]); };
+  const atom = () => { if (eat('-')) return -atom(); if (eat('+')) return atom(); let v; if (eat('(')) { v = add(); if (!eat(')')) throw new Error('Не закрыта скобка'); } else v = num(); while (eat('%')) v /= 100; return v; };
+  const pow = () => { const b = atom(); return eat('^') ? Math.pow(b, pow()) : b; };
+  const mul = () => { let v = pow(); for (;;) { if (eat('*')) v *= pow(); else if (eat('/')) { const d = pow(); if (d === 0) throw new Error('Деление на ноль'); v /= d; } else return v; } };
+  const add = () => { let v = mul(); for (;;) { if (eat('+')) v += mul(); else if (eat('-')) v -= mul(); else return v; } };
+  if (!s) return null; const v = add(); if (i < s.length) throw new Error('Ошибка в выражении'); if (!isFinite(v)) throw new Error('Слишком большое число'); return v;
+}
+const calcFmt = v => v == null ? '' : (Math.abs(v) >= 1e15 || (Math.abs(v) < 1e-9 && v !== 0) ? v.toExponential(8) : String(Math.round(v * 1e10) / 1e10)).replace('.', ',');
+function vCalcBasic(){
+  const H = calcSt.hist || [], keys = [['C', 'clr'], ['(', '('], [')', ')'], ['÷', '/'], ['7', '7'], ['8', '8'], ['9', '9'], ['×', '*'], ['4', '4'], ['5', '5'], ['6', '6'], ['−', '-'], ['1', '1'], ['2', '2'], ['3', '3'], ['+', '+'], ['%', '%'], ['0', '0'], [',', ','], ['=', 'eq'], ['⌫', 'bs'], ['xʸ', '^']];
+  return `<div class="calcbox"><div class="calcscr"><input class="in mono" id="calcIn" value="${esc(calcSt.expr || '')}" placeholder="Например: (1250 + 340) × 1,2" autocomplete="off" inputmode="decimal" aria-label="Выражение"><output class="mono" id="calcOut">${esc(calcSt.out || '')}</output></div>
+    <div class="calckeys">${keys.map(([l, k]) => `<button class="btn${k === 'eq' ? ' primary' : k === 'clr' ? ' danger' : ''}" data-calck="${esc(k)}">${l}</button>`).join('')}</div>
+    <p class="hint">Можно печатать с клавиатуры: Enter — посчитать, Esc — очистить. Дробная часть — через запятую или точку, «50%» — это 0,5.</p></div>
+    ${H.length ? `<div class="calchist"><b>История</b>${H.map((h, n) => `<button class="linkish mono" data-calch="${n}" title="Вставить в выражение">${esc(h.e)} = <b>${esc(h.r)}</b></button>`).join('')}<button class="linkish dim" data-calck="hclr">Очистить историю</button></div>` : ''}`;
+}
+function calcRun(final){
+  const inp = $('calcIn'), out = $('calcOut'); if (!inp) return; calcSt.expr = inp.value;
+  try { const v = calcEval(inp.value); calcSt.out = v == null ? '' : '= ' + calcFmt(v); out.classList.remove('bad-t');
+    if (final && v != null) { const H = calcSt.hist = calcSt.hist || []; H.unshift({ e: inp.value, r: calcFmt(v) }); H.splice(10); inp.value = calcFmt(v); calcSt.expr = inp.value; calcKeep(); render(); if (!ptMob()) $('calcIn')?.focus(); return; } }
+  catch(e) { calcSt.out = final ? e.message : ''; out.classList.toggle('bad-t', final); }
+  out.textContent = calcSt.out; calcKeep();
+}
+/* the voltage drop: the line from the source to the first consumer (the trunk), then equal steps between the consumers;
+   each piece carries the current of all the consumers after it; ΔU = k·I·(R·cosφ + X·sinφ), k = 2 for one phase, √3 for three phases */
+const EL_S = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300];
+const EL_RHO = { cu: 0.0175, al: 0.028 };   // Ом·мм²/м
+const EL_X = 0.00008;                      // Ом/м — the inductive resistance of a cable (0,08 Ом/км)
+const elDef = { ph: '1', u1: 230, u3: 400, mat: 'cu', mode: 'given', s: 2.5, lim: 5, n: 1, d: 0, p: 1, l: 50, cos: 0.95 };
+const elV = k => calcSt.el?.[k] ?? elDef[k];
+function elDrop(o, S){
+  const U = o.ph === '3' ? o.u3 : o.u1, k = o.ph === '3' ? Math.sqrt(3) : 2, cos = Math.min(1, Math.max(0.1, o.cos)), sin = Math.sqrt(1 - cos * cos);
+  const I1 = (o.p * 1000) / ((o.ph === '3' ? Math.sqrt(3) : 1) * U * cos), r = EL_RHO[o.mat] / S;
+  let dU = 0; const pts = [];
+  for (let i = 0; i < o.n; i++) { const len = i === 0 ? o.l : o.d, cur = I1 * (o.n - i); dU += k * cur * (r * len * cos + EL_X * len * sin); pts.push({ no: i + 1, at: o.l + o.d * i, u: U - dU, pct: dU / U * 100 }); }
+  return { U, dU, pct: dU / U * 100, uEnd: U - dU, I: I1 * o.n, I1, pts, len: o.l + o.d * Math.max(0, o.n - 1) };
+}
+function elInputs(){ const n = x => num(x); return { ph: elV('ph'), u1: n(elV('u1')) || 230, u3: n(elV('u3')) || 400, mat: elV('mat'), mode: elV('mode'), s: n(elV('s')) || 2.5, lim: n(elV('lim')) || 5,
+  n: Math.max(1, Math.min(1000, Math.round(n(elV('n')) || 1))), d: Math.max(0, n(elV('d'))), p: Math.max(0, n(elV('p'))), l: Math.max(0, n(elV('l'))), cos: n(elV('cos')) || 1 }; }
+function elResult(){
+  const o = elInputs(); if (!(o.p > 0)) return '<p class="hint">Укажите мощность потребителя.</p>'; if (!(o.l > 0) && !(o.d > 0 && o.n > 1)) return '<p class="hint">Укажите длину трассы.</p>';
+  let S = o.s, pick = '';
+  if (o.mode === 'calc') { const f = EL_S.find(x => elDrop(o, x).pct <= o.lim);
+    if (!f) { const r = elDrop(o, EL_S[EL_S.length - 1]); return `<div class="elres bad"><b>Даже сечение ${EL_S[EL_S.length - 1]} мм² не укладывается в ${o.lim} %</b> — потери ${r.pct.toFixed(2).replace('.', ',')} %. Уменьшите длину или нагрузку, разделите линию или поднимите напряжение.</div>`; }
+    S = f; pick = `<div><small>Сечение кабеля (подобрано)</small><b>${String(S).replace('.', ',')} мм²</b><small>минимальное стандартное, при котором потери ≤ ${o.lim} %</small></div>`; }
+  const r = elDrop(o, S), ok = r.pct <= 5 ? 'ok' : r.pct <= 10 ? 'warn' : 'bad', f2 = v => v.toFixed(2).replace('.', ',');
+  return `<div class="elres ${ok}">${pick}<div><small>Напряжение на конечном потребителе</small><b>${f2(r.uEnd)} В</b><small>из ${r.U} В · падение ${f2(r.dU)} В</small></div>
+      <div><small>Потери напряжения</small><b>${f2(r.pct)} %</b><small>${ok === 'ok' ? 'в пределах 5 %' : ok === 'warn' ? 'больше 5 %, но в пределах 10 %' : 'больше 10 % — недопустимо'}</small></div>
+      <div><small>Ток в начале линии</small><b>${f2(r.I)} А</b><small>${o.ph === '3' ? 'в фазе' : ''} · общая мощность ${f2(o.p * o.n)} кВт</small></div>
+      <div><small>Длина линии до конечного потребителя</small><b>${String(Math.round(r.len * 10) / 10).replace('.', ',')} м</b><small>${o.mat === 'cu' ? 'медь' : 'алюминий'}, ${String(S).replace('.', ',')} мм²</small></div></div>
+    ${o.n > 1 ? `<details class="elpts"><summary>Напряжение у каждого потребителя</summary><div class="tscroll"><table class="tbl esttbl"><thead><tr><th>№</th><th>От источника, м</th><th>Напряжение, В</th><th>Потери, %</th></tr></thead><tbody>${r.pts.map(x => `<tr><td>${x.no}</td><td class="mono">${String(Math.round(x.at * 10) / 10).replace('.', ',')}</td><td class="mono">${f2(x.u)}</td><td class="mono">${f2(x.pct)}</td></tr>`).join('')}</tbody></table></div></details>` : ''}`;
+}
+function vCalcEl(){
+  const sel = (k, opts) => `<select class="in" data-el="${k}">${opts.map(([v, l]) => `<option value="${v}" ${String(elV(k)) === String(v) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  const inp = (k, unit, attrs = '') => `<span class="elin"><input class="in mono" data-el="${k}" value="${esc(String(elV(k)).replace('.', ','))}" inputmode="decimal" ${attrs}><span>${unit}</span></span>`;
+  const ph3 = elV('ph') === '3', calc = elV('mode') === 'calc';
+  return `<div class="elbox"><h3>Потеря напряжения в линии переменного тока</h3>
+    <div class="elform">
+      <label>Сеть${sel('ph', [['1', 'Однофазная'], ['3', 'Трёхфазная']])}</label>
+      <label>Напряжение сети${ph3 ? inp('u3', 'В') : inp('u1', 'В')}</label>
+      <label>Материал жил${sel('mat', [['cu', 'Медь'], ['al', 'Алюминий']])}</label>
+      <label>Сечение кабеля${sel('mode', [['given', 'Указать сечение'], ['calc', 'Рассчитать сечение']])}</label>
+      ${calc ? `<label>Допустимые потери${sel('lim', [['5', '5 %'], ['10', '10 %']])}</label>` : `<label>Сечение жилы${sel('s', EL_S.map(x => [x, String(x).replace('.', ',') + ' мм²']))}</label>`}
+      <label>Количество потребителей${inp('n', 'шт', 'inputmode="numeric"')}</label>
+      <label>Мощность одного потребителя${inp('p', 'кВт')}</label>
+      <label>Длина трассы до первого потребителя${inp('l', 'м')}</label>
+      <label>Расстояние между потребителями${inp('d', 'м', elInputs().n > 1 ? '' : 'disabled title="Нужно, когда потребителей больше одного"')}</label>
+      <label>Коэффициент мощности cos φ${inp('cos', '')}</label>
+    </div>
+    <div id="elOut">${elResult()}</div>
+    <p class="hint">Считается по участкам: от источника до первого потребителя — ток всех потребителей, дальше на каждом участке — ток оставшихся. ΔU = ${ph3 ? '√3' : '2'}·I·(R·cos φ + X·sin φ); R = ρ·l/S (ρ: медь 0,0175, алюминий 0,028 Ом·мм²/м), X = 0,08 Ом/км. Мощность — активная, нагрузка ${ph3 ? 'равномерная по фазам' : 'на одну фазу'}. Нагрев кабеля и допустимый ток здесь не проверяются.</p></div>`;
+}
+function vCalc(){
+  const t = calcSt.tab === 'el' ? 'el' : 'basic';
+  return `<nav class="seg stabs" style="margin-bottom:12px"><a href="#calc" data-calctab="basic" class="${t === 'basic' ? 'on' : ''}">🔢 Калькулятор</a><a href="#calc" data-calctab="el" class="${t === 'el' ? 'on' : ''}">⚡ Расчёты электро</a></nav>` + (t === 'el' ? vCalcEl() : vCalcBasic());
+}
+document.addEventListener('click', e => {
+  if (ui.view !== 'calc') return; const t = e.target.closest('[data-calctab],[data-calck],[data-calch]'); if (!t) return; e.preventDefault(); const d = t.dataset;
+  if (d.calctab) { calcSt.tab = d.calctab; calcKeep(); return render(); }
+  if (d.calch != null) { const h = (calcSt.hist || [])[+d.calch]; if (h) { const i = $('calcIn'); i.value += h.r; if (!ptMob()) i.focus(); calcRun(); } return; }
+  const k = d.calck, i = $('calcIn'); if (!i) return;
+  if (k === 'hclr') { calcSt.hist = []; calcKeep(); return render(); }
+  if (k === 'clr') { i.value = ''; calcRun(); } else if (k === 'bs') { i.value = i.value.slice(0, -1); calcRun(); } else if (k === 'eq') calcRun(true); else { i.value += k; calcRun(); }
+  if (k !== 'eq' && !ptMob()) i.focus();   // a phone: no on-screen keyboard after every button
+});
+document.addEventListener('input', e => { if (ui.view !== 'calc') return; const t = e.target;
+  if (t.id === 'calcIn') return calcRun();
+  if (t.dataset?.el && t.tagName === 'INPUT') { calcSt.el = calcSt.el || {}; calcSt.el[t.dataset.el] = t.value; calcKeep(); const o = $('elOut'); if (o) o.innerHTML = elResult();
+    if (t.dataset.el === 'n') { const dd = document.querySelector('[data-el=d]'); if (dd) dd.disabled = !(num(t.value) > 1); } } });
+document.addEventListener('change', e => { if (ui.view !== 'calc') return; const t = e.target;
+  if (t.dataset?.el && t.tagName === 'SELECT') { calcSt.el = calcSt.el || {}; calcSt.el[t.dataset.el] = t.value; calcKeep(); render(); } });
+document.addEventListener('keydown', e => { if (ui.view !== 'calc' || e.target.id !== 'calcIn') return; if (e.key === 'Enter') { e.preventDefault(); calcRun(true); } else if (e.key === 'Escape') { e.target.value = ''; calcRun(); } });
 function vProdScr(){
   const F = ui.psF || 'active', q = (ui.psq || '').trim().toLowerCase();
   const all = psJobs().filter(j => ['prod', 'both'].includes(j.kind) && psOrd(j.orderId));
@@ -5908,8 +6017,8 @@ async function snXlsx(){
   for (let r = 1; r < a.length; r++) for (let c = 0; c < 4; c++) { const ref = X.utils.encode_cell({ r, c }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
   X.utils.book_append_sheet(wb, ws, 'Этикетки для модемов'); X.writeFile(wb, `Этикетки для модемов — ${today()}.xlsx`);
 }
-const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'mods', 'snmap', 'match'];
-const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль'], ['est', 'est', '🧮 Быстрая смета'], ['mods', 'mods', '🧩 Дополнительные модули']];
+const REF_VIEWS = ['refs', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'calc', 'mods', 'snmap', 'match'];
+const REF_TABS = [['refs', 'list', '📚 Справочники'], ['draw', 'draw', '✏️ Рисовалка'], ['vault', 'vault', '🔒 Личное хранилище'], ['labels', 'labels', '🏷 Печать этикеток'], ['netshare', 'netshare', '🗄 Сетевая папка'], ['ssh', 'ssh', '💻 SSH-консоль'], ['est', 'est', '🧮 Быстрая смета'], ['calc', 'calc', '🔢 Калькуляторы'], ['mods', 'mods', '🧩 Дополнительные модули']];
 const refTabsList = () => REF_TABS.filter(([, k]) => can('refs:' + k) && (k !== 'labels' || !isWorker()) && (k !== 'netshare' || isHead() || NETSHARES.length > 0) && (k !== 'ssh' || isHead()));
 const refTabs = () => { const cur = MOD_VIEWS.includes(ui.view) ? 'mods' : ui.view; return `<nav class="seg stabs" aria-label="Справочники и инструменты">${refTabsList().map(([v, , l]) => `<a href="#${v}" class="${cur === v ? 'on' : ''}" ${cur === v ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`; };
 /* «Дополнительные модули»: separate tools of their own; each opens on its own page under this tab */
@@ -6549,7 +6658,7 @@ function vTmine(){
 
 // the menu of a transport organization: a driver — his trips, waybills, receipts; the accountant — orders, «Учётка», reports; managers — all
 const transNav = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs'] : me.role === 'accountant' ? ['tor', 'stock', 'trep', 'notes', 'refs'] : ['tor', 'disp', 'transport', 'stock', 'trep', 'notes', 'refs', ...(me.role === 'admin' ? ['users'] : [])];
-const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare', 'est', 'mods', 'snmap', 'match'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', 'mods', 'snmap', 'match', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
+const transViews = () => isWorker() ? ['tmine', 'trips', 'checks', 'refs', 'draw', 'vault', 'netshare', 'est', 'calc', 'mods', 'snmap', 'match'] : [...(me.role === 'accountant' ? ['tor', 'trep'] : ['tor', 'disp', 'transport', 'tparts', 'trep']), 'cps', 'checks', 'trips', 'notes', 'devs', 'refs', 'draw', 'vault', 'netshare', 'ssh', 'est', 'calc', 'mods', 'snmap', 'match', ...(me.role === 'admin' ? ['users', 'admFiles'] : [])];
 /* ===== «Оборудование» системы заявок: справочник с QR-кодами и историей проблем ===== */
 let REQ_EQ = [];
 const eqOf = id => REQ_EQ.find(e => e.id === id);
@@ -9979,11 +10088,11 @@ function route(){
     : ipMode() ? (ipNav().includes(h) ? h : 'ipc')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
-    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'prodscr', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'est', 'mods', 'snmap', 'match'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
+    : isWorker() ? (['wwork', 'wdone', 'devs', 'mytasks', 'prodscr', 'wover', 'checks', 'trips', 'refs', 'draw', 'vault', 'netshare', 'est', 'calc', 'mods', 'snmap', 'match'].includes(h) && viewOk(h) ? h : REF_VIEWS.includes(h) && refTabsList().length ? refTabsList()[0][0] : 'wwork')
     : ['works','orders','stock','inc','cps','pay','plan','dt','labels','devs'].includes(h) || (ADMIN_VIEWS.includes(h) && !h.startsWith('req') && me?.role === 'admin') || (h === 'notes' && !isWorker()) || (h === 'wo' && (isHead() || me?.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(h) && isHead()) || (h === 'prodscr' && viewOk(h)) || h === 'checks' || h === 'trips' || REF_VIEWS.includes(h) ? h : (startViews().some(([k]) => k === PREFS.start) ? PREFS.start : 'works');
   if (!me?.sys && !reqMode() && !transMode() && !viewOk(ui.view)) {
     const top = (VIEW_KEY[ui.view] || '').split(':')[0], g = SECTIONS_UI.find(x => x[0] === top);
-    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', est: 'est', mods: 'mods', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
+    const sub = g && g[2] && g[2].map(([x]) => ({ works: 'works', labels: 'labels', stock: 'stock', inc: 'inc', wo: 'wo', pay: 'pay', list: 'refs', draw: 'draw', vault: 'vault', netshare: 'netshare', ssh: 'ssh', est: 'est', calc: 'calc', mods: 'mods', checks: 'checks', trips: 'trips' })[x]).find(x => x && viewOk(x) && (x !== 'wo' || canWo()));
     ui.view = sub || (isWorker() ? 'wwork' : (startViews().map(([k]) => k).find(viewOk) || 'notes'));
     try { history.replaceState(null, '', '#' + ui.view); } catch(e) {}
   }

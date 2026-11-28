@@ -481,7 +481,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], msgs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'mods'] };
+const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], msgs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'calc', 'mods'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
