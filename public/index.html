@@ -1334,6 +1334,11 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
 .elres div{display:flex;flex-direction:column}.elres small{color:var(--ink-2);font-size:12px}.elres b{font-size:22px}
 .elres.ok{background:rgba(46,160,67,.10);border-color:rgba(46,160,67,.45)}.elres.warn{background:rgba(214,150,0,.12);border-color:rgba(214,150,0,.5)}.elres.bad{background:rgba(211,47,47,.10);border-color:rgba(211,47,47,.5)}
 .elpts{margin-bottom:10px}.elpts summary{cursor:pointer;margin-bottom:6px}
+.etlist{display:flex;flex-direction:column;gap:10px}.etcard{background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.etcard.done{opacity:.8}.eth{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.etnote{white-space:pre-wrap;font-size:14px}.etmeta{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;font-size:14px}
+.etform{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 12px;align-items:end;border-top:1px dashed var(--rule);padding-top:8px}.etform label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--ink-2)}
+.etform .wide,.etform .row-g,.etform .etwarn{grid-column:1/-1}.etwarn{margin:0;color:var(--warn);font-size:13px}.etact{flex-wrap:wrap}
+.etmy{margin-bottom:12px}.etmyrow{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;border-top:1px solid var(--rule-2);padding:8px 0}.etmyrow:first-of-type{border-top:0}
 </style>
 </head>
 <body>
@@ -1415,6 +1420,7 @@ body.no-edit .g-task .g-lab,body.no-edit .bar,body.no-edit .tlist li{pointer-eve
       <a href="#wover" data-v="wover" hidden>Ненорм. день</a>
       <a href="#jobs" data-v="jobs" id="jobsTab">Задачи сотрудникам <span class="badge" id="jobBadge" hidden></span></a>
       <a href="#works" data-v="works">Работы</a>
+      <a href="#etasks" data-v="etasks" id="etTab" hidden>Задачи сотрудникам <span class="badge" id="etBadge" hidden></span></a>
       <a href="#prodscr" data-v="prodscr" id="prodTab">Экран производства</a>
       <a href="#stock" data-v="stock">Учётка <span class="badge" id="payBadge" hidden title="Счета к оплате"></span></a>
       <a href="#cps" data-v="cps">Контрагенты</a>
@@ -1753,7 +1759,7 @@ async function refresh(){
   ['projects','orders','invoices','tasks','counterparties','points','stock','jobs','products','receipts'].forEach(c => S[c] = d[c] || []);
   // the names of old points kept the reminder «(замена 2 модемов)» — it is not shown any more
   S.jobs.forEach(j => (j.places || []).forEach(x => { if (x.label && /\(замена \d+ модем/.test(x.label)) x.label = x.label.replace(/ ?\(замена \d+ модем[а-я]*\)/g, ''); }));
-  STAFF = d.staff || []; JGROUPS = d.jobGroups || []; PS_DATA = d.prodScr || null; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal;
+  STAFF = d.staff || []; JGROUPS = d.jobGroups || []; PS_DATA = d.prodScr || null; NOTES = d.notes || []; REQS = d.requests || []; REQ_USERS = d.reqUsers || []; DEV_READ = d.devReadings || []; REQ_DOCS = d.reqDocs || []; REQ_EQ = d.reqEquip || []; LABELS = d.labels || []; LABEL_SN = d.labelSerials || {}; LABEL_SCAN = d.labelScans || {}; DEVS = d.devs || []; OVERTIME = d.overtime || []; VEHICLES = d.vehicles || []; PARTS = d.parts || []; CHECKS = d.checks || []; VEH_BRIEF = d.vehBrief || []; ETASKS = d.etasks || []; REFS = d.refs || []; TRIPS = d.trips || []; TORDERS = d.tOrders || []; STAFF_MARKS = d.staffMarks || []; STAFF_RATINGS = d.staffRatings || []; NETSHARES = d.netshares || []; if (d.workCal) WORK_CAL = d.workCal;
   $('devsTab').hidden = !!me?.sys || reqMode() || transMode() || !can('devs') || !isWorker() || !DEVS.length;
   if (ui.drawer?.kind === 'dev' && !ui.devEditing && !drawerBusy()) renderDrawer();
   if (ui.lblId && !ui.lblDirty) { const keep = ui.lblSel; lblPick(ui.lblId); if (keep) ui.lblSel = keep; }
@@ -1764,7 +1770,8 @@ async function refresh(){
     b.textContent = actingWorker() ? '↩ Интерфейс руководителя' : '👷 Интерфейс сотрудника'; b.classList.toggle('primary', actingWorker());
     b.title = actingWorker() ? 'Вернуться к работе руководителя' : 'Открыть работы, назначенные вам, как у сотрудника'; }
   // an employee gets «Мои задачи» once a task is assigned to him
-  { const mine = NOTES.filter(x => x.type === 'shared' && x.assignee === me?.id), open = mine.filter(x => !x.done).length;
+  etBadge();
+  { const mine = NOTES.filter(x => x.type === 'shared' && x.assignee === me?.id), open = mine.filter(x => !x.done).length + etMine().length;
     $('mytTab').hidden = !isWorker(); $('mytBadge').hidden = !open; $('mytBadge').textContent = open; }
   if (mode !== 'live') { mode = 'live'; }
   $('banner').hidden = true;
@@ -1798,11 +1805,11 @@ function animateView(el){
 }
 /* tabs and sub-tabs that an organization (and a user) may be shown; hidden ones are kept as a list of keys «tab» / «tab:sub» */
 const SECTIONS_UI = [['works', 'Работы', [['works', 'Работы']]], ['prodscr', 'Экран производства', []], ['stock', 'Учётка', [['stock', 'Склад'], ['inc', 'Приходы'], ['wo', 'Списание материалов'], ['pay', 'Счета'], ['checks', 'Чеки'], ['trips', 'Путевые листы']]],
-  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['msgs', 'Сообщения'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['est', 'Быстрая смета'], ['calc', 'Калькуляторы'], ['mods', 'Дополнительные модули']]]];
+  ['cps', 'Контрагенты'], ['staff', 'Сотрудники'], ['staffp', 'По проектам'], ['plan', 'План-график'], ['dt', 'Карта объектов'], ['devs', 'Разработки'], ['etasks', 'Задачи сотрудникам'], ['msgs', 'Сообщения'], ['notes', 'Мои задачи', [['task', 'Собственные'], ['shared', 'Общие задачи']]], ['transport', 'Транспорт', [['cars', 'Транспорт'], ['parts', 'Запчасти']]], ['refs', 'Справочники и инструменты', [['list', 'Справочники'], ['draw', 'Рисовалка'], ['vault', 'Личное хранилище'], ['labels', 'Печать этикеток'], ['netshare', 'Сетевая папка'], ['ssh', 'SSH-консоль'], ['est', 'Быстрая смета'], ['calc', 'Калькуляторы'], ['mods', 'Дополнительные модули']]]];
 const can = key => { const H = (me && me.hide) || [], top = key.split(':')[0]; return !H.includes(key) && !H.includes(top); };
 // a tab of the menu is shown when it is open and at least one of its sub-tabs is
 const tabOpen = top => { const g = SECTIONS_UI.find(x => x[0] === top); return can(top) && (!g || !g[2] || !g[2].length || g[2].some(([s]) => can(top + ':' + s))); };   // a tab without sub-tabs is open by itself
-const VIEW_KEY = { msgs: 'msgs', prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', est: 'refs:est', calc: 'refs:calc', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
+const VIEW_KEY = { etasks: 'etasks', msgs: 'msgs', prodscr: 'prodscr', works: 'works:works', orders: 'works:works', labels: 'refs:labels', stock: 'stock:stock', inc: 'stock:inc', wo: 'stock:wo', pay: 'stock:pay', cps: 'cps', staff: 'staff', staffp: 'staffp', plan: 'plan', dt: 'dt', devs: 'devs', notes: 'notes', transport: 'transport:cars', tparts: 'transport:parts', refs: 'refs:list', draw: 'refs:draw', vault: 'refs:vault', netshare: 'refs:netshare', est: 'refs:est', calc: 'refs:calc', ssh: 'refs:ssh', snmap: 'refs:mods', match: 'refs:mods', mods: 'refs:mods' };
 // «Чеки» and «Путевые листы» of field staff and of a transport organization are always theirs; an office user may have them hidden
 const ckView = v => (v === 'checks' || v === 'trips') && !isWorker() && !transMode();
 const viewOk = v => ckView(v) ? can('stock:' + v) : !VIEW_KEY[v] || (v === 'notes' ? tabOpen('notes') : can(VIEW_KEY[v]));
@@ -1902,7 +1909,7 @@ function render(){
   if (onMap) { V.innerHTML = ''; if (changed) animateView($('mapView')); return renderMap(); }
   if (onDt) { V.innerHTML = ''; if (changed) animateView($('dtView')); return renderDt(); }
   if (onW) { V.innerHTML = ''; if (changed) { animateView($('wView')); wFitted = false; } return renderW(); }
-  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'msgs' ? vMsgs() : ui.view === 'est' ? vEst() : ui.view === 'calc' ? vCalc() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
+  V.innerHTML = IP_VIEWS.includes(ui.view) ? vIp(ui.view) : (inStockGroup(ui.view) ? stockTabs() : PLAN_VIEWS.includes(ui.view) && !isWorker() ? planTabs() : ui.view === 'devs' && !isWorker() ? notesTabsBar('devs') : ADMIN_VIEWS.includes(ui.view) ? adminTabs() : TR_VIEWS.includes(ui.view) ? trTabs() : REF_VIEWS.includes(ui.view) ? refTabs() : '') + (ui.view === 'draw' ? vDraw() : ui.view === 'vault' ? vVault() : ui.view === 'netshare' ? vNetshare() : ui.view === 'ssh' ? vSsh() : ui.view === 'snmap' ? modsBar('snmap') + vSnmap() : ui.view === 'match' ? modsBar('match') + vMatch() : ui.view === 'mods' ? vMods() : ui.view === 'admInit' ? vAdmInit() : ui.view === 'reqeq' ? vReqEq() : ui.view === 'tor' ? vTor() : ui.view === 'disp' ? vDisp() : ui.view === 'trep' ? vTrep() : ui.view === 'tmine' ? vTmine() : ui.view === 'trips' ? vTrips() : ui.view === 'refs' ? vRefs() : ui.view === 'checks' ? vChecks() : ui.view === 'transport' ? vTransport() : ui.view === 'tparts' ? vParts() : ui.view === 'wover' ? vWOver() : ui.view === 'reqdocs' ? vReqDocs() : ui.view === 'mytasks' ? vWorkerMy() : ui.view === 'msgs' ? vMsgs() : ui.view === 'etasks' ? vETasks() : ui.view === 'est' ? vEst() : ui.view === 'calc' ? vCalc() : ui.view === 'prodscr' ? vProdScr() : ui.view === 'admFiles' ? vAdmFiles() : ui.view === 'pay' ? vPay() : ui.view === 'plan' ? vPlan() : ui.view === 'users' ? vUsers() : ui.view === 'cps' ? vCps() : ui.view === 'works' ? vWorkList() : ui.view === 'stock' ? vStock() : ui.view === 'orgs' ? vOrgs() : ui.view === 'trials' ? vTrials() : ui.view === 'server' ? vServer() : ui.view === 'notes' ? vNotes() : ui.view === 'wo' ? vWoList() : ui.view === 'staff' ? vStaff() : ui.view === 'staffp' ? vStaffProj() : ui.view === 'req' ? vReq() : ui.view === 'labels' ? vLabels() : ui.view === 'devs' ? vDevs() : ui.view === 'inc' ? vIncView() : vOrders());
   if (changed) animateView(V);
   if (ui.view === 'draw') setTimeout(initDraw, 0);
   if (V.querySelector('.wtable')) wlClamp();
@@ -3522,6 +3529,107 @@ document.addEventListener('input', e => { if (ui.view !== 'calc') return; const 
 document.addEventListener('change', e => { if (ui.view !== 'calc') return; const t = e.target;
   if (t.dataset?.el && t.tagName === 'SELECT') { calcSt.el = calcSt.el || {}; calcSt.el[t.dataset.el] = t.value; calcKeep(); render(); } });
 document.addEventListener('keydown', e => { if (ui.view !== 'calc' || e.target.id !== 'calcIn') return; if (e.key === 'Enter') { e.preventDefault(); calcRun(true); } else if (e.key === 'Escape') { e.target.value = ''; calcRun(); } });
+/* ===== «Задачи сотрудникам»: a manager creates tasks — they wait on «Не назначены» (counted on the tab); assigned with an employee,
+   dates and transport («Своим ходом» or a vehicle) they move to «Назначены» and into «Сотрудники» (the work schedule) ===== */
+let ETASKS = [];
+const etOf = id => ETASKS.find(t => t.id === id);
+const etFree = () => ETASKS.filter(t => !t.assignee && !t.done);
+const etVeh = t => t.vehName || (t.vehicle === 'self' ? 'Своим ходом' : (() => { const v = (VEH_BRIEF || []).find(x => x.id === t.vehicle); return v ? [v.name, v.plate].filter(Boolean).join(' ') : ''; })());
+const etDates = t => t.start ? (t.end && t.end !== t.start ? fmtD(t.start) + ' – ' + fmtD(t.end) : fmtD(t.start)) : '';
+const etMine = () => ETASKS.filter(t => t.assignee === me?.id && !t.done);
+function etBadge(){ const b = $('etBadge'); if (!b) return; const n = isHead() ? etFree().length : 0; b.hidden = !n; b.textContent = n; b.title = 'Не назначено задач: ' + n; }
+async function etApi(m, id, body){ const r = await api(m, '/api/etasks' + (id ? '/' + id : ''), body); await refresh(); return r; }
+function etBusy(uid, s, e, self){ // what else the employee has on these days — a hint while assigning
+  if (!uid || !s) return [];
+  const en = e || s, out = [];
+  ETASKS.forEach(t => { if (t.id !== self && t.assignee === uid && !t.done && t.start && t.start <= en && (t.end || t.start) >= s) out.push('задача: ' + t.title); });
+  S.tasks.forEach(t => { if ((t.staff || []).includes(uid) && t.start <= en && t.end >= s) out.push('план-график: ' + t.title); });
+  return out;
+}
+function etAssignForm(t){
+  const ppl = STAFF.slice().sort((a, b) => (['worker', 'contractor'].includes(b.role) - ['worker', 'contractor'].includes(a.role)) || a.name.localeCompare(b.name, 'ru'));
+  const cur = ui.etA || {}, uid = cur.u ?? t.assignee ?? '', veh = cur.v ?? t.vehicle ?? '', s = cur.s ?? (t.start || today()), e = cur.e ?? (t.end || s), busy = etBusy(uid, s, e, t.id);
+  const vbusy = id => ETASKS.filter(x => x.id !== t.id && x.vehicle === id && !x.done && x.start && x.start <= e && (x.end || x.start) >= s).map(x => STAFF.find(u => u.id === x.assignee)?.name || '').filter(Boolean);
+  return `<div class="etform" data-keep data-etform="${t.id}">
+    <label>Сотрудник<select class="in" data-eta="u"><option value="">— выберите —</option>${ppl.map(u => `<option value="${u.id}" ${u.id === uid ? 'selected' : ''}>${esc(u.name)} — ${esc(ROLE_NAMES[u.role] || '')}</option>`).join('')}</select></label>
+    <label>Дата начала<input class="in" type="date" data-eta="s" value="${esc(s)}"></label><label>Дата окончания<input class="in" type="date" data-eta="e" value="${esc(e)}" min="${esc(s)}"></label>
+    <label>Транспорт<select class="in" data-eta="v"><option value="">— выберите —</option><option value="self" ${veh === 'self' ? 'selected' : ''}>🚶 Своим ходом</option>${(VEH_BRIEF || []).map(v => { const b = vbusy(v.id); return `<option value="${v.id}" ${v.id === veh ? 'selected' : ''}>🚗 ${esc([v.name, v.plate].filter(Boolean).join(' '))}${b.length ? ' — занят: ' + esc(b.join(', ')) : ''}</option>`; }).join('')}</select></label>
+    ${busy.length ? `<p class="etwarn">⚠ У сотрудника в эти дни уже есть: ${esc(busy.slice(0, 4).join('; '))}${busy.length > 4 ? ` и ещё ${busy.length - 4}` : ''}</p>` : ''}
+    <div class="row-g"><button class="btn primary" data-etact="assignSave" data-id="${t.id}">${t.assignee ? 'Сохранить назначение' : 'Назначить'}</button><button class="btn" data-etact="assignCancel">Отмена</button></div></div>`;
+}
+function etCard(t){
+  const u = t.assignee && STAFF.find(x => x.id === t.assignee), j = t.jobId && jobOf(t.jobId), ed = ui.etEdit === t.id;
+  if (ed) return `<article class="etcard" data-keep><div class="etform"><label class="wide">Что нужно сделать<input class="in" data-ete="title" value="${esc(t.title)}" maxlength="300"></label>
+      <label class="wide">Подробности<textarea class="in" data-ete="note" rows="3">${esc(t.note || '')}</textarea></label>
+      <label>Дата начала<input class="in" type="date" data-ete="start" value="${esc(t.start || '')}"></label><label>Дата окончания<input class="in" type="date" data-ete="end" value="${esc(t.end || '')}"></label>
+      <div class="row-g"><button class="btn primary" data-etact="editSave" data-id="${t.id}">Сохранить</button><button class="btn" data-etact="editCancel">Отмена</button></div></div></article>`;
+  return `<article class="etcard${t.done ? ' done' : ''}">
+    <div class="eth"><b>№ ${t.no || '—'} · ${esc(t.title)}</b>${etDates(t) ? `<span class="chip c-info">📅 ${etDates(t)}</span>` : ''}${t.done ? '<span class="chip c-ok">Выполнена</span>' : ''}</div>
+    ${t.note ? `<div class="etnote">${esc(t.note)}</div>` : ''}
+    <div class="etmeta">${u ? `<span>👷 <b>${esc(u.name)}</b></span><span>${t.vehicle === 'self' ? '🚶' : '🚗'} ${esc(etVeh(t) || '—')}</span>` : ''}${j ? `<span>📁 <button class="linkish" data-act="openJob" data-id="${j.id}">${esc(j.title)}</button></span>` : ''}
+      <small class="dim">создал ${esc(who(t.by))} ${fmtDT(t.at)}${t.assignedAt ? ` · назначил ${esc(who(t.assignedBy))} ${fmtDT(t.assignedAt)}` : ''}${t.doneAt ? ` · выполнено ${fmtDT(t.doneAt)}${t.doneBy && t.doneBy !== t.assignee ? ' (' + esc(who(t.doneBy)) + ')' : ''}` : ''}</small></div>
+    ${t.report ? `<div class="etnote">💬 ${esc(t.report)}</div>` : ''}
+    ${ui.etAssign === t.id ? etAssignForm(t) : `<div class="row-g etact">
+      ${t.done ? `<button class="btn sm" data-etact="undone" data-id="${t.id}">Вернуть в работу</button>` : `<button class="btn sm primary" data-etact="assign" data-id="${t.id}">${t.assignee ? '✎ Изменить назначение' : '👷 Назначить сотрудника'}</button>${t.assignee ? `<button class="btn sm ok" data-etact="done" data-id="${t.id}">✓ Выполнена</button><button class="btn sm" data-etact="unassign" data-id="${t.id}">Снять назначение</button>` : ''}`}
+      <button class="btn sm" data-etact="edit" data-id="${t.id}">Изменить</button><button class="btn sm danger" data-etact="del" data-id="${t.id}">Удалить</button></div>`}
+  </article>`;
+}
+function vETasks(){
+  const tab = ui.etTab || 'free', q = (ui.etQ || '').trim().toLowerCase();
+  const free = etFree(), asg = ETASKS.filter(t => t.assignee && !t.done), done = ETASKS.filter(t => t.done);
+  const L = (tab === 'free' ? free : tab === 'asg' ? asg : done).filter(t => !q || [t.title, t.note, STAFF.find(u => u.id === t.assignee)?.name].some(v => (v || '').toLowerCase().includes(q)))
+    .sort((a, b) => tab === 'done' ? String(b.doneAt).localeCompare(String(a.doneAt)) : (a.start || '9').localeCompare(b.start || '9') || (b.no || 0) - (a.no || 0));
+  const nf = ui.etNew;
+  return `<nav class="seg stabs" style="margin-bottom:12px"><a href="#etasks" data-ettab="free" class="${tab === 'free' ? 'on' : ''}">Не назначены${free.length ? ` <span class="badge">${free.length}</span>` : ''}</a><a href="#etasks" data-ettab="asg" class="${tab === 'asg' ? 'on' : ''}">Назначены · ${asg.length}</a><a href="#etasks" data-ettab="done" class="${tab === 'done' ? 'on' : ''}">Выполненные · ${done.length}</a></nav>
+    <div class="toolbar"><button class="btn primary" data-etact="new">＋ Новая задача</button><span data-keep style="display:contents"><input class="in" type="search" data-etq placeholder="Поиск по задачам и сотрудникам" value="${esc(ui.etQ || '')}" style="flex:1 1 220px;max-width:340px"></span></div>
+    ${nf ? `<article class="etcard" data-keep><div class="etform"><label class="wide">Что нужно сделать<input class="in" id="etn-title" maxlength="300" placeholder="Например: заменить модем на объекте 8357"></label>
+      <label class="wide">Подробности<textarea class="in" id="etn-note" rows="3" placeholder="Адрес, контакты, что взять с собой…"></textarea></label>
+      <label>Дата начала<input class="in" type="date" id="etn-start" value="${today()}"></label><label>Дата окончания<input class="in" type="date" id="etn-end" value="${today()}"></label>
+      <div class="row-g"><button class="btn primary" data-etact="create">Создать</button><button class="btn" data-etact="newCancel">Отмена</button></div>
+      <small class="dim wide">Задача появится на вкладке «Не назначены». Сотрудника и транспорт выберите кнопкой «Назначить сотрудника».</small></div></article>` : ''}
+    ${L.length ? `<div class="etlist">${L.map(etCard).join('')}</div>` : `<div class="empty"><h3>${q ? 'Ничего не найдено' : tab === 'free' ? 'Неназначенных задач нет' : tab === 'asg' ? 'Назначенных задач нет' : 'Выполненных задач пока нет'}</h3>${tab === 'free' && !q ? 'Создайте задачу кнопкой «＋ Новая задача».' : ''}</div>`}`;
+}
+// the tasks assigned to me — on top of «Мои задачи» of an employee
+function etMyBlock(){
+  const L = etMine().sort((a, b) => (a.start || '9').localeCompare(b.start || '9')); if (!L.length) return '';
+  return `<section class="card etmy"><h3 style="margin:0 0 8px">Задачи от руководителя · ${L.length}</h3>${L.map(t => `<div class="etmyrow"><div><b>${esc(t.title)}</b>${etDates(t) ? ` <span class="chip c-info">📅 ${etDates(t)}</span>` : ''}${t.start && t.start <= today() && (t.end || t.start) >= today() ? ' <span class="chip c-warn">сегодня</span>' : ''}
+      <div class="dim" style="font-size:13px">${t.vehicle === 'self' ? '🚶' : '🚗'} ${esc(etVeh(t) || '—')} · поставил ${esc(who(t.assignedBy || t.by))}</div>${t.note ? `<div class="etnote">${esc(t.note)}</div>` : ''}</div>
+      <button class="btn sm ok" data-etact="done" data-id="${t.id}">✓ Выполнено</button></div>`).join('')}</section>`;
+}
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-etact],[data-ettab]'); if (!t) return; e.preventDefault();
+  if (t.dataset.ettab) { ui.etTab = t.dataset.ettab; ui.etAssign = null; ui.etEdit = null; return render(); }
+  const a = t.dataset.etact, id = t.dataset.id, x = id && etOf(id), blur = () => { if (document.activeElement?.closest?.('[data-keep]')) document.activeElement.blur(); };
+  try {
+    if (a === 'new') { ui.etNew = true; ui.etTab = 'free'; blur(); render(); return $('etn-title')?.focus(); }
+    if (a === 'newCancel') { ui.etNew = false; blur(); return render(); }
+    if (a === 'create') { const title = $('etn-title').value.trim(); if (!title) { toast('Укажите, что нужно сделать'); return $('etn-title').focus(); }
+      const s = $('etn-start').value, en = $('etn-end').value; if (s && en && en < s) return toast('Окончание раньше начала');
+      await etApi('POST', '', { title, note: $('etn-note').value, start: s, end: en || s }); ui.etNew = false; blur(); render(); return toast('Задача создана — она на вкладке «Не назначены»'); }
+    if (!x) return;
+    if (a === 'assign') { ui.etAssign = id; ui.etA = {}; blur(); return render(); }
+    if (a === 'assignCancel') { ui.etAssign = null; blur(); return render(); }
+    if (a === 'assignSave') { const f = document.querySelector(`[data-etform="${id}"]`), g = k => f.querySelector(`[data-eta=${k}]`).value;
+      if (!g('u')) return toast('Выберите сотрудника'); if (!g('s')) return toast('Укажите дату начала'); if (!g('v')) return toast('Выберите транспорт или «Своим ходом»'); if (g('e') && g('e') < g('s')) return toast('Окончание раньше начала');
+      const was = !!x.assignee; await etApi('PATCH', id, { start: g('s'), end: g('e') || g('s'), assignee: g('u'), vehicle: g('v') }); ui.etAssign = null; blur();
+      if (!was) ui.etTab = 'asg'; render(); return toast(was ? 'Назначение изменено' : `Задача назначена: ${STAFF.find(u => u.id === g('u'))?.name || ''} — она на вкладке «Назначены» и в графике сотрудника`); }
+    if (a === 'unassign') { await etApi('PATCH', id, { assignee: null }); return toast('Назначение снято — задача снова в «Не назначены»'); }
+    if (a === 'done') { await etApi('PATCH', id, { done: true }); return toast('Задача выполнена'); }
+    if (a === 'undone') { await etApi('PATCH', id, { done: false }); return toast('Задача снова в работе'); }
+    if (a === 'edit') { ui.etEdit = id; ui.etAssign = null; blur(); return render(); }
+    if (a === 'editCancel') { ui.etEdit = null; blur(); return render(); }
+    if (a === 'editSave') { const c = t.closest('.etcard'), g = k => c.querySelector(`[data-ete=${k}]`).value; if (!g('title').trim()) return toast('Укажите, что нужно сделать');
+      if (g('start') && g('end') && g('end') < g('start')) return toast('Окончание раньше начала');
+      await etApi('PATCH', id, { title: g('title'), note: g('note'), start: g('start'), end: g('end') || g('start') }); ui.etEdit = null; blur(); render(); return toast('Задача сохранена'); }
+    if (a === 'del') { if (!(await askDel(`Удалить задачу «${x.title}»?`))) return; await etApi('DELETE', id); return toast('Задача удалена'); }
+  } catch(err) { toast(errText(err)); }
+});
+document.addEventListener('change', e => { const t = e.target, k = t.dataset?.eta; if (!k || ui.view !== 'etasks') return;
+  ui.etA = ui.etA || {}; ui.etA[k] = t.value; if (k === 's') { const en = t.closest('.etform').querySelector('[data-eta=e]'); if (en.value < t.value) { en.value = t.value; ui.etA.e = t.value; } }
+  // the hint «уже есть в эти дни» and the busy vehicles follow the choice
+  const f = t.closest('.etform'), x = etOf(f.dataset.etform); if (!x) return; ['u', 's', 'e', 'v'].forEach(q => { ui.etA[q] = f.querySelector(`[data-eta=${q}]`).value; });
+  const nf = document.createElement('div'); nf.innerHTML = etAssignForm(x); f.replaceWith(nf.firstElementChild); });
+document.addEventListener('input', e => { if (e.target.dataset?.etq == null) return; ui.etQ = e.target.value; const pos = e.target.selectionStart; e.target.blur(); render(); const n = document.querySelector('[data-etq]'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
 function vProdScr(){
   const F = ui.psF || 'active', q = (ui.psq || '').trim().toLowerCase();
   const all = psJobs().filter(j => ['prod', 'both'].includes(j.kind) && psOrd(j.orderId));
@@ -5306,6 +5414,7 @@ function sgAssigned(u, day){
   const n = dnum(day), tn = dnum(today()), out = [], off = dayKind(day) !== 'work';
   // on a day off only a task «including weekends» counts; a work without such a task does not make the weekend busy
   for (const t of S.tasks) if ((t.staff || []).includes(u.id) && t.start <= day && t.end >= day && (!off || taskWe(t))) out.push('план-график: ' + t.title);
+  for (const t of ETASKS) if (t.assignee === u.id && t.start && t.start <= day && (t.end || t.start) >= day) out.push('задача: ' + t.title + (t.done ? ' (выполнена)' : ''));
   for (const j of S.jobs) {
     if (off) continue;
     if (!((j.workers || []).includes(u.id) || (j.places || []).some(x => x.assignee === u.id))) continue;
@@ -6781,6 +6890,7 @@ const staffCardHtml = (r, day) => `<section class="card staffc">
       ${left.length ? `<small class="dim">Где: ${left.slice(0, 4).map(x => esc(x.label || (x.lat.toFixed(4) + ', ' + x.lng.toFixed(4)))).join('; ')}${left.length > 4 ? ` и ещё ${left.length - 4}` : ''}</small>` : ''}</li>`; }).join('')}</ul>` : ''}
     ${r.tasks.length ? `<h4 class="sub-h">В план-графике</h4><ul class="stlist">${r.tasks.map(t => `<li><button class="linkish" data-act="editTask" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([KIND[t.kind], jobOf(t.jobId) && '№ ' + jobNo(jobOf(t.jobId)) + ' · ' + jobOf(t.jobId).title, fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small></li>`).join('')}</ul>` : ''}
     ${r.doneDay.length ? `<h4 class="sub-h">Сделано за ${day === today() ? 'сегодня' : fmtD(day)}</h4><ul class="stlist">${r.doneDay.sort((a, b) => b.x.doneAt.localeCompare(a.x.doneAt)).map(({ j, x }) => `<li><small><b>${esc(fmtDT(x.doneAt).slice(-5))}</b> · ${esc(x.label || 'точка')} · ${esc(j.title)}${x.notWorking ? ' · <span style="color:var(--bad)">не работает</span>' : ''}</small></li>`).join('')}</ul>` : ''}
+    ${(() => { const L = ETASKS.filter(t => t.assignee === r.u.id && !t.done); return L.length ? `<h4 class="sub-h">Задачи сотрудникам</h4><ul class="stlist">${L.map(t => `<li><button class="linkish" data-act="etGo" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([etDates(t), (t.vehicle === 'self' ? '🚶 ' : '🚗 ') + (etVeh(t) || '—')].join(' · '))}</small></li>`).join('')}</ul>` : ''; })()}
     ${otStaffBlock(r.u, day)}
   </section>`;
 function vStaff(){
@@ -6797,6 +6907,7 @@ function vStaff(){
   return head + staffGrid(people);
 }
 /* a cell of the table: the marks and the irregular hours of the day with «Изменить», and what was assigned */
+const etDay = (uid, day) => { const L = ETASKS.filter(t => t.assignee === uid && t.start && t.start <= day && (t.end || t.start) >= day); return L.length ? `<div class="box"><h4>Задачи сотрудникам</h4><ul class="stlist">${L.map(t => `<li><button class="linkish" data-act="etGo" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([etDates(t), (t.vehicle === 'self' ? '🚶 ' : '🚗 ') + (etVeh(t) || '—'), t.done ? 'выполнена' : ''].filter(Boolean).join(' · '))}</small></li>`).join('')}</ul></div>` : ''; };
 function staffDayHtml(uid, day){
   const u = STAFF.find(x => x.id === uid); if (!u) return '<div class="d-body"><p>Сотрудник не найден</p></div>';
   const kind = dayKind(day), mk = STAFF_MARKS.filter(x => x.user === uid && x.from <= day && x.to >= day), ot = OVERTIME.filter(x => x.by === uid && x.date === day).sort((a, b) => a.from.localeCompare(b.from));
@@ -6809,6 +6920,7 @@ function staffDayHtml(uid, day){
     ${idle ? '<div class="box sgidle">Простой: в этот рабочий день у сотрудника нет назначений.</div>' : ''}
     ${mk.length ? `<div class="box"><h4>Отметки</h4>${mk.map(x => `<div class="sdrow"><div><span class="chip ${MARK_C[x.type]}">${MARK_T[x.type]}</span> <small>${markText(x)}</small>${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}${x.by ? `<small class="dim">${esc(markBy(x))}</small>` : ''}</div><button class="btn sm" data-act="smEdit" data-id="${x.id}">Изменить</button></div>`).join('')}</div>` : ''}
     ${ot.length ? `<div class="box"><h4>Ненормированный рабочий день</h4>${ot.map(x => `<div class="sdrow"><div><b>${otSpan(x)}</b> · ${otDur(otMin(x))}${otExtra(x) ? ` · сверх графика <b>${otDur(otExtra(x))}</b>` : ''}${x.note ? `<div class="otn">${esc(x.note)}</div>` : ''}<small class="dim">внесено ${esc(fmtDT(x.at))}${x.updatedAt ? ', изменено ' + esc(fmtDT(x.updatedAt)) : ''}</small></div><button class="btn sm" data-act="otHEdit" data-id="${x.id}">Изменить</button></div>`).join('')}</div>` : ''}
+    ${etDay(uid, day)}
     ${tasks.length || jobs.length || did.length ? `<div class="box"><h4>Назначено</h4><ul class="stlist">
       ${tasks.map(t => `<li><button class="linkish" data-act="editTask" data-id="${t.id}"><b>${esc(t.title)}</b></button> <small class="dim">${esc([KIND[t.kind], jobOf(t.jobId) && '№ ' + jobNo(jobOf(t.jobId)) + ' · ' + jobOf(t.jobId).title, fmtD(t.start) + ' – ' + fmtD(t.end)].filter(Boolean).join(' · '))}</small></li>`).join('')}
       ${jobs.map(j => { const m = (j.places || []).filter(x => x.assignee === uid); return `<li><button class="linkish" data-act="openJob" data-id="${j.id}"><b>№ ${jobNo(j)} · ${esc(j.title)}</b></button> <span class="chip ${JOB_CHIP[j.status]}">${JOB_ST[j.status]}</span><small class="dim">${[m.length ? `точек ${m.length}, осталось ${m.filter(x => !x.doneAt).length}` : '', j.due && 'срок ' + fmtD(j.due)].filter(Boolean).join(' · ')}</small></li>`; }).join('')}
@@ -6948,7 +7060,7 @@ function shComments(n, own){
 /* «Мои задачи» of an employee: the shared tasks assigned to him and «Мой календарь» */
 function vWorkerMy(){
   const tab = ui.mytab === 'cal' ? 'cal' : 'tasks', n = NOTES.filter(x => x.type === 'shared' && x.assignee === me.id && !x.done).length;
-  return `<div class="seg ntabs" role="tablist"><button role="tab" data-act="mytab" data-id="tasks" class="${tab === 'tasks' ? 'on' : ''}">Назначенные мне${n ? ` <span class="dim">${n}</span>` : ''}</button><button role="tab" data-act="mytab" data-id="cal" class="${tab === 'cal' ? 'on' : ''}">📅 Мой календарь</button></div>` + (tab === 'cal' ? vCal() : vMyTasks(''));
+  return etMyBlock() + `<div class="seg ntabs" role="tablist"><button role="tab" data-act="mytab" data-id="tasks" class="${tab === 'tasks' ? 'on' : ''}">Назначенные мне${n ? ` <span class="dim">${n}</span>` : ''}</button><button role="tab" data-act="mytab" data-id="cal" class="${tab === 'cal' ? 'on' : ''}">📅 Мой календарь</button></div>` + (tab === 'cal' ? vCal() : vMyTasks(''));
 }
 /* ===== «Мой календарь»: the own entries — a date, a time from–to, what, a comment; a month and the chosen day ===== */
 let CAL = null;
@@ -9174,6 +9286,7 @@ async function act(el){
     case 'snGuestSave': { const login = $('sng-login').value.trim(), pw = $('sng-pw').value; if (!login || !pw) return toast('Укажите логин и пароль');
       try { ui.snGuest = await api('POST', '/api/snmap/guest', { login, password: pw }); const b = $('sn-guest'); if (b) b.innerHTML = snGuestHtml(); toast('Гостевая страница включена — передайте адрес, логин и пароль'); } catch(e) { toast(errText(e)); } return; }
     case 'snGuestOff': try { ui.snGuest = await api('DELETE', '/api/snmap/guest'); const b = $('sn-guest'); if (b) b.innerHTML = snGuestHtml(); toast('Гостевая страница выключена'); } catch(e) { toast(errText(e)); } return;
+    case 'etGo': { const t = etOf(id); if (!t) return; closeDrawer(); ui.etTab = t.done ? 'done' : t.assignee ? 'asg' : 'free'; ui.etQ = ''; location.hash = '#etasks'; return; }
     case 'snApiToggle': ui.snApiOpen = !el.closest('details')?.open; if (ui.snApiOpen) snApiLoad(); return;
     case 'snApiShow': ui.snApiShow = !ui.snApiShow; { const b = $('sn-api'); if (b) b.innerHTML = snApiHtml(); } return;
     case 'snApiCopy': { const A = ui.snApi || {}, t = id === 'url' ? snApiUrl() : id === 'key' ? A.key : `curl -H "Authorization: Bearer ${A.key}" ${snApiUrl()}`; toast(await snCopyTxt(t) ? ({ url: 'Адрес', key: 'Ключ', curl: 'Команда' })[id] + ' скопирован' + (id === 'curl' ? 'а' : '') : 'Не удалось скопировать'); return; }
@@ -10107,6 +10220,7 @@ function route(){
   const h = /^eq-/.test(h0) ? 'req' : h0;
   ui.view = me?.sys ? (['orgs', 'server', 'trials'].includes(h) ? h : 'orgs')
     : h === 'msgs' && tabOpen('msgs') ? 'msgs'
+    : h === 'etasks' && !ipMode() && !reqMode() && isHead() && !isWorker() && tabOpen('etasks') ? 'etasks'
     : ipMode() ? (ipNav().includes(h) ? h : 'ipc')
     : transMode() ? (transViews().includes(h) ? h : h === 'stock' && !isWorker() ? 'cps' : transViews()[0])
     : reqMode() ? (h === 'reqdocs' || (h === 'reqeq' && isExec()) || (['users', 'admFiles'].includes(h) && me.role === 'admin') ? h : 'req')
@@ -10232,7 +10346,7 @@ async function start(u){
   $('blockscr').hidden = true;
   // the system administrator: organizations and the server; field staff: their points; the rest: the work of the organization
   document.querySelectorAll('#views a').forEach(a => { const v = a.dataset.v;
-    a.hidden = v === 'msgs' ? !!u.sys || !tabOpen('msgs') : u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs', 'prodscr'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
+    a.hidden = v === 'msgs' ? !!u.sys || !tabOpen('msgs') : v === 'etasks' ? !!u.sys || ipMode() || reqMode() || !isHead() || isWorker() || !tabOpen('etasks') : u.sys ? !['orgs', 'server', 'trials'].includes(v) : ipMode() ? !ipNav().includes(v) : transMode() ? !transNav().includes(v) || (VIEW_KEY[v] && !['stock', 'transport'].includes(v) && !tabOpen(VIEW_KEY[v].split(':')[0])) : ['tor', 'disp', 'tmine', 'trep'].includes(v) ? true : !reqMode() && VIEW_KEY[v] && !tabOpen(VIEW_KEY[v].split(':')[0]) ? true : reqMode() ? !(['req', 'reqdocs'].includes(v) || (v === 'reqeq' && isExec()) || (v === 'users' && u.role === 'admin')) : ['req', 'reqeq', 'reqdocs'].includes(v) ? true : isWorker() ? !['wwork', 'wdone', 'wover', 'checks', 'trips', 'refs', 'prodscr'].includes(v) : ['wwork', 'wdone', 'mytasks', 'wover', 'jobs', 'map', 'orgs', 'server', 'trials', ...IP_VIEWS].includes(v) || (v === 'users' && u.role !== 'admin') || (v === 'notes' && isWorker()) || (v === 'wo' && !(isHead() || u.role === 'accountant')) || (['staff', 'staffp', 'transport', 'tparts'].includes(v) && !isHead()) || ['staff', 'staffp', 'checks', 'trips', 'devs', 'cps'].includes(v); });
   ['orgsTab', 'serverTab', 'trialsTab'].forEach(id => { const t = $(id); if (t && !u.sys) t.hidden = true; });   // the tabs of the system administrator — only his
   // «Планирование и аналитика» and «Задачи» lead to their first open sub-tab
   if (transMode() && !isWorker()) { const st = document.querySelector('#views a[data-v=stock]'); if (st) st.href = '#cps'; }
