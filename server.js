@@ -481,7 +481,7 @@ function reqNotify(text) {
   } catch (e) { console.error('Telegram:', e.message); }
 }
 /* tabs and sub-tabs of «Все сервисы»: an organization and a user keep a list of the HIDDEN ones (new sections are visible by default) */
-const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], msgs: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'calc', 'mods'] };
+const SECTIONS = { works: ['works'], prodscr: [], stock: ['stock', 'inc', 'wo', 'pay', 'checks', 'trips'], cps: [], staff: [], staffp: [], plan: [], dt: [], devs: [], msgs: [], etasks: [], notes: ['task', 'shared'], transport: ['cars', 'parts'], refs: ['list', 'draw', 'vault', 'labels', 'netshare', 'ssh', 'est', 'calc', 'mods'] };
 const SECTION_KEYS = Object.entries(SECTIONS).flatMap(([k, subs]) => [k, ...subs.map(x => k + ':' + x)]);
 const cleanHide = a => [...new Set((Array.isArray(a) ? a : []).filter(k => SECTION_KEYS.includes(k)))];
 // what is hidden for a user: hidden for the organization or for him; a hidden tab hides its sub-tabs
@@ -831,7 +831,7 @@ async function api(req, res, url) {
   if (user.sys && !['rev', 'password', 'trials'].includes(p[1])) return fail(res, 403, 'Администратор системы управляет организациями. Для работы с данными войдите администратором организации');
   // «Сотрудник» and «Подрядчик» see and change only the work given to them
   // in the requests system an employee makes and does requests and attaches files to them
-  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap', 'cal', 'msgs', 'est'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
+  if ((FIELD(user) || user.role === 'executor') && !['rev', 'data', 'password', 'jobs', 'overtime', 'checks', 'trips', 'tor', 'vault', 'netshare', 'snmap', 'cal', 'msgs', 'est', 'etasks'].includes(p[1]) && !(orgType(user) === 'requests' && ['requests', 'files'].includes(p[1]))
     && !(p[1] === 'devs' || p[1] === 'notes' || p[1] === 'files')) return fail(res, 403, 'Недостаточно прав');
   if (p[1] === 'users') {
     if (user.role !== 'admin') return fail(res, 403, 'Управлять пользователями может только администратор');
@@ -953,6 +953,9 @@ async function api(req, res, url) {
     if (!FIELD(user) && out.labels.length) { const S = labelSerials(), SC = labelScans(); out.labelSerials = Object.fromEntries(Object.entries(S).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by]]));
       out.labelScans = Object.fromEntries(Object.entries(SC).slice(-20000).map(([k, v]) => [k, [v.l, v.at, v.by, v.serial || '']])); }
     out.receipts = FIELD(user) || !sees(user, 'stock:inc') ? [] : Object.entries(db.receipts || {}).map(([id, r]) => ({ id, ...r }));
+    // «Задачи сотрудникам»: managers see all; the others — the tasks assigned to them (with the name of the vehicle)
+    { const vn = id => id === 'self' ? 'Своим ходом' : (db.vehicles && db.vehicles[id] ? [db.vehicles[id].name, db.vehicles[id].plate].filter(Boolean).join(' ') : '');
+      out.etasks = (Array.isArray(db.etasks) ? db.etasks : []).filter(t => HEAD(user) || t.assignee === user.id).map(t => ({ ...t, vehName: vn(t.vehicle) })); }
     if (FIELD(user)) { out.meta = {}; out.staff = []; }
     // irregular working hours: an employee sees his own entries, a manager sees everyone's
     out.overtime = (Array.isArray(db.overtime) ? db.overtime : []).filter(x => HEAD(user) || x.by === user.id);
@@ -2633,6 +2636,48 @@ async function api(req, res, url) {
       return fail(res, 405, 'Метод не поддерживается');
     }
     return fail(res, 404, 'Не найдено');
+  }
+  /* «Задачи сотрудникам»: a manager creates a task (nobody is assigned), then assigns an employee, the dates and the transport
+     («своим ходом» or a vehicle of the company); the employee (or a manager) marks it done */
+  if (p[1] === 'etasks') {
+    const L = db.etasks = Array.isArray(db.etasks) ? db.etasks : [], now = new Date().toISOString(), str = (v, n) => String(v ?? '').trim().slice(0, n);
+    const dOk = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+    const staffOk = id => orgUsers().some(u => u.id === id && !u.sys && !u.blocked);
+    const vehOk = v => v === 'self' || !!(db.vehicles && db.vehicles[v]);
+    if (m === 'POST' && !p[2]) {
+      if (!HEAD(user)) return fail(res, 403, 'Задачи создают руководители');
+      const b = await readJsonBody(req) || {}, title = str(b.title, 300); if (!title) return fail(res, 400, 'Укажите, что нужно сделать');
+      const start = dOk(b.start) ? b.start : '', end = dOk(b.end) ? b.end : start; if (start && end < start) return fail(res, 400, 'Окончание раньше начала');
+      if (L.length >= 20000) L.splice(0, L.length - 19000);
+      const t = { id: newId(), no: Math.max(0, ...L.map(x => x.no || 0)) + 1, title, note: str(b.note, 5000), start, end, assignee: null, vehicle: '', jobId: b.jobId && db.jobs[b.jobId] ? b.jobId : null, done: false, by: user.id, at: now };
+      L.push(t); saveDb(); return send(res, 200, { ok: true, id: t.id, rev: db.rev });
+    }
+    const t = p[2] && L.find(x => x.id === p[2]); if (!t || (!HEAD(user) && t.assignee !== user.id)) return fail(res, 404, 'Задача не найдена — обновите страницу');
+    if (m === 'PATCH') {
+      const b = await readJsonBody(req) || {};
+      if (!HEAD(user)) { if (Object.keys(b).some(k => k !== 'done' && k !== 'report')) return fail(res, 403, 'Сотрудник отмечает только выполнение');
+        if ('report' in b) t.report = str(b.report, 3000); }
+      else {
+        if ('title' in b) { const v = str(b.title, 300); if (!v) return fail(res, 400, 'Укажите, что нужно сделать'); t.title = v; }
+        if ('note' in b) t.note = str(b.note, 5000);
+        if ('start' in b) t.start = dOk(b.start) ? b.start : '';
+        if ('end' in b) t.end = dOk(b.end) ? b.end : '';
+        if ('jobId' in b) t.jobId = b.jobId && db.jobs[b.jobId] ? b.jobId : null;
+        if ('assignee' in b) {
+          if (b.assignee) { if (!staffOk(b.assignee)) return fail(res, 400, 'Сотрудник не найден');
+            const v = String(b.vehicle ?? t.vehicle ?? ''); if (!vehOk(v)) return fail(res, 400, 'Выберите транспорт или «Своим ходом»');
+            if (!t.start) return fail(res, 400, 'Укажите дату, на которую назначается задача');
+            if (t.assignee !== b.assignee) { t.assignedAt = now; t.assignedBy = user.id; }
+            t.assignee = b.assignee; t.vehicle = v; }
+          else { t.assignee = null; t.vehicle = ''; t.assignedAt = null; t.assignedBy = null; t.done = false; t.doneAt = null; t.doneBy = null; }
+        } else if ('vehicle' in b && t.assignee) { if (!vehOk(String(b.vehicle))) return fail(res, 400, 'Выберите транспорт или «Своим ходом»'); t.vehicle = String(b.vehicle); }
+        if (t.start && t.end && t.end < t.start) t.end = t.start; if (t.start && !t.end) t.end = t.start;
+      }
+      if ('done' in b) { if (!t.assignee && b.done) return fail(res, 400, 'Сначала назначьте задачу сотруднику'); t.done = !!b.done; t.doneAt = t.done ? now : null; t.doneBy = t.done ? user.id : null; }
+      t.upd = now; saveDb(); return send(res, 200, { ok: true, rev: db.rev });
+    }
+    if (m === 'DELETE') { if (!HEAD(user)) return fail(res, 403, 'Удалить задачу может руководитель'); L.splice(L.indexOf(t), 1); saveDb(); return send(res, 200, { ok: true, rev: db.rev }); }
+    return fail(res, 405, 'Метод не поддерживается');
   }
   if (p[1] === 'msgs') {
     const L = msgList(), now = new Date().toISOString();
